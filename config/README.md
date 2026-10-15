@@ -219,6 +219,11 @@ the denylist cannot catch oddly named fields such as `access_key_id`.
 String values holding URL userinfo under any other key (for example a DSN
 under `database_url`) are scrubbed to `scheme://[REDACTED]@host...`;
 denylisted keys still redact the whole value.
+The type pass covers pointers, slices, maps, nested structs, and
+`any`-typed values: a secret tag or type applies to everything beneath it
+(a tagged `[]string` or `map[string]string` has every element redacted).
+Under URL/DSN-like keys (`*_url`, `*_dsn`, `*_endpoint`, `*_addr`, ...)
+scheme-less `user:pass@host` userinfo and `password=...` pairs are scrubbed too.
 
 ## Dev-secret warning
 

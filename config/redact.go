@@ -1,8 +1,10 @@
 package config
 
 import (
+	"encoding/json"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -177,7 +179,7 @@ func redactMap(m map[string]any) {
 
 		switch val := v.(type) {
 		case string:
-			if scrubbed := scrubURLUserinfo(val); scrubbed != val {
+			if scrubbed := scrubValue(k, val); scrubbed != val {
 				m[k] = scrubbed
 			}
 		case map[string]any:
@@ -190,15 +192,26 @@ func redactMap(m map[string]any) {
 			redactSlice(val)
 		case []string:
 			redactStringSlice(val)
+			scrubStringSlice(k, val)
 		}
+	}
+}
+
+// scrubStringSlice scrubs URL/DSN credentials from each entry in place; key
+// is the name of the slice's owning field.
+func scrubStringSlice(key string, s []string) {
+	for i, entry := range s {
+		s[i] = scrubValue(key, entry)
 	}
 }
 
 // redactSlice redacts secrets inside slice elements in place,
 // recursing into nested maps and slices.
 func redactSlice(s []any) {
-	for _, elem := range s {
+	for i, elem := range s {
 		switch v := elem.(type) {
+		case string:
+			s[i] = scrubURLUserinfo(v)
 		case map[string]any:
 			redactMap(v)
 		case []map[string]any:
@@ -254,7 +267,24 @@ func Redact(m map[string]any) map[string]any {
 func redactCopyMap(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))
 	for k, v := range m {
-		out[k] = redactCopyValue(v, isSensitiveKey(k))
+		sensitive := isSensitiveKey(k)
+		if !sensitive {
+			switch val := v.(type) {
+			case string:
+				out[k] = scrubValue(k, val)
+
+				continue
+			case []string:
+				cp := make([]string, len(val))
+				copy(cp, val)
+				redactStringSlice(cp)
+				scrubStringSlice(k, cp)
+				out[k] = cp
+
+				continue
+			}
+		}
+		out[k] = redactCopyValue(v, sensitive)
 	}
 
 	return out
@@ -308,7 +338,7 @@ func redactCopyValue(v any, sensitive bool) any {
 
 		return out
 	default:
-		return v
+		return redactTypedValue(v)
 	}
 }
 
@@ -316,72 +346,304 @@ func redactCopyValue(v any, sensitive bool) any {
 // typed options struct opts is marked secret, either by the zever:"secret"
 // struct tag or by the config.Secret type. Key-name denylisting already ran
 // in redactMap; this pass catches oddly named secret fields the denylist
-// cannot know about. Anonymous (embedded) struct fields are recursed into
-// the same map, matching the JSON flattening serviceToMap applies; named
-// struct fields recurse into their nested map.
+// cannot know about.
+//
+// The walk is type-driven and covers every shape a secret can take: plain
+// fields, pointers, slices, arrays, maps (string keys), nested structs
+// (named or embedded, flattened like encoding/json), and interface-typed
+// values, whose dynamic type is read from opts itself. A secret tag or
+// Secret type applies to everything beneath it, so a tagged []string or
+// map[string]string has every element redacted. Nil pointers, maps, and
+// interfaces are tolerated; recursion is bounded by the finite map m, so
+// cyclic Go values cannot loop.
 func redactSecretFields(opts any, m map[string]any) {
-	t := reflect.TypeOf(opts)
-	for t != nil && t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-	if t == nil || t.Kind() != reflect.Struct {
+	if opts == nil || m == nil {
 		return
 	}
 
-	markSecretFields(t, m)
+	v := reflect.ValueOf(opts)
+	walkSecret(v.Type(), v, m, false)
 }
 
-// markSecretFields walks struct type t, redacting secret-marked fields in
-// m. Set values collapse to RedactedValue while empty strings and nil stay
-// untouched, so unset fields are not confused with set-but-hidden secrets.
-func markSecretFields(t reflect.Type, m map[string]any) {
+// redactNode returns RedactedValue for a set node and the node itself for
+// an unset one: empty strings and nil stay untouched so unset fields are
+// not confused with set-but-hidden secrets.
+func redactNode(node any) any {
+	switch val := node.(type) {
+	case nil:
+		return nil
+	case string:
+		if val == "" {
+			return val
+		}
+	}
+
+	return RedactedValue
+}
+
+// walkSecret redacts node, the JSON-decoded form of a value of type t.
+// v is the live value (possibly invalid when only the type is known) and is
+// consulted solely to resolve interface-typed values. secret marks that an
+// ancestor field was tagged or typed secret. It returns the node to store
+// in place of the input; maps and slices are also edited in place.
+func walkSecret(t reflect.Type, v reflect.Value, node any, secret bool) any {
+	if node == nil {
+		return nil
+	}
+
+	for {
+		if t.Kind() == reflect.Interface {
+			if !v.IsValid() || v.IsNil() {
+				// Dynamic type unknown: only a secret-flagged ancestor
+				// needs handling.
+				if secret {
+					return redactAll(node)
+				}
+
+				return node
+			}
+			v = v.Elem()
+			t = v.Type()
+
+			continue
+		}
+		if t.Kind() == reflect.Pointer {
+			t = t.Elem()
+			if v.IsValid() {
+				if v.IsNil() {
+					v = reflect.Value{}
+				} else {
+					v = v.Elem()
+				}
+			}
+
+			continue
+		}
+
+		break
+	}
+
+	if t == secretType {
+		secret = true
+	}
+
+	switch n := node.(type) {
+	case map[string]any:
+		switch t.Kind() { //nolint:exhaustive // only container kinds matter
+		case reflect.Struct:
+			walkSecretStruct(t, v, n, secret)
+		case reflect.Map:
+			for k, child := range n {
+				var ev reflect.Value
+				if v.IsValid() && t.Key().Kind() == reflect.String {
+					ev = v.MapIndex(reflect.ValueOf(k).Convert(t.Key()))
+				}
+				n[k] = walkSecret(t.Elem(), ev, child, secret)
+			}
+		default:
+			if secret {
+				return redactAll(n)
+			}
+		}
+
+		return n
+	case []any:
+		switch t.Kind() { //nolint:exhaustive // only container kinds matter
+		case reflect.Slice, reflect.Array:
+			for i, child := range n {
+				var ev reflect.Value
+				if v.IsValid() && i < v.Len() {
+					ev = v.Index(i)
+				}
+				n[i] = walkSecret(t.Elem(), ev, child, secret)
+			}
+		default:
+			if secret {
+				return redactAll(n)
+			}
+		}
+
+		return n
+	default:
+		if secret {
+			return redactNode(node)
+		}
+
+		return node
+	}
+}
+
+// walkSecretStruct redacts the fields of struct type t in m. Anonymous
+// (embedded) struct fields without a JSON name are flattened into the same
+// map, matching encoding/json and serviceToMap; named struct fields recurse
+// into their own nested value.
+func walkSecretStruct(t reflect.Type, v reflect.Value, m map[string]any, secret bool) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 
-		if f.Anonymous {
+		var fv reflect.Value
+		if v.IsValid() {
+			fv = v.Field(i)
+		}
+
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if name == "-" {
+			continue
+		}
+
+		fieldSecret := secret || f.Tag.Get("zever") == "secret"
+
+		if f.Anonymous && name == "" {
 			ft := f.Type
 			for ft.Kind() == reflect.Pointer {
 				ft = ft.Elem()
 			}
 			if ft.Kind() == reflect.Struct {
-				markSecretFields(ft, m)
-			}
-			continue
-		}
-
-		key, _, _ := strings.Cut(f.Tag.Get("json"), ",")
-		if key == "" || key == "-" {
-			continue
-		}
-
-		ft := f.Type
-		for ft.Kind() == reflect.Pointer {
-			ft = ft.Elem()
-		}
-		if ft.Kind() == reflect.Struct {
-			if nested, ok := m[key].(map[string]any); ok {
-				markSecretFields(ft, nested)
-			}
-			continue
-		}
-
-		if f.Tag.Get("zever") != "secret" && f.Type != secretType {
-			continue
-		}
-
-		if v, ok := m[key]; ok {
-			switch val := v.(type) {
-			case string:
-				if val != "" {
-					m[key] = RedactedValue
+				fval := fv
+				for fval.IsValid() && fval.Kind() == reflect.Pointer {
+					if fval.IsNil() {
+						fval = reflect.Value{}
+					} else {
+						fval = fval.Elem()
+					}
 				}
-			default:
-				if v != nil {
-					m[key] = RedactedValue
-				}
+				walkSecretStruct(ft, fval, m, fieldSecret)
+
+				continue
+			}
+		}
+
+		if !f.IsExported() {
+			continue
+		}
+		if name == "" {
+			name = f.Name
+		}
+
+		child, ok := m[name]
+		if !ok {
+			continue
+		}
+		m[name] = walkSecret(f.Type, fv, child, fieldSecret)
+	}
+}
+
+// redactAll redacts every leaf beneath node, used when a secret marker
+// applies to a value whose Go type is not known (an untyped interface).
+func redactAll(node any) any {
+	switch n := node.(type) {
+	case map[string]any:
+		for k, child := range n {
+			n[k] = redactAll(child)
+		}
+
+		return n
+	case []any:
+		for i, child := range n {
+			n[i] = redactAll(child)
+		}
+
+		return n
+	default:
+		return redactNode(node)
+	}
+}
+
+// typeMayHoldSecret reports whether values of type t could carry a secret
+// by type: config.Secret, a zever:"secret" tagged field, or an interface
+// whose dynamic content is unknown. seen guards recursive types.
+func typeMayHoldSecret(t reflect.Type, seen map[reflect.Type]bool) bool {
+	if t == secretType {
+		return true
+	}
+	if seen[t] {
+		return false
+	}
+	seen[t] = true
+
+	switch t.Kind() { //nolint:exhaustive // only container kinds matter
+	case reflect.Interface:
+		return true
+	case reflect.Pointer, reflect.Slice, reflect.Array, reflect.Map:
+		return typeMayHoldSecret(t.Elem(), seen)
+	case reflect.Struct:
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			if f.Tag.Get("zever") == "secret" || typeMayHoldSecret(f.Type, seen) {
+				return true
 			}
 		}
 	}
+
+	return false
+}
+
+// redactTypedValue handles a Go-typed (non-JSON-shaped) value met inside a
+// map passed to Redact: a Secret, *Secret, []Secret, map[string]Secret,
+// struct with tagged fields, and so on. Such values are converted to their
+// JSON shape and redacted by type. Types that cannot carry a secret are
+// returned unchanged so durations and other non-JSON values survive.
+func redactTypedValue(v any) any {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() { //nolint:exhaustive // only container kinds matter
+	case reflect.String, reflect.Struct, reflect.Pointer, reflect.Slice,
+		reflect.Array, reflect.Map:
+	default:
+		return v
+	}
+	if !typeMayHoldSecret(rv.Type(), map[reflect.Type]bool{}) {
+		return v
+	}
+	if rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return v
+	}
+
+	b, err := json.Marshal(v)
+	if err != nil {
+		return RedactedValue
+	}
+	var node any
+	if err := json.Unmarshal(b, &node); err != nil {
+		return RedactedValue
+	}
+
+	return walkSecret(rv.Type(), rv, node, false)
+}
+
+// dsnPairRE matches keyword-style credentials such as "password=hunter2"
+// in libpq connection strings or URL query parameters.
+var dsnPairRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd)=('[^']*'|[^\s&;]+)`)
+
+// isURLishKey reports whether a key name suggests the value is a URL, DSN,
+// or connection string that may embed credentials.
+func isURLishKey(k string) bool {
+	for _, frag := range [...]string{"url", "uri", "dsn", "conn", "endpoint", "addr"} {
+		if asciiContainsFold(k, frag) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// scrubValue scrubs URL userinfo from s and, when key suggests a URL or
+// DSN, also the scheme-less forms: MySQL "user:pass@tcp(host)/db" userinfo
+// and keyword "password=..." pairs.
+func scrubValue(key, s string) string {
+	out := scrubURLUserinfo(s)
+	if !isURLishKey(key) {
+		return out
+	}
+
+	if !strings.Contains(out, "://") {
+		if at := strings.Index(out, "@"); at > 0 {
+			if cred := out[:at]; strings.Contains(cred, ":") && !strings.ContainsAny(cred, " /=") {
+				out = RedactedValue + out[at:]
+			}
+		}
+	}
+
+	return dsnPairRE.ReplaceAllString(out, "${1}="+RedactedValue)
 }
 
 // scrubURLUserinfo replaces the userinfo in s with RedactedValue when s

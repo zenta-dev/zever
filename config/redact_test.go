@@ -589,7 +589,9 @@ func TestRedact_scrubsURLUserinfo(t *testing.T) {
 		{"HTTP://user:pass@host/db", "http://[REDACTED]@host/db"},
 		{"postgres://host/db", "postgres://host/db"},
 		{"localhost:6379", "localhost:6379"},
-		{"user:pass@host", "user:pass@host"},
+		{"user:pass@host", "[REDACTED]@host"},
+		{"u:p@tcp(h:3306)/db", "[REDACTED]@tcp(h:3306)/db"},
+		{"host=h user=u password=hunter2 dbname=d", "host=h user=u password=[REDACTED] dbname=d"},
 		{"", ""},
 	}
 
