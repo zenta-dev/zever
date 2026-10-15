@@ -616,6 +616,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unmaps IPv4-mapped IPv6 prefixes (`::ffff:10.0.0.0/104` becomes
   `10.0.0.0/8`) so trusted ranges match in either form.
   into build-tagged files so the module compiles on Windows.
+- `config` redaction now covers every secret shape: `*Secret`, `[]Secret`,
+  `map[string]Secret`, `zever:"secret"`-tagged slices and maps (every element
+  redacted), structs, pointers, and slices of structs containing secrets, and
+  `any`-typed values holding a `Secret`; `Redact` also handles Go-typed
+  secret values. Nil pointers, maps, and cyclic values do not panic. DSN-like
+  values under URL/DSN-suggesting keys (`*_url`, `*_dsn`, `*_endpoint`, ...)
+  are scrubbed of scheme-less `user:pass@` userinfo and `password=` pairs, and
+  URL userinfo inside string slices is scrubbed. A guard test fails when a
+  secret-looking field in `core/*/options.go` is neither tagged nor
+  allowlisted.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).
