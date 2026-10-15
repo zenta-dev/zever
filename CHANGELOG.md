@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes still fail.
 ### Changed
 
+- `docs(stability): document the kid-less JWT token timeline`: `STABILITY.md`
+  states the current behavior (kid-less tokens verify against the legacy
+  `jwt.secret`), that it is not deprecated and has no removal date, and how
+  any future deprecation would proceed.
 - `chore: repo hygiene and docs checks`: `tools/check-doc-snippets.sh` now
   compiles and vets Go doc snippets marked ` ```go ... check ` (complete
   `package main` programs) in a temporary workspace module, and one stale
