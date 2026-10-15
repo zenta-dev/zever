@@ -59,8 +59,9 @@ linters:
     - zerologlint
   # wrapcheck is intentionally not enabled. Measured with
   # `golangci-lint run --enable-only wrapcheck ./...` per module (non-test
-  # code): config is clean, but container (16) plus 40+ core/* modules
-  # (~145) report ~160 hits in total. Most are deliberate pass-throughs of
+  # code, re-measured with --tests=false): config is clean, but container
+  # (17) plus 40+ core/* modules (145) report 162 hits in total, well over
+  # the ~25 that would make a scoped container + core/* enablement cheap. Most are deliberate pass-throughs of
   # adapter/interface errors (Close/Stop/Shutdown probes, registry
   # Register, ctx.Err) that callers match with errors.Is/As and that
   # already carry the adapter's own message prefix; wrapping them all adds
