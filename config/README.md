@@ -248,9 +248,13 @@ boot-time value until the process restarts:
 
 | Battery | SIGHUP behavior |
 |---|---|
-| `log` (`min_level`) | Swapped: the new level applies to subsequent events. |
-| `ratelimit` (`rate`, `burst`, …) | Swapped: the old limiter is closed after the swap. |
+| `log` (`min_level`) | Swapped: the new level applies to subsequent events, including loggers derived with `With()` before the reload. |
+| `ratelimit` (`rate`, `burst`, …) | Swapped: the old limiter is closed only after its in-flight calls drain; each limiter is closed exactly once (the boot-time one by the container at shutdown). |
 | `flag` | Swapped when the process holds the client through `container.ReloadableFlag`. The `static` adapter additionally re-reads its file per evaluation when `reload: true` (last-good on failure), with no signal needed. |
+
+A reload is all-or-nothing across batteries: the new log and rate-limit
+state are opened first and swapped in together; if either fails, the old
+state stays fully in place and a single warning is logged.
 
 Deliberately NOT reloaded (restart required): service adapters, DSNs and
 pool knobs, credentials and secrets, TLS material, listen addresses, and

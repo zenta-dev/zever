@@ -482,6 +482,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(container,cmd)`: SIGHUP reload is now atomic and race-free.
+  `ReloadableLimiter` retires a replaced limiter and closes it only after its
+  in-flight `Allow`/`Reset` calls drain; the boot-time limiter stays owned by
+  the container, so no limiter is closed twice at shutdown (the generated
+  server also closes reload-opened limiters on exit). `ReloadableLimiter.Swap`
+  now owns the swapped-in limiter and callers must not close it.
+  `ReloadableLogger` child loggers (`With`/`WithContext`) follow later level
+  swaps. New `container.ApplyReload` opens the new logger and limiter first
+  and swaps both only on success, so a failed rate-limit reopen no longer
+  leaves the log level changed.
+
 - `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
   the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
   `jwt.WarningReporter.Warnings()`) when the default per-process revocation
