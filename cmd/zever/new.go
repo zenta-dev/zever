@@ -55,8 +55,10 @@ that battery's adapter prompt, and -y/--yes skips the whole wizard.
 
 Start-small profiles (--profile): minimal scaffolds the bootable floor set
 only; api adds cache, queue, session, password, scheduler, outbox,
-idempotency and lock; full wires every known battery. Explicit --batteries
-add to the preset, --adapters override its picks.
+idempotency and lock; full wires every battery that resolves from config
+alone (all but ai, geo and i18n, which need an API key, dataset or FS; add
+those with "zever add"). Explicit --batteries add to the preset, --adapters
+override its picks.
 
 Flags:`
 
@@ -189,7 +191,7 @@ func newNewFlagSet() *flag.FlagSet {
 	fs.Bool("i", false, "alias for --interactive")
 	fs.String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache)")
 	fs.String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber)")
-	fs.String("profile", "", "scaffold profile: minimal (bootable floor only), api (+cache/queue/session/password/scheduler/outbox/idempotency/lock), or full (every battery)")
+	fs.String("profile", "", "scaffold profile: minimal (bootable floor only), api (+cache/queue/session/password/scheduler/outbox/idempotency/lock), or full (every battery that resolves from config alone; not ai/geo/i18n)")
 	fs.Bool("yes", false, "skip all prompts, scaffold floor+flags only")
 	fs.Bool("y", false, "alias for --yes")
 	fs.Bool("list-batteries", false, "print the battery/default-adapter table to stdout and exit")
@@ -1035,6 +1037,12 @@ var apiProfileBatteries = []string{
 	"session",
 }
 
+// fullProfileSkipped are the services the "full" profile leaves out: none has
+// an adapter that resolves from zever.yaml alone (ai needs an API key, geo a
+// dataset file, i18n an embedded FS), so wiring them would scaffold a config
+// that fails `zever doctor`. Add them with `zever add <battery>`.
+var fullProfileSkipped = map[string]bool{"ai": true, "geo": true, "i18n": true}
+
 // profileBatteries resolves a --profile name to its extra batteries (on top
 // of the floor+boot set batteriesFor always includes). "" means no profile
 // was passed (nil extras, no behavior change); "minimal" is the boot set
@@ -1057,7 +1065,7 @@ func profileBatteries(profile string) ([]string, error) {
 
 		extras := make([]string, 0, len(allServiceAdapters))
 		for battery := range allServiceAdapters {
-			if !boot[battery] {
+			if !boot[battery] && !fullProfileSkipped[battery] {
 				extras = append(extras, battery)
 			}
 		}
