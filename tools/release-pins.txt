@@ -1,0 +1,18 @@
+# Files that hard-code the release version, checked by tools/check-version.sh
+# and rewritten by tools/release-prep.sh. One entry per line:
+#   <path><TAB><ERE prefix directly before the X.Y.Z version>
+# The prefix is wrapped in one outer capture group (inner groups are fine), then
+# followed by X.Y.Z. Every listed file must contain at least one match, and every
+# match must equal the contents of cmd/zever/VERSION.
+cmd/zever/VERSION	^
+CITATION.cff	^version: 
+install.sh	(--version |ZEVER_VERSION=|ZEVER_VERSION_DEFAULT=")v
+install.ps1	(-Version |Version = "|default: )v
+docs/src/data/landing.ts	VERSION = 'v
+tools/zever-lsp/server.go	serverVersion = "
+tools/zever-mcp/server.go	serverVersion +[=] +"
+editors/vscode/package.json	^  "version": "
+docs/src/content/docs/start/installation.mdx	@v
+docs/src/content/docs/start/versioning.mdx	(@|container/|sqlite/)v
+docs/src/content/docs/guides/operate/upgrade.mdx	@v
+docs/src/content/docs/guides/extend/customizing-and-leaving.mdx	backend gogen v

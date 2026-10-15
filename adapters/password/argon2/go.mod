@@ -3,12 +3,12 @@ module github.com/zenta-dev/zever/adapters/password/argon2
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 )
 
 require (
-	github.com/zenta-dev/zever/core/password v0.6.1
+	github.com/zenta-dev/zever/core/password v0.7.1
 	golang.org/x/crypto v0.58.0
 )
 

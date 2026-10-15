@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/tools/zever-lsp
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/dsl v0.6.1
+	github.com/zenta-dev/zever/dsl v0.7.1
 	go.lsp.dev/jsonrpc2 v1.0.1
 	go.lsp.dev/protocol v1.0.1
 	go.lsp.dev/uri v1.0.1
