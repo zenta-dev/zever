@@ -7,16 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- `fix(cli): zever new pins every framework module at the framework version`:
-  the v0.7.0 release tags carry go.mod files that still require v0.6.1
-  siblings, so a published-mode scaffold resolved `shared/registry` at v0.6.1
-  and `go build` failed with `undefined: registry.SortedNames`. The scaffold
-  go.mod now also requires every shared, core and adapter module at the
-  framework version (as `// indirect`; `go mod tidy` drops unused ones).
-
-## [v0.7.0] - 2026-10-15
+## [v0.7.1] - 2026-10-15
 
 ### Breaking
 
@@ -62,6 +53,274 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sent as `"10.00"`) so both directions agree. Totals that overflow `int64`
   once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
   unchanged (native minor-unit integers).
+- **Breaking:** `fix(httpclient)`: clients built with `WithSafeDial` /
+  `NewSafeClient` no longer honor `HTTP_PROXY`/`HTTPS_PROXY` (the dial guard
+  only saw the proxy address, so private targets were reachable through a
+  proxy); pass the new `WithAllowProxy()` option to opt back in with a
+  trusted proxy. `IsPrivateIP` now also classifies NAT64
+  (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
+  (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
+  (`2001::/32`) and site-local (`fec0::/10`) as private.
+- **Breaking:** `fix(document)`: the `latex` adapter now defends against
+  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
+  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
+  bubblewrap (no network, read-only system trees, only the render dir
+  writable); `required` fails at open when bwrap is unavailable, `auto` logs
+  one warning and falls back. A source pre-scan now rejects `\input`,
+  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
+  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
+  `latex_allow_unsafe_source: true` restores the old behavior. Output and
+  stderr are size-capped before buffering, and process-group kill is split
+
+### Added
+
+- `fix(payment): at-least-once webhook handling`: `WebhookEvent` on the
+  `stripe` and `paddle` adapters records the event id as seen before the
+  caller processes it (at-most-once), so a failing handler loses the event
+  on the provider retry, and events with an empty id are never deduped. New
+  optional interface `payment.WebhookHandling` (`HandleWebhook(ctx, raw,
+  signature, handler)`) runs the handler under the reservation, commits only
+  on success, and releases the key on handler error or panic so retries are
+  accepted; an empty event id is rejected with `payment.ErrMissingEventID`.
+  `payment.ProcessWebhookOnce` is the shared helper. `WebhookEvent` behavior
+  is unchanged and now documented as at-most-once.
+- `feat(cli): slim adapter-scoped builds`: the new `zever build`
+  command compiles a slim CLI registering only `--adapters=a,b`
+  (bare batteries select every known adapter, `battery/adapter` pins
+  one; empty builds the full CLI). Unselected adapter packages leave
+  the binary via a `go build -overlay` of the central registration
+  list, so no build-tagged source variants are committed. Unknown
+  names fail listing the choices, `--dry-run` prints the plan, and
+  `--json` emits `{out, sizeBytes, adapters}`. A `log,router` floor
+  build measures 63 MB against the 310 MB full CLI with warm `--help`
+  at ~27 ms vs ~40 ms. The `doctor` adapters meta-check is now scoped
+  to the project's enabled batteries (nil scope still checks all),
+  so a slim binary passes its own `doctor` for its project.
+- `perf(queue/memory): cut round-trip allocs 12 to 1 per op`: the P5-8
+  follow-up pass over the documented leftovers. Drained topics are retained
+  instead of sweep-deleted and recreated per message (channels and maps
+  reused; the sweep still deletes promoter topics so their quit channel
+  closes, and now resets the retained heap/ready window since every leftover
+  heap entry references a gone inflight id); the ready list pops via a head
+  index instead of reslicing past the front (which shrank capacity and forced
+  the next Push to reallocate); the visibility heap is hand-rolled instead of
+  `container/heap` (whose `any` Push/Pop boxed one entry per Pop). Measured
+  `BenchmarkMemoryRoundTrip` 12→1 allocs/op, 1984→16 B/op (parallel
+  10/11→1). Deliberately deferred: `Message.Clone`'s payload copy (the last
+  alloc, pinned by `TestMemory_CloneIsolation`), `msgspan` wired-provider
+  spans (18 allocs/op when telemetry is wired, 0 on the default nil-provider
+  path), `traceprop` inject/extract (nil-path 0), and `shared/lrucache`
+  (0 allocs/op steady-state on every bench).
+- `perf(alloc): P5-8 leftover dispositions, bench-first (i5-11400H,
+  `-benchmem -count=3`)`: `traceprop BenchmarkInject` holds at 400 B/op,
+  3 allocs/op — memprofile attributes the third alloc to OTel-internal
+  `TraceContext.Inject` (string builder plus a `[][]byte` literal), and a
+  direct-propagator variant measured byte-identical, so the composite call
+  stays and the floor is pinned by upstream OTel. `msgspan` wired Producer
+  holds at ~1822 B/op, 18 allocs/op with a stub tracer (roughly two thirds
+  in the stub recorder/`SetAttributes` appends, the rest option closures,
+  attribute slice, span name, and `traceprop.TraceID`); the default
+  nil-provider path stays 0 B/op, 0 allocs/op and is now guarded by
+  `TestProducerNilPathZeroAllocs`. `BenchmarkMemoryRoundTrip` remainder is
+  the single `Message.Clone` payload copy, now documented on `Clone` as
+  isolation-pinned (the Pop clone keeps consumer mutations off the inflight
+  copy). `shared/lrucache` re-verified at 0 allocs/op steady-state on
+  Get/Put/GetOrCompute. No benchmark deltas by design: only regression
+  guards, no behavior change.
+
+### Changed
+
+- `docs(stability): document the kid-less JWT token timeline`: `STABILITY.md`
+  states the current behavior (kid-less tokens verify against the legacy
+  `jwt.secret`), that it is not deprecated and has no removal date, and how
+  any future deprecation would proceed.
+- `chore: repo hygiene and docs checks`: `tools/check-doc-snippets.sh` now
+  compiles and vets Go doc snippets marked ` ```go ... check ` (complete
+  `package main` programs) in a temporary workspace module, and one stale
+  outbox snippet it caught was fixed. The tracked `tools/modgraph/modgraph`
+  and `tools/affected/affected` binaries were removed and built tool binaries
+  are git-ignored. `docs/.../zen-syntax.mdx` gained enum, message, and grammar
+  sections, and a test in `dsl/gengrammar` fails when the page omits a keyword,
+  scalar type, attribute, or block label. The `.golangci.yml` wrapcheck note
+  now records measured numbers.
+
+### Fixed
+
+- `fix(cli): zever new --profile full scaffolds a config that passes doctor`:
+  the full profile wired `ai` (anthropic, needs an API key), `geo` (static,
+  needs a dataset) and `i18n` (embed, needs an embedded FS), so a fresh
+  `--profile full` project failed `zever doctor` with 3 FAILs. Those three
+  services are now left out; add them with `zever add`.
+- `docs(lint): refresh the wrapcheck measurement`: the `.golangci.yml` note now
+  records 162 hits for `container` + `core/*` (17 + 145), the reason wrapcheck
+  stays disabled.
+- `docs(auth): drop duplicated alg-none sentence from the JWT guide`: the
+  guide states HS256-only once and no longer repeats the `alg: none` rejection
+  note. No code or behavior change; asymmetric algorithms stay unsupported by
+  design.
+- `fix(cli): zever doctor uses the built server report when batteries fail`:
+  a generated server prints its `--doctor` JSON and exits 1 when a battery
+  fails; the CLI treated that exit as "server unavailable", fell back to the
+  CLI registry, and showed an unrelated log WARN as the reason. It now reads
+  the report regardless of exit status and, on a real crash, reports the last
+  stderr line.
+- `fix(build): exclude agent harness checkouts from the module list`:
+  `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
+  under `.claude/worktrees/` each contain full module trees; without the
+  exclusion the list ballooned past `ARG_MAX`, `printf` failed, and every
+  `*-all` loop silently tested nothing (false green `make check`).
+- `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
+  `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
+  hardcoded constant that lagged the release tags. The version now comes from
+  `-ldflags "-X main.cliVersion=..."` (release workflow and `make
+  build-release`), then the `go install module@vX.Y.Z` build info, then
+  `cmd/zever/VERSION` (now `0.7.0`), which `tools/tag-release.sh` requires to
+  match before tagging. `make version-check` (part of `make check`) fails when
+  that file is lower than the newest `cmd/zever/v*` tag.
+- `fix(cli): zever compile --check ignores the stamped CLI version`: a zever
+  upgrade alone no longer reports every generated file as drifted. Files that
+  differ only in the stamp version pass with a note (`stampVersionOnly` in
+  `--json`); the new `--strict` flag fails on them. Schema hash and content
+  changes still fail.
+- `fix(container,cmd)`: SIGHUP reload is now atomic and race-free.
+  `ReloadableLimiter` retires a replaced limiter and closes it only after its
+  in-flight `Allow`/`Reset` calls drain; the boot-time limiter stays owned by
+  the container, so no limiter is closed twice at shutdown (the generated
+  server also closes reload-opened limiters on exit). `ReloadableLimiter.Swap`
+  now owns the swapped-in limiter and callers must not close it.
+  `ReloadableLogger` child loggers (`With`/`WithContext`) follow later level
+  swaps. New `container.ApplyReload` opens the new logger and limiter first
+  and swaps both only on success, so a failed rate-limit reopen no longer
+  leaves the log level changed.
+- `fix(orm): dedupe oversized IN lists before chunking`: a value repeated in
+  a value-list `IN` that is auto-chunked across several statements could land
+  in two chunks, so `All`/`Stream` returned the same row twice and `Count`
+  double counted it. Repeated values are now removed (order-preserving, NULLs
+  collapsed since they never match) before splitting, and `Preload` fetches
+  each distinct parent key once. Chunked reads are documented as multiple
+  statements that are not snapshot-consistent unless run in a transaction.
+- `fix(config,container,cmd): scope adapter validation to enabled services and
+  run it at boot`: new `config.(*Config).EnabledServices`,
+  `ValidateEnabledAdapters` and `container.(*Container).ValidateEnabledAdapters`
+  check only services explicitly configured or at a non-default adapter, so a
+  generated server's `-doctor` no longer exits 1 on `unknown adapter
+  "anthropic" for service "ai"` for unconfigured services. The generated
+  server now validates at startup (one aggregated error with did-you-mean,
+  exit non-zero) instead of failing lazily on first use, and `zever doctor`
+  surfaces the server's `adapters` row. `ValidateAdapters` keeps checking
+  every service.
+- `fix(container): share a failed build with parked waiters`: concurrent
+  callers waiting on a lazy service build that errors or panics now receive
+  that build's error instead of each re-running the builder; a later call
+  still retries. The unused builder `context.Context` plumbing is removed and
+  the root-context design is documented in `container/README.md`.
+- `refactor(registry): drop dead nil-hook branches`: `registry.New` already
+  defaults every hook, so the unreachable nil checks in `Register`/`Lookup`
+  are gone (no behavior change).
+- `fix(cli,container): CLI polish and scaffold orm requirement`: `zever new`
+  now requires the `orm` module in the scaffolded `go.mod` (the zenorm
+  output imports it); `zever compile` runs `go mod tidy` (or prints a hint
+  with `--no-tidy`) when generated code imports framework modules `go.mod`
+  lacks; an unknown subcommand prints the error and did-you-mean hint first
+  instead of dumping usage; `db migrate --lint` prints error findings as
+  `error:` on stderr (warnings stay warnings), `-h/--help` exits 0 without
+  `flag: help requested`, and `--dry-run` help now states that it connects
+  read-only when `--dsn` is given; the informational `container: pool shared`
+  line is shown only when `ZEVER_DEBUG` is set.
+- `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
+  the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
+  `jwt.WarningReporter.Warnings()`) when the default per-process revocation
+  store is in use, pointing at `revocation/redis`. Docs and package comment
+  state "HS256 only; asymmetric via custom adapter". New
+  `crypto.IsDevEnv(value)` trims and case-folds `ZEVER_ENV` against
+  dev/test/development; `crypto.DevKeyAllowed` and the CLI's `devEnv` both
+  use it, so a padded value like `" Dev "` is no longer treated as
+  non-dev by the dev-key gate.
+- `fix(cmd/zever): parallel-safe agent catalog tests`: `agentCommands`,
+  `agentGlobalFlags`, and `printAgentHelp` gain `*On` variants taking the
+  Cobra tree explicitly (mirroring `topLevelNames`), and
+  `TestPrintAgentHelp`/`TestUninstallUpgradeWiring` run `t.Parallel`
+  against fresh per-test trees. `cobra.Command.Commands` sorts the tree's
+  children in place, so parallel reads of the shared `rootCmd` global race
+  (reproduced with a throwaway parallel test under `-race`); production
+  output is unchanged.
+- `fix(payment/paddle): reject decimal totals that overflow int64 minor
+  units`: `parsePaddleAmount` now returns the new `ErrAmountOverflow`
+  sentinel when the whole part no longer fits after the x100 scale shift or
+  the final fraction add/subtract carries past the limit (e.g.
+  `"9223372036854775807.99"` previously wrapped silently to a negative
+  amount, which could invert refund `amount > total` checks); the exact
+  `math.MaxInt64`/`math.MinInt64` totals still convert, and out-of-range
+  whole parts that `strconv.ParseInt` already rejects are unchanged. Stripe
+  needs no equivalent: it carries amounts as native int64, never decimals.
+- `fix(cli): zever new pins every framework module at the framework version`:
+  the v0.7.0 release tags carry go.mod files that still require v0.6.1
+  siblings, so a published-mode scaffold resolved `shared/registry` at v0.6.1
+  and `go build` failed with `undefined: registry.SortedNames`. The scaffold
+  go.mod now also requires every shared, core and adapter module at the
+  framework version (as `// indirect`; `go mod tidy` drops unused ones).
+
+### Security
+
+- `middleware.ClientIPKey` now reads every `X-Forwarded-For` header line
+  (not just the first) before picking the rightmost untrusted entry, so a
+  trusted proxy that appends a separate header line can no longer be
+  shadowed by a client-supplied first line. `ParseTrustedProxies` also
+  unmaps IPv4-mapped IPv6 prefixes (`::ffff:10.0.0.0/104` becomes
+  `10.0.0.0/8`) so trusted ranges match in either form.
+  into build-tagged files so the module compiles on Windows.
+- `config` redaction now covers every secret shape: `*Secret`, `[]Secret`,
+  `map[string]Secret`, `zever:"secret"`-tagged slices and maps (every element
+  redacted), structs, pointers, and slices of structs containing secrets, and
+  `any`-typed values holding a `Secret`; `Redact` also handles Go-typed
+  secret values. Nil pointers, maps, and cyclic values do not panic. DSN-like
+  values under URL/DSN-suggesting keys (`*_url`, `*_dsn`, `*_endpoint`, ...)
+  are scrubbed of scheme-less `user:pass@` userinfo and `password=` pairs, and
+  URL userinfo inside string slices is scrubbed. A guard test fails when a
+  secret-looking field in `core/*/options.go` is neither tagged nor
+  allowlisted.
+- `fix(security): P2-11 audit follow-ups`: the vault secrets adapter now
+  requires an `https` Addr (the token travels in `X-Vault-Token`, so plain
+  http sends it in cleartext); test setups opt into plain http explicitly
+  with `allow_insecure: true`, which logs a warning at open. Round-trips
+  use a client with a TLS 1.2 floor. The kms crypto adapter propagates
+  Key/SignKey base64 decode errors as `ErrInvalidKey` instead of deriving
+  keys from empty material, and `Sign`/`Verify` fail with `ErrKeyNotFound`
+  on a missing or malformed private key instead of panicking. The ffmpeg
+  media toolkit emits `--` before output paths (and at the exec boundary),
+  rejects flag-looking inputs/outputs before exec, allowlists probe inputs
+  via `ValidatePath` (`media.KindForExt`), bounds runs with
+  `DefaultProbeTimeout`/`DefaultTranscodeTimeout` when the caller sets no
+  deadline, and checks successful outputs against
+  `DefaultMaxOutputBytes`. `core/session` gains a `Rotate` helper for
+  post-login ID rotation (fixation defense) with no `Store` interface
+  change.
+- `fix(security): P2-11b vault token-file permissions`: a `token_file`
+  readable beyond its owner (any group/other permission bit, i.e. broader
+  than `0600`) now fails closed with `ErrInsecureTokenFilePerms` at both
+  validation and token resolution. Restrict the file to `0600`, or opt out
+  explicitly with `allow_insecure_token_file_perms: true` (logs a warning
+  at open when the file is actually permissive).
+- `fix(security): P2-11c vault mount escaping`: the KV mount path is now
+  escaped per slash-separated segment before interpolation into request
+  URLs, so reserved characters (`?`, `#`, `%`, …) cannot shift path
+  segments; empty and dot segments are rejected at validation. Nested
+  mounts (`team/secret`) keep working.
+
+### CI
+
+- `ci(apidiff)`: the `apidiff` gate is now module-scoped. A `**Breaking:**`
+  entry in `## [Unreleased]` only covers a module it names in backticks
+  (module path, directory, package path or short name), a Core-tier module
+  with no baseline tag now fails unless listed in
+  `.github/apidiff-baseline-allowlist.json` with an expiry, and
+  `tools/tag-release.sh --verify vX.Y.Z` checks that every module tag exists
+  locally or on origin. See `API Compatibility` in `.github/CONTRIBUTING.md`.
+
+## [v0.7.0] - 2026-10-14
+
+### Breaking
+
 - **Breaking:** `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
   no longer emits the untyped `SagaCaller.Call(ctx, service,
   method, in any, out any)`, the `sagaStep` helper, or `map[string]any`
@@ -137,49 +396,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   comparable: the new `Keys []JWTKey` field (kid-based rotation) makes `==`
   on these structs — and on `config.Service[auth.Options]` — a compile
   error. Compare field-by-field instead.
-- **Breaking:** `fix(httpclient)`: clients built with `WithSafeDial` /
-  `NewSafeClient` no longer honor `HTTP_PROXY`/`HTTPS_PROXY` (the dial guard
-  only saw the proxy address, so private targets were reachable through a
-  proxy); pass the new `WithAllowProxy()` option to opt back in with a
-  trusted proxy. `IsPrivateIP` now also classifies NAT64
-  (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
-  (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
-  (`2001::/32`) and site-local (`fec0::/10`) as private.
-- **Breaking:** `fix(document)`: the `latex` adapter now defends against
-  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
-  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
-  bubblewrap (no network, read-only system trees, only the render dir
-  writable); `required` fails at open when bwrap is unavailable, `auto` logs
-  one warning and falls back. A source pre-scan now rejects `\input`,
-  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
-  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
-  `latex_allow_unsafe_source: true` restores the old behavior. Output and
-  stderr are size-capped before buffering, and process-group kill is split
 
 ### Added
 
-- `fix(payment): at-least-once webhook handling`: `WebhookEvent` on the
-  `stripe` and `paddle` adapters records the event id as seen before the
-  caller processes it (at-most-once), so a failing handler loses the event
-  on the provider retry, and events with an empty id are never deduped. New
-  optional interface `payment.WebhookHandling` (`HandleWebhook(ctx, raw,
-  signature, handler)`) runs the handler under the reservation, commits only
-  on success, and releases the key on handler error or panic so retries are
-  accepted; an empty event id is rejected with `payment.ErrMissingEventID`.
-  `payment.ProcessWebhookOnce` is the shared helper. `WebhookEvent` behavior
-  is unchanged and now documented as at-most-once.
-- `feat(cli): slim adapter-scoped builds`: the new `zever build`
-  command compiles a slim CLI registering only `--adapters=a,b`
-  (bare batteries select every known adapter, `battery/adapter` pins
-  one; empty builds the full CLI). Unselected adapter packages leave
-  the binary via a `go build -overlay` of the central registration
-  list, so no build-tagged source variants are committed. Unknown
-  names fail listing the choices, `--dry-run` prints the plan, and
-  `--json` emits `{out, sizeBytes, adapters}`. A `log,router` floor
-  build measures 63 MB against the 310 MB full CLI with warm `--help`
-  at ~27 ms vs ~40 ms. The `doctor` adapters meta-check is now scoped
-  to the project's enabled batteries (nil scope still checks all),
-  so a slim binary passes its own `doctor` for its project.
 - `feat(cli): eject and drift tooling`: `zever compile` stamps every
   generated file with a provenance header (backend, CLI version, schema
   sha256; `.json` specs embed an `x-zever-generated` block instead of a
@@ -465,37 +684,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strict decoding stays strict. Known secret option fields across
   `core/*/options.go` (API keys, tokens, passwords, webhook secrets, HMAC/
   signing keys, AWS key pairs, crypto keys) are tagged.
-- `perf(queue/memory): cut round-trip allocs 12 to 1 per op`: the P5-8
-  follow-up pass over the documented leftovers. Drained topics are retained
-  instead of sweep-deleted and recreated per message (channels and maps
-  reused; the sweep still deletes promoter topics so their quit channel
-  closes, and now resets the retained heap/ready window since every leftover
-  heap entry references a gone inflight id); the ready list pops via a head
-  index instead of reslicing past the front (which shrank capacity and forced
-  the next Push to reallocate); the visibility heap is hand-rolled instead of
-  `container/heap` (whose `any` Push/Pop boxed one entry per Pop). Measured
-  `BenchmarkMemoryRoundTrip` 12→1 allocs/op, 1984→16 B/op (parallel
-  10/11→1). Deliberately deferred: `Message.Clone`'s payload copy (the last
-  alloc, pinned by `TestMemory_CloneIsolation`), `msgspan` wired-provider
-  spans (18 allocs/op when telemetry is wired, 0 on the default nil-provider
-  path), `traceprop` inject/extract (nil-path 0), and `shared/lrucache`
-  (0 allocs/op steady-state on every bench).
-- `perf(alloc): P5-8 leftover dispositions, bench-first (i5-11400H,
-  `-benchmem -count=3`)`: `traceprop BenchmarkInject` holds at 400 B/op,
-  3 allocs/op — memprofile attributes the third alloc to OTel-internal
-  `TraceContext.Inject` (string builder plus a `[][]byte` literal), and a
-  direct-propagator variant measured byte-identical, so the composite call
-  stays and the floor is pinned by upstream OTel. `msgspan` wired Producer
-  holds at ~1822 B/op, 18 allocs/op with a stub tracer (roughly two thirds
-  in the stub recorder/`SetAttributes` appends, the rest option closures,
-  attribute slice, span name, and `traceprop.TraceID`); the default
-  nil-provider path stays 0 B/op, 0 allocs/op and is now guarded by
-  `TestProducerNilPathZeroAllocs`. `BenchmarkMemoryRoundTrip` remainder is
-  the single `Message.Clone` payload copy, now documented on `Clone` as
-  isolation-pinned (the Pop clone keeps consumer mutations off the inflight
-  copy). `shared/lrucache` re-verified at 0 allocs/op steady-state on
-  Get/Put/GetOrCompute. No benchmark deltas by design: only regression
-  guards, no behavior change.
 - `install.sh` / `install.ps1`: richer output (plan summary, numbered steps,
   download progress, checksum details, next steps), uniform `--dry-run`
   rendering, actionable hints on failure, and new `--quiet` / `--no-color`
@@ -514,19 +702,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `docs(stability): document the kid-less JWT token timeline`: `STABILITY.md`
-  states the current behavior (kid-less tokens verify against the legacy
-  `jwt.secret`), that it is not deprecated and has no removal date, and how
-  any future deprecation would proceed.
-- `chore: repo hygiene and docs checks`: `tools/check-doc-snippets.sh` now
-  compiles and vets Go doc snippets marked ` ```go ... check ` (complete
-  `package main` programs) in a temporary workspace module, and one stale
-  outbox snippet it caught was fixed. The tracked `tools/modgraph/modgraph`
-  and `tools/affected/affected` binaries were removed and built tool binaries
-  are git-ignored. `docs/.../zen-syntax.mdx` gained enum, message, and grammar
-  sections, and a test in `dsl/gengrammar` fails when the page omits a keyword,
-  scalar type, attribute, or block label. The `.golangci.yml` wrapcheck note
-  now records measured numbers.
 - `perf(orm): LRU shape cache`: the render-shape cache evicts only the
   least-recently-used entry on overflow instead of dropping the whole map,
   so hot shapes survive churn. It is striped 16 ways over
@@ -606,96 +781,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `fix(cli): zever new --profile full scaffolds a config that passes doctor`:
-  the full profile wired `ai` (anthropic, needs an API key), `geo` (static,
-  needs a dataset) and `i18n` (embed, needs an embedded FS), so a fresh
-  `--profile full` project failed `zever doctor` with 3 FAILs. Those three
-  services are now left out; add them with `zever add`.
-- `docs(lint): refresh the wrapcheck measurement`: the `.golangci.yml` note now
-  records 162 hits for `container` + `core/*` (17 + 145), the reason wrapcheck
-  stays disabled.
-- `docs(auth): drop duplicated alg-none sentence from the JWT guide`: the
-  guide states HS256-only once and no longer repeats the `alg: none` rejection
-  note. No code or behavior change; asymmetric algorithms stay unsupported by
-  design.
-- `fix(cli): zever doctor uses the built server report when batteries fail`:
-  a generated server prints its `--doctor` JSON and exits 1 when a battery
-  fails; the CLI treated that exit as "server unavailable", fell back to the
-  CLI registry, and showed an unrelated log WARN as the reason. It now reads
-  the report regardless of exit status and, on a real crash, reports the last
-  stderr line.
-- `fix(build): exclude agent harness checkouts from the module list`:
-  `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
-  under `.claude/worktrees/` each contain full module trees; without the
-  exclusion the list ballooned past `ARG_MAX`, `printf` failed, and every
-  `*-all` loop silently tested nothing (false green `make check`).
-- `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
-  `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
-  hardcoded constant that lagged the release tags. The version now comes from
-  `-ldflags "-X main.cliVersion=..."` (release workflow and `make
-  build-release`), then the `go install module@vX.Y.Z` build info, then
-  `cmd/zever/VERSION` (now `0.7.0`), which `tools/tag-release.sh` requires to
-  match before tagging. `make version-check` (part of `make check`) fails when
-  that file is lower than the newest `cmd/zever/v*` tag.
-- `fix(cli): zever compile --check ignores the stamped CLI version`: a zever
-  upgrade alone no longer reports every generated file as drifted. Files that
-  differ only in the stamp version pass with a note (`stampVersionOnly` in
-  `--json`); the new `--strict` flag fails on them. Schema hash and content
-  changes still fail.
-- `fix(container,cmd)`: SIGHUP reload is now atomic and race-free.
-  `ReloadableLimiter` retires a replaced limiter and closes it only after its
-  in-flight `Allow`/`Reset` calls drain; the boot-time limiter stays owned by
-  the container, so no limiter is closed twice at shutdown (the generated
-  server also closes reload-opened limiters on exit). `ReloadableLimiter.Swap`
-  now owns the swapped-in limiter and callers must not close it.
-  `ReloadableLogger` child loggers (`With`/`WithContext`) follow later level
-  swaps. New `container.ApplyReload` opens the new logger and limiter first
-  and swaps both only on success, so a failed rate-limit reopen no longer
-  leaves the log level changed.
-- `fix(orm): dedupe oversized IN lists before chunking`: a value repeated in
-  a value-list `IN` that is auto-chunked across several statements could land
-  in two chunks, so `All`/`Stream` returned the same row twice and `Count`
-  double counted it. Repeated values are now removed (order-preserving, NULLs
-  collapsed since they never match) before splitting, and `Preload` fetches
-  each distinct parent key once. Chunked reads are documented as multiple
-  statements that are not snapshot-consistent unless run in a transaction.
-- `fix(config,container,cmd): scope adapter validation to enabled services and
-  run it at boot`: new `config.(*Config).EnabledServices`,
-  `ValidateEnabledAdapters` and `container.(*Container).ValidateEnabledAdapters`
-  check only services explicitly configured or at a non-default adapter, so a
-  generated server's `-doctor` no longer exits 1 on `unknown adapter
-  "anthropic" for service "ai"` for unconfigured services. The generated
-  server now validates at startup (one aggregated error with did-you-mean,
-  exit non-zero) instead of failing lazily on first use, and `zever doctor`
-  surfaces the server's `adapters` row. `ValidateAdapters` keeps checking
-  every service.
-- `fix(container): share a failed build with parked waiters`: concurrent
-  callers waiting on a lazy service build that errors or panics now receive
-  that build's error instead of each re-running the builder; a later call
-  still retries. The unused builder `context.Context` plumbing is removed and
-  the root-context design is documented in `container/README.md`.
-- `refactor(registry): drop dead nil-hook branches`: `registry.New` already
-  defaults every hook, so the unreachable nil checks in `Register`/`Lookup`
-  are gone (no behavior change).
-- `fix(cli,container): CLI polish and scaffold orm requirement`: `zever new`
-  now requires the `orm` module in the scaffolded `go.mod` (the zenorm
-  output imports it); `zever compile` runs `go mod tidy` (or prints a hint
-  with `--no-tidy`) when generated code imports framework modules `go.mod`
-  lacks; an unknown subcommand prints the error and did-you-mean hint first
-  instead of dumping usage; `db migrate --lint` prints error findings as
-  `error:` on stderr (warnings stay warnings), `-h/--help` exits 0 without
-  `flag: help requested`, and `--dry-run` help now states that it connects
-  read-only when `--dsn` is given; the informational `container: pool shared`
-  line is shown only when `ZEVER_DEBUG` is set.
-- `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
-  the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
-  `jwt.WarningReporter.Warnings()`) when the default per-process revocation
-  store is in use, pointing at `revocation/redis`. Docs and package comment
-  state "HS256 only; asymmetric via custom adapter". New
-  `crypto.IsDevEnv(value)` trims and case-folds `ZEVER_ENV` against
-  dev/test/development; `crypto.DevKeyAllowed` and the CLI's `devEnv` both
-  use it, so a padded value like `" Dev "` is no longer treated as
-  non-dev by the dev-key gate.
 - `fix(cli): project-aware doctor`: `zever doctor` now checks only the
   services enabled in the project config (top-level batteries in
   `zever.yaml`/`.yml`/`.json`, same discovery as `serve`; falls back to
@@ -765,23 +850,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps working. The unknown-command usage text now lists `docs` and
   `completion`, and `zever --help` shares the same `zever — zever toolkit`
   header as the unknown-command usage.
-- `fix(cmd/zever): parallel-safe agent catalog tests`: `agentCommands`,
-  `agentGlobalFlags`, and `printAgentHelp` gain `*On` variants taking the
-  Cobra tree explicitly (mirroring `topLevelNames`), and
-  `TestPrintAgentHelp`/`TestUninstallUpgradeWiring` run `t.Parallel`
-  against fresh per-test trees. `cobra.Command.Commands` sorts the tree's
-  children in place, so parallel reads of the shared `rootCmd` global race
-  (reproduced with a throwaway parallel test under `-race`); production
-  output is unchanged.
-- `fix(payment/paddle): reject decimal totals that overflow int64 minor
-  units`: `parsePaddleAmount` now returns the new `ErrAmountOverflow`
-  sentinel when the whole part no longer fits after the x100 scale shift or
-  the final fraction add/subtract carries past the limit (e.g.
-  `"9223372036854775807.99"` previously wrapped silently to a negative
-  amount, which could invert refund `amount > total` checks); the exact
-  `math.MaxInt64`/`math.MinInt64` totals still convert, and out-of-range
-  whole parts that `strconv.ParseInt` already rejects are unchanged. Stripe
-  needs no equivalent: it carries amounts as native int64, never decimals.
 - fix(container): a panicking service builder no longer wedges concurrent
   callers; returns BuildPanicError.
 - refactor(container): service builders now receive a builder-facing root
@@ -799,23 +867,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- `middleware.ClientIPKey` now reads every `X-Forwarded-For` header line
-  (not just the first) before picking the rightmost untrusted entry, so a
-  trusted proxy that appends a separate header line can no longer be
-  shadowed by a client-supplied first line. `ParseTrustedProxies` also
-  unmaps IPv4-mapped IPv6 prefixes (`::ffff:10.0.0.0/104` becomes
-  `10.0.0.0/8`) so trusted ranges match in either form.
-  into build-tagged files so the module compiles on Windows.
-- `config` redaction now covers every secret shape: `*Secret`, `[]Secret`,
-  `map[string]Secret`, `zever:"secret"`-tagged slices and maps (every element
-  redacted), structs, pointers, and slices of structs containing secrets, and
-  `any`-typed values holding a `Secret`; `Redact` also handles Go-typed
-  secret values. Nil pointers, maps, and cyclic values do not panic. DSN-like
-  values under URL/DSN-suggesting keys (`*_url`, `*_dsn`, `*_endpoint`, ...)
-  are scrubbed of scheme-less `user:pass@` userinfo and `password=` pairs, and
-  URL userinfo inside string slices is scrubbed. A guard test fails when a
-  secret-looking field in `core/*/options.go` is neither tagged nor
-  allowlisted.
 - Bump the Go toolchain pin from `go 1.27.0` to `go 1.27.2` in `go.work`
   and every module's `go.mod` (fixes stdlib `net/http` / HTTP/2
   advisories `GO-2026-6603`…`GO-2026-6617`).
@@ -824,43 +875,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump the pinned `golangci-lint` from `v2.13.2` to `v2.14.0` (the old
   linter cannot read `go1.27.2` export data); the CI binary cache is now
   keyed on `go.work` so future toolchain bumps rebuild it.
-- `fix(security): P2-11 audit follow-ups`: the vault secrets adapter now
-  requires an `https` Addr (the token travels in `X-Vault-Token`, so plain
-  http sends it in cleartext); test setups opt into plain http explicitly
-  with `allow_insecure: true`, which logs a warning at open. Round-trips
-  use a client with a TLS 1.2 floor. The kms crypto adapter propagates
-  Key/SignKey base64 decode errors as `ErrInvalidKey` instead of deriving
-  keys from empty material, and `Sign`/`Verify` fail with `ErrKeyNotFound`
-  on a missing or malformed private key instead of panicking. The ffmpeg
-  media toolkit emits `--` before output paths (and at the exec boundary),
-  rejects flag-looking inputs/outputs before exec, allowlists probe inputs
-  via `ValidatePath` (`media.KindForExt`), bounds runs with
-  `DefaultProbeTimeout`/`DefaultTranscodeTimeout` when the caller sets no
-  deadline, and checks successful outputs against
-  `DefaultMaxOutputBytes`. `core/session` gains a `Rotate` helper for
-  post-login ID rotation (fixation defense) with no `Store` interface
-  change.
-- `fix(security): P2-11b vault token-file permissions`: a `token_file`
-  readable beyond its owner (any group/other permission bit, i.e. broader
-  than `0600`) now fails closed with `ErrInsecureTokenFilePerms` at both
-  validation and token resolution. Restrict the file to `0600`, or opt out
-  explicitly with `allow_insecure_token_file_perms: true` (logs a warning
-  at open when the file is actually permissive).
-- `fix(security): P2-11c vault mount escaping`: the KV mount path is now
-  escaped per slash-separated segment before interpolation into request
-  URLs, so reserved characters (`?`, `#`, `%`, …) cannot shift path
-  segments; empty and dot segments are rejected at validation. Nested
-  mounts (`team/secret`) keep working.
-
-### CI
-
-- `ci(apidiff)`: the `apidiff` gate is now module-scoped. A `**Breaking:**`
-  entry in `## [Unreleased]` only covers a module it names in backticks
-  (module path, directory, package path or short name), a Core-tier module
-  with no baseline tag now fails unless listed in
-  `.github/apidiff-baseline-allowlist.json` with an expiry, and
-  `tools/tag-release.sh --verify vX.Y.Z` checks that every module tag exists
-  locally or on origin. See `API Compatibility` in `.github/CONTRIBUTING.md`.
 
 ### Tests
 
