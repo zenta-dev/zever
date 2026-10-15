@@ -27,6 +27,12 @@ import (
 // OFFSET, a row lock or TABLESAMPLE the row set cannot be reconstructed
 // from independent statements, so Stream fails closed with
 // ErrInListTooLarge instead of returning misordered or truncated rows.
+//
+// Chunked reads run several statements and are NOT snapshot-consistent:
+// rows written or deleted between chunks can be missed or seen inconsistently
+// unless the caller passes a transaction (db.Tx) whose isolation level
+// provides a stable snapshot. Repeated IN values are removed (order-preserving)
+// before chunking, so a duplicated value never yields its row twice.
 func (q Query[T, PT]) Stream(ctx context.Context, exec db.DB) iter.Seq2[PT, error] {
 	return func(yield func(PT, error) bool) {
 		d, err := resolveDialect(exec)

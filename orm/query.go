@@ -750,6 +750,12 @@ func (q Query[T, PT]) FirstOrErr(ctx context.Context, exec db.DB) (PT, error) {
 // statement per IN chunk (see planInChunks) and returns the summed total;
 // order/limit/offset need no fail-closed gate here because they never
 // shape a count.
+//
+// Chunked reads run several statements and are NOT snapshot-consistent:
+// rows written or deleted between chunks can be missed or seen inconsistently
+// unless the caller passes a transaction (db.Tx) whose isolation level
+// provides a stable snapshot. Repeated IN values are removed (order-preserving)
+// before chunking, so a duplicated value never yields its row twice.
 func (q Query[T, PT]) Count(ctx context.Context, exec db.DB) (int64, error) {
 	if q.lock != LockNone || q.nowait || q.skipLocked {
 		return 0, fmt.Errorf("orm: Query.Count: %w", ErrLockingNotSelect)
