@@ -1550,6 +1550,9 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		// Generated server entrypoints always wire authz + middleware.
 		frameworkModulePath+"/core/authz",
 		frameworkModulePath+"/core/middleware",
+		// The default zenorm backend emits packages importing the orm
+		// module, so every scaffold that compiles entities requires it.
+		frameworkModulePath+"/orm",
 	)
 	direct = append(direct, corePaths...)
 	direct = append(direct, adapterPaths...)
@@ -1584,11 +1587,6 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		for _, dir := range sharedModuleDirs {
 			rest = append(rest, frameworkModulePath+"/"+dir)
 		}
-
-		// orm is a transitive framework module (container requires it) with
-		// no adapter dir of its own; without a replace `go mod tidy`
-		// fetches it from the proxy even against a local checkout.
-		rest = append(rest, frameworkModulePath+"/orm")
 
 		for battery := range allServiceAdapters {
 			if path := coreModulePath(battery); !seen[path] {

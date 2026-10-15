@@ -131,7 +131,7 @@ exit:0
 | Scaffold | `zever generate` |
 | Scaffold | `zever generate tinker` |
 | Scaffold | `zever extract` |
-| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs) |
+| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs; runs `go mod tidy` when generated code imports modules `go.mod` lacks, skip with `--no-tidy`) |
 | Inspect | `zever check` |
 | Inspect | `zever breaking` |
 | Inspect | `zever fmt` |
@@ -166,6 +166,7 @@ exit:0
 | `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt) |
 | `--profile minimal\|api\|full` | `zever new`: start-small preset (explicit `--batteries` add to it) |
 | `--check` | `zever compile`: verify committed output matches a fresh compile, write nothing (exit 1 on drift) |
+| `--no-tidy` | `zever compile`: print a hint instead of running `go mod tidy` when go.mod misses modules the generated code imports |
 | `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt) |
 | `-y`, `--yes` | `zever new`: skip all prompts, scaffold floor plus flags only |
 | `--list-batteries` | `zever new`: print the battery/default-adapter table to stdout and exit |

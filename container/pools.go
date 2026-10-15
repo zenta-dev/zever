@@ -167,8 +167,24 @@ type poolRegistry struct {
 func newPoolRegistry() *poolRegistry {
 	return &poolRegistry{
 		open: db.Open,
-		warn: func(msg string) { fmt.Fprintln(os.Stderr, msg) },
+		warn: defaultPoolWarn,
 	}
+}
+
+// poolInfoPrefix marks the purely informational "pool shared ..." lines
+// emitted by logOpen. They are debug-level: shown on stderr only when the
+// ZEVER_DEBUG environment variable is non-empty. Mismatch warnings (which
+// signal ignored configuration) are always shown.
+const poolInfoPrefix = "container: pool shared "
+
+// defaultPoolWarn writes pool lifecycle notes to stderr, dropping the
+// informational shared-open lines unless ZEVER_DEBUG is set.
+func defaultPoolWarn(msg string) {
+	if strings.HasPrefix(msg, poolInfoPrefix) && os.Getenv("ZEVER_DEBUG") == "" {
+		return
+	}
+
+	fmt.Fprintln(os.Stderr, msg)
 }
 
 // borrow returns the shared pool for key, opening it on first use with the
