@@ -101,7 +101,7 @@ installer-test: ## Run installer fail-closed tests (offline, stubbed PATH)
 
 .PHONY: version-check
 version-check: ## Fail if cmd/zever/VERSION is lower than the newest cmd/zever/v* tag (skips without tags)
-	sh tools/check-version.sh
+	bash tools/check-version.sh
 
 .PHONY: changelog-lint
 changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** prefix, indentation)

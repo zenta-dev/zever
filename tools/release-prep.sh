@@ -39,5 +39,5 @@ done <"$pins"
 
 go run ./tools/modgraph --set-pins --version "$ver"
 make deps-sync
-sh tools/check-version.sh
+bash tools/check-version.sh
 echo "release-prep: repo pinned at $ver; review 'git diff', commit, then run tools/tag-release.sh --dry-run $ver"

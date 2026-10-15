@@ -73,7 +73,7 @@ fi
 # cannot be fixed after the proxy caches them. Fix with `make release-prep`.
 check_script="$(cd "$(dirname "$0")" && pwd)/check-version.sh"
 if [ -f "$version_file" ] && [ -f "$check_script" ]; then
-  ZEVER_ROOT="$PWD" sh "$check_script" || {
+  ZEVER_ROOT="$PWD" bash "$check_script" || {
     echo "error: release pins do not match $ver; run: make release-prep VERSION=$ver" >&2
     exit 1
   }
