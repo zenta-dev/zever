@@ -66,6 +66,22 @@ func TestValidateAdaptersFailsFastWithSuggestion(t *testing.T) {
 	}
 }
 
+func TestValidateEnabledAdaptersSkipsUnconfiguredServices(t *testing.T) {
+	// Default config: no service is explicitly enabled and every adapter is
+	// at its default, so nothing is validated even if some were unregistered.
+	c := New(config.Default())
+	if err := c.ValidateEnabledAdapters(nil); err != nil {
+		t.Fatalf("ValidateEnabledAdapters(nil) on defaults = %v, want nil", err)
+	}
+
+	cfg := config.Default()
+	cfg.Cache.Adapter = "definitely-not-registered"
+	err := New(cfg).ValidateEnabledAdapters(nil)
+	if !errors.Is(err, config.ErrUnknownAdapter) {
+		t.Fatalf("non-default unregistered adapter = %v, want ErrUnknownAdapter", err)
+	}
+}
+
 func slicesContains(names []string, want string) bool {
 	for _, n := range names {
 		if n == want {
