@@ -87,7 +87,7 @@ go get github.com/zenta-dev/zever/config@v0.6.1 github.com/zenta-dev/zever/conta
 
 Build one container from `config.Default()` and resolve the database. The default `db` adapter is `sqlite`, so the check imports that adapter and calls its `Register()`. An unregistered adapter fails with `UnknownAdapterError`.
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (

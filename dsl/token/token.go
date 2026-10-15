@@ -157,7 +157,7 @@ func (k Kind) String() string {
 // Keywords maps keyword strings to their Kind tokens.
 // Note: type names (uuid, string, int64, timestamp, ...), contextual block labels
 // (http, auth, permission, queue, retry, cron, dispatch, join_table), and HTTP verbs
-// are NOT reserved keywords. Only the 12 words that unambiguously start a production
+// are NOT reserved keywords. Only these words that unambiguously start a production
 // wherever they appear are reserved.
 var Keywords = map[string]Kind{
 	"entity":       ENTITY,

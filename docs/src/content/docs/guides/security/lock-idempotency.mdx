@@ -9,7 +9,7 @@ Use `lock` for mutual exclusion and `idempotency` for dedupe. `Locker` offers `T
 
 Both default to `memory`: single process only. Register the adapters before resolving, since the container wires nothing.
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (

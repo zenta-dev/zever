@@ -38,7 +38,7 @@ Env vars: `VECTORSTORE_ADAPTER`, `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION`. `di
 
 The container wires nothing: register the adapter first. `VectorStore()` resolves lazily, caches, and retries.
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (

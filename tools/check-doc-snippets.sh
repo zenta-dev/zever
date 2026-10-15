@@ -14,7 +14,12 @@
 #
 # Blocks WITHOUT imports: import check skipped; with no package map there is
 # nothing to symbol-check against, so skipped gracefully.
-# `package main` vs fragments: never compiled — only resolve+existence checks.
+# Fragments are never compiled — only resolve+existence checks. A block is
+# COMPILED (go vet in a temp module whose go.work mirrors the repo workspace)
+# only when its info string carries the word `check`, e.g.
+#   ```go check title="main.go"
+# Such a block must be a complete `package main` program. Keep the set small:
+# every marked block adds build time to the doc-snippets CI job.
 #
 # Fails closed with file:line (block opening fence) on first violation.
 # `--self-test` feeds a planted stale import (zever/cache) and expects the
@@ -26,6 +31,10 @@ PREFIX="github.com/zenta-dev/zever"
 
 declare -A LIST_OK=() # import path -> 0 resolves / 1 stale
 declare -A SYM_OK=()  # "path.Symbol" -> 0 exists / 1 missing
+
+CHECK_DIR="$(mktemp -d)" # complete snippets marked `go check`, one dir each
+CHECK_N=0
+trap 'rm -rf "$CHECK_DIR"' EXIT
 
 err() { printf '%s\n' "$*" >&2; }
 
@@ -129,15 +138,53 @@ check_block() {
   return 0
 }
 
+# stage_check <file> <line> <blockfile> : queue a `go check` block for compile.
+stage_check() {
+  local file="$1" start="$2" block="$3" d
+  CHECK_N=$((CHECK_N + 1))
+  d="$CHECK_DIR/b$(printf '%03d' "$CHECK_N")"
+  mkdir -p "$d"
+  cp "$block" "$d/main.go"
+  printf '%s:%s' "$file" "$start" >"$d/src"
+}
+
+# compile_checks : vet every staged block in a temp module that joins the
+# repo workspace. Reports the origin (file:line) of each failing block.
+compile_checks() {
+  ((CHECK_N > 0)) || return 0
+  local d rc=0 out
+  printf 'module doccheck\n\ngo 1.21\n' >"$CHECK_DIR/go.mod"
+  {
+    awk '/^go /{print; exit}' "$ROOT/go.work"
+    printf 'use (\n\t%s\n' "$CHECK_DIR"
+    sed -n '/^use (/,/^)/p' "$ROOT/go.work" | grep -E '^[[:space:]]+\./' | sed "s#\./#$ROOT/#"
+    printf ')\n'
+  } >"$CHECK_DIR/go.work"
+  cp "$ROOT/go.work.sum" "$CHECK_DIR/go.work.sum" 2>/dev/null || true
+  # One vet over all staged blocks (a single build is far faster than one
+  # `go vet` per block); failing blocks are mapped back to file:line.
+  if ! out="$(cd "$CHECK_DIR" && GOWORK="$CHECK_DIR/go.work" go vet ./... 2>&1)"; then
+    for d in "$CHECK_DIR"/b*/; do
+      if grep -q "$(basename "$d")/main.go" <<<"$out"; then
+        err "$(cat "$d/src"): snippet marked \`go check\` does not compile/vet ($(basename "$d")/main.go)"
+      fi
+    done
+    err "$out"
+    rc=1
+  fi
+  return "$rc"
+}
+
 # check_file <file> : 0 clean, 1 violation.
 check_file() {
   local file="$1"
-  local lineno=0 in_block=0 start=0 line
+  local lineno=0 in_block=0 start=0 line is_check=0
   local block
   block="$(mktemp)"
   # shellcheck disable=SC2064
   trap "rm -f '$block'" RETURN
   local fence_open='^[[:space:]]*```go'
+  local fence_check='^[[:space:]]*```go[[:space:]]+([^[:space:]]+[[:space:]]+)*check([[:space:]]|$)'
   local fence_any='^[[:space:]]*```[[:space:]]*$'
   while IFS= read -r line || [[ -n "$line" ]]; do
     lineno=$((lineno + 1))
@@ -145,12 +192,15 @@ check_file() {
       if [[ "$line" =~ $fence_open ]]; then
         in_block=1
         start="$lineno"
+        is_check=0
+        if [[ "$line" =~ $fence_check ]]; then is_check=1; fi
         : >"$block"
       fi
     else
       if [[ "$line" =~ $fence_any ]]; then
         in_block=0
         check_block "$file" "$start" "$block" || return 1
+        if ((is_check == 1)); then stage_check "$file" "$start" "$block"; fi
       else
         printf '%s\n' "$line" >>"$block"
       fi
@@ -158,6 +208,7 @@ check_file() {
   done <"$file"
   if ((in_block == 1)); then
     check_block "$file" "$start" "$block" || return 1
+    if ((is_check == 1)); then stage_check "$file" "$start" "$block"; fi
   fi
   return 0
 }
@@ -197,6 +248,32 @@ import (
 c := container.New(config.Default())
 ```
 EOF
+  local badcomp="$tmp/badcomp.md" goodcomp="$tmp/goodcomp.md"
+  cat >"$goodcomp" <<'EOF'
+```go check title="main.go"
+package main
+
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+func main() { _ = container.New(config.Default()) }
+```
+EOF
+  cat >"$badcomp" <<'EOF'
+```go check
+package main
+
+func main() { undefinedSymbolXYZ() }
+```
+EOF
+  CHECK_N=0
+  check_file "$badcomp" && ! compile_checks 2>/dev/null || { err "self-test FAIL: non-compiling go check block passed"; return 1; }
+  err "self-test: non-compiling go check block correctly rejected"
+  rm -rf "$CHECK_DIR"/b* ; CHECK_N=0
+  check_file "$goodcomp" && compile_checks || { err "self-test FAIL: valid go check block rejected"; return 1; }
+  rm -rf "$CHECK_DIR"/b* ; CHECK_N=0
   if check_file "$bad"; then
     err "self-test FAIL: planted stale import (zever/cache) passed the check"
     return 1
@@ -249,4 +326,5 @@ done < <(cd "$ROOT" && find . -type d \( -name node_modules -o -name .git \) -pr
 if ((fail == 1)); then
   exit 1
 fi
+compile_checks || exit 1
 err "doc-snippets: all Go blocks clean"
