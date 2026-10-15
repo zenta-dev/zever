@@ -376,6 +376,39 @@ func TestDecodeServerDoctorReport(t *testing.T) {
 	}
 }
 
+// TestInterpretServerDoctor proves a built server that exits non-zero because
+// a battery failed (its documented --doctor behavior) still yields its JSON
+// report, and that a genuine crash reports the real error line rather than a
+// leading log WARN.
+func TestInterpretServerDoctor(t *testing.T) {
+	t.Parallel()
+
+	exitErr := errors.New("exit status 1")
+	body := []byte(`{"ok":false,"batteries":[{"name":"ai","ok":false,"error":"boom"}]}`)
+
+	rep, err := interpretServerDoctor(exitErr, body, "2026/10/15 WARN jwt: noise\nserver: batteries failed\n")
+	if err != nil {
+		t.Fatalf("interpretServerDoctor(exit 1 + report) error = %v, want nil", err)
+	}
+
+	if rep.OK || len(rep.Batteries) != 1 || rep.Batteries[0].Name != "ai" {
+		t.Fatalf("report = %+v, want the failing ai row", rep)
+	}
+
+	_, err = interpretServerDoctor(exitErr, nil, "2026/10/15 WARN jwt: noise\npanic: boom\n")
+	if err == nil {
+		t.Fatal("interpretServerDoctor(crash) error = nil, want non-nil")
+	}
+
+	if strings.Contains(err.Error(), "WARN") || !strings.Contains(err.Error(), "panic: boom") {
+		t.Fatalf("crash error = %q, want the last stderr line, not the WARN", err)
+	}
+
+	if _, err = interpretServerDoctor(nil, []byte("not json"), ""); err == nil {
+		t.Fatal("interpretServerDoctor(clean exit, garbage) error = nil, want non-nil")
+	}
+}
+
 // TestServerTemplateHasDoctorMode pins the generated server contract: a
 // --doctor flag that prints per-battery JSON without serving.
 func TestServerTemplateHasDoctorMode(t *testing.T) {

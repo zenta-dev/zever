@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guide states HS256-only once and no longer repeats the `alg: none` rejection
   note. No code or behavior change; asymmetric algorithms stay unsupported by
   design.
+- `fix(cli): zever doctor uses the built server report when batteries fail`:
+  a generated server prints its `--doctor` JSON and exits 1 when a battery
+  fails; the CLI treated that exit as "server unavailable", fell back to the
+  CLI registry, and showed an unrelated log WARN as the reason. It now reads
+  the report regardless of exit status and, on a real crash, reports the last
+  stderr line.
 - `fix(build): exclude agent harness checkouts from the module list`:
   `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
   under `.claude/worktrees/` each contain full module trees; without the
