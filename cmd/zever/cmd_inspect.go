@@ -43,6 +43,7 @@ func newInspectCmds() []*cobra.Command {
 	compileCmd.Flags().String("backend", defaultBackends(), "comma-separated list of backends to run (available: "+backendNames()+")")
 	compileCmd.Flags().String("out", "./generated", "output directory for generated files")
 	compileCmd.Flags().Bool("check", false, "verify committed output matches a fresh compile (exit 1 on drift, write nothing)")
+	compileCmd.Flags().Bool("no-tidy", false, "do not run 'go mod tidy' when generated code imports modules go.mod lacks (print a hint instead)")
 
 	checkCmd := &cobra.Command{
 		Use:   "check <files...>",
