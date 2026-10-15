@@ -66,8 +66,48 @@ func (c *Config) adapters() []serviceAdapter {
 // registered name is close; an empty list means nothing was imported and
 // every configured adapter fails (forgotten import).
 func (c *Config) ValidateAdapters(registered func(service string) []string) error {
+	return c.validateAdapters(nil, registered)
+}
+
+// EnabledServices returns the set of services the project actually uses: the
+// explicitly configured names (top-level keys of the project config) plus
+// every service whose adapter differs from Default(), which covers env
+// overrides. Unconfigured services left at their default adapter are not
+// enabled, so a slim binary need not register adapters it never uses.
+func (c *Config) EnabledServices(explicit []string) map[string]bool {
+	out := make(map[string]bool, len(explicit))
+	for _, name := range explicit {
+		out[name] = true
+	}
+
+	defaults := Default().adapters()
+	for i, sa := range c.adapters() {
+		if sa.adapter != defaults[i].adapter {
+			out[sa.service] = true
+		}
+	}
+
+	return out
+}
+
+// ValidateEnabledAdapters is ValidateAdapters scoped to the services in
+// EnabledServices(explicit): unconfigured services at their default adapter
+// are skipped, so a minimal scaffold registering only db and router passes.
+// Enabled services with an unregistered adapter still fail with the
+// did-you-mean hint, and custom adapters pass as long as they are registered.
+func (c *Config) ValidateEnabledAdapters(explicit []string, registered func(service string) []string) error {
+	return c.validateAdapters(c.EnabledServices(explicit), registered)
+}
+
+// validateAdapters checks every service when enabled is nil, else only the
+// services in enabled.
+func (c *Config) validateAdapters(enabled map[string]bool, registered func(service string) []string) error {
 	var errs []error
 	for _, sa := range c.adapters() {
+		if enabled != nil && !enabled[sa.service] {
+			continue
+		}
+
 		known := registered(sa.service)
 		found := false
 		for _, name := range known {

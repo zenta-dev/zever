@@ -1123,6 +1123,20 @@ func isDoctorBatteryKey(s string) bool {
 	return true
 }
 
+// enabledKeys returns the battery names of an enabled set, sorted. A nil set
+// (no project config) yields nil: adapter validation then scopes itself to
+// services whose adapter differs from the defaults.
+func enabledKeys(enabled map[string]bool) []string {
+	keys := make([]string, 0, len(enabled))
+	for k := range enabled {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	return keys
+}
+
 // runDoctor resolves every enabled battery through this binary's real
 // container and registrations, prints one JSON document
 // ({"ok": bool, "batteries": [{"name", "ok", "error"}]}) to stdout, and
@@ -1155,9 +1169,11 @@ func runDoctor() error {
 		_ = c.Close(closeCtx)
 	}()
 
+	enabled := doctorEnabled()
+
 	checks := map[string]func() error{
 		"config":        cfg.Validate,
-		"adapters":      c.ValidateAdapters,
+		"adapters":      func() error { return c.ValidateEnabledAdapters(enabledKeys(enabled)) },
 		"ai":            func() error { _, err := c.AI(); return err },
 		"analytics":     func() error { _, err := c.Analytics(); return err },
 		"auth":          func() error { _, err := c.Auth(); return err },
@@ -1192,8 +1208,6 @@ func runDoctor() error {
 		"webhook":       func() error { _, err := c.Webhook(); return err },
 		"workflow":      func() error { _, err := c.Workflow(); return err },
 	}
-
-	enabled := doctorEnabled()
 
 	names := make([]string, 0, len(checks))
 	for name := range checks {
@@ -1261,6 +1275,13 @@ func main() {
 func run(addr, grpcAddr string) error {
 	c, err := app.New()
 	if err != nil {
+		return err
+	}
+
+	// Fail fast, before anything opens: an enabled service whose adapter was
+	// never registered (forgotten import, typo) is one aggregated error with
+	// did-you-mean hints instead of a lazy "unknown adapter" at first use.
+	if err := c.ValidateEnabledAdapters(enabledKeys(doctorEnabled())); err != nil {
 		return err
 	}
 

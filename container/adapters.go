@@ -143,3 +143,12 @@ func RegisteredAdapters(service string) []string {
 func (c *Container) ValidateAdapters() error {
 	return c.cfg.ValidateAdapters(registeredAdapters)
 }
+
+// ValidateEnabledAdapters is ValidateAdapters scoped to the services the
+// project enables: explicit names (top-level keys of the project config)
+// plus any service whose adapter differs from config.Default(). Unconfigured
+// services at their default adapter are skipped, so a minimal scaffold that
+// registers only what it uses passes. Generated servers call it at startup.
+func (c *Container) ValidateEnabledAdapters(explicit []string) error {
+	return c.cfg.ValidateEnabledAdapters(explicit, registeredAdapters)
+}
