@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs a dataset) and `i18n` (embed, needs an embedded FS), so a fresh
   `--profile full` project failed `zever doctor` with 3 FAILs. Those three
   services are now left out; add them with `zever add`.
+- `docs(lint): refresh the wrapcheck measurement`: the `.golangci.yml` note now
+  records 162 hits for `container` + `core/*` (17 + 145), the reason wrapcheck
+  stays disabled.
 - `docs(auth): drop duplicated alg-none sentence from the JWT guide`: the
   guide states HS256-only once and no longer repeats the `alg: none` rejection
   note. No code or behavior change; asymmetric algorithms stay unsupported by
