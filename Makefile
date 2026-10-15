@@ -103,6 +103,10 @@ installer-test: ## Run installer fail-closed tests (offline, stubbed PATH)
 version-check: ## Fail if cmd/zever/VERSION is lower than the newest cmd/zever/v* tag (skips without tags)
 	sh tools/check-version.sh
 
+.PHONY: changelog-lint
+changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** prefix, indentation)
+	bash tools/changelog-lint.sh
+
 .PHONY: compile-check
 compile-check: ## Verify committed generated code matches the schema (zever compile --check over examples)
 	cd examples/todo && $(GO) run ../../cmd/zever compile --check --out ./generated schema/todo.zen schema/todo_grpc.zen
@@ -172,7 +176,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check version-check ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
