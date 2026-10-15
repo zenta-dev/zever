@@ -199,6 +199,7 @@ test-race-pr: ## Run tests with the race detector, shuffled order, 2 iterations 
 .PHONY: modgraph-check
 modgraph-check: ## Verify every module requires+replaces the intra-repo modules it imports, and every go.mod follows the release tag path rule (CI module-graph gate)
 	$(GO) run ./tools/modgraph --check
+	$(GO) run ./tools/modgraph --check-pins
 
 .PHONY: test-flake
 test-flake: ## Hunt flaky tests: race + shuffle + repeat across modules (FLAKE_COUNT=5, override list via MODULES)
@@ -223,6 +224,11 @@ deps-sync: ## Reconcile dependency versions across all modules after a bump
 	$(MAKE) tidy-all
 	GOWORK=off go -C docs/examples mod tidy
 	GOWORK=off go -C examples/external-sms mod tidy
+
+.PHONY: release-prep
+release-prep: ## Pin the repo for a release: VERSION=vX.Y.Z rewrites cmd/zever/VERSION, installers, docs pins and every intra-repo go.mod require, then tidies
+	@test -n "$(VERSION)" || { echo "usage: make release-prep VERSION=vX.Y.Z" >&2; exit 1; }
+	bash tools/release-prep.sh $(VERSION)
 
 deps-sync-check: ## Verify no dependency drift remains after a bump
 	$(MAKE) tidy-check-all

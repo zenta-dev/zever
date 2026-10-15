@@ -3,13 +3,13 @@ module github.com/zenta-dev/zever/adapters/lock/memory
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/lock v0.6.1
-	github.com/zenta-dev/zever/shared/lrucache v0.6.1
+	github.com/zenta-dev/zever/core/lock v0.7.1
+	github.com/zenta-dev/zever/shared/lrucache v0.7.1
 )
 
 require (
-	github.com/zenta-dev/zever/shared/redisopt v0.6.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.6.1 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.7.1 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/lock => ../../../core/lock

@@ -14,6 +14,8 @@
 # With --verify, create nothing: confirm every module's tag exists locally or
 # on origin (remote tag listing; skipped when no origin is configured) and
 # exit 1 listing the missing ones. Used by the release docs.
+# Before any mode runs, tools/check-version.sh must pass: every version pin and
+# every intra-repo go.mod require equals cmd/zever/VERSION (== <version>).
 # Prints a `git push --tags` hint at the end; never pushes.
 set -euo pipefail
 
@@ -63,6 +65,18 @@ if [ -f "$version_file" ] && [ "$(tr -d '[:space:]' <"$version_file")" != "${ver
     echo "updated $version_file to ${ver#v}; commit it, then re-run $0 $ver" >&2
     exit 1
   fi
+fi
+
+# Every hard-coded version (installers, CITATION.cff, docs pins, CHANGELOG
+# top section) and every intra-repo go.mod require must equal the release
+# version before anything is tagged or verified: published go.mod files
+# cannot be fixed after the proxy caches them. Fix with `make release-prep`.
+check_script="$(cd "$(dirname "$0")" && pwd)/check-version.sh"
+if [ -f "$version_file" ] && [ -f "$check_script" ]; then
+  ZEVER_ROOT="$PWD" sh "$check_script" || {
+    echo "error: release pins do not match $ver; run: make release-prep VERSION=$ver" >&2
+    exit 1
+  }
 fi
 
 pass1=()
