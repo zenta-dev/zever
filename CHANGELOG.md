@@ -536,7 +536,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   collapsed since they never match) before splitting, and `Preload` fetches
   each distinct parent key once. Chunked reads are documented as multiple
   statements that are not snapshot-consistent unless run in a transaction.
-
+- `fix(config,container,cmd): scope adapter validation to enabled services and
+  run it at boot`: new `config.(*Config).EnabledServices`,
+  `ValidateEnabledAdapters` and `container.(*Container).ValidateEnabledAdapters`
+  check only services explicitly configured or at a non-default adapter, so a
+  generated server's `-doctor` no longer exits 1 on `unknown adapter
+  "anthropic" for service "ai"` for unconfigured services. The generated
+  server now validates at startup (one aggregated error with did-you-mean,
+  exit non-zero) instead of failing lazily on first use, and `zever doctor`
+  surfaces the server's `adapters` row. `ValidateAdapters` keeps checking
+  every service.
 - `fix(container): share a failed build with parked waiters`: concurrent
   callers waiting on a lazy service build that errors or panics now receive
   that build's error instead of each re-running the builder; a later call

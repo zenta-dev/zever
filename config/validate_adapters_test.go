@@ -86,6 +86,80 @@ func TestValidateAdaptersEmptyRegistryFailsClosed(t *testing.T) {
 	}
 }
 
+// scaffoldRegistry mimics a minimal scaffold: only db and router adapters
+// are registered.
+func scaffoldRegistry(service string) []string {
+	switch service {
+	case "db":
+		return []string{"sqlite", "postgres"}
+	case "router":
+		return []string{"chi"}
+	}
+	return nil
+}
+
+func TestValidateEnabledAdaptersScaffoldPasses(t *testing.T) {
+	t.Parallel()
+
+	cfg := Default()
+	cfg.DB.Adapter = "sqlite"
+	cfg.Router.Adapter = "chi"
+
+	if err := cfg.ValidateEnabledAdapters([]string{"db", "router"}, scaffoldRegistry); err != nil {
+		t.Fatalf("scaffold-like config = %v, want nil (unconfigured services must be skipped)", err)
+	}
+}
+
+func TestValidateEnabledAdaptersUnregisteredFailsWithHint(t *testing.T) {
+	t.Parallel()
+
+	cfg := Default()
+	cfg.DB.Adapter = "sqlite"
+	cfg.Router.Adapter = "chi"
+	cfg.Cache.Adapter = "redsi"
+
+	reg := func(service string) []string {
+		if service == "cache" {
+			return []string{"memory", "redis"}
+		}
+		return scaffoldRegistry(service)
+	}
+
+	err := cfg.ValidateEnabledAdapters([]string{"db", "router", "cache"}, reg)
+	if err == nil {
+		t.Fatal("want error for unregistered cache adapter")
+	}
+
+	var ua *UnknownAdapterError
+	if !errors.As(err, &ua) || ua.Service != "cache" || ua.Suggestion != "redis" {
+		t.Fatalf("err = %v, want cache UnknownAdapterError suggesting redis", err)
+	}
+}
+
+func TestValidateEnabledAdaptersNonDefaultAdapterCountsAsEnabled(t *testing.T) {
+	t.Parallel()
+
+	cfg := Default()
+	cfg.Cache.Adapter = "redis"
+
+	err := cfg.ValidateEnabledAdapters(nil, func(string) []string { return []string{"memory"} })
+	if err == nil || !strings.Contains(err.Error(), `"redis"`) {
+		t.Fatalf("err = %v, want failure for non-default cache adapter", err)
+	}
+}
+
+func TestValidateEnabledAdaptersCustomRegisteredPasses(t *testing.T) {
+	t.Parallel()
+
+	cfg := Default()
+	cfg.Cache.Adapter = "my-custom"
+
+	err := cfg.ValidateEnabledAdapters([]string{"cache"}, func(string) []string { return []string{"my-custom"} })
+	if err != nil {
+		t.Fatalf("custom registered adapter = %v, want nil", err)
+	}
+}
+
 func TestUnknownAdapterErrorMessage(t *testing.T) {
 	t.Parallel()
 

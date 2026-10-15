@@ -168,19 +168,14 @@ func scopedValidateAdapters(resolved *config.Config, enabled map[string]bool, re
 		return resolved.ValidateAdapters(registered)
 	}
 
-	services := resolved.RedactedServices()
+	keys := make([]string, 0, len(enabled))
+	for k := range enabled {
+		keys = append(keys, k)
+	}
 
-	return resolved.ValidateAdapters(func(service string) []string {
-		if !enabled[service] {
-			if sc, ok := services[service]; ok {
-				return []string{sc.Adapter}
-			}
+	sort.Strings(keys)
 
-			return nil
-		}
-
-		return registered(service)
-	})
+	return resolved.ValidateEnabledAdapters(keys, registered)
 }
 
 // doctorRow is one battery's check result, human and JSON alike.
@@ -305,7 +300,7 @@ func serverDoctorRows(resolved *config.Config, rep serverDoctorReport, enabled m
 
 		byName[b.Name] = b
 
-		if enabled == nil || enabled[b.Name] {
+		if b.Name == "adapters" || enabled == nil || enabled[b.Name] {
 			names = append(names, b.Name)
 		}
 	}
