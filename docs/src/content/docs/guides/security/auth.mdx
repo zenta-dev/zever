@@ -41,7 +41,7 @@ if err != nil {
 
 ## Key rotation
 
-List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported — use a custom auth adapter if you need them. Also, `alg: none` tokens are rejected, and `alg: none` tokens are rejected.
+List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported — use a custom auth adapter if you need them. `alg: none` tokens are rejected.
 
 ```yaml title="zever.yaml"
 auth:
