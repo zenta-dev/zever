@@ -80,7 +80,7 @@ Cap public bodies (413) and pass `r.Context()` downstream for `middleware.Timeou
 GET /v1/orders?cursor=eyJpZCI6NDJ9&limit=50
 ```
 
-The generated service method takes an opaque `Cursor` plus `limit int32`, and the generated handler rejects a negative limit or one above `MaxPageLimit` (`DefaultPageLimit` applies when the client sends none) before the service runs. The generated `Page[T]` type carries one page (`Items` plus `NextCursor`, empty when last) for consumers that prefer it over the protobuf response message.
+The synthesized request message carries `cursor` and `limit` fields (so gRPC clients paginate too, and a paginated RPC may not declare params of those names). The generated service method takes the opaque `cursor string` plus `limit int32`. Both transports apply the same bounds before the service runs: zero becomes the default (20), a limit above the max (100) is clamped, and a negative limit is `InvalidArgument`. The response is the protobuf `<Op>Response` message (`items` plus `next_cursor`, empty when last).
 
 ```go
 key := orm.NewCursorKey(UserID, lastSeenID)

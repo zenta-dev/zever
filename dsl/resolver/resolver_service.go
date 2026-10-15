@@ -133,6 +133,16 @@ func resolveOperation(
 
 	rpc.Paginated = rd.Paginated
 
+	if rd.Paginated {
+		for _, p := range rd.Params {
+			if p.Name == "cursor" || p.Name == "limit" {
+				diags = append(diags, diag.Wrap("resolve", p.NamePos, ErrInvalidOption,
+					"rpc %s.%s: param %q is reserved on a paginated rpc (the request carries cursor and limit)",
+					serviceName, rd.Name, p.Name))
+			}
+		}
+	}
+
 	return rpc, diags
 }
 

@@ -32,10 +32,10 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 
 		req := &ListProductsRequest{}
 
-		var cursor Cursor
+		var cursor string
 		var limit int32
 
-		cursor = Cursor(r.URL.Query().Get("cursor"))
+		cursor = r.URL.Query().Get("cursor")
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			v, err := strconv.ParseInt(raw, 10, 32)
 			if err != nil {
@@ -43,12 +43,13 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 				return
 			}
 
-			if v < 0 || v > int64(MaxPageLimit) {
-				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
-				return
-			}
-
 			limit = int32(v)
+		}
+
+		limit, err := normalizePageLimit(limit)
+		if err != nil {
+			writeGogenError(w, r, err)
+			return
 		}
 
 		{
@@ -61,6 +62,8 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 			req.CategoryId = raw
 
 		}
+
+		req.Cursor, req.Limit = cursor, limit
 
 		resp, err := svc.ListProducts(ctx, req, cursor, limit)
 		if err != nil {
@@ -355,10 +358,10 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 
 		req := &ListOrdersRequest{}
 
-		var cursor Cursor
+		var cursor string
 		var limit int32
 
-		cursor = Cursor(r.URL.Query().Get("cursor"))
+		cursor = r.URL.Query().Get("cursor")
 		if raw := r.URL.Query().Get("limit"); raw != "" {
 			v, err := strconv.ParseInt(raw, 10, 32)
 			if err != nil {
@@ -366,12 +369,13 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 				return
 			}
 
-			if v < 0 || v > int64(MaxPageLimit) {
-				writeGogenError(w, r, apperror.New(apperror.InvalidArgument, "invalid parameter \"limit\""))
-				return
-			}
-
 			limit = int32(v)
+		}
+
+		limit, err := normalizePageLimit(limit)
+		if err != nil {
+			writeGogenError(w, r, err)
+			return
 		}
 
 		{
@@ -384,6 +388,8 @@ func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 			req.UserId = raw
 
 		}
+
+		req.Cursor, req.Limit = cursor, limit
 
 		resp, err := svc.ListOrders(ctx, req, cursor, limit)
 		if err != nil {

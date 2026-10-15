@@ -145,12 +145,12 @@ func TestValidationRunsBeforeServiceCall(t *testing.T) {
 }
 
 // TestPaginatedServiceTakesCursorLimit locks the paginated method shape the
-// stub must implement: cursor/limit travel outside the protobuf request.
+// stub must implement: cursor/limit are passed as explicit args (also carried on the request).
 func TestPaginatedServiceTakesCursorLimit(t *testing.T) {
 	out := generateGolden(t)
 
 	if !strings.Contains(string(out["app/service.go"]),
-		"ListTasks(ctx context.Context, req *ListTasksRequest, cursor Cursor, limit int32) (*ListTasksResponse, error)") {
+		"ListTasks(ctx context.Context, req *ListTasksRequest, cursor string, limit int32) (*ListTasksResponse, error)") {
 		t.Fatalf("service.go missing paginated ListTasks shape:\n%s", out["app/service.go"])
 	}
 }

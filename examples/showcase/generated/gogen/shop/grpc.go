@@ -34,11 +34,14 @@ func NewShopServiceGRPCServer(svc ShopService) *ShopServiceGRPCServer {
 var _ pb.ShopServiceServer = (*ShopServiceGRPCServer)(nil)
 
 func (g *ShopServiceGRPCServer) ListProducts(ctx context.Context, req *ListProductsRequest) (*ListProductsResponse, error) {
-	// NOTE: protogogen's synthesized request message carries no cursor/limit
-	// fields (Phase 2 does not extend proto request-message synthesis for
-	// pagination) -- a gRPC caller always gets the first page today; an HTTP
-	// caller gets full cursor/limit support via query parameters, see router.go.
-	resp, err := g.svc.ListProducts(ctx, req, Cursor(""), 0)
+	limit, err := normalizePageLimit(req.GetLimit())
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	req.Limit = limit
+
+	resp, err := g.svc.ListProducts(ctx, req, req.GetCursor(), limit)
 	if err != nil {
 		return nil, gogenGRPCError(err)
 	}
@@ -126,11 +129,14 @@ func (g *ShopServiceGRPCServer) GetOrder(ctx context.Context, req *GetOrderReque
 }
 
 func (g *ShopServiceGRPCServer) ListOrders(ctx context.Context, req *ListOrdersRequest) (*ListOrdersResponse, error) {
-	// NOTE: protogogen's synthesized request message carries no cursor/limit
-	// fields (Phase 2 does not extend proto request-message synthesis for
-	// pagination) -- a gRPC caller always gets the first page today; an HTTP
-	// caller gets full cursor/limit support via query parameters, see router.go.
-	resp, err := g.svc.ListOrders(ctx, req, Cursor(""), 0)
+	limit, err := normalizePageLimit(req.GetLimit())
+	if err != nil {
+		return nil, gogenGRPCError(err)
+	}
+
+	req.Limit = limit
+
+	resp, err := g.svc.ListOrders(ctx, req, req.GetCursor(), limit)
 	if err != nil {
 		return nil, gogenGRPCError(err)
 	}

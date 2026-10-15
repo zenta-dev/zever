@@ -371,7 +371,9 @@ func newOpModel(op *ir.Operation) opModel {
 
 	requestType := name + "Request"
 
-	singleRefParam := len(op.Params) == 1 && op.Params[0].Ref != nil
+	// Mirrors proto's singleRefParam: a paginated operation always gets the
+	// synthesized request wrapper carrying cursor and limit.
+	singleRefParam := !op.Paginated && len(op.Params) == 1 && op.Params[0].Ref != nil
 	if singleRefParam {
 		requestType = naming.PascalCase(op.Params[0].Ref.Name())
 	}
