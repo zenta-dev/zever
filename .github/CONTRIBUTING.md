@@ -192,6 +192,8 @@ Before changing anything exported (functions, types, methods, interfaces, constr
 
 Keep public API changes minimal and deliberate. Do not make unrelated breaking changes as a side effect of another fix. Public API changes should be called out explicitly in the pull request and reviewed by a maintainer.
 
+The `apidiff` CI gate (`make apidiff`) enforces this for Core-tier modules. An incompatible change in module `M` must be covered by a `**Breaking:**` entry under `## [Unreleased]` in `CHANGELOG.md` that names `M`. An entry is a `- ` bullet plus its indented continuation lines; it covers `M` when it carries a backticked token that is the module path (`github.com/zenta-dev/zever/core/auth`), the module directory (`core/auth`), a package path under either (`core/auth/jwt`, a trailing `/...` is ignored), the short name (`auth`) or a qualified identifier (`auth.JWTOptions`). A `**Breaking:**` line that names only other modules does not satisfy the gate. A Core-tier module with no `<dir>/v*` baseline tag fails the gate unless it is listed, with a reason and an `expires` date (`YYYY-MM-DD`), in `.github/apidiff-baseline-allowlist.json`; expired entries fail again.
+
 ## Versioning
 
 This project follows [Semantic Versioning](https://semver.org/):
@@ -210,7 +212,7 @@ Every module (there is no root `go.mod`) shares the lockstep release version wit
 
 ## Release checklist (lockstep per-module tags)
 
-Every release ships one number across all modules via `tools/tag-release.sh` (finds every `go.mod`, tags each module as `<module-path>/vX.Y.Z`, e.g. `github.com/zenta-dev/zever/adapters/cache/redis/vX.Y.Z`, in dependency order — `shared/*`, then `core/*` plus `config`/`container`/`orm`/`dsl`/`cmd`, then `adapters/*` and the rest; preview with `--dry-run`; prints a `git push --tags` hint, never pushes). There is no root `go.mod`, so the script creates no bare `vX.Y.Z` tag; bare `vX.Y.Z` tags in history are the historical root marker while the per-module tags carry the release payload. The `dsl` compiler has no
+Every release ships one number across all modules via `tools/tag-release.sh` (finds every `go.mod`, tags each module as `<module-path>/vX.Y.Z`, e.g. `github.com/zenta-dev/zever/adapters/cache/redis/vX.Y.Z`, in dependency order — `shared/*`, then `core/*` plus `config`/`container`/`orm`/`dsl`/`cmd`, then `adapters/*` and the rest; preview with `--dry-run`; after tagging, confirm every module's tag exists locally or on origin with `tools/tag-release.sh --verify vX.Y.Z`; prints a `git push --tags` hint, never pushes). There is no root `go.mod`, so the script creates no bare `vX.Y.Z` tag; bare `vX.Y.Z` tags in history are the historical root marker while the per-module tags carry the release payload. The `dsl` compiler has no
 release-version constant (schema `v1`/`v2` segments are API versions, not
 releases) — everything else moves together:
 

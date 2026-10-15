@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/apidiff"
 	"golang.org/x/mod/modfile"
@@ -41,6 +45,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	rootFlag := fs.String("root", "", "repo root (default: git toplevel of cwd)")
 	modulesFlag := fs.String("modules", "", "comma-separated module dirs (default: Core tier)")
 	changelogFlag := fs.String("changelog", "", "changelog path (default: <root>/CHANGELOG.md)")
+	allowFlag := fs.String("allowlist", "", "no-baseline allowlist JSON (default: <root>/.github/apidiff-baseline-allowlist.json)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -63,17 +68,39 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		changelog = filepath.Join(root, "CHANGELOG.md")
 	}
 
+	allowPath := *allowFlag
+	if allowPath == "" {
+		allowPath = filepath.Join(root, ".github", "apidiff-baseline-allowlist.json")
+	}
+	allow, allowErr := loadBaselineAllowlist(allowPath)
+	if allowErr != nil {
+		fmt.Fprintf(stderr, "apidiff: %v\n", allowErr)
+		return 1
+	}
+
 	type failure struct {
 		module string
 		tag    string
 		report string
 	}
 	var failures []failure
+	missing := 0
 	for _, dir := range modules {
 		dir = strings.TrimSpace(dir)
 		tag, err := latestTag(ctx, root, dir)
 		if err != nil {
-			fmt.Fprintf(stderr, "apidiff: %s: %v; skipping\n", dir, err)
+			entry, ok := allow[dir]
+			switch {
+			case !ok:
+				fmt.Fprintf(stdout, "apidiff: %s: no baseline tag %s/v*; Core-tier modules must be tagged "+
+					"(or listed with an expiry in %s)\n", dir, dir, allowPath)
+				missing++
+			case entry.expired(now()):
+				fmt.Fprintf(stdout, "apidiff: %s: no baseline tag and its allowlist entry expired on %s\n", dir, entry.Expires)
+				missing++
+			default:
+				fmt.Fprintf(stdout, "apidiff: %s: no baseline tag; allowlisted until %s (%s)\n", dir, entry.Expires, entry.Reason)
+			}
 			continue
 		}
 		report, err := compareModule(ctx, root, dir, tag)
@@ -89,6 +116,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 
 	if len(failures) == 0 {
+		if missing > 0 {
+			fmt.Fprintf(stdout, "apidiff: %d Core-tier module(s) without a usable baseline tag\n", missing)
+			return 1
+		}
 		fmt.Fprintf(stdout, "apidiff: all checked modules compatible\n")
 		return 0
 	}
@@ -101,12 +132,79 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "apidiff: read %s: %v\n", changelog, err)
 		return 1
 	}
-	if !unreleasedHasBreaking(string(raw)) {
-		fmt.Fprintf(stdout, "apidiff: incompatible API changes without a **Breaking:** line under ## [Unreleased] in %s\n", changelog)
+	entries := breakingEntries(string(raw))
+	uncovered := 0
+	for _, f := range failures {
+		mod, merr := goModPath(filepath.Join(root, f.module, "go.mod"))
+		if merr != nil {
+			fmt.Fprintf(stderr, "apidiff: %v\n", merr)
+			return 1
+		}
+		if !anyCovers(entries, f.module, mod) {
+			fmt.Fprintf(stdout, "apidiff: %s: incompatible changes need a **Breaking:** entry under ## [Unreleased] in %s "+
+				"naming the module (`%s`), a package under it or its short name (`%s`) in backticks\n",
+				f.module, changelog, f.module, path.Base(f.module))
+			uncovered++
+		}
+	}
+	if uncovered > 0 || missing > 0 {
 		return 1
 	}
 	fmt.Fprintf(stdout, "apidiff: incompatible changes documented under ## [Unreleased]\n")
 	return 0
+}
+
+// now is the clock used for allowlist expiry; tests replace it.
+var now = time.Now
+
+// baselineEntry is one allowlist record exempting a Core-tier module from the
+// "must have a baseline tag" rule until Expires.
+type baselineEntry struct {
+	// Module is the module directory relative to the repo root.
+	Module string `json:"module"`
+	// Reason explains why no baseline tag exists yet.
+	Reason string `json:"reason"`
+	// Expires is the last day (YYYY-MM-DD, UTC) the exemption holds.
+	Expires string `json:"expires"`
+}
+
+// expired reports whether the exemption has lapsed at t.
+func (e baselineEntry) expired(t time.Time) bool {
+	d, err := time.Parse("2006-01-02", e.Expires)
+	if err != nil {
+		return true
+	}
+	return t.UTC().After(d.AddDate(0, 0, 1))
+}
+
+// loadBaselineAllowlist reads the allowlist file ({"allowlist": [...]}); a
+// missing file is an empty list. Every entry needs a module, a reason and a
+// valid expiry date.
+func loadBaselineAllowlist(file string) (map[string]baselineEntry, error) {
+	raw, err := os.ReadFile(file)
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]baselineEntry{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read allowlist: %w", err)
+	}
+	var doc struct {
+		Allowlist []baselineEntry `json:"allowlist"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("parse allowlist %s: %w", file, err)
+	}
+	out := make(map[string]baselineEntry, len(doc.Allowlist))
+	for _, e := range doc.Allowlist {
+		if e.Module == "" || e.Reason == "" {
+			return nil, fmt.Errorf("allowlist %s: entry needs module and reason: %+v", file, e)
+		}
+		if _, perr := time.Parse("2006-01-02", e.Expires); perr != nil {
+			return nil, fmt.Errorf("allowlist %s: %s: expires must be YYYY-MM-DD: %w", file, e.Module, perr)
+		}
+		out[e.Module] = e
+	}
+	return out, nil
 }
 
 func gitTopLevel(ctx context.Context) (string, error) {
@@ -245,20 +343,96 @@ func isInternalPackage(pkgPath, modulePath string) bool {
 	return false
 }
 
-// unreleasedHasBreaking reports whether body carries a **Breaking:** line
+// unreleasedHasBreaking reports whether body carries a **Breaking:** entry
 // inside the ## [Unreleased] section (stopping at the next ## [x] header).
 func unreleasedHasBreaking(body string) bool {
-	lines := strings.Split(body, "\n")
-	inUnreleased := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "## ") {
-			inUnreleased = trimmed == "## [Unreleased]"
-			continue
+	return len(breakingEntries(body)) > 0
+}
+
+// breakingEntries returns the ## [Unreleased] list entries (a "- " bullet
+// plus its indented continuation lines) that contain a **Breaking:** marker.
+func breakingEntries(body string) []string {
+	var entries []string
+	var cur []string
+	flush := func() {
+		if len(cur) == 0 {
+			return
 		}
-		if inUnreleased && strings.Contains(line, "**Breaking:**") {
+		text := strings.Join(cur, "\n")
+		if strings.Contains(text, "**Breaking:**") {
+			entries = append(entries, text)
+		}
+		cur = nil
+	}
+	inUnreleased := false
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "## "):
+			flush()
+			inUnreleased = trimmed == "## [Unreleased]"
+		case !inUnreleased:
+		case strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* "):
+			flush()
+			cur = []string{line}
+		case trimmed == "" || strings.HasPrefix(trimmed, "#"):
+			flush()
+		case len(cur) > 0:
+			cur = append(cur, line)
+		default:
+			// Free text outside a bullet still counts as its own entry.
+			cur = append(make([]string, 0, 2), line)
+		}
+	}
+	flush()
+	return entries
+}
+
+// anyCovers reports whether some entry names module dir (import path mod).
+func anyCovers(entries []string, dir, mod string) bool {
+	for _, e := range entries {
+		if entryCovers(e, dir, mod) {
 			return true
 		}
 	}
 	return false
+}
+
+// entryCovers implements the naming convention: a **Breaking:** entry covers
+// module dir when it carries a backticked token that is the module import
+// path, the module directory, a package path under either, or the short name
+// (last directory element, optionally qualified as `short.Ident`). A
+// trailing "/..." is ignored.
+func entryCovers(entry, dir, mod string) bool {
+	short := path.Base(dir)
+	for _, tok := range backticked(entry) {
+		tok = strings.TrimSuffix(tok, "/...")
+		switch {
+		case tok == mod, tok == dir, tok == short:
+			return true
+		case strings.HasPrefix(tok, mod+"/"), strings.HasPrefix(tok, dir+"/"):
+			return true
+		case strings.HasPrefix(tok, short+"."):
+			return true
+		}
+	}
+	return false
+}
+
+// backticked returns the inline-code spans of s.
+func backticked(s string) []string {
+	var out []string
+	for {
+		i := strings.IndexByte(s, '`')
+		if i < 0 {
+			return out
+		}
+		s = s[i+1:]
+		j := strings.IndexByte(s, '`')
+		if j < 0 {
+			return out
+		}
+		out = append(out, s[:j])
+		s = s[j+1:]
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func mustWrite(t *testing.T, path, content string) {
@@ -172,20 +173,135 @@ func (World) Method(a int64) int64 { return a }
 		t.Errorf("gate output does not ask for a **Breaking:** line:\n%s", out)
 	}
 
-	mustWrite(t, filepath.Join(root, "CHANGELOG.md"), `# Changelog
-
-## [Unreleased]
-
-### Breaking
-
-- **Breaking:** drop api.Hello and widen World.Method
-
-## [v0.1.0] - 2026-01-01
-`)
+	mustWrite(t, filepath.Join(root, "CHANGELOG.md"),
+		changelogWith("- **Breaking:** `mod` drops `api.Hello` and widens `api.World.Method`"))
 	stdout.Reset()
 	stderr.Reset()
 	code = run(context.Background(), []string{"--root", root, "--modules", "mod"}, &stdout, &stderr)
 	if code != 0 {
 		t.Errorf("run broken tree with Breaking trailer = exit %d, want 0\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+	}
+}
+
+const breakAPI = `package api
+
+// World is a sample type.
+type World struct{}
+
+// Method answers with a widened signature.
+func (World) Method(a int64) int64 { return a }
+`
+
+func breakingRepo(t *testing.T) string {
+	t.Helper()
+	root := initRepo(t)
+	mustGit(t, root, "tag", "mod/v0.1.0")
+	mustWrite(t, filepath.Join(root, "mod", "api.go"), breakAPI)
+	mustGit(t, root, "add", "-A")
+	mustGit(t, root, "commit", "-qm", "break api")
+	return root
+}
+
+func changelogWith(entry string) string {
+	return "# Changelog\n\n## [Unreleased]\n\n### Breaking\n\n" + entry + "\n\n## [v0.1.0] - 2026-01-01\n"
+}
+
+func runGate(t *testing.T, root string, extra ...string) (int, string) {
+	t.Helper()
+	var stdout, stderr strings.Builder
+	args := append([]string{"--root", root, "--modules", "mod"}, extra...)
+	code := run(context.Background(), args, &stdout, &stderr)
+	return code, stdout.String() + stderr.String()
+}
+
+func TestGateBreakCoveredOnlyByUnrelatedEntryFails(t *testing.T) {
+	root := breakingRepo(t)
+	mustWrite(t, filepath.Join(root, "CHANGELOG.md"),
+		changelogWith("- **Breaking:** `other/pkg` drops `Foo` and the `payment` adapter changes"))
+	code, out := runGate(t, root)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1\n%s", code, out)
+	}
+	if !strings.Contains(out, "naming the module") {
+		t.Errorf("output does not explain the naming rule:\n%s", out)
+	}
+}
+
+func TestGateBreakCoveredByNamingEntryPasses(t *testing.T) {
+	for _, entry := range []string{
+		"- **Breaking:** `mod` drops Hello",
+		"- **Breaking:** `example.com/acme/mod` drops Hello",
+		"- **Breaking:** `example.com/acme/mod/sub` drops Hello",
+		"- fix(mod)!: drop\n  **Breaking:** `mod.Hello` removed",
+	} {
+		root := breakingRepo(t)
+		mustWrite(t, filepath.Join(root, "CHANGELOG.md"), changelogWith(entry))
+		if code, out := runGate(t, root); code != 0 {
+			t.Errorf("entry %q: exit %d, want 0\n%s", entry, code, out)
+		}
+	}
+}
+
+func TestGateNoBaselineTagFailsUnlessAllowlisted(t *testing.T) {
+	root := initRepo(t) // no tag
+	code, out := runGate(t, root)
+	if code != 1 || !strings.Contains(out, "no baseline tag") {
+		t.Fatalf("untagged: exit %d, want 1 with message\n%s", code, out)
+	}
+
+	allow := filepath.Join(root, "allow.json")
+	mustWrite(t, allow, `{"allowlist":[{"module":"mod","reason":"first release","expires":"2099-01-01"}]}`)
+	if c, o := runGate(t, root, "--allowlist", allow); c != 0 {
+		t.Errorf("allowlisted: exit %d, want 0\n%s", c, o)
+	}
+
+	old := now
+	t.Cleanup(func() { now = old })
+	now = func() time.Time { return time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC) }
+	code, out = runGate(t, root, "--allowlist", allow)
+	if code != 1 || !strings.Contains(out, "expired") {
+		t.Errorf("expired allowlist: exit %d, want 1 with 'expired'\n%s", code, out)
+	}
+}
+
+func TestLoadBaselineAllowlistValidation(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"noreason": `{"allowlist":[{"module":"a","expires":"2099-01-01"}]}`,
+		"baddate":  `{"allowlist":[{"module":"a","reason":"r","expires":"soon"}]}`,
+		"badjson":  `{`,
+	} {
+		f := filepath.Join(dir, name)
+		mustWrite(t, f, body)
+		if _, err := loadBaselineAllowlist(f); err == nil {
+			t.Errorf("%s: want error", name)
+		}
+	}
+	if m, err := loadBaselineAllowlist(filepath.Join(dir, "missing")); err != nil || len(m) != 0 {
+		t.Errorf("missing file: got %v, %v; want empty, nil", m, err)
+	}
+}
+
+func TestEntryCovers(t *testing.T) {
+	t.Parallel()
+	const mod = "github.com/zenta-dev/zever/core/auth"
+	tests := []struct {
+		entry string
+		want  bool
+	}{
+		{"**Breaking:** `core/auth` x", true},
+		{"**Breaking:** `auth` x", true},
+		{"**Breaking:** `auth.JWTOptions` x", true},
+		{"**Breaking:** `" + mod + "/jwt` x", true},
+		{"**Breaking:** `core/auth/jwt/...` x", true},
+		{"**Breaking:** `core/authz` x", false},
+		{"**Breaking:** auth without backticks", false},
+		{"**Breaking:** `orm` x", false},
+	}
+	for _, tc := range tests {
+		if got := entryCovers(tc.entry, "core/auth", mod); got != tc.want {
+			t.Errorf("entryCovers(%q) = %v, want %v", tc.entry, got, tc.want)
+		}
 	}
 }

@@ -125,6 +125,19 @@ Pre-1.0 Extended packages are exempt (they break freely with release
 notes); pre-1.0 Core follows the window on a best-effort basis and always
 with release notes.
 
+## API compatibility gate
+
+`make apidiff` (CI job `apidiff`) diffs each Core-tier module against its
+latest `<dir>/vX.Y.Z` tag. An incompatible change fails unless
+`## [Unreleased]` in `CHANGELOG.md` carries a `**Breaking:**` entry that
+names the affected module in backticks: its module path, directory, a
+package path under it, its short name, or a qualified identifier such as
+`auth.JWTOptions`. A `**Breaking:**` entry for a different module does not
+count. A Core module with no baseline tag also fails, unless it is listed
+with a reason and an `expires` date in
+`.github/apidiff-baseline-allowlist.json`. Details: `API Compatibility` in
+`.github/CONTRIBUTING.md`.
+
 ## 1.0 promotion criteria
 
 Core graduates from "toward 1.0 promise" to the 1.0 compatibility promise
