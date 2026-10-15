@@ -13,7 +13,7 @@ Use it for domain events, webhook fan-out, cache invalidation, and audit trails.
 
 One transaction, one event, one idempotent consumer side effect:
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (
@@ -29,7 +29,7 @@ import (
 
 func main() {
 	cfg := config.Default()
-	cfg.DB.Path = ":memory:"
+	cfg.DB.Options.Path = ":memory:"
 	c := container.New(cfg)
 
 	conn, err := c.DB()

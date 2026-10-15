@@ -57,10 +57,17 @@ linters:
     - wastedassign
     - whitespace
     - zerologlint
-  # wrapcheck is intentionally not enabled: it would fail CI on hundreds of
-  # pre-existing cross-package error returns. The repo's error conventions
-  # (message prefixes, no double %w, no stray panics) are enforced by
-  # `make err-lint` (tools/errscan) instead — see docs/errors.md.
+  # wrapcheck is intentionally not enabled. Measured with
+  # `golangci-lint run --enable-only wrapcheck ./...` per module (non-test
+  # code): config is clean, but container (16) plus 40+ core/* modules
+  # (~145) report ~160 hits in total. Most are deliberate pass-throughs of
+  # adapter/interface errors (Close/Stop/Shutdown probes, registry
+  # Register, ctx.Err) that callers match with errors.Is/As and that
+  # already carry the adapter's own message prefix; wrapping them all adds
+  # stutter without information. The repo's error conventions (message
+  # prefixes, no double %w, no stray panics) are enforced by
+  # `make err-lint` (tools/errscan) instead; see
+  # docs/src/content/docs/reference/errors.mdx.
   settings:
     depguard:
       rules:

@@ -38,6 +38,24 @@ Reserved words: `entity`, `service`, `job`, `schedule`, `rpc`, `index`, `enum`, 
 
 Append `?` to make a field optional: `bio: string?`.
 
+## Enums and messages
+
+```zen
+enum Status { active, inactive }
+
+message LoginRequest {
+  email: string @validate(format: "email")
+  remember: bool
+}
+
+entity Account {
+  id: uuid @primary
+  status: Status @default(active)
+}
+```
+
+A named `enum` needs at least one value and unique values, and its name cannot collide with an entity. A `message` carries fields but is never persisted.
+
 ## Entities
 
 ```zen
@@ -106,6 +124,21 @@ Every field of an entity or message used as an RPC parameter must carry at least
 ### Indexes
 
 `index(a, b)` declares a secondary index over one or more fields. Index attributes follow the closing parenthesis.
+
+## Grammar summary
+
+```text
+file     = { entity | service | enum | message | job | schedule | saga }
+entity   = "entity" Name { attr } "{" { field | relation | index } "}"
+field    = name ":" type [ "?" ] { attr }
+relation = ("has_many" | "has_one" | "belongs_to" | "many_to_many") name ":" Name { attr } [ "{" "join_table" ":" name "}" ]
+index    = "index" "(" name { "," name } ")" { attr }
+service  = "service" Name "{" { rpc } "}"
+rpc      = "rpc" Name "(" [ param { "," param } ] ")" "->" Type "{" { option } "}"
+param    = name ":" type { attr }
+attr     = "@" name [ "(" args ")" ]
+option   = label ":" value
+```
 
 ## Services and RPCs
 

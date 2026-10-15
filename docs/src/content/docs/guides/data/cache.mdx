@@ -39,7 +39,7 @@ File durations are integer nanoseconds; env accepts Go durations such as `"1m"`.
 
 Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (

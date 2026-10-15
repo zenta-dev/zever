@@ -36,7 +36,7 @@ Env vars: `CDN_ADAPTER`, `CDN_API_TOKEN`, `CDN_ZONE_ID`. The `cloudflare` adapte
 
 Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
 
-```go title="main.go"
+```go title="main.go" check
 package main
 
 import (
