@@ -43,6 +43,17 @@ the adapters they selected.
 Each service resolves on first use and caches the result. On error the
 cached state clears so the next call retries.
 
+Concurrent first calls share one build. Callers waiting on a build that fails
+(or panics, surfacing as `BuildPanicError`) all receive that build's error
+without re-running the builder; only a call made after the build settled
+retries.
+
+Builders run on whichever goroutine resolves the service first and do not
+inherit that caller's context: accessors take no `ctx`, so a canceled first
+request cannot poison a process-wide singleton. Long-lived work a build starts
+uses the container's root context, which is detached from callers (no
+cancellation, deadline, or values) and canceled by `Close`.
+
 37 rows below are the configured services (same set as `config/README.md`
 and `knownServiceNames()` in `config/config.go`); `agent`, `grpc`,
 `grpcclient`, `job`, and `rag` resolve over other services and take no

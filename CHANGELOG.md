@@ -546,6 +546,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exit non-zero) instead of failing lazily on first use, and `zever doctor`
   surfaces the server's `adapters` row. `ValidateAdapters` keeps checking
   every service.
+- `fix(container): share a failed build with parked waiters`: concurrent
+  callers waiting on a lazy service build that errors or panics now receive
+  that build's error instead of each re-running the builder; a later call
+  still retries. The unused builder `context.Context` plumbing is removed and
+  the root-context design is documented in `container/README.md`.
+- `refactor(registry): drop dead nil-hook branches`: `registry.New` already
+  defaults every hook, so the unreachable nil checks in `Register`/`Lookup`
+  are gone (no behavior change).
 - `fix(auth,crypto): warn on in-memory JWT revocation; shared dev-env check`:
   the `jwt` adapter now logs a one-time `slog` WARN (and exposes it via
   `jwt.WarningReporter.Warnings()`) when the default per-process revocation

@@ -47,7 +47,7 @@ func guardedGRPCClient(ctx context.Context, c *container.Container, resMgr resil
 	if err != nil {
 		return nil, err
 	}
-	return c.GRPCClient(target, grpcclient.WithGuard(g)) //nolint:contextcheck // Container.GRPCClient takes no ctx; the dial runs inside the container.
+	return c.GRPCClient(target, grpcclient.WithGuard(g))
 }
 
 func main() {

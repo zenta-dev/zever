@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"errors"
 	"runtime"
 	"strings"
@@ -148,56 +147,120 @@ func TestLazy_ConcurrentSingleflight(t *testing.T) {
 	}
 }
 
-func TestLazy_WaiterBecomesRetryLeader(t *testing.T) {
-	var l lazy[int]
-	fail := errors.New("leader failed")
-	release := make(chan struct{})
+// parkedWaiters reports how many callers have joined the in-flight build.
+func parkedWaiters[T any](l *lazy[T]) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.parked
+}
+
+// runParkedFlight starts a leader whose builder blocks until released, parks
+// n waiters on that flight, releases it, and returns every caller's result.
+func runParkedFlight(t *testing.T, l *lazy[int], n int, leader func() (int, error)) ([]int, []error) {
+	t.Helper()
+
 	entered := make(chan struct{})
-	leaderBuild := func() (int, error) {
-		close(entered)
-		<-release
-		return 0, fail
-	}
-	var waiterCalls atomic.Int32
-	//nolint:unparam // get requires (T, error); the retry-success path is nil by design
-	waiterBuild := func() (int, error) {
-		waiterCalls.Add(1)
-		return 9, nil
-	}
+	release := make(chan struct{})
+	vals := make([]int, n+1)
+	errs := make([]error, n+1)
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	var leaderVal, waiterVal int
-	var leaderErr, waiterErr error
-	var waiterStarted atomic.Bool
+
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		leaderVal, leaderErr = l.get(leaderBuild)
+		vals[0], errs[0] = l.get(func() (int, error) {
+			close(entered)
+			<-release
+
+			return leader()
+		})
 	}()
 	<-entered
-	go func() {
-		defer wg.Done()
-		waiterStarted.Store(true)
-		waiterVal, waiterErr = l.get(waiterBuild)
-	}()
-	// Wait until the waiter goroutine has started instead of a fixed sleep.
-	// Even if it arrives late it becomes the retry leader itself; the
-	// assertions hold either way.
-	eventually(t, 2*time.Second, waiterStarted.Load, "waiter goroutine did not start")
+
+	for i := 1; i <= n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			vals[i], errs[i] = l.get(func() (int, error) {
+				t.Error("waiter parked on a flight must not run its own builder")
+				return -1, nil
+			})
+		}()
+	}
+	eventually(t, 5*time.Second, func() bool { return parkedWaiters(l) == n }, "waiters did not park")
 	close(release)
 	wg.Wait()
 
-	if !errors.Is(leaderErr, fail) {
-		t.Fatalf("leader: got (%d, %v), want failure", leaderVal, leaderErr)
+	return vals, errs
+}
+
+// TestLazy_ParkedWaitersShareLeaderError pins that waiters parked on a failed
+// flight receive the leader's error instead of re-running the builder, and
+// that a later call retries.
+func TestLazy_ParkedWaitersShareLeaderError(t *testing.T) {
+	var l lazy[int]
+	fail := errors.New("leader failed")
+	var calls atomic.Int32
+
+	_, errs := runParkedFlight(t, &l, 8, func() (int, error) {
+		calls.Add(1)
+		return 0, fail
+	})
+	for i, err := range errs {
+		if !errors.Is(err, fail) {
+			t.Fatalf("caller %d: got %v, want leader error", i, err)
+		}
 	}
-	if waiterErr != nil || waiterVal != 9 {
-		t.Fatalf("waiter: got (%d, %v), want (9, nil)", waiterVal, waiterErr)
+	if calls.Load() != 1 {
+		t.Fatalf("builder ran %d times, want 1", calls.Load())
 	}
-	if waiterCalls.Load() != 1 {
-		t.Fatalf("waiter build ran %d times, want 1", waiterCalls.Load())
+	if l.resolved() {
+		t.Fatal("failure was cached")
 	}
-	if !l.resolved() {
-		t.Fatal("resolved is false after waiter retry succeeded")
+
+	v, err := l.get(func() (int, error) { return 9, nil })
+	if err != nil || v != 9 {
+		t.Fatalf("later call: got (%d, %v), want (9, nil)", v, err)
+	}
+}
+
+// TestLazy_ParkedWaitersSharePanicError is the panic variant: waiters get the
+// converted BuildPanicError and the builder runs once.
+func TestLazy_ParkedWaitersSharePanicError(t *testing.T) {
+	var l lazy[int]
+	var calls atomic.Int32
+
+	_, errs := runParkedFlight(t, &l, 8, func() (int, error) {
+		calls.Add(1)
+		panic("boom")
+	})
+	for i, err := range errs {
+		var pe BuildPanicError
+		if !errors.As(err, &pe) || pe.Value != "boom" {
+			t.Fatalf("caller %d: got %v, want BuildPanicError(boom)", i, err)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("builder ran %d times, want 1", calls.Load())
+	}
+
+	v, err := l.get(func() (int, error) { return 3, nil })
+	if err != nil || v != 3 {
+		t.Fatalf("later call: got (%d, %v), want (3, nil)", v, err)
+	}
+}
+
+// TestLazy_ParkedWaitersShareSuccess pins that waiters get the leader's value.
+func TestLazy_ParkedWaitersShareSuccess(t *testing.T) {
+	var l lazy[int]
+
+	vals, errs := runParkedFlight(t, &l, 4, func() (int, error) { return 7, nil })
+	for i := range vals {
+		if errs[i] != nil || vals[i] != 7 {
+			t.Fatalf("caller %d: got (%d, %v), want (7, nil)", i, vals[i], errs[i])
+		}
 	}
 }
 
@@ -418,7 +481,7 @@ func TestLazy_WaiterDoneBranch(t *testing.T) {
 		var l lazy[int]
 		ch := make(chan struct{})
 		l.mu.Lock()
-		l.wait = ch
+		l.cur = &flight[int]{done: ch}
 		l.mu.Unlock()
 
 		finished := make(chan struct{})
@@ -449,37 +512,10 @@ func TestLazy_WaiterDoneBranch(t *testing.T) {
 		l.mu.Lock()
 		l.val = 7
 		l.done = true
-		l.wait = nil
+		l.cur = nil
 		l.mu.Unlock()
 		close(ch)
 		<-finished
-	}
-}
-
-// TestGetCtx_PropagatesValueIntoBuilder pins that a caller's context values
-// reach the builder function, so cancellation and tracing propagate into
-// service construction instead of being dropped.
-func TestGetCtx_PropagatesValueIntoBuilder(t *testing.T) {
-	var l lazy[string]
-
-	type ctxKey string
-	const key ctxKey = "k"
-
-	ctx := context.WithValue(context.Background(), key, "trace-id-123")
-
-	var seen string
-	v, err := l.getCtx(ctx, func(bctx context.Context) (string, error) {
-		seen, _ = bctx.Value(key).(string)
-		return "ok", nil
-	})
-	if err != nil {
-		t.Fatalf("getCtx: unexpected error: %v", err)
-	}
-	if v != "ok" {
-		t.Fatalf("getCtx = %q, want %q", v, "ok")
-	}
-	if seen != "trace-id-123" {
-		t.Fatalf("builder saw ctx value %q, want %q", seen, "trace-id-123")
 	}
 }
 

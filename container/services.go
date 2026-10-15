@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -78,7 +77,7 @@ func openService[T any, A any, O any](service string, name string, parse func(st
 // options. Like Job, it shares the process-wide backend instance. Options
 // apply only on first resolution; later calls return the cached singleton.
 func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
-	return c.agent.getCtx(c.rootCtx, func(_ context.Context) (*agent.Loop, error) {
+	return c.agent.get(func() (*agent.Loop, error) {
 		a, err := c.AI()
 		if err != nil {
 			return nil, fmt.Errorf("container: agent: resolve ai: %w", err)
@@ -104,28 +103,28 @@ func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
 
 // AI resolves and returns the AI service instance.
 func (c *Container) AI() (ai.AI, error) {
-	return c.ai.getCtx(c.rootCtx, func(_ context.Context) (ai.AI, error) {
+	return c.ai.get(func() (ai.AI, error) {
 		return openService("ai", c.cfg.AI.Adapter, ai.ParseAdapter, ai.Open, c.cfg.AI.Options)
 	})
 }
 
 // Analytics resolves and returns the analytics service instance.
 func (c *Container) Analytics() (analytics.Analytics, error) {
-	return c.analytics.getCtx(c.rootCtx, func(_ context.Context) (analytics.Analytics, error) {
+	return c.analytics.get(func() (analytics.Analytics, error) {
 		return openService("analytics", c.cfg.Analytics.Adapter, analytics.ParseAdapter, analytics.Open, c.cfg.Analytics.Options)
 	})
 }
 
 // Auth resolves and returns the auth service instance.
 func (c *Container) Auth() (auth.Auth, error) {
-	return c.auth.getCtx(c.rootCtx, func(_ context.Context) (auth.Auth, error) {
+	return c.auth.get(func() (auth.Auth, error) {
 		return openService("auth", c.cfg.Auth.Adapter, auth.ParseAdapter, auth.Open, c.cfg.Auth.Options)
 	})
 }
 
 // Billing resolves and returns the billing service instance.
 func (c *Container) Billing() (billing.Billing, error) {
-	return c.billing.getCtx(c.rootCtx, func(_ context.Context) (billing.Billing, error) {
+	return c.billing.get(func() (billing.Billing, error) {
 		return openService("billing", c.cfg.Billing.Adapter, billing.ParseAdapter, billing.Open, c.cfg.Billing.Options)
 	})
 }
@@ -134,7 +133,7 @@ func (c *Container) Billing() (billing.Billing, error) {
 // pointing at an already-pooled DSN borrows the shared pool (owns=false);
 // DedicatedPool or a non-shareable DSN opens a private pool as before.
 func (c *Container) Cache() (cache.Cache, error) {
-	return c.cache.getCtx(c.rootCtx, func(_ context.Context) (cache.Cache, error) {
+	return c.cache.get(func() (cache.Cache, error) {
 		if v, shared, err := c.openSharedCache(); shared || err != nil {
 			return v, err
 		}
@@ -145,14 +144,14 @@ func (c *Container) Cache() (cache.Cache, error) {
 
 // CDN resolves and returns the CDN service instance.
 func (c *Container) CDN() (cdn.CDN, error) {
-	return c.cdn.getCtx(c.rootCtx, func(_ context.Context) (cdn.CDN, error) {
+	return c.cdn.get(func() (cdn.CDN, error) {
 		return openService("cdn", c.cfg.CDN.Adapter, cdn.ParseAdapter, cdn.Open, c.cfg.CDN.Options)
 	})
 }
 
 // Crypto resolves and returns the crypto service instance.
 func (c *Container) Crypto() (crypto.Crypto, error) {
-	return c.crypto.getCtx(c.rootCtx, func(_ context.Context) (crypto.Crypto, error) {
+	return c.crypto.get(func() (crypto.Crypto, error) {
 		return openService("crypto", c.cfg.Crypto.Adapter, crypto.ParseAdapter, crypto.Open, c.cfg.Crypto.Options)
 	})
 }
@@ -161,7 +160,7 @@ func (c *Container) Crypto() (crypto.Crypto, error) {
 // in the DSN registry for borrowers; DedicatedPool is meaningless on db
 // itself and is ignored.
 func (c *Container) DB() (db.DB, error) {
-	return c.db.getCtx(c.rootCtx, func(_ context.Context) (db.DB, error) {
+	return c.db.get(func() (db.DB, error) {
 		return c.openDB()
 	})
 }
@@ -185,14 +184,14 @@ func (c *Container) Transactor() (db.Transactor, error) {
 
 // Document resolves and returns the document service instance.
 func (c *Container) Document() (document.Document, error) {
-	return c.document.getCtx(c.rootCtx, func(_ context.Context) (document.Document, error) {
+	return c.document.get(func() (document.Document, error) {
 		return openService("document", c.cfg.Document.Adapter, document.ParseAdapter, document.Open, c.cfg.Document.Options)
 	})
 }
 
 // EventBus resolves and returns the eventbus service instance.
 func (c *Container) EventBus() (eventbus.EventBus, error) {
-	return c.eventbus.getCtx(c.rootCtx, func(_ context.Context) (eventbus.EventBus, error) {
+	return c.eventbus.get(func() (eventbus.EventBus, error) {
 		return openService("eventbus", c.cfg.EventBus.Adapter, eventbus.ParseAdapter, eventbus.Open, c.cfg.EventBus.Options)
 	})
 }
@@ -204,14 +203,14 @@ func (c *Container) Eventbus() (eventbus.EventBus, error) {
 
 // Flag resolves and returns the flag service instance.
 func (c *Container) Flag() (flag.Flag, error) {
-	return c.flag.getCtx(c.rootCtx, func(_ context.Context) (flag.Flag, error) {
+	return c.flag.get(func() (flag.Flag, error) {
 		return openService("flag", c.cfg.Flag.Adapter, flag.ParseAdapter, flag.Open, c.cfg.Flag.Options)
 	})
 }
 
 // Geo resolves and returns the geo service instance.
 func (c *Container) Geo() (geo.Geo, error) {
-	return c.geo.getCtx(c.rootCtx, func(_ context.Context) (geo.Geo, error) {
+	return c.geo.get(func() (geo.Geo, error) {
 		return openService("geo", c.cfg.Geo.Adapter, geo.ParseAdapter, geo.Open, c.cfg.Geo.Options)
 	})
 }
@@ -221,7 +220,7 @@ func (c *Container) Geo() (geo.Geo, error) {
 // Options passed on later calls are ignored, since a server's interceptor
 // chain is fixed at construction and cannot change once built.
 func (c *Container) GRPC(opts ...grpc.ServerOption) (*grpc.Server, error) {
-	return c.grpcServer.getCtx(c.rootCtx, func(_ context.Context) (*grpc.Server, error) {
+	return c.grpcServer.get(func() (*grpc.Server, error) {
 		return grpc.NewServer(opts...), nil
 	})
 }
@@ -276,7 +275,7 @@ func (c *Container) GRPCClient(target string, opts ...grpcclient.Option) (*grpc.
 
 // I18n resolves and returns the i18n service instance.
 func (c *Container) I18n() (i18n.I18n, error) {
-	return c.i18n.getCtx(c.rootCtx, func(_ context.Context) (i18n.I18n, error) {
+	return c.i18n.get(func() (i18n.I18n, error) {
 		return openService("i18n", c.cfg.I18n.Adapter, i18n.ParseAdapter, i18n.Open, c.cfg.I18n.Options)
 	})
 }
@@ -286,7 +285,7 @@ func (c *Container) I18n() (i18n.I18n, error) {
 // pool (owns=false); DedicatedPool or a non-shareable DSN opens a private
 // pool as before.
 func (c *Container) Idempotency() (idempotency.Store, error) {
-	return c.idempotency.getCtx(c.rootCtx, func(_ context.Context) (idempotency.Store, error) {
+	return c.idempotency.get(func() (idempotency.Store, error) {
 		if v, shared, err := c.openSharedIdempotency(); shared || err != nil {
 			return v, err
 		}
@@ -307,7 +306,7 @@ func (c *Container) Idempotency() (idempotency.Store, error) {
 // (traceprop.StartConsumeSpan). The dispatcher wraps the shared queue
 // unwrapped: d.Q is the process-wide Queue instance.
 func (c *Container) Job() (*job.Dispatcher, error) {
-	return c.job.getCtx(c.rootCtx, func(_ context.Context) (*job.Dispatcher, error) {
+	return c.job.get(func() (*job.Dispatcher, error) {
 		q, err := c.Queue()
 		if err != nil {
 			return nil, fmt.Errorf("container: job: resolve queue: %w", err)
@@ -319,42 +318,42 @@ func (c *Container) Job() (*job.Dispatcher, error) {
 
 // Lock resolves and returns the lock service instance.
 func (c *Container) Lock() (lock.Locker, error) {
-	return c.lock.getCtx(c.rootCtx, func(_ context.Context) (lock.Locker, error) {
+	return c.lock.get(func() (lock.Locker, error) {
 		return openService("lock", c.cfg.Lock.Adapter, lock.ParseAdapter, lock.Open, c.cfg.Lock.Options)
 	})
 }
 
 // Log resolves and returns the log service instance.
 func (c *Container) Log() (log.Logger, error) {
-	return c.log.getCtx(c.rootCtx, func(_ context.Context) (log.Logger, error) {
+	return c.log.get(func() (log.Logger, error) {
 		return openService("log", c.cfg.Log.Adapter, log.ParseAdapter, log.Open, c.cfg.Log.Options)
 	})
 }
 
 // Mailer resolves and returns the mailer service instance.
 func (c *Container) Mailer() (mailer.Mailer, error) {
-	return c.mailer.getCtx(c.rootCtx, func(_ context.Context) (mailer.Mailer, error) {
+	return c.mailer.get(func() (mailer.Mailer, error) {
 		return openService("mailer", c.cfg.Mailer.Adapter, mailer.ParseAdapter, mailer.Open, c.cfg.Mailer.Options)
 	})
 }
 
 // Media resolves and returns the media service instance.
 func (c *Container) Media() (media.Media, error) {
-	return c.media.getCtx(c.rootCtx, func(_ context.Context) (media.Media, error) {
+	return c.media.get(func() (media.Media, error) {
 		return openService("media", c.cfg.Media.Adapter, media.ParseAdapter, media.Open, c.cfg.Media.Options)
 	})
 }
 
 // Notification resolves and returns the notification service instance.
 func (c *Container) Notification() (notification.Notifier, error) {
-	return c.notification.getCtx(c.rootCtx, func(_ context.Context) (notification.Notifier, error) {
+	return c.notification.get(func() (notification.Notifier, error) {
 		return openService("notification", c.cfg.Notification.Adapter, notification.ParseAdapter, notification.Open, c.cfg.Notification.Options)
 	})
 }
 
 // Observability resolves and returns the observability service instance.
 func (c *Container) Observability() (observability.Provider, error) {
-	return c.observability.getCtx(c.rootCtx, func(_ context.Context) (observability.Provider, error) {
+	return c.observability.get(func() (observability.Provider, error) {
 		return openService("observability", c.cfg.Observability.Adapter, observability.ParseAdapter, observability.Open, c.cfg.Observability.Options)
 	})
 }
@@ -367,7 +366,7 @@ func (c *Container) Observability() (observability.Provider, error) {
 // separately, so use OutboxRelay(ctx) to attach it and start draining. This
 // accessor keeps working for Record after the relay is running.
 func (c *Container) Outbox() (outbox.Store, error) {
-	return c.outbox.getCtx(c.rootCtx, func(_ context.Context) (outbox.Store, error) {
+	return c.outbox.get(func() (outbox.Store, error) {
 		opts := c.cfg.Outbox.Options
 		// Best-effort: inject the resolved observability provider so the relay
 		// emits metrics/spans. A failed or unconfigured observability service
@@ -382,7 +381,7 @@ func (c *Container) Outbox() (outbox.Store, error) {
 
 // Password resolves and returns the password service instance.
 func (c *Container) Password() (password.Hasher, error) {
-	return c.password.getCtx(c.rootCtx, func(_ context.Context) (password.Hasher, error) {
+	return c.password.get(func() (password.Hasher, error) {
 		return openService("password", c.cfg.Password.Adapter, password.ParseAdapter, password.Open, c.cfg.Password.Options)
 	})
 }
@@ -392,7 +391,7 @@ func (c *Container) Password() (password.Hasher, error) {
 // resolved idempotency service is reused for webhook replay dedupe; an
 // unresolvable idempotency service never blocks payment resolution.
 func (c *Container) Payment() (payment.Payment, error) {
-	return c.payment.getCtx(c.rootCtx, func(_ context.Context) (payment.Payment, error) {
+	return c.payment.get(func() (payment.Payment, error) {
 		opts := c.cfg.Payment.Options
 		if opts.Idempotency == nil {
 			if store, err := c.Idempotency(); err == nil {
@@ -406,7 +405,7 @@ func (c *Container) Payment() (payment.Payment, error) {
 
 // Permission resolves and returns the permission service instance.
 func (c *Container) Permission() (permission.Checker, error) {
-	return c.permission.getCtx(c.rootCtx, func(_ context.Context) (permission.Checker, error) {
+	return c.permission.get(func() (permission.Checker, error) {
 		return openService("permission", c.cfg.Permission.Adapter, permission.ParseAdapter, permission.Open, c.cfg.Permission.Options)
 	})
 }
@@ -417,7 +416,7 @@ func (c *Container) Permission() (permission.Checker, error) {
 // Under sustained load prefer a separate queue database with
 // DedicatedPool (Solid Queue guidance).
 func (c *Container) Queue() (queue.Queue, error) {
-	return c.queue.getCtx(c.rootCtx, func(_ context.Context) (queue.Queue, error) {
+	return c.queue.get(func() (queue.Queue, error) {
 		if v, shared, err := c.openSharedQueue(); shared || err != nil {
 			return v, err
 		}
@@ -432,7 +431,7 @@ func (c *Container) Queue() (queue.Queue, error) {
 // later calls return the cached singleton. WithHybridSearch additionally
 // resolves the Search backend and builds via rag.NewHybrid.
 func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
-	return c.rag.getCtx(c.rootCtx, func(_ context.Context) (*rag.Engine, error) {
+	return c.rag.get(func() (*rag.Engine, error) {
 		a, err := c.AI()
 		if err != nil {
 			return nil, fmt.Errorf("container: rag: resolve ai: %w", err)
@@ -478,7 +477,7 @@ func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
 
 // RateLimit resolves and returns the ratelimit service instance.
 func (c *Container) RateLimit() (ratelimit.Limiter, error) {
-	return c.ratelimit.getCtx(c.rootCtx, func(_ context.Context) (ratelimit.Limiter, error) {
+	return c.ratelimit.get(func() (ratelimit.Limiter, error) {
 		return openService("ratelimit", c.cfg.RateLimit.Adapter, ratelimit.ParseAdapter, ratelimit.Open, c.cfg.RateLimit.Options)
 	})
 }
@@ -490,14 +489,14 @@ func (c *Container) Ratelimit() (ratelimit.Limiter, error) {
 
 // Resilience resolves and returns the resilience service instance.
 func (c *Container) Resilience() (resilience.Manager, error) {
-	return c.resilience.getCtx(c.rootCtx, func(_ context.Context) (resilience.Manager, error) {
+	return c.resilience.get(func() (resilience.Manager, error) {
 		return openService("resilience", c.cfg.Resilience.Adapter, resilience.ParseAdapter, resilience.Open, c.cfg.Resilience.Options)
 	})
 }
 
 // Router resolves and returns the router service instance.
 func (c *Container) Router() (router.Router, error) {
-	return c.router.getCtx(c.rootCtx, func(_ context.Context) (router.Router, error) {
+	return c.router.get(func() (router.Router, error) {
 		return openService("router", c.cfg.Router.Adapter, router.ParseAdapter, router.Open, c.cfg.Router.Options)
 	})
 }
@@ -509,7 +508,7 @@ func (c *Container) Router() (router.Router, error) {
 // already-pooled DSN borrows the shared pool (owns=false); DedicatedPool
 // or a non-shareable DSN opens a private pool as before.
 func (c *Container) Scheduler() (scheduler.Scheduler, error) {
-	return c.scheduler.getCtx(c.rootCtx, func(_ context.Context) (scheduler.Scheduler, error) {
+	return c.scheduler.get(func() (scheduler.Scheduler, error) {
 		if v, shared, err := c.openSharedScheduler(); shared || err != nil {
 			return v, err
 		}
@@ -533,7 +532,7 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 // an already-pooled DSN borrows the shared pool (owns=false);
 // DedicatedPool or a non-shareable DSN opens a private pool as before.
 func (c *Container) Search() (search.Search, error) {
-	return c.search.getCtx(c.rootCtx, func(_ context.Context) (search.Search, error) {
+	return c.search.get(func() (search.Search, error) {
 		if v, shared, err := c.openSharedSearch(); shared || err != nil {
 			return v, err
 		}
@@ -544,7 +543,7 @@ func (c *Container) Search() (search.Search, error) {
 
 // Secrets resolves and returns the secrets service instance.
 func (c *Container) Secrets() (secrets.Secrets, error) {
-	return c.secrets.getCtx(c.rootCtx, func(_ context.Context) (secrets.Secrets, error) {
+	return c.secrets.get(func() (secrets.Secrets, error) {
 		return openService("secrets", c.cfg.Secrets.Adapter, secrets.ParseAdapter, secrets.Open, c.cfg.Secrets.Options)
 	})
 }
@@ -554,7 +553,7 @@ func (c *Container) Secrets() (secrets.Secrets, error) {
 // (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
 // as before.
 func (c *Container) Session() (session.Store, error) {
-	return c.session.getCtx(c.rootCtx, func(_ context.Context) (session.Store, error) {
+	return c.session.get(func() (session.Store, error) {
 		if v, shared, err := c.openSharedSession(); shared || err != nil {
 			return v, err
 		}
@@ -565,14 +564,14 @@ func (c *Container) Session() (session.Store, error) {
 
 // Storage resolves and returns the storage service instance.
 func (c *Container) Storage() (storage.Storage, error) {
-	return c.storage.getCtx(c.rootCtx, func(_ context.Context) (storage.Storage, error) {
+	return c.storage.get(func() (storage.Storage, error) {
 		return openService("storage", c.cfg.Storage.Adapter, storage.ParseAdapter, storage.Open, c.cfg.Storage.Options)
 	})
 }
 
 // Tenant resolves and returns the tenant service instance.
 func (c *Container) Tenant() (tenant.Tenant, error) {
-	return c.tenant.getCtx(c.rootCtx, func(_ context.Context) (tenant.Tenant, error) {
+	return c.tenant.get(func() (tenant.Tenant, error) {
 		return openService("tenant", c.cfg.Tenant.Adapter, tenant.ParseAdapter, tenant.Open, c.cfg.Tenant.Options)
 	})
 }
@@ -583,7 +582,7 @@ func (c *Container) Tenant() (tenant.Tenant, error) {
 // (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
 // as before.
 func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
-	return c.vectorstore.getCtx(c.rootCtx, func(_ context.Context) (vectorstore.VectorStore, error) {
+	return c.vectorstore.get(func() (vectorstore.VectorStore, error) {
 		if v, shared, err := c.openSharedVectorStore(); shared || err != nil {
 			return v, err
 		}
@@ -594,7 +593,7 @@ func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
 
 // Webhook resolves and returns the webhook service instance.
 func (c *Container) Webhook() (webhook.Webhook, error) {
-	return c.webhook.getCtx(c.rootCtx, func(_ context.Context) (webhook.Webhook, error) {
+	return c.webhook.get(func() (webhook.Webhook, error) {
 		return openService("webhook", c.cfg.Webhook.Adapter, webhook.ParseAdapter, webhook.Open, c.cfg.Webhook.Options)
 	})
 }
@@ -605,7 +604,7 @@ func (c *Container) Webhook() (webhook.Webhook, error) {
 // or a non-shareable DSN opens a private pool as before. Under sustained
 // load prefer a separate workflow database with DedicatedPool.
 func (c *Container) Workflow() (workflow.Workflow, error) {
-	return c.workflow.getCtx(c.rootCtx, func(_ context.Context) (workflow.Workflow, error) {
+	return c.workflow.get(func() (workflow.Workflow, error) {
 		if v, shared, err := c.openSharedWorkflow(); shared || err != nil {
 			return v, err
 		}
