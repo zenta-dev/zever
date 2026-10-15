@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `fix(cli): zever new pins every framework module at the framework version`:
+  the v0.7.0 release tags carry go.mod files that still require v0.6.1
+  siblings, so a published-mode scaffold resolved `shared/registry` at v0.6.1
+  and `go build` failed with `undefined: registry.SortedNames`. The scaffold
+  go.mod now also requires every shared, core and adapter module at the
+  framework version (as `// indirect`; `go mod tidy` drops unused ones).
+
 ## [v0.7.0] - 2026-10-15
 
 ### Breaking

@@ -1628,6 +1628,55 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		_, _ = fmt.Fprintf(&b, "require %s %s\n", path, cfg.FrameworkVersion)
 	}
 
+	// Published mode: released framework go.mod files may require older
+	// sibling modules than cfg.FrameworkVersion, and minimal version
+	// selection would keep the older sibling (e.g. shared/registry lacking
+	// symbols newer core modules call). Pin every other framework module at
+	// the same version so the whole graph resolves consistently.
+	if cfg.FrameworkDir == "" {
+		pinned := map[string]bool{}
+		for _, path := range direct {
+			pinned[path] = true
+		}
+
+		var extra []string
+
+		add := func(dir string) {
+			if path := frameworkModulePath + "/" + dir; !pinned[path] {
+				pinned[path] = true
+				extra = append(extra, path)
+			}
+		}
+
+		for _, dir := range sharedModuleDirs {
+			add(dir)
+		}
+
+		for battery := range allServiceAdapters {
+			add("core/" + battery)
+		}
+
+		// core/eval is not a service battery but container's graph needs it.
+		add("core/eval")
+
+		for _, dir := range nestedModuleDirs {
+			add(dir)
+		}
+
+		sort.Strings(extra)
+
+		if len(extra) > 0 {
+			_, _ = fmt.Fprint(&b, "\n// Version pins keeping every transitive framework module at the same\n"+
+				"// release as the direct requirements; `go mod tidy` drops unused ones.\n")
+
+			for _, path := range extra {
+				_, _ = fmt.Fprintf(&b, "require %s %s // indirect\n", path, cfg.FrameworkVersion)
+			}
+
+			_, _ = fmt.Fprint(&b, "\n")
+		}
+	}
+
 	// Pin the tool dependency version (matching dsl/go.mod) so `go mod tidy`
 	// resolves offline from the module cache instead of querying the proxy
 	// for the latest version providing the tool package.
