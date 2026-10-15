@@ -7,73 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- `fix(cli): zever new --profile full scaffolds a config that passes doctor`:
-  the full profile wired `ai` (anthropic, needs an API key), `geo` (static,
-  needs a dataset) and `i18n` (embed, needs an embedded FS), so a fresh
-  `--profile full` project failed `zever doctor` with 3 FAILs. Those three
-  services are now left out; add them with `zever add`.
-- `docs(lint): refresh the wrapcheck measurement`: the `.golangci.yml` note now
-  records 162 hits for `container` + `core/*` (17 + 145), the reason wrapcheck
-  stays disabled.
-- `docs(auth): drop duplicated alg-none sentence from the JWT guide`: the
-  guide states HS256-only once and no longer repeats the `alg: none` rejection
-  note. No code or behavior change; asymmetric algorithms stay unsupported by
-  design.
-- `fix(cli): zever doctor uses the built server report when batteries fail`:
-  a generated server prints its `--doctor` JSON and exits 1 when a battery
-  fails; the CLI treated that exit as "server unavailable", fell back to the
-  CLI registry, and showed an unrelated log WARN as the reason. It now reads
-  the report regardless of exit status and, on a real crash, reports the last
-  stderr line.
-- `fix(build): exclude agent harness checkouts from the module list`:
-  `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
-  under `.claude/worktrees/` each contain full module trees; without the
-  exclusion the list ballooned past `ARG_MAX`, `printf` failed, and every
-  `*-all` loop silently tested nothing (false green `make check`).
-- `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
-  `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
-  hardcoded constant that lagged the release tags. The version now comes from
-  `-ldflags "-X main.cliVersion=..."` (release workflow and `make
-  build-release`), then the `go install module@vX.Y.Z` build info, then
-  `cmd/zever/VERSION` (now `0.7.0`), which `tools/tag-release.sh` requires to
-  match before tagging. `make version-check` (part of `make check`) fails when
-  that file is lower than the newest `cmd/zever/v*` tag.
-- `fix(cli): zever compile --check ignores the stamped CLI version`: a zever
-  upgrade alone no longer reports every generated file as drifted. Files that
-  differ only in the stamp version pass with a note (`stampVersionOnly` in
-  `--json`); the new `--strict` flag fails on them. Schema hash and content
-  changes still fail.
-### Changed
-
-- `docs(stability): document the kid-less JWT token timeline`: `STABILITY.md`
-  states the current behavior (kid-less tokens verify against the legacy
-  `jwt.secret`), that it is not deprecated and has no removal date, and how
-  any future deprecation would proceed.
-- `chore: repo hygiene and docs checks`: `tools/check-doc-snippets.sh` now
-  compiles and vets Go doc snippets marked ` ```go ... check ` (complete
-  `package main` programs) in a temporary workspace module, and one stale
-  outbox snippet it caught was fixed. The tracked `tools/modgraph/modgraph`
-  and `tools/affected/affected` binaries were removed and built tool binaries
-  are git-ignored. `docs/.../zen-syntax.mdx` gained enum, message, and grammar
-  sections, and a test in `dsl/gengrammar` fails when the page omits a keyword,
-  scalar type, attribute, or block label. The `.golangci.yml` wrapcheck note
-  now records measured numbers.
-
-### CI
-
-- `ci(apidiff)`: the `apidiff` gate is now module-scoped. A `**Breaking:**`
-  entry in `## [Unreleased]` only covers a module it names in backticks
-  (module path, directory, package path or short name), a Core-tier module
-  with no baseline tag now fails unless listed in
-  `.github/apidiff-baseline-allowlist.json` with an expiry, and
-  `tools/tag-release.sh --verify vX.Y.Z` checks that every module tag exists
-  locally or on origin. See `API Compatibility` in `.github/CONTRIBUTING.md`.
+## [v0.7.0] - 2026-10-15
 
 ### Breaking
 
-- `fix(payment)!: all adapters use minor units (cents)`: every `Amount`
+- **Breaking:** `fix(payment)!: all adapters use minor units (cents)`: every `Amount`
   field across `core/payment` (`Request`, `Result`) and `core/billing`
   (`Invoice`) is now uniformly minor units, extending the Paddle payment
   normalization above to every other money path. The Paddle billing adapter
@@ -87,12 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Stripe and stub payment/billing adapters already passed native int64
   minor units through and are unchanged apart from pinning
   normalize/round-trip/refund-symmetry tests.
-  **Breaking:** Paddle billing totals without decimals change value
+  Paddle billing totals without decimals change value
   (`"4200"` was 4200 minor units, now 420000); truncation becomes
   half-away-from-zero rounding there too.
-
-- `fix(gogen,proto)!: wire pagination through gRPC and drop collision-prone helpers`:
-  **Breaking:** a `paginated: true` RPC's synthesized request message now
+- **Breaking:** `fix(gogen,proto)!: wire pagination through gRPC and drop collision-prone helpers`:
+  a `paginated: true` RPC's synthesized request message now
   carries `string cursor` and `int32 limit` (numbered after the declared
   params), so gRPC clients can paginate; an RPC whose sole param is a
   message/entity is now wrapped in `<Op>Request` like any other paginated
@@ -106,20 +43,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exported `Cursor` type, the unused generic `Page[T]` and the exported
   `DefaultPageLimit`/`MaxPageLimit` were removed (now unexported) so they
   cannot collide with user-declared messages or entities.
-- `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
-  **Breaking:** the `paddle` adapter now scales whole-unit decimal totals to
+- **Breaking:** `fix(payment)!: normalize Paddle whole-unit amounts to minor units`:
+  the `paddle` adapter now scales whole-unit decimal totals to
   minor units (`"10"` parses to `1000`, matching `"10.00"`), where it
   previously passed them through verbatim (`"10"` parsed to `10`). Sub-cent
   precision now rounds half away from zero (`"10.005"` becomes `1001`,
   `"-10.005"` becomes `-1001`) instead of truncating, and partial-refund
   adjustment amounts are formatted back to major-unit decimals (`1000` is
   sent as `"10.00"`) so both directions agree. Totals that overflow `int64`
-   once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
-   unchanged (native minor-unit integers).
-
-
-- `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
-  **Breaking:** no longer emits the untyped `SagaCaller.Call(ctx, service,
+  once scaled still fail with `ErrAmountOverflow`. The `stripe` adapter is
+  unchanged (native minor-unit integers).
+- **Breaking:** `feat(gogen)!: typed saga steps`: the `gogen` backend's `<module>/saga.go`
+  no longer emits the untyped `SagaCaller.Call(ctx, service,
   method, in any, out any)`, the `sagaStep` helper, or `map[string]any`
   payloads. It now generates per-step typed input/output structs (one pair
   per step role, e.g. `CheckoutSagaReserveInput/Output`, with plain
@@ -136,8 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goldens) and reimplement the caller seam with the new per-step methods;
   values still cross step boundaries via encoding/json, so every generated
   struct stays JSON-marshalable.
-
-- `fix(httpclient)!: block private addresses for remote adapters by default`:
+- **Breaking:** `fix(httpclient)!: block private addresses for remote adapters by default`:
   outbound HTTP clients in the `ai` (`anthropic`, `openai`, `gemini`,
   `ollama`), `document/remote`, `geo` (`google`, `osm`), `i18n/remote`,
   and `notification/twilio` adapters now dial only globally routable
@@ -157,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged. New `shared/httpclient` seams: `LookupFunc`,
   `SafeDialContextWithLookup`, and the `WithLookup` option for pinning DNS
   in tests and split-horizon environments.
-- `fix(server)!: gRPC reflection off by default`: the generated server
+- **Breaking:** `fix(server)!: gRPC reflection off by default`: the generated server
   entrypoint (`zever generate server`) no longer registers the gRPC
   reflection service unconditionally. Reflection exposes every service
   schema to any client that can reach the port, so it now wires only
@@ -166,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GRPC_REFLECTION=false` always wins. Existing projects that relied on
   grpcurl/reflection keep working by setting `GRPC_REFLECTION=true` in
   their environment or re-scaffolding with `--force`.
-- `fix(installer)!: fail when checksum cannot be verified`: `install.sh` and
+- **Breaking:** `fix(installer)!: fail when checksum cannot be verified`: `install.sh` and
   `install.ps1` now abort when no SHA-256 tool is available (or hashing fails)
   instead of skipping checksum verification with a warning. Opt out
   explicitly with `--insecure-skip-verify` / `-InsecureSkipVerify` or
@@ -175,8 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `gh attestation verify <binary> --repo zenta-dev/zever` command. New
   offline test harness: `sh tools/installer-test.sh` (also wired into
   `make check` and CI).
-- `fix(crypto)!: reject the public dev key unless explicitly allowed`:
-- `fix(crypto)!: reject the public dev key unless explicitly allowed`: the
+- **Breaking:** `fix(crypto)!: reject the public dev key unless explicitly allowed`: the
   local crypto adapter now fails `Open` with a typed `DevKeyError`
   (sentinel `ErrDevKey`, with a fix hint) when the deterministic public
   dev key is supplied without an explicit allow. The dev key is accepted
@@ -190,11 +123,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scaffolded `zever new` dev config writes `allow_dev_key: true` plus the
   dev key with a comment, and `zever doctor` flags the dev key in
   non-dev environments. Test fixtures must set `allow_dev_key` or
-   `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
+  `ZEVER_ENV` explicitly when resolving crypto from `config.Default()`.
 - **Breaking:** `auth.JWTOptions` and `auth.Options` are no longer
   comparable: the new `Keys []JWTKey` field (kid-based rotation) makes `==`
   on these structs — and on `config.Service[auth.Options]` — a compile
   error. Compare field-by-field instead.
+- **Breaking:** `fix(httpclient)`: clients built with `WithSafeDial` /
+  `NewSafeClient` no longer honor `HTTP_PROXY`/`HTTPS_PROXY` (the dial guard
+  only saw the proxy address, so private targets were reachable through a
+  proxy); pass the new `WithAllowProxy()` option to opt back in with a
+  trusted proxy. `IsPrivateIP` now also classifies NAT64
+  (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
+  (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
+  (`2001::/32`) and site-local (`fec0::/10`) as private.
+- **Breaking:** `fix(document)`: the `latex` adapter now defends against
+  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
+  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
+  bubblewrap (no network, read-only system trees, only the render dir
+  writable); `required` fails at open when bwrap is unavailable, `auto` logs
+  one warning and falls back. A source pre-scan now rejects `\input`,
+  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
+  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
+  `latex_allow_unsafe_source: true` restores the old behavior. Output and
+  stderr are size-capped before buffering, and process-group kill is split
 
 ### Added
 
@@ -208,7 +159,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepted; an empty event id is rejected with `payment.ErrMissingEventID`.
   `payment.ProcessWebhookOnce` is the shared helper. `WebhookEvent` behavior
   is unchanged and now documented as at-most-once.
-
 - `feat(cli): slim adapter-scoped builds`: the new `zever build`
   command compiles a slim CLI registering only `--adapters=a,b`
   (bare batteries select every known adapter, `battery/adapter` pins
@@ -251,7 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proto shape are unchanged, so this is not wire-breaking; Go implementers
   must update `cursor string` parameters (and `string` cursor variables) to
   `Cursor`, converting from protobuf `next_cursor` strings where they cross
-   the boundary.
+  the boundary.
 - `feat(payment): dedupe webhook events by id`: the stripe and paddle
   adapters accept the existing optional `payment.Options.Idempotency`
   store for webhook replay protection (previously refund-only). After
@@ -274,7 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ratelimit.Options` gains `trusted_proxies` (CIDRs or bare IPs,
   validated by `ratelimit.ParseTrustedProxies`, mirrored as
   `middleware.ParseTrustedProxies` and in the config JSON schema); the
-   generated server builds the key from it and keeps `RemoteAddrKey`
+  generated server builds the key from it and keeps `RemoteAddrKey`
     when none are configured. `RemoteAddrKey` itself is unchanged.
 - `feat(orm): auto-chunk large IN lists`: a value-list `IN` larger than
   the resolved dialect's per-statement parameter budget now fans out into
@@ -298,8 +248,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fiber `ServeHTTP` costs ~46 allocs/op (isolated adaptor wrapping ~35,
   concurrent ~55) against ~17 for a `stdhttp` param route (~10 static).
   The older "45–55 allocs/op adaptor cost" note is corrected: the
-   `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
-   brackets the full serve path.
+  `newHTTPHandler` rework cut the isolated adaptor to 35; 45–55 still
+  brackets the full serve path.
 - `feat(db): migration lint and lock timeouts`: `zever db migrate --lint`
   lints the planned DDL before anything runs and fails on error-severity
   findings: `DROP TABLE`/`DROP COLUMN` (`drop_table`, `drop_column`),
@@ -319,8 +269,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CREATE INDEX CONCURRENTLY` (each build outside a transaction, since
   postgres forbids it inside one), via `PlanOptions.ConcurrentIndexes`
   and `atlas.DDLOptions`/`RenderSchemaDDLWithOptions`. Docs gain
-   expand/contract, batched-backfill, concurrent-index, and timeout sections
-   in the migrations guide.
+  expand/contract, batched-backfill, concurrent-index, and timeout sections
+  in the migrations guide.
 - `feat: SIGHUP reload for log level, flags, rate limits`: new
   `container.ReloadableLogger`, `container.ReloadableFlag`, and
   `container.ReloadableLimiter` front their battery behind an atomic swap,
@@ -339,8 +289,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   target version (`--version`, default latest stable), runs `go mod tidy`,
   and prints the `**Breaking:**` CHANGELOG entries between the installed
   and target versions (fetched once, cached under the user cache dir).
-   `--dry-run` prints the plan without writing, fetching, or tidying;
-   `--check` prints the available version only.
+  `--dry-run` prints the plan without writing, fetching, or tidying;
+  `--check` prints the available version only.
 - `feat(breaking): index, relation, enum, job, schedule, saga, default
   detection`: the schema comparator now covers the extended structural
   set. Enum removal and value removal are breaking (pure additions and
@@ -537,9 +487,152 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   copy). `shared/lrucache` re-verified at 0 allocs/op steady-state on
   Get/Put/GetOrCompute. No benchmark deltas by design: only regression
   guards, no behavior change.
+- `install.sh` / `install.ps1`: richer output (plan summary, numbered steps,
+  download progress, checksum details, next steps), uniform `--dry-run`
+  rendering, actionable hints on failure, and new `--quiet` / `--no-color`
+  (`-Quiet` / `-NoColor`) flags; honours `NO_COLOR`.
+- `install.sh` / `install.ps1`: one-line installers that download the release
+  binaries (`zever`, `zever-lsp`), verify `SHA256SUMS.txt`, and add them to
+  `PATH` (`--version`, `--prefix`, `--yes`, `--force`, `--dry-run`).
+- `zever uninstall`: remove the `zever` and `zever-lsp` binaries from
+  `PATH` (binaries only; `--dry-run`, `--keep-lsp`, `--yes`/`--force`,
+  `--json`, TTY `[y/N]` confirmation with non-TTY re-run hint).
+- `zever upgrade`: upgrade the `zever` binary to the latest stable
+  GitHub release or an explicit `--version` (SemVer compare via
+  `golang.org/x/mod/semver`, `--check`/`--dry-run`, SHA256-verified
+  `GOOS`/`GOARCH` asset, atomic POSIX install, staged Windows
+  install, same confirmation rules as `uninstall`).
+
+### Changed
+
+- `docs(stability): document the kid-less JWT token timeline`: `STABILITY.md`
+  states the current behavior (kid-less tokens verify against the legacy
+  `jwt.secret`), that it is not deprecated and has no removal date, and how
+  any future deprecation would proceed.
+- `chore: repo hygiene and docs checks`: `tools/check-doc-snippets.sh` now
+  compiles and vets Go doc snippets marked ` ```go ... check ` (complete
+  `package main` programs) in a temporary workspace module, and one stale
+  outbox snippet it caught was fixed. The tracked `tools/modgraph/modgraph`
+  and `tools/affected/affected` binaries were removed and built tool binaries
+  are git-ignored. `docs/.../zen-syntax.mdx` gained enum, message, and grammar
+  sections, and a test in `dsl/gengrammar` fails when the page omits a keyword,
+  scalar type, attribute, or block label. The `.golangci.yml` wrapcheck note
+  now records measured numbers.
+- `perf(orm): LRU shape cache`: the render-shape cache evicts only the
+  least-recently-used entry on overflow instead of dropping the whole map,
+  so hot shapes survive churn. It is striped 16 ways over
+  `shared/lrucache` (one bounded LRU per stripe, 256 entries total):
+  LRU `Get` rewrites recency and needs exclusive access, so a single
+  instance would serialize every parallel hit where the old `RWMutex` map
+  allowed concurrent reads. Hit-path cost is unchanged (128 B/op,
+  1 alloc/op sequential; 155 B/op, 3 allocs/op parallel on the bench
+  machine, within noise of the map). New tests pin single-entry eviction,
+  concurrent access under `-race`, and the capacity bound.
+- `docs: hygiene pass`: recount confirms 37 configured services
+  (`knownServiceNames()` in `config/config.go`) against 42 container
+  accessor rows — the five extra rows (`agent`, `grpc`, `grpcclient`,
+  `job`, `rag`) resolve over other services and take no `config`
+  section; `STABILITY.md` and `container/README.md` now say so instead
+  of implying drift. The stale `dsl/compile/testdata/app.zen` header
+  (non-existent `internal/dsl/compile` paths, test names, and committed
+  packages) now describes the fixture's real consumers, and stale
+  `internal/dsl/` path comments across `dsl/`, `cmd/zever`, `orm/migrate`,
+  `tools/gengrammar`, and the generated `editors/` grammar are fixed.
+  New `config/readme_test.go` pins the `config/README.md` adapter table
+  to the `Config` struct (row per known service, default adapter listed).
+  The `docs/{production,errors,writing-a-plugin}.md` redirect stubs, the
+  `session/cookie` + `media/ffmpeg` matrix rows, `argon2id` vs `argon2`,
+  `resilience` memory vs inproc, and the `.zen` reference
+  (`reference/zen-syntax.mdx`) were verified already correct.
+- `docs: governance files`: new `GOVERNANCE.md` (roles, decisions,
+  releases, policy index), `MAINTAINERS`, and `ROADMAP.md` with the 1.0
+  criteria checklist (mirrors `STABILITY.md`, all three unchecked).
+  `STABILITY.md` gains the Go version policy (latest toolchain only) and
+  the deprecation window policy (≥1 minor with `// Deprecated:`); README
+  notes generic methods need Go 1.27+. `.github/SECURITY.md` already
+  records the backport decision (latest release only) — no change.
+- `refactor(container): identity-based close dedup without unsafe`: `Close`
+  now dedupes services by the value's own reference identity (pointer, chan,
+  map, func, slice via `reflect.Value.Pointer`) instead of searching struct
+  fields for the first non-nil pointer. Two distinct services whose structs
+  embed the same pointer (e.g. a shared logger) both close now; previously
+  the second was skipped. The `unsafe` import is gone, and the 33-entry
+  `snapshots()` copy-paste collapsed into a generic `snap` helper over a
+  method-value table.
+- `chore(lint): wrapcheck evaluation, errscan missing-%w, nolintlint, any`:
+  `wrapcheck` was trial-enabled over `container` and `core/cache` (9 and 7
+  hits, all registry `Register`/`Lookup` passthroughs, `Close`-probe returns,
+  and test helpers): enabling it would relitigate the registry-passthrough
+  convention in every battery, so it stays off and the existing
+  `.golangci.yml` comment records why. `tools/errscan` gains a `missing-%w`
+  rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
+  argument (conservative: `err.Error()` and other names are out of scope);
+  the repo scans clean.   `nolintlint` is now enabled so stale suppressions
+  fail the build, and the 123 unused directives it reported (mostly
+  `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
+  `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
+  `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
+  `errcheck`/`contextcheck`/`staticcheck`/`nilnil`/`spancheck`) are removed.
+  One survivor needed care: `adapters/media/local` `MkdirAll` tripped gosec
+  G703 taint analysis once its directive was lifted (the sink is safe —
+  `filepath.Ext` yields no separators), so it now carries a gosec-native
+  `#nosec G703` pin like the one in `tools/errscan`, which both linters
+  accept stably. Remaining `interface{}` spellings outside
+  generated protobuf code become `any` (the `twilio` test fake keeps
+  `interface{}` to match the upstream `twilioclient.BaseClient` signature).
+- `chore(modules): tag-path gate, shared/* verdict, versioning doc, mysql
+  status`: `modgraph --check` (hence `make modgraph-check`) now also
+  verifies every `go.mod` module path follows the `tools/tag-release.sh`
+  rule (tag `<suffix>/vX.Y.Z`), allowlisting the two deliberate
+  consumer-proof exceptions (`docs/examples` dashed path,
+  `examples/external-sms` under another org); clean over all 177 modules.
+  Import scan of all 22 `shared/*` packages shows every one has importers
+  in at least two areas or sits on a public API seam (`mcpclient` in
+  `core/agent` signatures, `outboxbridge` as the documented hand-wiring
+  seam, `prompt` unused in-repo), so nothing moves under `internal/`.
+  New `start/versioning` docs page pins the lockstep release model and
+  replace-less consumer rules; `orm/README` no longer claims mysql support
+  was dropped and states the real split (query builder sqlite/postgres
+  only; atlas DDL + `orm/migrate` live-diff cover mysql).
 
 ### Fixed
 
+- `fix(cli): zever new --profile full scaffolds a config that passes doctor`:
+  the full profile wired `ai` (anthropic, needs an API key), `geo` (static,
+  needs a dataset) and `i18n` (embed, needs an embedded FS), so a fresh
+  `--profile full` project failed `zever doctor` with 3 FAILs. Those three
+  services are now left out; add them with `zever add`.
+- `docs(lint): refresh the wrapcheck measurement`: the `.golangci.yml` note now
+  records 162 hits for `container` + `core/*` (17 + 145), the reason wrapcheck
+  stays disabled.
+- `docs(auth): drop duplicated alg-none sentence from the JWT guide`: the
+  guide states HS256-only once and no longer repeats the `alg: none` rejection
+  note. No code or behavior change; asymmetric algorithms stay unsupported by
+  design.
+- `fix(cli): zever doctor uses the built server report when batteries fail`:
+  a generated server prints its `--doctor` JSON and exits 1 when a battery
+  fails; the CLI treated that exit as "server unavailable", fell back to the
+  CLI registry, and showed an unrelated log WARN as the reason. It now reads
+  the report regardless of exit status and, on a real crash, reports the last
+  stderr line.
+- `fix(build): exclude agent harness checkouts from the module list`:
+  `ALL_MODULES` in `Makefile` now skips `./.claude/*`. Harness checkouts
+  under `.claude/worktrees/` each contain full module trees; without the
+  exclusion the list ballooned past `ARG_MAX`, `printf` failed, and every
+  `*-all` loop silently tested nothing (false green `make check`).
+- `fix(cli): resolve the CLI version from ldflags, build info, or VERSION`:
+  `zever -V`, `zever new` pins, and generated-file stamps no longer rely on a
+  hardcoded constant that lagged the release tags. The version now comes from
+  `-ldflags "-X main.cliVersion=..."` (release workflow and `make
+  build-release`), then the `go install module@vX.Y.Z` build info, then
+  `cmd/zever/VERSION` (now `0.7.0`), which `tools/tag-release.sh` requires to
+  match before tagging. `make version-check` (part of `make check`) fails when
+  that file is lower than the newest `cmd/zever/v*` tag.
+- `fix(cli): zever compile --check ignores the stamped CLI version`: a zever
+  upgrade alone no longer reports every generated file as drifted. Files that
+  differ only in the stamp version pass with a note (`stampVersionOnly` in
+  `--json`); the new `--strict` flag fails on them. Schema hash and content
+  changes still fail.
 - `fix(container,cmd)`: SIGHUP reload is now atomic and race-free.
   `ReloadableLimiter` retires a replaced limiter and closes it only after its
   in-flight `Allow`/`Reset` calls drain; the boot-time limiter stays owned by
@@ -550,7 +643,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   swaps. New `container.ApplyReload` opens the new logger and limiter first
   and swaps both only on success, so a failed rate-limit reopen no longer
   leaves the log level changed.
-
 - `fix(orm): dedupe oversized IN lists before chunking`: a value repeated in
   a value-list `IN` that is auto-chunked across several statements could land
   in two chunks, so `All`/`Stream` returned the same row twice and `Count`
@@ -681,27 +773,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `math.MaxInt64`/`math.MinInt64` totals still convert, and out-of-range
   whole parts that `strconv.ParseInt` already rejects are unchanged. Stripe
   needs no equivalent: it carries amounts as native int64, never decimals.
+- fix(container): a panicking service builder no longer wedges concurrent
+  callers; returns BuildPanicError.
+- refactor(container): service builders now receive a builder-facing root
+  context (detached `context.WithoutCancel` with container-lifetime
+  cancellation) instead of `context.Background()`, so cancellation and
+  tracing propagate into service construction; `Close` cancels it.
+  `zever launch` uses a signal context for `exec.CommandContext`.
+- Point all one-line installer URLs at `main` instead of the `v0.6.1`
+  tag: `install.sh`/`install.ps1` were added after `v0.6.1` was cut, so
+  the tag-pinned raw URLs returned 404. The scripts still install
+  pinned-version binaries by default.
+- `adapters/ratelimit/memory`: hold the admission lock across slot
+  reservation and bucket insert so concurrent new-key bursts can no
+  longer overshoot the `MaxEntries` bound.
 
 ### Security
 
-- `fix(httpclient)`: **Breaking:** clients built with `WithSafeDial` /
-  `NewSafeClient` no longer honor `HTTP_PROXY`/`HTTPS_PROXY` (the dial guard
-  only saw the proxy address, so private targets were reachable through a
-  proxy); pass the new `WithAllowProxy()` option to opt back in with a
-  trusted proxy. `IsPrivateIP` now also classifies NAT64
-  (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) and IPv4-compatible
-  (`::/96`) addresses by their embedded IPv4 address, and treats Teredo
-  (`2001::/32`) and site-local (`fec0::/10`) as private.
-- `fix(document)`: **Breaking:** the `latex` adapter now defends against
-  local file reads on TeX Live >= 2026 (where `openin_any` is a no-op). New
-  `latex_sandbox` option (`auto` default, `required`, `off`) runs TeX inside
-  bubblewrap (no network, read-only system trees, only the render dir
-  writable); `required` fails at open when bwrap is unavailable, `auto` logs
-  one warning and falls back. A source pre-scan now rejects `\input`,
-  `\include`, `\openin`, `\openout` etc. with absolute, `..`, `~` or piped
-  paths, `\write18`, and shell-escape packages with `ErrUnsafeSource`;
-  `latex_allow_unsafe_source: true` restores the old behavior. Output and
-  stderr are size-capped before buffering, and process-group kill is split
 - `middleware.ClientIPKey` now reads every `X-Forwarded-For` header line
   (not just the first) before picking the rightmost untrusted entry, so a
   trusted proxy that appends a separate header line can no longer be
@@ -755,6 +843,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   segments; empty and dot segments are rejected at validation. Nested
   mounts (`team/secret`) keep working.
 
+### CI
+
+- `ci(apidiff)`: the `apidiff` gate is now module-scoped. A `**Breaking:**`
+  entry in `## [Unreleased]` only covers a module it names in backticks
+  (module path, directory, package path or short name), a Core-tier module
+  with no baseline tag now fails unless listed in
+  `.github/apidiff-baseline-allowlist.json` with an expiry, and
+  `tools/tag-release.sh --verify vX.Y.Z` checks that every module tag exists
+  locally or on origin. See `API Compatibility` in `.github/CONTRIBUTING.md`.
+
 ### Tests
 
 - `test(orm): fuzz JSON path key escaping`: native Go fuzz targets
@@ -763,120 +861,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   string-literal terminator for arbitrary json path keys (quotes,
   backslashes, NUL, unicode, `}`/`,`/`{`), with seed corpus under
   `orm/render/testdata/fuzz`.
-
-### Changed
-
-- `perf(orm): LRU shape cache`: the render-shape cache evicts only the
-  least-recently-used entry on overflow instead of dropping the whole map,
-  so hot shapes survive churn. It is striped 16 ways over
-  `shared/lrucache` (one bounded LRU per stripe, 256 entries total):
-  LRU `Get` rewrites recency and needs exclusive access, so a single
-  instance would serialize every parallel hit where the old `RWMutex` map
-  allowed concurrent reads. Hit-path cost is unchanged (128 B/op,
-  1 alloc/op sequential; 155 B/op, 3 allocs/op parallel on the bench
-  machine, within noise of the map). New tests pin single-entry eviction,
-  concurrent access under `-race`, and the capacity bound.
-- `docs: hygiene pass`: recount confirms 37 configured services
-  (`knownServiceNames()` in `config/config.go`) against 42 container
-  accessor rows — the five extra rows (`agent`, `grpc`, `grpcclient`,
-  `job`, `rag`) resolve over other services and take no `config`
-  section; `STABILITY.md` and `container/README.md` now say so instead
-  of implying drift. The stale `dsl/compile/testdata/app.zen` header
-  (non-existent `internal/dsl/compile` paths, test names, and committed
-  packages) now describes the fixture's real consumers, and stale
-  `internal/dsl/` path comments across `dsl/`, `cmd/zever`, `orm/migrate`,
-  `tools/gengrammar`, and the generated `editors/` grammar are fixed.
-  New `config/readme_test.go` pins the `config/README.md` adapter table
-  to the `Config` struct (row per known service, default adapter listed).
-  The `docs/{production,errors,writing-a-plugin}.md` redirect stubs, the
-  `session/cookie` + `media/ffmpeg` matrix rows, `argon2id` vs `argon2`,
-  `resilience` memory vs inproc, and the `.zen` reference
-  (`reference/zen-syntax.mdx`) were verified already correct.
-- `docs: governance files`: new `GOVERNANCE.md` (roles, decisions,
-  releases, policy index), `MAINTAINERS`, and `ROADMAP.md` with the 1.0
-  criteria checklist (mirrors `STABILITY.md`, all three unchecked).
-  `STABILITY.md` gains the Go version policy (latest toolchain only) and
-  the deprecation window policy (≥1 minor with `// Deprecated:`); README
-  notes generic methods need Go 1.27+. `.github/SECURITY.md` already
-  records the backport decision (latest release only) — no change.
-- `refactor(container): identity-based close dedup without unsafe`: `Close`
-  now dedupes services by the value's own reference identity (pointer, chan,
-  map, func, slice via `reflect.Value.Pointer`) instead of searching struct
-  fields for the first non-nil pointer. Two distinct services whose structs
-  embed the same pointer (e.g. a shared logger) both close now; previously
-  the second was skipped. The `unsafe` import is gone, and the 33-entry
-  `snapshots()` copy-paste collapsed into a generic `snap` helper over a
-  method-value table.
-- `chore(lint): wrapcheck evaluation, errscan missing-%w, nolintlint, any`:
-  `wrapcheck` was trial-enabled over `container` and `core/cache` (9 and 7
-  hits, all registry `Register`/`Lookup` passthroughs, `Close`-probe returns,
-  and test helpers): enabling it would relitigate the registry-passthrough
-  convention in every battery, so it stays off and the existing
-  `.golangci.yml` comment records why. `tools/errscan` gains a `missing-%w`
-  rule flagging `fmt.Errorf` without `%w` that still takes a bare `err`
-  argument (conservative: `err.Error()` and other names are out of scope);
-  the repo scans clean.   `nolintlint` is now enabled so stale suppressions
-  fail the build, and the 123 unused directives it reported (mostly
-  `nolint:gosec` on `os.ReadFile`/`os.WriteFile` already covered by the
-  `std-error-handling` exclusion preset, plus stale `unparam`/`dupl`/
-  `nilerr`/`unused`/`revive`/`tparallel`/`exhaustive`/`forcetypeassert`/
-  `errcheck`/`contextcheck`/`staticcheck`/`nilnil`/`spancheck`) are removed.
-  One survivor needed care: `adapters/media/local` `MkdirAll` tripped gosec
-  G703 taint analysis once its directive was lifted (the sink is safe —
-  `filepath.Ext` yields no separators), so it now carries a gosec-native
-  `#nosec G703` pin like the one in `tools/errscan`, which both linters
-  accept stably. Remaining `interface{}` spellings outside
-  generated protobuf code become `any` (the `twilio` test fake keeps
-  `interface{}` to match the upstream `twilioclient.BaseClient` signature).
-- `chore(modules): tag-path gate, shared/* verdict, versioning doc, mysql
-  status`: `modgraph --check` (hence `make modgraph-check`) now also
-  verifies every `go.mod` module path follows the `tools/tag-release.sh`
-  rule (tag `<suffix>/vX.Y.Z`), allowlisting the two deliberate
-  consumer-proof exceptions (`docs/examples` dashed path,
-  `examples/external-sms` under another org); clean over all 177 modules.
-  Import scan of all 22 `shared/*` packages shows every one has importers
-  in at least two areas or sits on a public API seam (`mcpclient` in
-  `core/agent` signatures, `outboxbridge` as the documented hand-wiring
-  seam, `prompt` unused in-repo), so nothing moves under `internal/`.
-  New `start/versioning` docs page pins the lockstep release model and
-  replace-less consumer rules; `orm/README` no longer claims mysql support
-  was dropped and states the real split (query builder sqlite/postgres
-  only; atlas DDL + `orm/migrate` live-diff cover mysql).
-
-### Added
-
-- `install.sh` / `install.ps1`: richer output (plan summary, numbered steps,
-  download progress, checksum details, next steps), uniform `--dry-run`
-  rendering, actionable hints on failure, and new `--quiet` / `--no-color`
-  (`-Quiet` / `-NoColor`) flags; honours `NO_COLOR`.
-- `install.sh` / `install.ps1`: one-line installers that download the release
-  binaries (`zever`, `zever-lsp`), verify `SHA256SUMS.txt`, and add them to
-  `PATH` (`--version`, `--prefix`, `--yes`, `--force`, `--dry-run`).
-- `zever uninstall`: remove the `zever` and `zever-lsp` binaries from
-  `PATH` (binaries only; `--dry-run`, `--keep-lsp`, `--yes`/`--force`,
-  `--json`, TTY `[y/N]` confirmation with non-TTY re-run hint).
-- `zever upgrade`: upgrade the `zever` binary to the latest stable
-  GitHub release or an explicit `--version` (SemVer compare via
-  `golang.org/x/mod/semver`, `--check`/`--dry-run`, SHA256-verified
-  `GOOS`/`GOARCH` asset, atomic POSIX install, staged Windows
-  install, same confirmation rules as `uninstall`).
-
-### Fixed
-
-- fix(container): a panicking service builder no longer wedges concurrent
-  callers; returns BuildPanicError.
-- refactor(container): service builders now receive a builder-facing root
-  context (detached `context.WithoutCancel` with container-lifetime
-  cancellation) instead of `context.Background()`, so cancellation and
-  tracing propagate into service construction; `Close` cancels it.
-  `zever launch` uses a signal context for `exec.CommandContext`.
-- Point all one-line installer URLs at `main` instead of the `v0.6.1`
-  tag: `install.sh`/`install.ps1` were added after `v0.6.1` was cut, so
-  the tag-pinned raw URLs returned 404. The scripts still install
-  pinned-version binaries by default.
-- `adapters/ratelimit/memory`: hold the admission lock across slot
-  reservation and bucket insert so concurrent new-key bursts can no
-  longer overshoot the `MaxEntries` bound.
 
 ## [v0.6.1] - 2026-10-08
 
