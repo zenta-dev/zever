@@ -87,6 +87,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modules (temporary local replaces), and the release workflow runs
   `tools/verify-go-install.sh` against the pushed tag. v0.7.1 and earlier
   tags stay uninstallable this way; docs updated accordingly.
+- `zever new` scaffolded CI workflow installs the CLI from the release binary
+  (`install.sh --version <pin>`) instead of `go install .../cmd/zever@<pin>`,
+  which fails for every tag that commits `replace` directives in
+  `cmd/zever/go.mod` (v0.7.1 and earlier).
 
 ### Changed
 

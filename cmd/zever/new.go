@@ -1374,7 +1374,7 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 	cliPin := cfg.FrameworkVersion
 	if cliPin == "" || cliPin == pseudoVersionZero {
 		// Local checkouts have no published version to install from; CI
-		// installs the latest release instead.
+		// installs the installer's default (newest) release instead.
 		cliPin = "latest"
 	}
 
@@ -1775,16 +1775,24 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr
 }
 
 // renderCIGitHubWorkflow returns the scaffolded project's CI workflow: it
-// installs the pinned zever CLI, regenerates derived code from the schema,
+// installs the pinned zever CLI release binary, regenerates derived code from the schema,
 // gates drift with `zever compile --check` (proving compile is
 // deterministic on regenerating projects, and gating committed-output drift
 // for teams that check in generated/), then builds and tests. cliPin is the
-// `go install ...@version` pin (see writeNewProject: "latest" for local
-// checkouts, the release tag otherwise); backends is the --backend value
-// for both compile invocations.
+// release pin (see writeNewProject: "latest" for local checkouts, which
+// omits --version, the release tag otherwise); backends is the --backend value
+// for both compile invocations. The CLI is installed from the release
+// binary via install.sh: `go install` of cmd/zever only works from the
+// release that ships a replace-free cmd/zever/go.mod (v0.7.2), so scaffolds
+// pinned to older versions could not build.
 func renderCIGitHubWorkflow(goVersion, cliPin, backends string) string {
 	if goVersion == "" {
 		goVersion = defaultGoVersion
+	}
+
+	installVersion := ""
+	if cliPin != "" && cliPin != "latest" {
+		installVersion = " --version " + cliPin
 	}
 
 	return fmt.Sprintf(`# Scaffolded by `+"`zever new`"+`. Regenerate derived code, gate drift, build and test.
@@ -1808,7 +1816,9 @@ jobs:
         with:
           go-version: '%s'
       - name: Install zever CLI
-        run: go install github.com/zenta-dev/zever/cmd/zever@%s
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh -s -- --yes%s
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Regenerate from schema
         run: zever compile --backend=%s --out ./generated schema/*.zen
       - name: Drift gate (committed generated/ must match the schema)
@@ -1817,7 +1827,7 @@ jobs:
         run: go build ./...
       - name: Test
         run: go test ./...
-`, goVersion, cliPin, backends, backends)
+`, goVersion, installVersion, backends, backends)
 }
 
 // renderNewCompose returns compose.yaml for a scaffolded project, or ""

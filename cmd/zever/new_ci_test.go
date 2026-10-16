@@ -42,11 +42,17 @@ func TestRunNewWritesCIWorkflow(t *testing.T) {
 		"zever compile --backend=",
 		"go build ./...",
 		"go test ./...",
-		"cmd/zever@v0.6.1",
+		"install.sh",
+		"--version v0.6.1",
+		`>> "$GITHUB_PATH"`,
 	} {
 		if !strings.Contains(content, fragment) {
 			t.Errorf("scaffolded ci.yml lacks %q:\n%s", fragment, content)
 		}
+	}
+
+	if strings.Contains(content, "go install") {
+		t.Errorf("scaffolded ci.yml must not use go install (uninstallable before the first release that ships replace-free cmd/zever):\n%s", content)
 	}
 
 	found := false
@@ -63,8 +69,8 @@ func TestRunNewWritesCIWorkflow(t *testing.T) {
 }
 
 // TestRenderCIWorkflowLocalCheckoutPinsLatest proves scaffolds bound to a
-// local framework checkout (pseudo-version, uninstallable) pin the CI's
-// `go install` to latest instead of emitting an uninstallable version.
+// local framework checkout (pseudo-version, uninstallable) let the installer
+// pick its default release instead of emitting an uninstallable version.
 func TestRenderCIWorkflowLocalCheckoutPinsLatest(t *testing.T) {
 	t.Parallel()
 
@@ -76,8 +82,8 @@ func TestRenderCIWorkflowLocalCheckoutPinsLatest(t *testing.T) {
 
 	content := readFile(t, filepath.Join(cfg.OutDir, ".github", "workflows", "ci.yml"))
 
-	if !strings.Contains(content, "cmd/zever@latest") {
-		t.Errorf("local-checkout ci.yml should install latest CLI:\n%s", content)
+	if !strings.Contains(content, "install.sh") || strings.Contains(content, "--version") {
+		t.Errorf("local-checkout ci.yml should run install.sh without --version:\n%s", content)
 	}
 
 	if strings.Contains(content, pseudoVersionZero) {
