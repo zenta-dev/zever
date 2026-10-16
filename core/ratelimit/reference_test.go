@@ -104,8 +104,9 @@ func errorSentinels(t *testing.T, name string) []string {
 	if err != nil {
 		t.Fatalf("read %s: %v", name, err)
 	}
-	var names []string
-	for _, m := range errVarPattern.FindAllStringSubmatch(string(raw), -1) {
+	matches := errVarPattern.FindAllStringSubmatch(string(raw), -1)
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
 		names = append(names, m[1])
 	}
 	if len(names) == 0 {
