@@ -194,6 +194,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   upgrade` refuses release downloads larger than 512 MiB instead of buffering
   them (checksum verification was already enforced).
 
+- Repo housekeeping: add `.github/CODEOWNERS` (`@zenta-dev/maintainers`),
+  ignore `.claude/` (agent harness state), group all github-actions Dependabot
+  updates into one PR (`tools/gen-dependabot.sh`), and remove the empty stub
+  `docs/production.md` (nothing linked to it).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
