@@ -138,17 +138,10 @@ func TestLocalNewValidateError(t *testing.T) {
 }
 
 func TestLocalNewDefaultRoot(t *testing.T) {
-	// Root "" falls back to /tmp/storage. Preserve any pre-existing state.
-	const defRoot = "/tmp/storage"
+	old := defaultRoot
+	t.Cleanup(func() { defaultRoot = old })
 
-	var prevMode os.FileMode
-
-	hadRoot := false
-
-	if fi, statErr := os.Stat(defRoot); statErr == nil {
-		hadRoot = true
-		prevMode = fi.Mode().Perm()
-	}
+	defaultRoot = filepath.Join(t.TempDir(), "storage")
 
 	s, err := New(storage.Options{
 		LocalOptions: storage.LocalOptions{Secret: testSecret},
@@ -158,18 +151,8 @@ func TestLocalNewDefaultRoot(t *testing.T) {
 	}
 
 	a := mustAdapter(t, s)
-	if a.root != defRoot {
-		t.Fatalf("root = %q, want %q", a.root, defRoot)
-	}
-
-	if hadRoot {
-		if err := os.Chmod(defRoot, prevMode); err != nil {
-			t.Fatal(err)
-		}
-	} else {
-		if err := os.RemoveAll(defRoot); err != nil {
-			t.Fatal(err)
-		}
+	if a.root != defaultRoot {
+		t.Fatalf("root = %q, want %q", a.root, defaultRoot)
 	}
 }
 
@@ -1554,17 +1537,17 @@ func TestLocalCoreWriteBodyTemp(t *testing.T) {
 	dir := t.TempDir()
 
 	// Missing directory.
-	if _, err := writeBodyTemp(filepath.Join(dir, "nope"), strings.NewReader("x"), 0o600); err == nil {
+	if _, err := writeBodyTempLimit(filepath.Join(dir, "nope"), strings.NewReader("x"), 0o600, maxBody); err == nil {
 		t.Fatal("expected CreateTemp error")
 	}
 
 	// Failing body.
-	if _, err := writeBodyTemp(dir, failReader{err: io.ErrUnexpectedEOF}, 0o600); err == nil {
+	if _, err := writeBodyTempLimit(dir, failReader{err: io.ErrUnexpectedEOF}, 0o600, maxBody); err == nil {
 		t.Fatal("expected copy error")
 	}
 
 	// Success with mode.
-	name, err := writeBodyTemp(dir, strings.NewReader("hello"), 0o600)
+	name, err := writeBodyTempLimit(dir, strings.NewReader("hello"), 0o600, maxBody)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1595,7 +1578,7 @@ func TestLocalCoreWriteBodyTempTooLarge(t *testing.T) {
 
 	dir := t.TempDir()
 
-	_, err := writeBodyTemp(dir, strings.NewReader(strings.Repeat("x", 32)), 0o600)
+	_, err := writeBodyTempLimit(dir, strings.NewReader(strings.Repeat("x", 32)), 0o600, maxBody)
 	if !errors.Is(err, io.EOF) {
 		t.Fatalf("expected io.EOF, got %v", err)
 	}
