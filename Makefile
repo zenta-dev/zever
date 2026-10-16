@@ -142,7 +142,7 @@ tidy-check: ## Verify go.mod/go.sum are tidy (no root module; delegates to the p
 
 .PHONY: tidy-lsp-check
 tidy-lsp-check: ## Verify zever-lsp go.mod/go.sum are tidy
-	cd tools/zever-lsp && $(GO) mod tidy -diff
+	cd tools/zever-lsp && $(CURDIR)/tools/gotidy.sh -diff
 
 .PHONY: download
 download: ## Download module dependencies
@@ -185,7 +185,7 @@ download-all: ## Download dependencies of every module (override list via MODULE
 
 .PHONY: check-all build-all test-all test-race-all test-race-fast test-race-pr vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
-	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) vet ./... && $(GO) mod tidy -diff && $(GO) test -vet=off ./... && $(GO) build ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) vet ./... && $(CURDIR)/tools/gotidy.sh -diff && $(GO) test -vet=off ./... && $(GO) build ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	mkdir -p .coverage; root="$$PWD"; failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); if ! (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
@@ -215,10 +215,10 @@ vet-all: ## Run go vet in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) vet ./...); done
 
 tidy-all: ## Run go mod tidy in every module (override list via MODULES)
-	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) mod tidy); done
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(CURDIR)/tools/gotidy.sh); done
 
 tidy-check-all: ## Verify go.mod/go.sum are tidy in every module (override list via MODULES)
-	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(GO) mod tidy -diff); done
+	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(CURDIR)/tools/gotidy.sh -diff); done
 
 deps-sync: ## Reconcile dependency versions across all modules after a bump
 	$(MAKE) tidy-all

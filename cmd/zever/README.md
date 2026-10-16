@@ -27,10 +27,11 @@ If PowerShell blocks the script, download it first, then run
 `Unblock-File install.ps1` or invoke it with
 `powershell -ExecutionPolicy Bypass -File install.ps1`.
 
-Do not use `go install github.com/zenta-dev/zever/cmd/zever@version`: the
-repo commits `replace` directives, so `go install <module>@version` does not
-work for zever modules. Use the installer above or a prebuilt release binary
-instead.
+From v0.7.2 on you can also build from source with
+`go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` (`cmd/zever/go.mod`
+commits no `replace` directives and pins every sibling module). v0.7.1 and
+earlier tags cannot be installed this way; use the installer above or a
+prebuilt release binary for those.
 
 After install, `zever upgrade` self-updates (`--check` to preview,
 `--version` to pin a target) and `zever uninstall` removes both binaries

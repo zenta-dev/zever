@@ -9,7 +9,8 @@
 #      cmd/zever/VERSION;
 #   3. the newest released CHANGELOG.md section is not cmd/zever/VERSION;
 #   4. any intra-repo `require github.com/zenta-dev/zever/... vX` in any
-#      go.mod differs from cmd/zever/VERSION (tools/modgraph --check-pins).
+#      go.mod differs from cmd/zever/VERSION (tools/modgraph --check-pins);
+#   5. cmd/zever/go.mod commits a replace directive (breaks go install).
 # `make release-prep VERSION=vX.Y.Z` (tools/release-prep.sh) rewrites all of
 # these together; tools/tag-release.sh runs this gate before tagging/verifying.
 # Usage: tools/check-version.sh [VERSION_FILE]
@@ -92,6 +93,13 @@ fi
 # 4. Intra-repo go.mod requires.
 if [ -d "$root/tools/modgraph" ] && command -v go >/dev/null 2>&1; then
   (cd "$root" && go run ./tools/modgraph --check-pins) || exit 1
+fi
+
+# 5. The go install target must not commit replace directives, or
+# `go install github.com/zenta-dev/zever/cmd/zever@vX` is rejected.
+if grep -Eq '^[[:space:]]*replace[[:space:]]' "$root/cmd/zever/go.mod" 2>/dev/null; then
+  echo "error: cmd/zever/go.mod commits replace directives; go install <module>@version would fail (run: go run ./tools/modgraph)" >&2
+  exit 1
 fi
 
 echo "check-version: release pins consistent at v$ver"
