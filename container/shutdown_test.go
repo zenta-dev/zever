@@ -108,7 +108,7 @@ var errSigtermDBDown = errors.New("container test: db closed")
 // awaitSIGTERM delivers one SIGTERM to this process and waits for ctx
 // (from signal.NotifyContext) to observe it. The signal is caught by the
 // notifier, so the test process survives it.
-func awaitSIGTERM(t *testing.T, ctx context.Context) {
+func awaitSIGTERM(ctx context.Context, t *testing.T) {
 	t.Helper()
 
 	if err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM); err != nil {
@@ -143,7 +143,7 @@ func TestContainer_Shutdown_UnderSIGTERM(t *testing.T) {
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
 	defer stop()
-	awaitSIGTERM(t, sigCtx)
+	awaitSIGTERM(sigCtx, t)
 	stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

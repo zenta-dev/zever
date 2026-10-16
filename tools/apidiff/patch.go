@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -107,9 +108,11 @@ func newerThan(x, y, z, floor string) bool {
 		return true
 	}
 	var ix, iy, iz int
-	fmt.Sscanf(x, "%d", &ix)
-	fmt.Sscanf(y, "%d", &iy)
-	fmt.Sscanf(z, "%d", &iz)
+	// x, y, and z match patchSectionHeader's (\d+) groups, so Atoi cannot
+	// fail; the blank keeps the zero value on input no caller can produce.
+	ix, _ = strconv.Atoi(x)
+	iy, _ = strconv.Atoi(y)
+	iz, _ = strconv.Atoi(z)
 	switch {
 	case ix != fx:
 		return ix > fx
