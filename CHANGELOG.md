@@ -80,6 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sources. Docs gain a ready-to-copy `breaking` CI workflow, an
   extend-around-generated-code guide, and a WASM-playground ADR (proposal
   only, not implemented).
+- `docs(quickstart)`: re-executed every quickstart command in a temp dir and
+  fixed the doc to match reality (fresh scaffolds serve fine — the stale
+  `unknown adapter: jwt` caution is gone; `zever new` already runs
+  `go mod tidy`; the API-call step shows `/healthz` 200 plus the `zever
+  routes` listing with a note that RPCs 404 until handlers are written).
+  New `quickstart.yml` CI job runs the same commands verbatim in a temp
+  directory so future doc drift fails loudly.
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
   helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
   and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake
