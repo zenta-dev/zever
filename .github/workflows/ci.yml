@@ -657,6 +657,31 @@ jobs:
       - name: API compatibility against last tags
         run: make apidiff
 
+  # Patch-release guard: no Core-tier breaking change may ship in a patch.
+  # `go run ./tools/apidiff --check-patch` scans released X.Y.Z sections
+  # newer than cmd/zever/VERSION and fails when a **Breaking:** entry names
+  # a Core module (Extended packages may still break in patches pre-1.0).
+  # Older sections are grandfathered by the VERSION floor; the bad fixture
+  # is pinned by tools/apidiff/patch_test.go (TestCheckPatchFailsOnBadFixture).
+  patch-break:
+    name: patch-break
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: No Core-tier breaks in patch releases
+        run: go run ./tools/apidiff --check-patch
+      - name: Compatibility matrix is current
+        run: go run ./tools/apidiff --check-compat-matrix docs/src/content/docs/reference/compatibility-matrix.mdx
+
   sbom:
     name: sbom
     timeout-minutes: 20
@@ -728,7 +753,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, fuzz-smoke]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke]
     steps:
       - name: Aggregate results
         run: |

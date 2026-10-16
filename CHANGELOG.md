@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   why-not table for sqlc/ent/Goa/Encore/plain chi+sqlc, real `zenorm`
   output, Core vs Extended tiers, "What zever will not do") plus a new
   honest `docs/comparison.md`.
+- `feat(runtime)`: minimal runtime profile (`config`, `orm`, `core/db`,
+  `core/router`, `core/log`) measured at 419 transitive packages (185
+  third-party) versus 1706 (1396 third-party) for the full CLI; numbers and
+  repro commands live in `docs/src/content/docs/reference/minimal-profile.mdx`.
+  Binary sizes are cited from the benchmarks page (full 309.7 MB, slim
+  log+router floor 63.3 MB).
+- `feat(tools)`: `tools/apidiff` gains `--check-patch` (fails when a released
+  patch section newer than `cmd/zever/VERSION` documents a Core-tier
+  `**Breaking:**` change; Extended breaks stay allowed pre-1.0 and older
+  sections are grandfathered) and `--compat-matrix`/`--check-compat-matrix`
+  (generates and verifies
+  `docs/src/content/docs/reference/compatibility-matrix.mdx`). CI runs both
+  in a new `patch-break` job.
+- `feat(container)`: SIGTERM shutdown tests prove ordered draining
+  (scheduler, then snapshots, then cache/queue leaves, then db), readiness
+  flipping to `ErrDatabaseUnavailable` once the database is down, and no
+  goroutine leaks.
 - `ci(test)`: live conformance workflow (`.github/workflows/conformance-live.yml`)
   running the shared kits against real services in containers — postgres:17,
   redis:7, S3-compatible minio — via new skip-gated live tests

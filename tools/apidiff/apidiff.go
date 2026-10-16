@@ -46,6 +46,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	modulesFlag := fs.String("modules", "", "comma-separated module dirs (default: Core tier)")
 	changelogFlag := fs.String("changelog", "", "changelog path (default: <root>/CHANGELOG.md)")
 	allowFlag := fs.String("allowlist", "", "no-baseline allowlist JSON (default: <root>/.github/apidiff-baseline-allowlist.json)")
+	checkPatchFlag := fs.Bool("check-patch", false, "fail when a released patch section carries a **Breaking:** entry (no git needed)")
+	floorFlag := fs.String("floor", "", "grandfather patch sections at or below this version (default: <root>/cmd/zever/VERSION)")
+	matrixFlag := fs.String("compat-matrix", "", "write the generated compatibility-matrix doc to FILE and exit")
+	checkMatrixFlag := fs.String("check-compat-matrix", "", "exit 1 when FILE differs from the generated compatibility-matrix doc")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -66,6 +70,25 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	changelog := *changelogFlag
 	if changelog == "" {
 		changelog = filepath.Join(root, "CHANGELOG.md")
+	}
+
+	if *matrixFlag != "" {
+		return runCompatMatrix(*matrixFlag, stdout)
+	}
+	if *checkMatrixFlag != "" {
+		return runCheckCompatMatrix(*checkMatrixFlag, stdout)
+	}
+	if *checkPatchFlag {
+		floor := *floorFlag
+		if floor == "" {
+			var err error
+			floor, err = versionFloor(filepath.Join(root, "cmd", "zever", "VERSION"))
+			if err != nil {
+				fmt.Fprintf(stderr, "apidiff: read version floor: %v\n", err)
+				return 1
+			}
+		}
+		return runPatchGuard(changelog, floor, stdout, stderr)
 	}
 
 	allowPath := *allowFlag
