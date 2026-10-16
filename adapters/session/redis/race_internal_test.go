@@ -88,7 +88,7 @@ func TestSave_atomicUnderStaleReadRace(t *testing.T) {
 		t.Fatalf("Create err = %v, want nil", err)
 	}
 
-	key := prefix + ":" + s.ID
+	key := prefix + ":" + hashID(s.ID)
 	hook := newDelayFirstGetHook(key)
 	client.AddHook(hook)
 

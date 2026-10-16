@@ -1,6 +1,6 @@
 // Package db provides a DB-backed session.Store over shared/kvstore.
 //
-// Sessions are stored as a single JSON value per key (prefix + ":" + id)
+// Sessions are stored as a single JSON value per key (prefix + ":" + hex(sha256(id)))
 // with an absolute expiry enforced by the kv row's expires_at: like the
 // redis adapter's SET EX, no access is needed for a session to expire.
 // Expired rows read as missing and are purged lazily on read plus by

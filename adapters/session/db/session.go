@@ -2,6 +2,8 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -130,8 +132,18 @@ func openFromDB(conn coredb.DB, o Options, owns bool) (session.Store, error) {
 	return &driver{db: conn, kv: kv, prefix: prefix, ttl: ttl, owns: owns}, nil
 }
 
+// key returns the kv key for id. The session ID is a bearer token, so the key
+// holds its SHA-256 hex digest rather than the ID itself: a database dump or
+// query log cannot be replayed as a login.
 func (d *driver) key(id string) string {
-	return d.prefix + ":" + id
+	return d.prefix + ":" + hashID(id)
+}
+
+// hashID returns the lowercase hex SHA-256 of a session ID.
+func hashID(id string) string {
+	sum := sha256.Sum256([]byte(id))
+
+	return hex.EncodeToString(sum[:])
 }
 
 func unixNano(t time.Time) int64 {
