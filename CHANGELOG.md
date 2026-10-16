@@ -183,6 +183,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keys, so every active Redis/DB session ends once at upgrade (users sign in
   again). The memory and cookie stores are unaffected.
 
+### Security
+
+- Supply-chain hardening: `release.yml` now defaults to `permissions: {}` and
+  grants write scopes only to the publish job (dropping `actions: write`);
+  `bench.yml` pins benchstat and no longer interpolates `github.base_ref` into
+  shell. `install.sh` fails (and removes the binaries) when `gh attestation
+  verify` rejects a download and `gh` is authenticated, unless
+  `--insecure-skip-verify` is set, and uses `wget --https-only`. `zever
+  upgrade` refuses release downloads larger than 512 MiB instead of buffering
+  them (checksum verification was already enforced).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

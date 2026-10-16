@@ -449,7 +449,7 @@ download_file() {
             curl --proto '=https' --tlsv1.2 -sSf -L -o "$2" "$1"
         fi
     else
-        wget -q -O "$2" "$1"
+        wget --https-only -q -O "$2" "$1"
     fi
 }
 
@@ -631,14 +631,29 @@ install_asset "$LSP_ASSET" "$TARGET_LSP" "zever-lsp"
 if [ "$DRY_RUN" -eq 1 ]; then
     would "run gh attestation verify (only if gh exists)"
 elif command -v gh >/dev/null 2>&1; then
-    info "verifying build provenance with gh"
-    for _bin in "$TARGET_BIN" "$TARGET_LSP"; do
-        if gh attestation verify "$_bin" --repo "$ZEVER_REPO" >/dev/null 2>&1; then
-            ok "attestation verified for ${_bin##*/}"
-        else
-            warn "gh attestation verify failed for ${_bin}"
-        fi
-    done
+    # gh needs a login to query the attestation API; an unauthenticated gh
+    # cannot verify anything, so that case only warns. An authenticated gh
+    # that rejects a binary is a hard failure (fail closed) unless the user
+    # opted out with --insecure-skip-verify.
+    if ! gh auth status >/dev/null 2>&1; then
+        warn "gh is not authenticated; skipping attestation verification (run: gh auth login)"
+        for _bin in "$TARGET_BIN" "$TARGET_LSP"; do
+            hint "verify manually: gh attestation verify ${_bin} --repo ${ZEVER_REPO}"
+        done
+    else
+        info "verifying build provenance with gh"
+        for _bin in "$TARGET_BIN" "$TARGET_LSP"; do
+            if gh attestation verify "$_bin" --repo "$ZEVER_REPO" >/dev/null 2>&1; then
+                ok "attestation verified for ${_bin##*/}"
+            elif [ "$INSECURE_SKIP_VERIFY" -eq 1 ]; then
+                warn "gh attestation verify failed for ${_bin} (continuing: --insecure-skip-verify)"
+            else
+                rm -f "$TARGET_BIN" "$TARGET_LSP"
+                die_hint "gh attestation verify failed for ${_bin}; removed the unverified binaries" \
+                    "re-run, or pass --insecure-skip-verify (or set ZEVER_INSTALL_INSECURE=1) to proceed unverified"
+            fi
+        done
+    fi
 else
     for _bin in "$TARGET_BIN" "$TARGET_LSP"; do
         hint "gh not found; verify manually: gh attestation verify ${_bin} --repo ${ZEVER_REPO}"

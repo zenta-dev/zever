@@ -216,6 +216,39 @@ assert_rc "gh-absent path proceeds" 0 "$_rc"
 assert_contains "gh-absent prints manual command" "$_out" "gh attestation verify"
 assert_contains "gh-absent names the repo" "$_out" "zenta-dev/zever"
 
+# 6b. gh present: a failed attestation verification must fail the install and
+# must not leave unverified binaries behind; an unauthenticated gh only warns.
+cat >"$STUB/gh" <<'EOF2'
+#!/bin/sh
+case "$1" in
+    auth) [ "$GH_STUB_AUTH" = "1" ] ;;
+    attestation) [ "$GH_STUB_ATTEST" = "1" ] ;;
+    *) exit 0 ;;
+esac
+EOF2
+chmod +x "$STUB/gh"
+
+rm -rf "$TMPD/home"
+_out="$(run_install_sh GH_STUB_AUTH=1 GH_STUB_ATTEST=0 -- --yes)"; _rc=$?
+assert_rc "attestation failure fails the install" 1 "$_rc"
+assert_contains "attestation failure message" "$_out" "attestation"
+if [ -e "$TMPD/home/.local/bin/zever" ]; then bad "attestation failure removes unverified binary"; else ok "attestation failure removes unverified binary"; fi
+
+rm -rf "$TMPD/home"
+_out="$(run_install_sh GH_STUB_AUTH=1 GH_STUB_ATTEST=0 -- --yes --insecure-skip-verify)"; _rc=$?
+assert_rc "attestation failure with escape hatch proceeds" 0 "$_rc"
+
+rm -rf "$TMPD/home"
+_out="$(run_install_sh GH_STUB_AUTH=0 GH_STUB_ATTEST=0 -- --yes)"; _rc=$?
+assert_rc "unauthenticated gh only warns" 0 "$_rc"
+assert_contains "unauthenticated gh warning" "$_out" "not authenticated"
+
+rm -rf "$TMPD/home"
+_out="$(run_install_sh GH_STUB_AUTH=1 GH_STUB_ATTEST=1 -- --yes)"; _rc=$?
+assert_rc "attestation success proceeds" 0 "$_rc"
+assert_contains "attestation success message" "$_out" "attestation verified"
+rm -f "$STUB/gh"
+
 # 7. Dry run without a sha256 tool also fails closed.
 unlink_sha256
 _out="$(run_install_sh -- --yes --dry-run)"; _rc=$?
