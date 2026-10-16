@@ -172,3 +172,14 @@ func TestMergeExecErrorPaths(t *testing.T) {
 		t.Fatalf("Exec err = %v, want errors.Is(err, boom)", err)
 	}
 }
+
+func TestMergeValueOfMatchesMergeValue(t *testing.T) {
+	t.Parallel()
+
+	got := MergeValueOf(widgetQty, int64(7))
+	want := MergeValue(widgetQty.Col(), int64(7))
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("MergeValueOf = %+v, want %+v", got, want)
+	}
+}

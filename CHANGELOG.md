@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Clock` and deterministic `IDs`, and an in-process HTTP `Client`. The testing
   guide documents it, and CI gains a 20s-per-target fuzz smoke job over the DSL
   lexer, parser, resolver and the new formatter idempotence target.
+- `feat(orm)`: typed keyset and MERGE helpers. `orm.AfterTuple2` and
+  `orm.AfterTuple3` build the multi-column keyset predicate from typed columns
+  and typed values (no length-mismatch error path), and `orm.MergeValueOf`
+  is the typed form of `orm.MergeValue` (column and literal share one value
+  type). All additive.
 
 ### Fixed
 
