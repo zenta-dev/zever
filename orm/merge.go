@@ -33,6 +33,13 @@ func MergeValue[T any](target AnyColumn[T], value any) MergeAssignment {
 	return MergeAssignment{column: target.Name(), value: value}
 }
 
+// MergeValueOf is the typed form of MergeValue: the target column and the
+// literal share value type V, so assigning a mismatched type does not
+// compile. The value is bound as a placeholder.
+func MergeValueOf[T any, V any](target Column[T, V], value V) MergeAssignment {
+	return MergeAssignment{column: target.Name(), value: value}
+}
+
 // MergeTarget is the half-built MERGE stage MergeInto returns: it pins the
 // target entity and waits for the source. UsingSource completes it into a
 // Merge.
