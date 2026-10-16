@@ -53,7 +53,7 @@ func newAddFlagSet() *flag.FlagSet {
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(fs.Output(), addUsageBody)
-		fs.PrintDefaults()
+		printFlagDefaults(fs)
 	}
 
 	return fs

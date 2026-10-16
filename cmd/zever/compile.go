@@ -465,7 +465,7 @@ func printCompileUsage(fs *flag.FlagSet) {
 		dim("Available backends: ")+cyan(backendNames()),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever compile schema/app.zen --backend=proto"))
