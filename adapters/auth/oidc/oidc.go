@@ -47,6 +47,9 @@ func New(opts auth.Options) (auth.Auth, error) {
 	// http.DefaultClient. AllowInsecure opts a test issuer into http and
 	// private addresses; production keeps both blocked.
 	client := httpclient.NewSafeClient(timeout, opts.OIDC.AllowInsecure)
+	// Bound discovery/JWKS bodies and throttle unknown-kid JWKS refetches
+	// (go-oidc does neither); see guardedTransport.
+	client.Transport = newGuardedTransport(client.Transport)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

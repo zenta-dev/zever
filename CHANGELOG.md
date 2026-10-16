@@ -121,6 +121,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and, when no `root` is set, refuses the shared default `/tmp/storage` if it
   is a symlink, not a directory, or owned by another user. `config` schema
   gains `storage.options.max_upload_bytes`.
+- `fix(oidc)`: `adapters/auth/oidc` now caps discovery and JWKS response bodies
+  at 1 MiB (via `httpclient.ReadLimited`; go-oidc reads them unbounded) and
+  throttles repeat fetches of the same URL to one per 10 seconds, so tokens
+  with unknown `kid` values can no longer be amplified into a stream of JWKS
+  requests to the IdP. A freshly rotated signing key can take up to 10 seconds
+  to become visible. The package docs state that the adapter is verify-only.
 
 - `tools/tag-release.sh`: new `--push` publishes every module tag with a single
   `git push --atomic` (a rejected ref leaves the remote with no lockstep tags)

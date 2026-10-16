@@ -8,6 +8,12 @@
 // local signing secrets: verification keys come from the provider's JWKS
 // endpoint discovered at construction time.
 //
+// Discovery and JWKS responses are capped at 1 MiB and repeat fetches of the
+// same URL within 10 seconds replay the previous response, so a flood of
+// tokens carrying unknown key IDs cannot be amplified into a flood of IdP
+// requests (at the cost of a freshly rotated key taking up to 10 seconds to
+// become visible).
+//
 // Revocation is the IdP's job too: this adapter keeps no revocation list,
 // so a compromised ID token verifies until it expires. Keep IdP lifetimes
 // short and revoke at the provider (session/end-session, token revocation

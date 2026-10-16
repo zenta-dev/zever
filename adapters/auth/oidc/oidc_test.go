@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ type fakeIDP struct {
 	srv *httptest.Server
 	key *rsa.PrivateKey
 	kid string
+
+	onKeys func()
 }
 
 func b64u(b []byte) string {
@@ -55,6 +58,10 @@ func newFakeIDP(tb testing.TB) *fakeIDP {
 	})
 
 	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
+		if idp.onKeys != nil {
+			idp.onKeys()
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"keys": []map[string]any{{
@@ -385,5 +392,50 @@ func TestClose(t *testing.T) {
 
 	if err := a.Close(); err != nil {
 		t.Fatalf("Close: %s", err)
+	}
+}
+
+// TestVerify_UnknownKidDoesNotHammerJWKS proves a stream of tokens with an
+// unknown kid triggers at most one JWKS fetch.
+func TestVerify_UnknownKidDoesNotHammerJWKS(t *testing.T) {
+	t.Parallel()
+
+	var keyHits atomic.Int32
+
+	idp := newFakeIDP(t)
+	idp.onKeys = func() { keyHits.Add(1) }
+	a := newAdapter(t, idp)
+
+	for range 10 {
+		raw := mintToken(t, idp.key, "attacker-kid", idp.srv.URL, "test-client", time.Now().Add(time.Hour), nil)
+		if _, err := a.Verify(t.Context(), raw); !errors.Is(err, auth.ErrInvalidToken) {
+			t.Fatalf("Verify err = %v, want ErrInvalidToken", err)
+		}
+	}
+
+	if got := keyHits.Load(); got > 1 {
+		t.Fatalf("JWKS fetched %d times, want at most 1", got)
+	}
+}
+
+// TestNew_OversizeDiscoveryRejected proves a hostile issuer cannot stream an
+// unbounded discovery document into memory.
+func TestNew_OversizeDiscoveryRejected(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"issuer":"x","pad":"`))
+		_, _ = w.Write([]byte(strings.Repeat("a", 2<<20)))
+		_, _ = w.Write([]byte(`"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	opts := auth.Options{}
+	opts.OIDC.Issuer = srv.URL
+	opts.OIDC.ClientID = "test-client"
+	opts.OIDC.AllowInsecure = true
+
+	if _, err := oidc.New(opts); err == nil {
+		t.Fatal("oidc.New accepted an oversize discovery document")
 	}
 }
