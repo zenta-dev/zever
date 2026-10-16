@@ -79,6 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `test(shared)`: benchmarks for `shared/msgspan` (untraced fast path, traced
   producer/consumer span) and `shared/outboxbridge` (queue and eventbus
   publishers, with and without headers). Test-only.
+- `docs(system)`: documentation IA pilot — new generated-from-code reference
+  pages for the `flag`, `ratelimit`, and `session` batteries (adapters, config
+  keys, options, per-battery error indexes), each pinned by drift tests in
+  `core/<battery>/reference_test.go`; three page moves with redirects
+  (`digging-deeper` strays to `guides/`, `agent-skill` to `guides/extend/`);
+  full quadrant map proposed in `docs/plans/pr-ws8.md`.
 
 ### Fixed
 
