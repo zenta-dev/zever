@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dropped index is end-anchored to the exact `CREATE INDEX` shape this tool
   generates, so a hand-edited row can no longer splice or append extra
   statements into a rollback.
+
+- `fix(dsl)`: the resolver now rejects `http:` paths that do not start with `/`
+  or contain anything outside printable ASCII (no spaces, control characters or
+  newlines), and `dsl/backend/gogen` quotes the path in the generated handler
+  comment. A crafted `.zen` path could previously inject Go source through the
+  comment via lexer-decoded `\n`.
+- `refactor(auth,idempotency)`: the jwt adapter, the memory idempotency store and
+  the memory revocation store read time through an unexported injectable clock
+  (matching the memory session store), so expiry behavior is tested with a fake
+  clock instead of real sleeps. No public API or default behavior change.
+
 ### Added
 
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
@@ -54,13 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on `readyAt`, so each promoter wake-up pops only due entries instead of
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
-### Security
-
-- `fix(dsl)`: the resolver now rejects `http:` paths that do not start with `/`
-  or contain anything outside printable ASCII (no spaces, control characters or
-  newlines), and `dsl/backend/gogen` quotes the path in the generated handler
-  comment. A crafted `.zen` path could previously inject Go source through the
-  comment via lexer-decoded `\n`.
 
 ## [v0.7.1] - 2026-10-15
 
