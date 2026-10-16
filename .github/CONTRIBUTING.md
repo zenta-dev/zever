@@ -14,6 +14,9 @@ Thanks for contributing to zever. This guide explains how to set up the project,
 - [Commit Convention](#commit-convention)
 - [Changelog](#changelog)
 - [License](#license)
+- [Architecture](../docs/architecture.md)
+- [AI-assisted development](../docs/ai-assisted-development.md)
+- [Good first issues (draft pool)](../docs/plans/good-first-issues.md)
 
 ## Getting Started
 
