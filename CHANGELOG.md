@@ -66,6 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+- `feat(ai)`: `ai.Options` (and `ollama.Options`) gain an optional `Logger *slog.Logger`;
+  the anthropic, gemini, ollama and openai adapters send their open-time
+  `allow_private` / `insecure_skip_verify` notices to it instead of the global
+  `slog.Default()` (still the fallback when nil). Additive, never read from
+  configuration.
+- `core/middleware.RequestLogger` now logs `duration_ms` as a float
+  (fractional milliseconds) instead of a truncated integer, so sub-millisecond
+  requests no longer log as `0`. Log pipelines that typed the field as an
+  integer should accept a number.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
