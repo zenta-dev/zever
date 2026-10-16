@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and typed values (no length-mismatch error path), and `orm.MergeValueOf`
   is the typed form of `orm.MergeValue` (column and literal share one value
   type). All additive.
+- `test(shared)`: benchmarks for `shared/msgspan` (untraced fast path, traced
+  producer/consumer span) and `shared/outboxbridge` (queue and eventbus
+  publishers, with and without headers). Test-only.
 
 ### Fixed
 
