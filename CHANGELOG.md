@@ -71,17 +71,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `docs/plans/good-first-issues.md` (draft pool, not filed on
   GitHub) — plus concrete deprecation timelines and Go support
   window in `STABILITY.md`.
-
-### Fixed
-
-- `fix(outbox)`: the postgres claim statement put `FOR UPDATE SKIP LOCKED`
-  inside an `IN` subquery, which postgres rejects (SQLSTATE 42601) — every
-  live claim failed. Selection now runs in a `WITH due AS (...)` CTE feeding
-  the `UPDATE`. Found by the new live conformance workflow.
-- `fix(postgres)`: the `?`→`$n` rewriter mistook `LIMIT ? FOR ...` for a
-  JSONB existence check (`FOR` was missing from the keyword list), sending a
-  raw `?` to the server. The row-lock keyword cluster is now recognized
-  (`KEY` stays unlisted so `payload ? key` keeps working).
+- `feat(dsl)`: diagnostics carry positions plus source excerpts and
+  "did you mean" hints. `diag.Closest`/`HintSuffix` (same thresholds as
+  `config`'s suggester) power hints on every unknown type, attribute, field,
+  error code, and service/RPC reference in the resolver; `diag.Excerpt`/
+  `Render` format `file:line:col` plus the offending line and caret, and
+  `zever compile`, `check`, and `breaking` print excerpts from the compiled
+  sources. Docs gain a ready-to-copy `breaking` CI workflow, an
+  extend-around-generated-code guide, and a WASM-playground ADR (proposal
+  only, not implemented).
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
   helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
   and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake
@@ -105,6 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(outbox)`: the postgres claim statement put `FOR UPDATE SKIP LOCKED`
+  inside an `IN` subquery, which postgres rejects (SQLSTATE 42601) — every
+  live claim failed. Selection now runs in a `WITH due AS (...)` CTE feeding
+  the `UPDATE`. Found by the new live conformance workflow.
+- `fix(postgres)`: the `?`→`$n` rewriter mistook `LIMIT ? FOR ...` for a
+  JSONB existence check (`FOR` was missing from the keyword list), sending a
+  raw `?` to the server. The row-lock keyword cluster is now recognized
+  (`KEY` stays unlisted so `payload ? key` keeps working).
 - `fix(dsl/format)`: the formatter wrote gap edits at rune columns instead of the
   byte offsets `Apply` expects, so a multi-byte character earlier on a line
   (a non-ASCII string literal) made it insert whitespace inside the character

@@ -315,7 +315,7 @@ func runCompileWith(cfg CompileConfig) error {
 	result, diags := compile.WithSchemaDir(files, schemaDir, backends...)
 
 	if len(diags) > 0 {
-		printDiagnostics(diags)
+		printDiagnosticsWithSources(diags, files)
 	}
 
 	if diags.HasErrors() {
@@ -528,16 +528,25 @@ func loadFiles(paths []string) (map[string]string, error) {
 
 // printDiagnostics writes every diagnostic to stderr in sorted, human-readable order with colors.
 func printDiagnostics(diags diag.List) {
+	printDiagnosticsWithSources(diags, nil)
+}
+
+// printDiagnosticsWithSources writes every diagnostic to stderr like
+// printDiagnostics, plus a source excerpt per diagnostic (the offending line
+// plus a caret) drawn from sources, keyed by file name. A diagnostic whose
+// file is absent from sources renders header-only, never failing.
+func printDiagnosticsWithSources(diags diag.List, sources map[string]string) {
 	for _, d := range diags.Sorted() {
-		msg := d.Error()
+		rendered := diag.Render(d, sources)
+		var msg string
 		// Color by severity if present.
 		switch d.Severity {
 		case diag.SeverityError:
-			msg = red(failMark() + " " + msg)
+			msg = red(failMark() + " " + rendered)
 		case diag.SeverityWarning:
-			msg = yellow("⚠ " + msg)
+			msg = yellow("⚠ " + rendered)
 		default:
-			msg = dim(msg)
+			msg = dim(rendered)
 		}
 
 		_, _ = fmt.Fprintln(os.Stderr, msg)

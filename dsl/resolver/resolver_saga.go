@@ -115,7 +115,7 @@ func resolveRPCRef(ref *ast.RPCRef, serviceByName map[string]*ir.Service) (*ir.S
 	svc, ok := serviceByName[ref.Service]
 	if !ok {
 		return nil, diag.List{diag.Wrap("resolve", ref.Pos, ErrUnresolvedReference,
-			"saga references unknown service %q", ref.Service)}
+			"saga references unknown service %q%s", ref.Service, hint(ref.Service, serviceCandidates(serviceByName)))}
 	}
 
 	for _, op := range svc.Operations {
@@ -124,8 +124,13 @@ func resolveRPCRef(ref *ast.RPCRef, serviceByName map[string]*ir.Service) (*ir.S
 		}
 	}
 
+	rpcs := make([]string, 0, len(svc.Operations))
+	for _, op := range svc.Operations {
+		rpcs = append(rpcs, op.Name)
+	}
+
 	return nil, diag.List{diag.Wrap("resolve", ref.Pos, ErrUnresolvedReference,
-		"service %s has no rpc %q", ref.Service, ref.RPC)}
+		"service %s has no rpc %q%s", ref.Service, ref.RPC, hint(ref.RPC, rpcs))}
 }
 
 // buildServiceIndex indexes every resolved service by name. Service names

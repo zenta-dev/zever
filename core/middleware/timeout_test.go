@@ -165,6 +165,52 @@ func TestTimeoutUnaryServerInterceptor_HandlerErrorPassedThrough(t *testing.T) {
 	}
 }
 
+func TestTimeout_HandlerImplicitStatusOK(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		handler  http.Handler
+		wantBody string
+	}{
+		{
+			name: "write without WriteHeader",
+			handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte("ok"))
+			}),
+			wantBody: "ok",
+		},
+		{
+			name: "headers only",
+			handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("X-Custom", "yes")
+			}),
+			wantBody: "",
+		},
+	}
+
+	for _, tt := range tests {
+		wrapped := Timeout(time.Second)(tt.handler)
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+
+		wrapped.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: Code = %d, want %d", tt.name, rec.Code, http.StatusOK)
+		}
+		if rec.Body.String() != tt.wantBody {
+			t.Errorf("%s: Body = %q, want %q", tt.name, rec.Body.String(), tt.wantBody)
+		}
+		if tt.name == "headers only" {
+			if got := rec.Header().Get("X-Custom"); got != "yes" {
+				t.Errorf("%s: X-Custom header = %q, want yes", tt.name, got)
+			}
+		}
+	}
+}
+
 func TestTimeout_HandlerPanicPropagatesToCaller(t *testing.T) {
 	t.Parallel()
 

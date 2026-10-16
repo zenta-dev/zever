@@ -76,10 +76,25 @@ The test parses the fixture, resolves it, runs `gogen`, and diffs against the go
 zever breaking schema-old/*.zen -- schema/*.zen
 ```
 
+Full command shape: `zever breaking <old-files...> -- <new-files...>`. Each side takes files, globs, or bare directories (recursively discovered for `.zen` files). Exit code is non-zero when any breaking change is found, so it gates directly. `--json` emits a machine-readable envelope (`changes`, `breaking` count) instead of the human list. Additions and new `@validate` rules report as informational and still exit zero.
+
 | Change class | Examples | CI posture |
 |---|---|---|
 | Additive | New entity, new field, new RPC, new `@validate`, a field renamed with `@renamed_from` | Pass (reported as informational) |
 | Breaking | Removed entity, field, or RPC (so renaming an RPC), changed field type, optionality, params, return type, or HTTP method or path | Exit non-zero, fail the build |
+
+Ready-to-copy GitHub workflow (diffs the PR schema against `main`):
+
+```yaml
+- name: Check for breaking schema changes
+  run: |
+    mkdir -p /tmp/old-schema
+    git fetch origin main --depth=1
+    for f in schema/*.zen; do
+      git show origin/main:"$f" > "/tmp/old-schema/$(basename "$f")" 2>/dev/null || true
+    done
+    zever breaking /tmp/old-schema -- schema
+```
 
 ## Design decisions and trade-offs
 

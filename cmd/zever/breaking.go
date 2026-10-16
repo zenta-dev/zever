@@ -173,7 +173,7 @@ func runBreakingWith(cfg BreakingConfig) error {
 
 	oldResult, oldDiags := compile.Compile(oldFiles)
 	if oldDiags.HasErrors() {
-		printDiagnostics(oldDiags)
+		printDiagnosticsWithSources(oldDiags, oldFiles)
 
 		err := fmt.Errorf("zever breaking: old schema (%d file(s)) failed to compile", len(oldFiles))
 		if cfg.JSON {
@@ -185,7 +185,7 @@ func runBreakingWith(cfg BreakingConfig) error {
 
 	newResult, newDiags := compile.Compile(newFiles)
 	if newDiags.HasErrors() {
-		printDiagnostics(newDiags)
+		printDiagnosticsWithSources(newDiags, newFiles)
 
 		err := fmt.Errorf("zever breaking: new schema (%d file(s)) failed to compile", len(newFiles))
 		if cfg.JSON {
