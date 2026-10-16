@@ -108,8 +108,13 @@ changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** p
 	bash tools/changelog-lint.sh
 
 .PHONY: compile-check
-compile-check: ## Verify committed generated code matches the schema (zever compile --check over examples)
+compile-check: ## Verify committed generated code matches the schema (zever compile --check over every example)
 	cd examples/todo && $(GO) run ../../cmd/zever compile --check --out ./generated schema/todo.zen schema/todo_grpc.zen
+	cd examples/bookings && $(GO) run ../../cmd/zever compile --check --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out ./generated schema/bookings.zen
+	cd examples/demoapp && $(GO) run ../../cmd/zever compile --check --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out ./generated schema/app.zen
+	cd examples/showcase && $(GO) run ../../cmd/zever compile --check --backend=atlas,gogen,openapi,proto,protogogen,zenorm --out ./generated schema/shop/shop.zen
+	$(GO) run ./cmd/zever compile --check --backend=zenorm --out examples/json_query/generated examples/json_query/schema/json_query.zen
+	$(GO) run ./cmd/zever compile --check --backend=zenorm --out examples/bulk_upsert/generated examples/bulk_upsert/schema/bulk_upsert.zen
 
 .PHONY: test-race
 test-race: ## Run tests with the race detector
