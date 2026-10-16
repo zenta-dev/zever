@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/cdn/cloudflare
 go 1.27.2
 
 require (
-	github.com/cloudflare/cloudflare-go/v7 v7.12.0
+	github.com/cloudflare/cloudflare-go/v7 v7.13.0
 	github.com/zenta-dev/zever/core/cdn v0.7.1
 )
 
