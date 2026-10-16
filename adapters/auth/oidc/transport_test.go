@@ -29,7 +29,12 @@ func TestGuardedTransportRejectsOversizeBody(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := gt.RoundTrip(req); !errors.Is(err, httpclient.ErrTooLarge) {
+	resp, err := gt.RoundTrip(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	if !errors.Is(err, httpclient.ErrTooLarge) {
 		t.Fatalf("RoundTrip err = %v, want ErrTooLarge", err)
 	}
 }
