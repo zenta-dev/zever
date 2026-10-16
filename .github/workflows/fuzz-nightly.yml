@@ -1,0 +1,108 @@
+# Nightly long-fuzz. The ci.yml fuzz-smoke job runs the DSL frontend
+# targets for 20s per PR as a regression tripwire; this workflow soaks every
+# fuzz target longer (default 120s each), reusing the accumulated corpus
+# across nights via the cache so coverage compounds.
+#
+# Corpus flow: restore last night's corpus from cache (best-effort — a cold
+# cache just starts from the committed testdata/fuzz seeds), fuzz, then save
+# the grown corpus back and upload it as an artifact for inspection. A
+# fuzzer-found crasher is written under testdata/fuzz as FAIL* and fails
+# the job red: fix the bug, commit the regressing input with the fix (like
+# fuzz-smoke), and the next night continues from there.
+#
+# Not a merge gate: a red run here names a target to fix, it never blocks
+# unrelated merges (same policy as the flake-hunt workflow).
+
+name: fuzz-nightly
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: "Per-target fuzz time (e.g. 30s, 120s)"
+        default: "120s"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: long fuzz (corpus reuse)
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    env:
+      # Schedule default is 120s per target; dispatch callers can shorten it.
+      FUZZTIME: ${{ inputs.fuzztime || '120s' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Restore fuzz corpus (best-effort)
+        uses: actions/cache/restore@8b402aa82689d5dd8a3298a246a9c4aa4dfa9bf0 # v5.0.3
+        with:
+          path: |
+            dsl/**/testdata/fuzz
+            orm/**/testdata/fuzz
+            core/**/testdata/fuzz
+            config/testdata/fuzz
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-
+      - name: Fuzz DSL targets (long)
+        working-directory: dsl
+        run: |
+          set -euo pipefail
+          for target in lexer:FuzzLex parser:FuzzParse resolver:FuzzResolve format:FuzzFormatIdempotent backend/gogen:FuzzImportClass backend/gogen:FuzzPathParamNames backend/gogen:FuzzResourceIDExpr; do
+            pkg="${target%%:*}"; fn="${target##*:}"
+            echo "== ${pkg} ${fn} (${FUZZTIME})"
+            go test -run '^$' -fuzz "^${fn}\$" -fuzztime "$FUZZTIME" "./${pkg}"
+          done
+      - name: Fuzz ORM render targets (long)
+        working-directory: orm/render
+        run: |
+          set -euo pipefail
+          for fn in FuzzRenderRaw FuzzSQLiteJSONPathKey FuzzPostgresJSONPathKey; do
+            echo "== render ${fn} (${FUZZTIME})"
+            go test -run '^$' -fuzz "^${fn}\$" -fuzztime "$FUZZTIME" .
+          done
+      - name: Fuzz session ID + config targets (long)
+        run: |
+          set -euo pipefail
+          echo "== session FuzzValidateID (${FUZZTIME})"
+          go -C core/session test -run '^$' -fuzz '^FuzzValidateID$' -fuzztime "$FUZZTIME" .
+          for fn in FuzzDecodeFile FuzzSetOptionField FuzzMatchService; do
+            echo "== config ${fn} (${FUZZTIME})"
+            go -C config test -run '^$' -fuzz "^${fn}\$" -fuzztime "$FUZZTIME" .
+          done
+      - name: Save grown corpus
+        if: always()
+        uses: actions/cache/save@8b402aa82689d5dd8a3298a246a9c4aa4dfa9bf0 # v5.0.3
+        with:
+          path: |
+            dsl/**/testdata/fuzz
+            orm/**/testdata/fuzz
+            core/**/testdata/fuzz
+            config/testdata/fuzz
+          key: fuzz-corpus-${{ github.run_id }}
+      - name: Upload corpus artifact
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-corpus-${{ github.run_id }}
+          path: |
+            dsl/**/testdata/fuzz
+            orm/**/testdata/fuzz
+            core/**/testdata/fuzz
+            config/testdata/fuzz
+          if-no-files-found: warn
+          retention-days: 30

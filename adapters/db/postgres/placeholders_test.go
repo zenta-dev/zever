@@ -264,6 +264,11 @@ func TestReplacePlaceholders(t *testing.T) {
 			want:  `SELECT * FROM t WHERE a = $1 OFFSET 10 FETCH FIRST 5 ROWS ONLY`,
 		},
 		{
+			name:  "placeholder before row-lock clause",
+			query: `SELECT id FROM t WHERE s = 'pending' ORDER BY c LIMIT ? FOR UPDATE SKIP LOCKED`,
+			want:  `SELECT id FROM t WHERE s = 'pending' ORDER BY c LIMIT $1 FOR UPDATE SKIP LOCKED`,
+		},
+		{
 			name:  "escaped double question mark",
 			query: `SELECT * FROM t WHERE a = ??`,
 			want:  `SELECT * FROM t WHERE a = ?`,

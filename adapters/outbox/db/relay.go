@@ -201,7 +201,7 @@ func (d *driver) claim(ctx context.Context) ([]claimed, error) {
 
 	now := time.Now().UTC()
 
-	rows, err := d.conn.Query(ctx, d.claimSQL(), d.ts(now.Add(d.lock)), d.ts(now), d.batch)
+	rows, err := d.conn.Query(ctx, d.claimSQL(), d.ts(now), d.batch, d.ts(now.Add(d.lock)))
 	if err != nil {
 		return nil, fmt.Errorf("db: claim: %w", err)
 	}
@@ -226,7 +226,11 @@ func (d *driver) claim(ctx context.Context) ([]claimed, error) {
 	return out, nil
 }
 
-// claimSQL builds the dialect-specific atomic claim statement.
+// claimSQL builds the dialect-specific atomic claim statement. Postgres
+// forbids FOR UPDATE inside an IN-subquery, so selection and locking live in
+// a CTE (`WITH due AS (... FOR UPDATE SKIP LOCKED)`) feeding the UPDATE;
+// sqlite takes the same shape without the lock clause and serializes on the
+// process-local claim mutex instead (see claim).
 func (d *driver) claimSQL() string {
 	t := quoteIdent(d.table)
 
@@ -235,10 +239,11 @@ func (d *driver) claimSQL() string {
 		skip = " FOR UPDATE SKIP LOCKED"
 	}
 
-	return `UPDATE ` + t + ` SET locked_until = ?, attempts = attempts + 1 ` +
-		`WHERE id IN (SELECT id FROM ` + t + ` ` +
+	return `WITH due AS (SELECT id FROM ` + t + ` ` +
 		`WHERE status = 'pending' AND (locked_until IS NULL OR locked_until < ?) ` +
 		`ORDER BY created_at LIMIT ?` + skip + `) ` +
+		`UPDATE ` + t + ` SET locked_until = ?, attempts = attempts + 1 ` +
+		`WHERE id IN (SELECT id FROM due) ` +
 		`RETURNING id, topic, "key", payload, headers, created_at, attempts`
 }
 

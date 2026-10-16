@@ -1,0 +1,2 @@
+go test fuzz v1
+string("saga Checkout {\n\tstep reserve: Inventory.reserve\n\tstep charge: Billing.charge\n}")
