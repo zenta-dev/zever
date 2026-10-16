@@ -62,7 +62,8 @@ type Options struct {
 	// SameSite controls the SameSite attribute. The zero value defaults
 	// to http.SameSiteLaxMode; set explicitly to
 	// http.SameSiteDefaultMode, http.SameSiteStrictMode, or
-	// http.SameSiteNoneMode to override.
+	// http.SameSiteNoneMode to override. SameSiteNoneMode forces Secure
+	// (browsers reject SameSite=None cookies that are not Secure).
 	SameSite http.SameSite `json:"same_site" toml:"same_site" yaml:"same_site"`
 	// MaxAge is the cookie lifetime in seconds. Zero means a session
 	// cookie: no Max-Age or Expires attribute is sent, and the browser
@@ -125,6 +126,13 @@ func New(sessionID string, cfg Options) *http.Cookie {
 	sameSite := cfg.SameSite
 	if sameSite == 0 {
 		sameSite = http.SameSiteLaxMode
+	}
+
+	// Browsers drop a SameSite=None cookie that is not Secure, which would
+	// silently lose the session (or tempt callers into serving it over
+	// plain HTTP); force Secure like the cookie-name prefixes do.
+	if sameSite == http.SameSiteNoneMode {
+		secure = true
 	}
 
 	// Secure, HttpOnly and SameSite are all set above, defaulted to their
