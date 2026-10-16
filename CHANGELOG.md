@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+- Repo housekeeping: add `.github/CODEOWNERS` (`@zenta-dev/maintainers`),
+  ignore `.claude/` (agent harness state), group all github-actions Dependabot
+  updates into one PR (`tools/gen-dependabot.sh`), and remove the empty stub
+  `docs/production.md` (nothing linked to it).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

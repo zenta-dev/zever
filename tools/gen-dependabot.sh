@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Regenerate .github/dependabot.yml from the go.mod files in the repo.
 #
+# Updates are grouped to keep PR volume down: gomod bumps are grouped per
+# dependency across modules, and every github-actions bump lands in one PR.
+#
 # Layout: ONE gomod entry whose `directories:` lists every module, with a
 # `group-by: dependency-name` group. Dependabot then opens a single PR per
 # dependency that bumps it in every module that requires it directly,
@@ -56,6 +59,10 @@ EOF
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 EOF
 }
 
