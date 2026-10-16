@@ -188,7 +188,7 @@ func renderHandler(b *strings.Builder, svcName string, op opModel, imports map[s
 		}
 	}
 
-	fmt.Fprintf(b, "// handle%s%s handles %s %s, calling %s.%s.\n",
+	fmt.Fprintf(b, "// handle%s%s handles %s %q, calling %s.%s.\n",
 		svcName, op.Name, op.HTTP.Method, op.HTTP.Path, svcName, op.Name)
 	fmt.Fprintf(b, "func handle%s%s(svc %s) http.HandlerFunc {\n", svcName, op.Name, svcName)
 	b.WriteString("\treturn func(w http.ResponseWriter, r *http.Request) {\n")

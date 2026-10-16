@@ -23,7 +23,8 @@ func (b BucketName) Validate() error {
 	return nil
 }
 
-// ValidKey reports whether key is a safe relative object path.
+// ValidKey reports whether key is a safe relative object path: no traversal,
+// backslashes or ASCII control characters (NUL, newlines, DEL, ...).
 func ValidKey(key string) bool {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -47,10 +48,8 @@ func ValidKey(key string) bool {
 	}
 
 	for i := 0; i < len(clean); i++ {
-		switch clean[i] {
-		case 0:
-			return false
-		case '\\':
+		c := clean[i]
+		if c < 0x20 || c == 0x7f || c == '\\' {
 			return false
 		}
 	}

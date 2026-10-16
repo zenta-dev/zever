@@ -148,3 +148,23 @@ jobs:
           else
             gh release create "${{ github.ref_name }}" --generate-notes dist/* sbom/*.json
           fi
+
+  # After the lockstep tags are on origin, prove the documented
+  # `go install .../cmd/zever@<tag>` works from a clean machine with the
+  # workspace off, resolving every sibling through the module proxy.
+  go-install:
+    name: verify go install
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache: false
+      - name: GOWORK=off go install cmd/zever@tag
+        run: bash tools/verify-go-install.sh "${GITHUB_REF_NAME}"
+      - name: Module proxy resolves every module at the tag
+        run: bash tools/tag-release.sh --verify-proxy "${GITHUB_REF_NAME}"

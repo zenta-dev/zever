@@ -2,11 +2,18 @@ package db
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
 )
+
+// liveTableSeq hands out unique table suffixes so reruns against a shared
+// database never collide with residue from an earlier run (cleanup DROP
+// runs on the already-canceled test context and best-effort fails).
+var liveTableSeq atomic.Uint64
 
 // TestPostgresLive exercises the driver end to end against a live postgres.
 // Set POSTGRES_DSN to run; skipped otherwise.
@@ -15,13 +22,18 @@ func TestPostgresLive(t *testing.T) {
 
 	pub := &recordingPublisher{}
 
-	d := mustNew(t, Options{DSN: dsn, Table: "outbox_live", InboxTable: "inbox_live", Publisher: pub})
+	n := liveTableSeq.Add(1)
+	table := fmt.Sprintf("outbox_live_%d", n)
+	inbox := fmt.Sprintf("inbox_live_%d", n)
+
+	d := mustNew(t, Options{DSN: dsn, Table: table, InboxTable: inbox, Publisher: pub})
 
 	ctx := t.Context()
 
 	t.Cleanup(func() {
-		_, _ = d.conn.Exec(ctx, `DROP TABLE IF EXISTS "outbox_live"`)
-		_, _ = d.conn.Exec(ctx, `DROP TABLE IF EXISTS "inbox_live"`)
+		// context.Background: t.Context is already canceled during cleanup.
+		_, _ = d.conn.Exec(context.Background(), `DROP TABLE IF EXISTS "`+table+`"`)
+		_, _ = d.conn.Exec(context.Background(), `DROP TABLE IF EXISTS "`+inbox+`"`)
 	})
 
 	mustRecord(t, d, outbox.Message{ID: "live-1", Topic: "orders", Payload: []byte("p")})

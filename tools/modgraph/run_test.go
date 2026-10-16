@@ -164,3 +164,67 @@ func TestMainCLI(t *testing.T) {
 		t.Errorf("stdout = %q, want drift listing", stdout.String())
 	}
 }
+
+// writeNoReplaceRepo builds a scratch repo whose cmd/zever (a no-replace
+// module) imports a sibling, with cmdGoMod as its go.mod.
+func writeNoReplaceRepo(t *testing.T, cmdGoMod string) string {
+	t.Helper()
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "libs", "leaf", "go.mod"),
+		"module github.com/zenta-dev/zever/libs/leaf\n\ngo 1.27.0\n")
+	mustWriteFile(t, filepath.Join(root, "libs", "leaf", "leaf.go"), "package leaf\n")
+	mustWriteFile(t, filepath.Join(root, "cmd", "zever", "go.mod"), cmdGoMod)
+	mustWriteFile(t, filepath.Join(root, "cmd", "zever", "main.go"),
+		"package main\n\nimport \"github.com/zenta-dev/zever/libs/leaf\"\n\nvar _ = leaf.X\n")
+
+	return root
+}
+
+// TestRunCheckNoReplaceForbidsReplace pins that the go-install target module
+// fails --check when it commits an intra-repo replace directive.
+func TestRunCheckNoReplaceForbidsReplace(t *testing.T) {
+	root := writeNoReplaceRepo(t, "module github.com/zenta-dev/zever/cmd/zever\n\ngo 1.27.0\n\n"+
+		"require github.com/zenta-dev/zever/libs/leaf v0.1.0\n\n"+
+		"replace github.com/zenta-dev/zever/libs/leaf => ../../libs/leaf\n")
+
+	code, stdout, _ := runModgraph(t, []string{"-check", "-root", root})
+	if code != 1 {
+		t.Fatalf("run = %d, want 1 (stdout %q)", code, stdout)
+	}
+	if !strings.Contains(stdout, "cmd/zever: forbidden replace") || !strings.Contains(stdout, "libs/leaf") {
+		t.Errorf("stdout lacks forbidden-replace line:\n%s", stdout)
+	}
+}
+
+// TestRunCheckNoReplaceClean pins that a no-replace module with requires but
+// no replaces is clean (a missing replace is not drift for it).
+func TestRunCheckNoReplaceClean(t *testing.T) {
+	root := writeNoReplaceRepo(t, "module github.com/zenta-dev/zever/cmd/zever\n\ngo 1.27.0\n\n"+
+		"require github.com/zenta-dev/zever/libs/leaf v0.1.0\n")
+
+	code, stdout, stderr := runModgraph(t, []string{"-check", "-root", root})
+	if code != 0 {
+		t.Fatalf("run = %d, want 0 (stdout %q, stderr %q)", code, stdout, stderr)
+	}
+}
+
+// TestRunFixNoReplaceDropsReplace pins that the fix mode adds the require but
+// strips replaces for a no-replace module.
+func TestRunFixNoReplaceDropsReplace(t *testing.T) {
+	root := writeNoReplaceRepo(t, "module github.com/zenta-dev/zever/cmd/zever\n\ngo 1.27.0\n\n"+
+		"replace github.com/zenta-dev/zever/libs/leaf => ../../libs/leaf\n")
+
+	code, stdout, stderr := runModgraph(t, []string{"-version", "v0.2.0", "-root", root})
+	if code != 0 {
+		t.Fatalf("run = %d (stdout %q, stderr %q)", code, stdout, stderr)
+	}
+	b, err := os.ReadFile(filepath.Join(root, "cmd", "zever", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if strings.Contains(got, "=>") || !strings.Contains(got, "libs/leaf v0.2.0") {
+		t.Errorf("go.mod after fix:\n%s", got)
+	}
+}

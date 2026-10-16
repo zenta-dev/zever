@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/document/local
 go 1.27.2
 
 require (
-	github.com/chromedp/chromedp v0.20.1
+	github.com/chromedp/chromedp v0.21.0
 	github.com/zenta-dev/zever/core/document v0.7.1
 )
 

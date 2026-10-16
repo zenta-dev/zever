@@ -20,13 +20,14 @@ func RequestLogger(logger log.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(rec, r)
 
-			ms := time.Since(start).Milliseconds()
+			// Fractional milliseconds: whole-ms truncation logs sub-ms requests as 0.
+			ms := float64(time.Since(start)) / float64(time.Millisecond)
 
 			ev := logger.Info().
 				Str("method", r.Method).
 				Str("path", r.URL.Path).
 				Int("status", rec.status).
-				Int64("duration_ms", ms)
+				Float64("duration_ms", ms)
 
 			if id := observability.RequestIDFromContext(r.Context()); id != "" {
 				ev = ev.Str("request_id", id)

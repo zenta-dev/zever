@@ -103,7 +103,7 @@ func TestInverseStatement_delegatesConstraints(t *testing.T) {
 		ok   bool
 	}{
 		{"createIndex", migrationRow{Kind: kindCreateIndex, Table: "t", ObjectName: "i"}, true},
-		{"dropIndex", migrationRow{Kind: kindDropIndex, Table: "t", PriorSQL: "CREATE INDEX x;"}, true},
+		{"dropIndex", migrationRow{Kind: kindDropIndex, Table: "t", PriorSQL: `CREATE INDEX "x" ON t ("a");`}, true},
 		{"addFK", migrationRow{Kind: kindAddForeignKey, Table: "t", ObjectName: "f"}, true},
 		{"nullability", migrationRow{Kind: kindAlterNullability, Table: "t", Column: "c", PriorType: "NULL"}, true},
 	}
@@ -361,6 +361,30 @@ func TestInverseStatement_constraints(t *testing.T) {
 			name:    "dropIndexEmpty",
 			dialect: pg,
 			row:     migrationRow{Kind: kindDropIndex, Table: "t"},
+			ok:      false,
+		},
+		{
+			name:    "dropIndexTrailingStatementRefused",
+			dialect: pg,
+			row:     migrationRow{Kind: kindDropIndex, Table: "t", PriorSQL: `CREATE INDEX "x" ON t ("a"); DROP TABLE users;`},
+			ok:      false,
+		},
+		{
+			name:    "dropIndexTrailingGarbageRefused",
+			dialect: pg,
+			row:     migrationRow{Kind: kindDropIndex, Table: "t", PriorSQL: "CREATE INDEX IF NOT EXISTS x ON t (a) WHERE 1=1; DROP TABLE users;"},
+			ok:      false,
+		},
+		{
+			name:    "injectedTableRefused",
+			dialect: pg,
+			row:     migrationRow{Kind: kindAddColumn, Table: `t; DROP TABLE users`, Column: "c"},
+			ok:      false,
+		},
+		{
+			name:    "injectedObjectNameRefused",
+			dialect: pg,
+			row:     migrationRow{Kind: kindCreateIndex, Table: "t", ObjectName: `i; DROP TABLE users`},
 			ok:      false,
 		},
 		{

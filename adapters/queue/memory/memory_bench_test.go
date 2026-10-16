@@ -157,3 +157,35 @@ func BenchmarkMemoryRoundTripParallel(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkCollectDue100kDelayed measures one promoter wake-up on a topic
+// holding 100k not-yet-due delayed messages plus one due message per
+// iteration. It exposes the per-wake cost of the delayed set.
+func BenchmarkCollectDue100kDelayed(b *testing.B) {
+	const n = 100_000
+
+	tq := newTopicQueue()
+	far := time.Now().Add(time.Hour)
+
+	for i := range n {
+		tq.pushDelayedLocked(delayedEntry{
+			msg:     queue.NewMessage("t", queue.Payload([]byte("x")), nil),
+			readyAt: far.Add(time.Duration(n-i) * time.Millisecond),
+		})
+	}
+
+	due := delayedEntry{msg: queue.NewMessage("t", queue.Payload([]byte("d")), nil)}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		due.readyAt = time.Now().Add(-time.Second)
+		tq.pushDelayedLocked(due)
+
+		got, _, _ := tq.collectDue()
+		if len(got) != 1 {
+			b.Fatalf("collectDue len = %d, want 1", len(got))
+		}
+	}
+}

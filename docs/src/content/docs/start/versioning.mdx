@@ -3,7 +3,7 @@ title: Versioning
 description: One lockstep version across every Zever module, per-module tags, and replace-less consumption.
 ---
 
-Zever ships ~177 Go modules (one per battery interface, adapter, helper, and tool) under a single lockstep version. There is no umbrella module and no root `go.mod`: you require only the modules you use, all pinned to the same version.
+Zever ships about 180 Go modules (one per battery interface, adapter, helper, and tool; 176 in the repo workspace plus two out-of-tree consumer proofs) under a single lockstep version. There is no umbrella module and no root `go.mod`: you require only the modules you use, all pinned to the same version.
 
 ## One version, per-module tags
 
@@ -24,6 +24,6 @@ Rules for a healthy consumer `go.mod`:
 
 - Keep every `github.com/zenta-dev/zever/*` require on the same version; mixed versions are untested and unsupported.
 - `go mod tidy` must succeed with no `replace` pointing at a local checkout (`zever new` writes plain requires against the published modules; local replaces appear only when scaffolding from inside a framework checkout — see [Installation](./installation/)).
-- `go install <module>@version` does not work for Zever modules because the repo commits `replace` directives for its own workspace; install the CLI via the installer or a release binary instead.
+- `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` works from v0.7.2 on (`cmd/zever/go.mod` commits no `replace` directives). Earlier tags, and the other modules (libraries meant for `go get`), cannot be installed this way; use the installer or a release binary for those.
 
 `zever new` scaffolds a project that already follows these rules. Bumps move every require together — see [Upgrade](../guides/operate/upgrade/).

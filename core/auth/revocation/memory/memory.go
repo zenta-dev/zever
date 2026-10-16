@@ -8,7 +8,9 @@ import (
 	"container/heap"
 	"context"
 	"errors"
+	"log/slog"
 	mrand "math/rand"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,6 +91,12 @@ type store struct {
 	revoked  map[string]time.Time
 	byExpiry expiryHeap
 
+	// logger receives pruner panic reports. Set once in New.
+	logger *slog.Logger
+
+	// now is the clock; read only under mu. Tests swap it via setClock.
+	now func() time.Time
+
 	closed atomic.Bool
 	stop   chan struct{}
 	wg     sync.WaitGroup
@@ -107,6 +115,8 @@ func New(opts Options) (revocation.Store, error) {
 		max:     maxEntries,
 		revoked: make(map[string]time.Time),
 		stop:    make(chan struct{}),
+		logger:  slog.Default(),
+		now:     time.Now,
 	}
 	s.startPruner()
 
@@ -122,7 +132,10 @@ func (s *store) Revoke(_ context.Context, jti string, until time.Time) error {
 		return revocation.ErrClosed
 	}
 
-	now := time.Now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := s.now()
 
 	// An until that has already lapsed is a no-op (mirrors the redis
 	// store): there is nothing left to enforce, and storing it would only
@@ -130,9 +143,6 @@ func (s *store) Revoke(_ context.Context, jti string, until time.Time) error {
 	if !until.After(now) {
 		return nil
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if _, dup := s.revoked[jti]; dup {
 		return nil
@@ -156,13 +166,14 @@ func (s *store) IsRevoked(_ context.Context, jti string) (bool, error) {
 
 	s.mu.Lock()
 	until, ok := s.revoked[jti]
+	now := s.now()
 	s.mu.Unlock()
 
 	if !ok {
 		return false, nil
 	}
 
-	return time.Now().Before(until), nil
+	return now.Before(until), nil
 }
 
 // Close stops the background pruner and releases resources. It is
@@ -233,7 +244,6 @@ func (s *store) startPruner() {
 
 	go func() {
 		defer s.wg.Done()
-		defer func() { _ = recover() }()
 		defer ticker.Stop()
 
 		for {
@@ -241,10 +251,24 @@ func (s *store) startPruner() {
 			case <-s.stop:
 				return
 			case now := <-ticker.C:
-				s.pruneOnce(now)
+				s.pruneSafely(now)
 			}
 		}
 	}()
+}
+
+// pruneSafely runs one sweep and contains a panic: it logs the panic value
+// and stack, then returns so the pruner keeps running. A dead pruner would
+// let expired revocations accumulate until the capacity cap evicts live ones.
+func (s *store) pruneSafely(now time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("revocation/memory: pruner panic recovered; pruner keeps running",
+				"panic", r, "stack", string(debug.Stack()))
+		}
+	}()
+
+	s.pruneOnce(now)
 }
 
 // pruneOnce drops expired revocations under lock. Split from the loop for

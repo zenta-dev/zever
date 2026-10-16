@@ -18,6 +18,22 @@ To help triage the issue quickly, include:
 
 You may include a patch or proof of concept. Do not include secrets, credentials, or private keys.
 
+Do not open a public pull request that fixes (or describes) an unpatched
+vulnerability. Public PRs, issues, and discussion threads are visible to
+everyone before a fix ships; use the private advisory channel above so the
+fix and the disclosure ship together.
+
+### Scope
+
+All modules in this repository are in scope, with priority on the Core
+batteries (`config`, `container`, `db`, `orm`, `router`, `cache`, `queue`,
+`session`, `auth`, `crypto`, `password`, `secrets`, `dsl` — see
+`../docs/security/threat-model-<battery>.md` for each battery's guarantees and
+caller duties) and the security-sensitive adapters (`auth/jwt`, `auth/oidc`,
+`crypto/local`, `crypto/kms`, `secrets/vault`, `session/*`, `db/*`). Test
+fixtures and deterministic dev-only secrets (e.g. the public dev crypto key)
+are out of scope unless they can affect a non-dev deployment.
+
 ### What to expect
 
 - An initial acknowledgement within 3 business days of submission.

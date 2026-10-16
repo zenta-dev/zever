@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tag every Go module in the repo for a release.
-# Usage: tools/tag-release.sh [--dry-run|--check|--verify] v0.6.0
+# Usage: tools/tag-release.sh [--dry-run|--check|--verify|--push|--verify-proxy] v0.6.0
 # Creates one tag per tracked go.mod found via find, excluding nested
 # worktrees, harness checkouts, and vendored copies: every module is tagged
 # `<reldir>/<version>` where <reldir> is the module dir relative to the
@@ -16,24 +16,39 @@
 # exit 1 listing the missing ones. Used by the release docs.
 # Before any mode runs, tools/check-version.sh must pass: every version pin and
 # every intra-repo go.mod require equals cmd/zever/VERSION (== <version>).
-# Prints a `git push --tags` hint at the end; never pushes.
+# With --push, create the tags and publish them to origin in ONE
+# `git push --atomic`, so a rejected ref (hook, protection rule, network) leaves
+# the remote with none of the lockstep tags rather than a half-released set
+# that the module proxy would cache forever. Without --push the script never
+# pushes and prints the equivalent command.
+# With --verify-proxy, create nothing: ask the module proxy (GOPROXY, default
+# proxy.golang.org) to resolve `<module>@<version>` for every tagged module,
+# retrying while the proxy catches up (ATTEMPTS=10, DELAY=30 seconds). Run it
+# after the push (the release workflow does) to catch tags the proxy cannot
+# serve before users hit them.
 set -euo pipefail
+
+usage="usage: $0 [--dry-run|--check|--verify|--push|--verify-proxy] <version>  (e.g. $0 v0.5.0)"
 
 dry_run=0
 verify=0
+push=0
+proxy=0
 if [ "$#" -eq 2 ]; then
   case "$1" in
     --dry-run|--check) dry_run=1; shift ;;
     --verify) verify=1; shift ;;
+    --push) push=1; shift ;;
+    --verify-proxy) proxy=1; shift ;;
     *)
-      echo "usage: $0 [--dry-run|--check|--verify] <version>  (e.g. $0 v0.5.0)" >&2
+      echo "$usage" >&2
       exit 1
       ;;
   esac
 fi
 
 if [ "$#" -ne 1 ]; then
-  echo "usage: $0 [--dry-run|--check|--verify] <version>  (e.g. $0 v0.5.0)" >&2
+  echo "$usage" >&2
   exit 1
 fi
 ver="$1"
@@ -48,6 +63,8 @@ esac
 created=0
 skipped=0
 missing=0
+all_tags=()
+proxy_bad=0
 remote_tags=""
 if [ "$verify" -eq 1 ] && git remote get-url origin >/dev/null 2>&1; then
   remote_tags=$(git ls-remote --tags origin 2>/dev/null | sed 's#.*refs/tags/##; s#\^{}$##' || true)
@@ -94,6 +111,30 @@ for f in $(find . -type f -name go.mod -not -path "./.git/*" -not -path "./.work
   esac
 done
 
+# verify_on_proxy MODULE: succeed once the module proxy resolves
+# MODULE@$ver, retrying while the proxy catches up with a fresh tag. Runs in a
+# scratch directory with the workspace off so only the proxy answers.
+verify_on_proxy() {
+  _mod="$1"
+  _n=1
+  until (cd "$proxy_dir" && GOWORK=off GOFLAGS=-mod=mod go list -m "$_mod@$ver" >/dev/null 2>&1); do
+    if [ "$_n" -ge "${ATTEMPTS:-10}" ]; then
+      echo "proxy cannot resolve: $_mod@$ver" >&2
+      proxy_bad=$((proxy_bad + 1))
+      return
+    fi
+    _n=$((_n + 1))
+    sleep "${DELAY:-30}"
+  done
+  created=$((created + 1))
+}
+
+proxy_dir=""
+if [ "$proxy" -eq 1 ]; then
+  proxy_dir="$(mktemp -d)"
+  trap 'rm -rf "$proxy_dir"' EXIT
+fi
+
 tag_one() {
   f="$1"
   mod=$(sed -n 's/^module[[:space:]]\+//p' "$f" | head -n 1)
@@ -107,7 +148,16 @@ tag_one() {
   else
     tag="${mod#github.com/zenta-dev/zever/}/$ver"
   fi
-  if [ "$verify" -eq 1 ]; then
+  all_tags+=("$tag")
+  if [ "$proxy" -eq 1 ]; then
+    # Only modules whose path equals prefix + dir can be resolved by tag
+    # (the out-of-tree consumer proofs keep deliberate exceptions).
+    if [ "$mod" != "github.com/zenta-dev/zever/${d#./}" ]; then
+      skipped=$((skipped + 1))
+      return
+    fi
+    verify_on_proxy "$mod"
+  elif [ "$verify" -eq 1 ]; then
     if git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
       skipped=$((skipped + 1))
     elif printf '%s\n' "$remote_tags" | grep -qxF "$tag"; then
@@ -139,6 +189,15 @@ for f in "${pass3[@]}"; do
   tag_one "$f"
 done
 
+if [ "$proxy" -eq 1 ]; then
+  if [ "$proxy_bad" -gt 0 ]; then
+    echo "verify-proxy failed: the module proxy cannot resolve $proxy_bad module(s) at $ver ($created resolved, $skipped skipped)." >&2
+    exit 1
+  fi
+  echo "verify-proxy ok: the module proxy resolves $created module(s) at $ver ($skipped skipped)."
+  exit 0
+fi
+
 if [ "$verify" -eq 1 ]; then
   if [ "$missing" -gt 0 ]; then
     echo "verify failed: $missing module tag(s) missing for $ver ($skipped present)." >&2
@@ -153,4 +212,14 @@ if [ "$dry_run" -eq 1 ]; then
 else
   echo "created $created tag(s), skipped $skipped existing."
 fi
-echo "To publish, run: git push --tags"
+if [ "$push" -eq 1 ]; then
+  refs=()
+  for t in "${all_tags[@]}"; do
+    refs+=("refs/tags/$t")
+  done
+  git push --atomic origin "${refs[@]}"
+  echo "pushed ${#refs[@]} tag(s) atomically to origin."
+else
+  echo "To publish all-or-nothing, run: $0 --push $ver"
+  echo "(equivalent: git push --atomic origin <every $ver tag>; never use git push --tags)"
+fi

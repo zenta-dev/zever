@@ -140,6 +140,12 @@ func AfterTuple[T any](cols []AnyColumn[T], values []any, desc bool) (Predicate[
 		return Predicate[T]{}, fmt.Errorf("orm: AfterTuple: %d columns but %d values", len(cols), len(values))
 	}
 
+	return keysetAfter(cols, values, desc), nil
+}
+
+// keysetAfter builds the OR-expansion for AfterTuple. Callers guarantee
+// len(cols) == len(values) > 0.
+func keysetAfter[T any](cols []AnyColumn[T], values []any, desc bool) Predicate[T] {
 	relOp := Gt
 	if desc {
 		relOp = Lt
@@ -159,7 +165,21 @@ func AfterTuple[T any](cols []AnyColumn[T], values []any, desc bool) (Predicate[
 		terms = append(terms, And(prefix...))
 	}
 
-	return Or(terms...), nil
+	return Or(terms...)
+}
+
+// AfterTuple2 is the typed two-column form of AfterTuple: "strictly after
+// (a, b) = (va, vb)" over an ORDER BY on ca, cb in one direction (desc picks
+// the direction). Because each value is checked against its column's value
+// type at compile time and the arity is fixed, it cannot return the
+// length-mismatch error AfterTuple can, so it returns the Predicate alone.
+func AfterTuple2[T any, A, B any](ca Column[T, A], cb Column[T, B], va A, vb B, desc bool) Predicate[T] {
+	return keysetAfter([]AnyColumn[T]{ca.Col(), cb.Col()}, []any{va, vb}, desc)
+}
+
+// AfterTuple3 is the three-column form of AfterTuple2.
+func AfterTuple3[T any, A, B, C any](ca Column[T, A], cb Column[T, B], cc Column[T, C], va A, vb B, vc C, desc bool) Predicate[T] {
+	return keysetAfter([]AnyColumn[T]{ca.Col(), cb.Col(), cc.Col()}, []any{va, vb, vc}, desc)
 }
 
 // cursor token encoding: a binary, base64url (unpadded) page token.

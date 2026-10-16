@@ -3,6 +3,8 @@ package memory
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,6 +41,8 @@ type bus struct {
 	closeTimeout   time.Duration
 	provider       observability.Provider
 	onPanic        func(topic string, msg eventbus.Message, r any)
+	// logger reports handler panics when no OnPanic hook is set.
+	logger *slog.Logger
 }
 
 // New creates an in-memory eventbus from opts.
@@ -85,6 +89,7 @@ func newBus(opts eventbus.Options) (*bus, error) {
 		closeTimeout:   closeTimeout,
 		provider:       opts.Provider,
 		onPanic:        opts.OnPanic,
+		logger:         slog.Default(),
 	}, nil
 }
 
@@ -261,7 +266,14 @@ func (b *bus) forward(parent context.Context, topic string, sub *subscription, h
 					if r := recover(); r != nil {
 						if b.onPanic != nil {
 							b.onPanic(topic, m, r)
+
+							return
 						}
+
+						// No hook: never swallow silently.
+						b.logger.ErrorContext(ctx, "eventbus/memory: handler panic recovered",
+							"topic", topic, "message_id", m.ID.String(),
+							"panic", r, "stack", string(debug.Stack()))
 					}
 				}()
 

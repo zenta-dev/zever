@@ -29,10 +29,21 @@ var ErrParseGoMod = errors.New("modgraph: parse go mod edit output failed")
 // ErrEmptyModulePath reports `go mod edit -json` output with no module path.
 var ErrEmptyModulePath = errors.New("modgraph: go mod edit output has empty module path")
 
-// drift lists the require+replace entries a module's go.mod lacks.
+// drift lists the require+replace entries a module's go.mod lacks, plus
+// the replace directives a no-replace module must not carry.
 type drift struct {
-	Require []string
-	Replace []string
+	Require   []string
+	Replace   []string
+	Forbidden []string
+}
+
+// noReplaceModules lists module dirs that must commit no intra-repo
+// `replace` directives. These are the `go install <module>@version`
+// targets: the go command refuses to install a main package whose go.mod
+// holds replace directives. Local development resolves their siblings
+// through go.work; consumers resolve them from the pinned requires.
+var noReplaceModules = map[string]bool{
+	"cmd/zever": true,
 }
 
 // tagPathExceptions lists module dirs whose module path deliberately
@@ -324,24 +335,30 @@ func checkModules(root string, mods map[string]string) map[string]drift {
 			continue
 		}
 		needed, err := neededClosure(root, path, moddir, mods)
-		if err != nil || len(needed) == 0 {
+		if err != nil || (len(needed) == 0 && !noReplaceModules[moddir]) {
 			continue
 		}
 		reqs := gomodRequires(root, moddir)
 		reps := gomodReplaces(root, moddir)
-		var missingReq, missingRep []string
+		var missingReq, missingRep, forbidden []string
 		for dep := range needed {
 			if !reqs[dep] {
 				missingReq = append(missingReq, dep)
 			}
-			if !reps[dep] {
+			if !noReplaceModules[moddir] && !reps[dep] {
 				missingRep = append(missingRep, dep)
 			}
 		}
-		if len(missingReq) > 0 || len(missingRep) > 0 {
+		if noReplaceModules[moddir] {
+			for dep := range reps {
+				forbidden = append(forbidden, dep)
+			}
+		}
+		if len(missingReq) > 0 || len(missingRep) > 0 || len(forbidden) > 0 {
 			sort.Strings(missingReq)
 			sort.Strings(missingRep)
-			out[moddir] = drift{Require: missingReq, Replace: missingRep}
+			sort.Strings(forbidden)
+			out[moddir] = drift{Require: missingReq, Replace: missingRep, Forbidden: forbidden}
 		}
 	}
 	return out
@@ -356,16 +373,50 @@ func fixModule(ctx context.Context, root, moddir string, deps []string, mods map
 		if err != nil {
 			return err
 		}
-		cmd := exec.CommandContext(ctx, "go", "mod", "edit", //nolint:gosec // fixed "go mod edit" argv; dep/ver come from the repo's own go.mod files, no shell
-			"-require="+dep+"@"+ver,
-			"-replace="+dep+"="+filepath.ToSlash(rel),
-			"go.mod")
+		args := []string{"mod", "edit", "-require=" + dep + "@" + ver}
+		if noReplaceModules[moddir] {
+			args = append(args, "-dropreplace="+dep)
+		} else {
+			args = append(args, "-replace="+dep+"="+filepath.ToSlash(rel))
+		}
+		args = append(args, "go.mod")
+		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Dir = full
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return &fixError{dep: dep, output: string(out), err: err}
 		}
 	}
 	return nil
+}
+
+// dropReplaces removes every intra-repo replace directive from a no-replace
+// module's go.mod via `go mod edit`.
+func dropReplaces(ctx context.Context, root, moddir string) error {
+	reps := gomodReplaces(root, moddir)
+	if len(reps) == 0 {
+		return nil
+	}
+	args := []string{"mod", "edit"}
+	for _, dep := range sortedMapKeys(reps) {
+		args = append(args, "-dropreplace="+dep)
+	}
+	args = append(args, "go.mod")
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = filepath.Join(root, filepath.FromSlash(moddir))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return &fixError{dep: "(replace directives)", output: string(out), err: err}
+	}
+	return nil
+}
+
+// sortedMapKeys returns the sorted keys of set.
+func sortedMapKeys(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // fixError records a failed `go mod edit` invocation for one dependency.

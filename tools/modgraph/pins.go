@@ -23,7 +23,7 @@ var pinLine = regexp.MustCompile(`^(\s*(?:require\s+)?` + regexp.QuoteMeta(zever
 func releaseVersion(root string) (string, error) {
 	b, err := os.ReadFile(filepath.Join(root, "cmd", "zever", "VERSION"))
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrVersionFile, err)
+		return "", errors.Join(ErrVersionFile, err)
 	}
 	v := strings.TrimSpace(string(b))
 	if !regexp.MustCompile(`^v?\d+\.\d+\.\d+$`).MatchString(v) {

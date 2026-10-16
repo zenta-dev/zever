@@ -42,11 +42,16 @@ func New(opts ai.Options) (ai.AI, error) {
 
 	httpClient := newHTTPClient(opts.Timeout, opts.AllowPrivate, opts.InsecureSkipVerify)
 
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	if opts.AllowPrivate {
-		slog.Default().Info("gemini: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+		logger.Info("gemini: allow_private enabled: private, loopback, and link-local addresses can be dialed")
 	}
 	if opts.InsecureSkipVerify {
-		slog.Default().Warn("gemini: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
+		logger.Warn("gemini: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
 	}
 
 	cc := &genai.ClientConfig{

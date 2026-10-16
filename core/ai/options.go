@@ -2,6 +2,7 @@ package ai
 
 import (
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/zenta-dev/zever/shared/endpoint"
@@ -26,6 +27,10 @@ type Options struct {
 	// Enable only for testing; the adapter logs a warning at open.
 	InsecureSkipVerify bool          `json:"insecure_skip_verify" toml:"insecure_skip_verify" yaml:"insecure_skip_verify"`
 	Timeout            time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	// Logger receives the adapter's open-time notices (allow_private and
+	// insecure_skip_verify). Nil uses slog.Default(). It is never loaded
+	// from configuration and never validated.
+	Logger *slog.Logger `json:"-" toml:"-" yaml:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

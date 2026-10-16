@@ -14,6 +14,144 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guide, a Kubernetes deployment guide with Deployment, Service, PodDisruptionBudget,
   HorizontalPodAutoscaler, ConfigMap and Secret manifests, and an FAQ with a
   cross-cutting troubleshooting list. Docs only.
+### Security
+
+- `fix(orm/migrate)`: rollback now validates the stored `Table` and
+  `ObjectName` of every `schema_migrations` row as plain (optionally quoted or
+  schema-qualified) identifiers, and the `PriorSQL` allowlist for re-creating a
+  dropped index is end-anchored to the exact `CREATE INDEX` shape this tool
+  generates, so a hand-edited row can no longer splice or append extra
+  statements into a rollback.
+
+- `fix(dsl)`: the resolver now rejects `http:` paths that do not start with `/`
+  or contain anything outside printable ASCII (no spaces, control characters or
+  newlines), and `dsl/backend/gogen` quotes the path in the generated handler
+  comment. A crafted `.zen` path could previously inject Go source through the
+  comment via lexer-decoded `\n`.
+- `refactor(auth,idempotency)`: the jwt adapter, the memory idempotency store and
+  the memory revocation store read time through an unexported injectable clock
+  (matching the memory session store), so expiry behavior is tested with a fake
+  clock instead of real sleeps. No public API or default behavior change.
+
+### Added
+
+- `ci(test)`: live conformance workflow (`.github/workflows/conformance-live.yml`)
+  running the shared kits against real services in containers — postgres:17,
+  redis:7, S3-compatible minio — via new skip-gated live tests
+  (`ZEVER_REDIS_ADDR`, `ZEVER_S3_ENDPOINT`; postgres reuses the existing
+  `POSTGRES_DSN` suites), plus a per-package Core coverage floor
+  (`tools/coverage-core.sh`, ratchet-up-only) and a nightly long-fuzz workflow
+  with cross-night corpus reuse (`.github/workflows/fuzz-nightly.yml`).
+  Mutation pilot report at `docs/plans/mutation-report.md` with five new
+  mutant-killing tests in `dsl/parser` and `orm/render`.
+
+### Fixed
+
+- `fix(outbox)`: the postgres claim statement put `FOR UPDATE SKIP LOCKED`
+  inside an `IN` subquery, which postgres rejects (SQLSTATE 42601) — every
+  live claim failed. Selection now runs in a `WITH due AS (...)` CTE feeding
+  the `UPDATE`. Found by the new live conformance workflow.
+- `fix(postgres)`: the `?`→`$n` rewriter mistook `LIMIT ? FOR ...` for a
+  JSONB existence check (`FOR` was missing from the keyword list), sending a
+  raw `?` to the server. The row-lock keyword cluster is now recognized
+  (`KEY` stays unlisted so `payload ? key` keeps working).
+
+- `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
+  helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
+  and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake
+  `Clock` and deterministic `IDs`, and an in-process HTTP `Client`. The testing
+  guide documents it, and CI gains a 20s-per-target fuzz smoke job over the DSL
+  lexer, parser, resolver and the new formatter idempotence target.
+- `feat(orm)`: typed keyset and MERGE helpers. `orm.AfterTuple2` and
+  `orm.AfterTuple3` build the multi-column keyset predicate from typed columns
+  and typed values (no length-mismatch error path), and `orm.MergeValueOf`
+  is the typed form of `orm.MergeValue` (column and literal share one value
+  type). All additive.
+- `test(shared)`: benchmarks for `shared/msgspan` (untraced fast path, traced
+  producer/consumer span) and `shared/outboxbridge` (queue and eventbus
+  publishers, with and without headers). Test-only.
+
+### Fixed
+
+- `fix(dsl/format)`: the formatter wrote gap edits at rune columns instead of the
+  byte offsets `Apply` expects, so a multi-byte character earlier on a line
+  (a non-ASCII string literal) made it insert whitespace inside the character
+  and corrupt the file; `OffsetOf` also now counts UTF-16 code units, matching
+  the lexer's columns, so astral characters such as emoji no longer shift
+  later edits. Found by the new `FuzzFormatIdempotent`.
+- `fix(eventbus,revocation)`: the memory eventbus no longer swallows handler
+  panics silently when `Options.OnPanic` is unset; it logs the panic value and
+  stack through `slog`. The memory revocation store's background pruner now
+  recovers per sweep, logs the panic with its stack, and keeps running instead
+  of dying silently.
+
+
+- `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` now works (from the
+  next release): `cmd/zever/go.mod` no longer commits `replace` directives and
+  pins every sibling module. `tools/modgraph --check` and
+  `tools/check-version.sh` fail if a replace reappears in a `go install`
+  target, `tools/gotidy.sh` keeps `make tidy-all` / `check` working for such
+  modules (temporary local replaces), and the release workflow runs
+  `tools/verify-go-install.sh` against the pushed tag. v0.7.1 and earlier
+  tags stay uninstallable this way; docs updated accordingly.
+
+### Changed
+
+- `perf(queue)`: the memory queue adapter keeps delayed messages in a min-heap
+  on `readyAt`, so each promoter wake-up pops only due entries instead of
+  rescanning and reallocating the whole delayed set (100k delayed messages:
+  one wake-up now ~370 ns, 1 alloc).
+- `fix(middleware)`: `core/middleware` `Timeout` and `TimeoutUnaryServerInterceptor`
+  now recover a handler panic on their child goroutine (previously unrecovered,
+  which crashed the process despite an outer `Recover`). The HTTP variant
+  re-panics on the request goroutine; the gRPC variant returns `codes.Internal`.
+  `core/agent` parallel tool fan-out likewise turns a panicking tool into a
+  `Run` error instead of crashing the process.
+
+- `feat(ai)`: `ai.Options` (and `ollama.Options`) gain an optional `Logger *slog.Logger`;
+  the anthropic, gemini, ollama and openai adapters send their open-time
+  `allow_private` / `insecure_skip_verify` notices to it instead of the global
+  `slog.Default()` (still the fallback when nil). Additive, never read from
+  configuration.
+- `core/middleware.RequestLogger` now logs `duration_ms` as a float
+  (fractional milliseconds) instead of a truncated integer, so sub-millisecond
+  requests no longer log as `0`. Log pipelines that typed the field as an
+  integer should accept a number.
+- **Breaking:** `fix(storage)`: hardened `adapters/storage/local` and `core/storage`.
+  `core/storage` `ValidKey` now rejects ASCII control characters (including DEL).
+  The local adapter rejects keys ending in `.meta` or with a segment starting
+  `.tmp-`/`.mtmp-` (its own sidecar and staging files), caps a PUT at 64 MiB by
+  default (was 2 GiB; new `storage.LocalOptions.MaxUploadBytes` /
+  `max_upload_bytes` overrides it, enforced with `http.MaxBytesReader`), only
+  echoes stored content types from an allowlist (anything else is served as
+  `application/octet-stream`), always sends `Content-Disposition: attachment`,
+  and, when no `root` is set, refuses the shared default `/tmp/storage` if it
+  is a symlink, not a directory, or owned by another user. `config` schema
+  gains `storage.options.max_upload_bytes`.
+
+- `tools/tag-release.sh`: new `--push` publishes every module tag with a single
+  `git push --atomic` (a rejected ref leaves the remote with no lockstep tags)
+  and the closing hint no longer suggests `git push --tags`; new
+  `--verify-proxy` asks the module proxy to resolve each module at the tag,
+  retrying while the proxy catches up.
+
+### Security
+
+- `docs(security)`: new per-battery threat models under `docs/security/`
+  (`threat-model-<battery>.md` for every Core battery: config, container,
+  db, orm, router, cache, queue, session, auth, crypto, password, secrets,
+  dsl) stating assets, trust boundaries, zever's guarantees, and caller
+  duties — each grounded in the current code, including explicit
+  non-guarantees. New ADR (`docs/adrs/2026-10-16-asymmetric-jwt.md`)
+  proposes EdDSA + RS256 JWT support with algorithm pinning and key-rotation
+  guarantees (proposal only, nothing implemented). Draft-only proposals under
+  `docs/plans/` for an OpenSSF Scorecard workflow and for cosign release
+  signing + SBOM binding (neither wired; both need human approval).
+  `.github/SECURITY.md` gains a no-public-PR rule for unpatched
+  vulnerabilities and a scope section. Docs only; no behavior change.
+
+- Docs: `start/versioning` and `start/project-layout` no longer carry stale
+  module counts (about 180 modules; 176 workspace `use` entries).
 
 ## [v0.7.1] - 2026-10-15
 
