@@ -1,0 +1,5 @@
+# Default owners for everything in the repo. MAINTAINERS describes the
+# policy: the @zenta-dev org team maintains zever. The team slug below must
+# exist in the org for review requests to be routed (create it under
+# Organization > Teams if it does not).
+* @zenta-dev/maintainers
