@@ -643,6 +643,7 @@
         "root": { "type": "string", "description": "local adapter: directory objects are stored under." },
         "secret": { "type": "string", "description": "local adapter: HMAC key for presigned URLs." },
         "public_url": { "type": "string", "description": "local adapter: public base URL for unsigned links." },
+        "max_upload_bytes": { "type": "integer", "minimum": 0, "description": "local adapter: per-object upload cap in bytes (0 = default 64 MiB)." },
         "access_key_id": { "type": "string", "description": "s3 adapter." },
         "secret_access_key": { "type": "string", "description": "s3 adapter." },
         "region": { "type": "string", "description": "s3 adapter; default us-east-1." },

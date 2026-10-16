@@ -543,7 +543,7 @@ func TestEnsurePutDir(t *testing.T) {
 func TestWriteBodyTemp(t *testing.T) {
 	dir := t.TempDir()
 
-	name, err := writeBodyTemp(dir, strings.NewReader("data"), 0o600)
+	name, err := writeBodyTempLimit(dir, strings.NewReader("data"), 0o600, maxBody)
 	if err != nil {
 		t.Fatalf("writeBodyTemp: %v", err)
 	}
@@ -558,11 +558,11 @@ func TestWriteBodyTemp(t *testing.T) {
 		t.Fatalf("mode = %v err %v", st.Mode(), err3)
 	}
 
-	if _, err := writeBodyTemp(filepath.Join(dir, "nodir"), strings.NewReader("x"), 0o600); err == nil {
+	if _, err := writeBodyTempLimit(filepath.Join(dir, "nodir"), strings.NewReader("x"), 0o600, maxBody); err == nil {
 		t.Errorf("missing dir accepted")
 	}
 
-	if _, err := writeBodyTemp(dir, handlerErrReader{}, 0o600); !errors.Is(err, errHandlerBoom) {
+	if _, err := writeBodyTempLimit(dir, handlerErrReader{}, 0o600, maxBody); !errors.Is(err, errHandlerBoom) {
 		t.Errorf("copy err = %v, want boom", err)
 	}
 
@@ -571,7 +571,7 @@ func TestWriteBodyTemp(t *testing.T) {
 
 	defer func() { maxBody = old }()
 
-	if _, err := writeBodyTemp(dir, strings.NewReader("toolarge"), 0o600); !errors.Is(err, io.EOF) {
+	if _, err := writeBodyTempLimit(dir, strings.NewReader("toolarge"), 0o600, maxBody); !errors.Is(err, io.EOF) {
 		t.Errorf("oversize err = %v, want EOF", err)
 	}
 }
