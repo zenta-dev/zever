@@ -59,3 +59,23 @@ service TaskService {
 	}
 }`)
 }
+
+// TestResolveHTTPPathRejectsUnsafe proves http paths with control characters,
+// spaces or no leading slash are rejected before they reach any backend.
+func TestResolveHTTPPathRejectsUnsafe(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{`/a\nfunc evil() {}`, `/a b`, `a/b`, "/a\\tb", "/café"} {
+		src := "entity Task {\n\tid: uuid @primary\n}\n\nservice TaskService {\n\trpc GetTask() -> Task {\n\t\thttp: GET \"" + path + "\"\n\t\tauth: required\n\t}\n}"
+
+		file, pd := parser.New("test.zen", []byte(src)).ParseFile()
+		if pd.HasErrors() {
+			t.Fatalf("path %q: parse errors: %v", path, pd)
+		}
+
+		_, diags := Resolve([]*ast.File{file})
+		if !errors.Is(diags, ErrInvalidOption) {
+			t.Errorf("path %q: want ErrInvalidOption, got %v", path, diags)
+		}
+	}
+}

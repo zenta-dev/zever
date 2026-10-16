@@ -25,7 +25,7 @@ import (
 
 const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
-// handleTaskServiceCreateTask handles POST /tasks, calling TaskService.CreateTask.
+// handleTaskServiceCreateTask handles POST "/tasks", calling TaskService.CreateTask.
 func handleTaskServiceCreateTask(svc TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -65,7 +65,7 @@ func handleTaskServiceCreateTask(svc TaskService) http.HandlerFunc {
 	}
 }
 
-// handleTaskServiceGetTask handles GET /tasks/{id}, calling TaskService.GetTask.
+// handleTaskServiceGetTask handles GET "/tasks/{id}", calling TaskService.GetTask.
 func handleTaskServiceGetTask(svc TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -93,7 +93,7 @@ func handleTaskServiceGetTask(svc TaskService) http.HandlerFunc {
 	}
 }
 
-// handleTaskServiceListTasks handles GET /tasks, calling TaskService.ListTasks.
+// handleTaskServiceListTasks handles GET "/tasks", calling TaskService.ListTasks.
 func handleTaskServiceListTasks(svc TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -143,7 +143,7 @@ func handleTaskServiceListTasks(svc TaskService) http.HandlerFunc {
 	}
 }
 
-// handleTaskServiceDeleteTask handles DELETE /tasks/{id}, calling TaskService.DeleteTask.
+// handleTaskServiceDeleteTask handles DELETE "/tasks/{id}", calling TaskService.DeleteTask.
 func handleTaskServiceDeleteTask(svc TaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

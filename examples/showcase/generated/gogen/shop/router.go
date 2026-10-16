@@ -25,7 +25,7 @@ import (
 
 const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
-// handleShopServiceListProducts handles GET /products, calling ShopService.ListProducts.
+// handleShopServiceListProducts handles GET "/products", calling ShopService.ListProducts.
 func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -75,7 +75,7 @@ func handleShopServiceListProducts(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceGetProduct handles GET /products/{id}, calling ShopService.GetProduct.
+// handleShopServiceGetProduct handles GET "/products/{id}", calling ShopService.GetProduct.
 func handleShopServiceGetProduct(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -103,7 +103,7 @@ func handleShopServiceGetProduct(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceCreateProduct handles POST /products, calling ShopService.CreateProduct.
+// handleShopServiceCreateProduct handles POST "/products", calling ShopService.CreateProduct.
 func handleShopServiceCreateProduct(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -148,7 +148,7 @@ func handleShopServiceCreateProduct(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceUpdateProduct handles PUT /products/{id}, calling ShopService.UpdateProduct.
+// handleShopServiceUpdateProduct handles PUT "/products/{id}", calling ShopService.UpdateProduct.
 func handleShopServiceUpdateProduct(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -204,7 +204,7 @@ func handleShopServiceUpdateProduct(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServicePatchProduct handles PATCH /products/{id}, calling ShopService.PatchProduct.
+// handleShopServicePatchProduct handles PATCH "/products/{id}", calling ShopService.PatchProduct.
 func handleShopServicePatchProduct(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -255,7 +255,7 @@ func handleShopServicePatchProduct(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceDeleteProduct handles DELETE /products/{id}, calling ShopService.DeleteProduct.
+// handleShopServiceDeleteProduct handles DELETE "/products/{id}", calling ShopService.DeleteProduct.
 func handleShopServiceDeleteProduct(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -283,7 +283,7 @@ func handleShopServiceDeleteProduct(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceCheckout handles POST /orders/checkout, calling ShopService.Checkout.
+// handleShopServiceCheckout handles POST "/orders/checkout", calling ShopService.Checkout.
 func handleShopServiceCheckout(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -323,7 +323,7 @@ func handleShopServiceCheckout(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceGetOrder handles GET /orders/{id}, calling ShopService.GetOrder.
+// handleShopServiceGetOrder handles GET "/orders/{id}", calling ShopService.GetOrder.
 func handleShopServiceGetOrder(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -351,7 +351,7 @@ func handleShopServiceGetOrder(svc ShopService) http.HandlerFunc {
 	}
 }
 
-// handleShopServiceListOrders handles GET /orders, calling ShopService.ListOrders.
+// handleShopServiceListOrders handles GET "/orders", calling ShopService.ListOrders.
 func handleShopServiceListOrders(svc ShopService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
