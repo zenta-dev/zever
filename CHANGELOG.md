@@ -143,6 +143,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.github/SECURITY.md` gains a no-public-PR rule for unpatched
   vulnerabilities and a scope section. Docs only; no behavior change.
 
+- Docs: `start/versioning` and `start/project-layout` no longer carry stale
+  module counts (about 180 modules; 176 workspace `use` entries).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
