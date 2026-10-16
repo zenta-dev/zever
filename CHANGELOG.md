@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recovers per sweep, logs the panic with its stack, and keeps running instead
   of dying silently.
 
+
+- `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` now works (from the
+  next release): `cmd/zever/go.mod` no longer commits `replace` directives and
+  pins every sibling module. `tools/modgraph --check` and
+  `tools/check-version.sh` fail if a replace reappears in a `go install`
+  target, `tools/gotidy.sh` keeps `make tidy-all` / `check` working for such
+  modules (temporary local replaces), and the release workflow runs
+  `tools/verify-go-install.sh` against the pushed tag. v0.7.1 and earlier
+  tags stay uninstallable this way; docs updated accordingly.
+
 ### Changed
 
 - `perf(queue)`: the memory queue adapter keeps delayed messages in a min-heap

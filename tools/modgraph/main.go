@@ -104,6 +104,9 @@ func runCheck(root string, mods map[string]string, stdout *os.File) int {
 		if len(missing.Replace) > 0 {
 			fmt.Fprintf(stdout, "%s: missing replace: %s\n", moddir, joinAll(missing.Replace))
 		}
+		if len(missing.Forbidden) > 0 {
+			fmt.Fprintf(stdout, "%s: forbidden replace (go install <module>@version rejects replace directives): %s\n", moddir, joinAll(missing.Forbidden))
+		}
 	}
 	for _, moddir := range sortedTagKeys(tagged) {
 		fmt.Fprintf(stdout, "%s: tag path rule broken: module %s, want %s%s\n",
@@ -139,6 +142,12 @@ func runFix(ctx context.Context, root string, mods map[string]string, ver string
 		if err != nil {
 			fmt.Fprintf(stderr, "modgraph: %s: %v\n", moddir, err)
 			return 1
+		}
+		if noReplaceModules[moddir] {
+			if err := dropReplaces(ctx, root, moddir); err != nil {
+				fmt.Fprintf(stderr, "modgraph: %s: %v\n", moddir, err)
+				return 1
+			}
 		}
 		if len(needed) == 0 {
 			continue
