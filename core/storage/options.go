@@ -12,6 +12,9 @@ type LocalOptions struct {
 	Secret string `json:"secret" toml:"secret" yaml:"secret" zever:"secret"`
 	// PublicURL is the public base URL for unsigned links.
 	PublicURL string `json:"public_url" toml:"public_url" yaml:"public_url"`
+	// MaxUploadBytes caps the size of one uploaded object; zero means the
+	// adapter default (64 MiB for the local backend).
+	MaxUploadBytes int64 `json:"max_upload_bytes" toml:"max_upload_bytes" yaml:"max_upload_bytes"`
 }
 
 // S3Options configures the Amazon S3 backend.

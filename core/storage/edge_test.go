@@ -33,7 +33,7 @@ func TestValidKey_additional_boundaries(t *testing.T) {
 		{"a/b/", false},
 		{"a b", true},
 		{strings.Repeat("a/", 1<<16) + "z", true},
-		{"a\x7fb", true},
+		{"a\x7fb", false},
 	}
 
 	for _, tc := range cases {
@@ -109,4 +109,14 @@ func TestRegister_Open_concurrent(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestValidKeyRejectsControlCharacters(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"a\nb", "a\tb", "a\rb", "a\x7fb", "a\x01b", "a\x00b"} {
+		if ValidKey(key) {
+			t.Errorf("ValidKey(%q) = true, want false", key)
+		}
+	}
 }

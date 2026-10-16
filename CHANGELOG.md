@@ -86,6 +86,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (fractional milliseconds) instead of a truncated integer, so sub-millisecond
   requests no longer log as `0`. Log pipelines that typed the field as an
   integer should accept a number.
+- **Breaking:** `fix(storage)`: hardened `adapters/storage/local` and `core/storage`.
+  `core/storage` `ValidKey` now rejects ASCII control characters (including DEL).
+  The local adapter rejects keys ending in `.meta` or with a segment starting
+  `.tmp-`/`.mtmp-` (its own sidecar and staging files), caps a PUT at 64 MiB by
+  default (was 2 GiB; new `storage.LocalOptions.MaxUploadBytes` /
+  `max_upload_bytes` overrides it, enforced with `http.MaxBytesReader`), only
+  echoes stored content types from an allowlist (anything else is served as
+  `application/octet-stream`), always sends `Content-Disposition: attachment`,
+  and, when no `root` is set, refuses the shared default `/tmp/storage` if it
+  is a symlink, not a directory, or owned by another user. `config` schema
+  gains `storage.options.max_upload_bytes`.
 
 ## [v0.7.1] - 2026-10-15
 

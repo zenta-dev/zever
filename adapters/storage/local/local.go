@@ -25,11 +25,26 @@ import (
 	"github.com/zenta-dev/zever/core/storage"
 )
 
+// validateBucketKey is storage.ValidateBucketKey plus the keys reserved for
+// the adapter's own sidecar and staging files.
+func validateBucketKey(bucket, key string) error {
+	if err := storage.ValidateBucketKey(bucket, key); err != nil {
+		return err
+	}
+
+	if reservedKey(key) {
+		return fmt.Errorf("%w: %q is reserved", storage.ErrInvalidKey, key)
+	}
+
+	return nil
+}
+
 type localAdapter struct {
-	root    string
-	urlBase string
-	base    url.URL
-	secret  []byte
+	maxBytes int64
+	root     string
+	urlBase  string
+	base     url.URL
+	secret   []byte
 	storage.PolicyStore
 	logger log.Logger
 
@@ -46,6 +61,20 @@ func (a *localAdapter) log() log.Logger {
 	return noop.New()
 }
 
+// defaultRoot is used when no root is configured. It is a shared, predictable
+// location, so checkDefaultRoot refuses it unless it is a real directory
+// owned by the current user; production deployments should set root.
+var defaultRoot = "/tmp/storage"
+
+// uploadLimit returns the per-object upload cap in bytes.
+func (a *localAdapter) uploadLimit() int64 {
+	if a.maxBytes > 0 {
+		return a.maxBytes
+	}
+
+	return maxBody
+}
+
 // randRead is crypto/rand.Read as a var so tests can inject failures.
 var randRead = rand.Read
 
@@ -56,7 +85,15 @@ func New(opts storage.Options) (storage.Storage, error) {
 
 	root := opts.Root
 	if root == "" {
-		root = "/tmp/storage"
+		root = defaultRoot
+
+		if err := checkDefaultRoot(root); err != nil {
+			return nil, fmt.Errorf("local: default root %q is unsafe (set the %q option): %w", root, "root", err)
+		}
+	}
+
+	if opts.MaxUploadBytes < 0 {
+		return nil, storage.InvalidOptionsError{Reason: "local: max_upload_bytes must not be negative"}
 	}
 
 	urlBase := opts.URLBase
@@ -113,6 +150,7 @@ func New(opts storage.Options) (storage.Storage, error) {
 	}
 
 	return &localAdapter{
+		maxBytes:    opts.MaxUploadBytes,
 		root:        root,
 		urlBase:     urlBase,
 		base:        base,
@@ -144,7 +182,7 @@ func (a *localAdapter) PresignUpload(
 	contentType string,
 	ttl time.Duration,
 ) (storage.PresignedURL, error) {
-	if err := storage.ValidateBucketKey(bucket, key); err != nil {
+	if err := validateBucketKey(bucket, key); err != nil {
 		return storage.PresignedURL{}, fmt.Errorf("local: %w", err)
 	}
 
@@ -206,7 +244,7 @@ func (a *localAdapter) PresignDownload(
 	key string,
 	ttl time.Duration,
 ) (storage.PresignedURL, error) {
-	if err := storage.ValidateBucketKey(bucket, key); err != nil {
+	if err := validateBucketKey(bucket, key); err != nil {
 		return storage.PresignedURL{}, fmt.Errorf("local: %w", err)
 	}
 
@@ -258,7 +296,7 @@ func (a *localAdapter) PresignDownload(
 }
 
 func (a *localAdapter) Exists(_ context.Context, bucket string, key string) (bool, error) {
-	if err := storage.ValidateBucketKey(bucket, key); err != nil {
+	if err := validateBucketKey(bucket, key); err != nil {
 		return false, fmt.Errorf("local: %w", err)
 	}
 
@@ -266,7 +304,7 @@ func (a *localAdapter) Exists(_ context.Context, bucket string, key string) (boo
 }
 
 func (a *localAdapter) Delete(ctx context.Context, bucket string, key string) error {
-	if err := storage.ValidateBucketKey(bucket, key); err != nil {
+	if err := validateBucketKey(bucket, key); err != nil {
 		return fmt.Errorf("local: %w", err)
 	}
 
@@ -298,11 +336,11 @@ func (a *localAdapter) Delete(ctx context.Context, bucket string, key string) er
 }
 
 func (a *localAdapter) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error {
-	if err := storage.ValidateBucketKey(srcBucket, srcKey); err != nil {
+	if err := validateBucketKey(srcBucket, srcKey); err != nil {
 		return fmt.Errorf("local: %w", err)
 	}
 
-	if err := storage.ValidateBucketKey(dstBucket, dstKey); err != nil {
+	if err := validateBucketKey(dstBucket, dstKey); err != nil {
 		return fmt.Errorf("local: %w", err)
 	}
 
@@ -668,7 +706,7 @@ func parseBucketKey(path string) (string, string, bool) {
 		return "", "", false
 	}
 
-	if !storage.ValidBucket(bucket) || !storage.ValidKey(key) {
+	if validateBucketKey(bucket, key) != nil {
 		return "", "", false
 	}
 
@@ -852,17 +890,17 @@ func (a *localAdapter) ensurePutDir(full string) (string, error) {
 	return dir, nil
 }
 
-func writeBodyTemp(dir string, body io.Reader, mode os.FileMode) (string, error) {
+func writeBodyTempLimit(dir string, body io.Reader, mode os.FileMode, limit int64) (string, error) {
 	if strings.Contains(dir, "..") {
 		return "", storage.ErrForbidden
 	}
 
-	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	tmp, err := os.CreateTemp(dir, bodyTempPrefix+"*")
 	if err != nil {
 		return "", err
 	}
 
-	n, err := io.Copy(tmp, io.LimitReader(body, maxBody+1))
+	n, err := io.Copy(tmp, io.LimitReader(body, limit+1))
 	if err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
@@ -870,7 +908,7 @@ func writeBodyTemp(dir string, body io.Reader, mode os.FileMode) (string, error)
 		return "", err
 	}
 
-	if n > maxBody {
+	if n > limit {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
 
@@ -895,7 +933,7 @@ func writeMetaTemp(dir, declaredType string, mode os.FileMode) string {
 		return ""
 	}
 
-	mt, err := os.CreateTemp(dir, ".mtmp-*")
+	mt, err := os.CreateTemp(dir, metaTempPrefix+"*")
 	if err != nil {
 		return ""
 	}
@@ -922,9 +960,14 @@ func (a *localAdapter) put(w http.ResponseWriter, r *http.Request, full string, 
 		return
 	}
 
-	tmpName, err := writeBodyTemp(dir, r.Body, mode)
+	limit := a.uploadLimit()
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+
+	tmpName, err := writeBodyTempLimit(dir, r.Body, mode, limit)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
+		var tooBig *http.MaxBytesError
+
+		if errors.Is(err, io.EOF) || errors.As(err, &tooBig) {
 			http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 		} else {
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -1034,6 +1077,7 @@ func (a *localAdapter) get(w http.ResponseWriter, full string) {
 
 	w.Header().Set("Content-Type", contentTypeFor(full))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Disposition", "attachment")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, f)
 }
@@ -1051,7 +1095,7 @@ func contentTypeFor(full string) string {
 		b, err := io.ReadAll(io.LimitReader(f, 8192))
 		if err == nil {
 			var meta objectMeta
-			if json.Unmarshal(b, &meta) == nil && meta.ContentType != "" && !isScriptable(meta.ContentType) {
+			if json.Unmarshal(b, &meta) == nil && meta.ContentType != "" && !isScriptable(meta.ContentType) && allowedContentType(meta.ContentType) {
 				return meta.ContentType
 			}
 		}
