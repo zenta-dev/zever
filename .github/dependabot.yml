@@ -182,6 +182,7 @@ updates:
       - "/tools/vulngate"
       - "/tools/zever-lsp"
       - "/tools/zever-mcp"
+      - "/zevertest"
     schedule:
       interval: weekly
       day: monday

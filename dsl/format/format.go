@@ -32,6 +32,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/zenta-dev/zever/dsl/lexer"
@@ -209,14 +210,18 @@ func SplitLines(src []byte) []Line {
 	return lines
 }
 
-// OffsetOf converts a 1-based rune column on line into a byte offset.
+// OffsetOf converts a 1-based column on line into a byte offset. Columns are
+// counted in UTF-16 code units, the unit the lexer reports in token
+// positions (and LSP uses): a rune outside the BMP, such as an emoji, spans
+// two columns.
 func OffsetOf(src []byte, line Line, col int) int {
 	offset := line.start
 
-	for n := 1; n < col && offset < line.end; n++ {
+	for units := 1; units < col && offset < line.end; {
 		// Dead-guard removed: DecodeRune returns size 0 only on empty input, and offset < line.end keeps src[offset:line.end] non-empty.
-		_, size := utf8.DecodeRune(src[offset:line.end])
+		r, size := utf8.DecodeRune(src[offset:line.end])
 		offset += size
+		units += utf16.RuneLen(r)
 	}
 
 	return offset
@@ -369,11 +374,13 @@ func spacingEdits(src []byte, lines []Line, tokens []token.Token) []Edit {
 			continue
 		}
 
-		// The gap is ASCII whitespace, so its byte width is its column width.
+		// Edit columns are byte offsets from the start of the line, not rune
+		// columns: an earlier non-ASCII rune (e.g. in a string literal) makes
+		// the two differ, and a rune-based column would land inside it.
 		edits = append(edits, Edit{
 			Line:     index,
-			StartCol: next.Pos.Col - 1 - (end - start),
-			EndCol:   next.Pos.Col - 1,
+			StartCol: start - line.start,
+			EndCol:   end - line.start,
 			NewText:  sep,
 		})
 	}

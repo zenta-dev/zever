@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/zenta-dev/zever/dsl/token"
 )
@@ -243,5 +244,34 @@ func TestLexAllReportsLexErrors(t *testing.T) {
 	_, clean := LexAll("bad.zen", []byte("\x01"))
 	if clean {
 		t.Fatal("LexAll clean = true, want false for illegal character")
+	}
+}
+
+// TestFormatNonASCIIBeforeGap is the regression for rune-vs-byte columns: a
+// multi-byte rune earlier on the line must not shift where a gap edit lands
+// (it used to split the string literal's bytes).
+func TestFormatNonASCIIBeforeGap(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct{ name, src, want string }{
+		{"string then token", "\"耥\"0", "\"耥\" 0"},
+		{"emoji default", "entity A {\n\tx: string @default(\"héllo 🙂\")   @unique\n}\n", "entity A {\n  x: string @default(\"héllo 🙂\") @unique\n}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Format([]byte(tc.src))
+			if err != nil {
+				t.Fatalf("Format: %v", err)
+			}
+
+			if string(got) != tc.want {
+				t.Fatalf("Format = %q, want %q", got, tc.want)
+			}
+
+			if !utf8.Valid(got) {
+				t.Fatalf("Format produced invalid UTF-8: %q", got)
+			}
+		})
 	}
 }
