@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on `readyAt`, so each promoter wake-up pops only due entries instead of
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
+### Security
+
+- `fix(dsl)`: the resolver now rejects `http:` paths that do not start with `/`
+  or contain anything outside printable ASCII (no spaces, control characters or
+  newlines), and `dsl/backend/gogen` quotes the path in the generated handler
+  comment. A crafted `.zen` path could previously inject Go source through the
+  comment via lexer-decoded `\n`.
 
 ## [v0.7.1] - 2026-10-15
 
