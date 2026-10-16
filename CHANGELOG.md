@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+- `tools/tag-release.sh`: new `--push` publishes every module tag with a single
+  `git push --atomic` (a rejected ref leaves the remote with no lockstep tags)
+  and the closing hint no longer suggests `git push --tags`; new
+  `--verify-proxy` asks the module proxy to resolve each module at the tag,
+  retrying while the proxy catches up.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
