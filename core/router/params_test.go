@@ -214,3 +214,31 @@ func TestStripRegexWrapper_table(t *testing.T) {
 		})
 	}
 }
+
+func TestWithOwnedParams(t *testing.T) {
+	t.Parallel()
+
+	params := map[string]string{"id": "42"}
+	ctx := WithOwnedParams(t.Context(), params)
+	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
+
+	if got := Param(r, "id"); got != "42" {
+		t.Fatalf("Param(id) = %q, want 42", got)
+	}
+
+	if got := ParamNames(r); len(got) != 1 || got["id"] != "42" {
+		t.Fatalf("ParamNames = %v, want map[id:42]", got)
+	}
+
+	// Ownership transfer: no defensive copy is made.
+	params["id"] = "7"
+
+	if got := Param(r, "id"); got != "7" {
+		t.Fatalf("Param(id) after caller write = %q, want 7 (no copy)", got)
+	}
+
+	nilCtx := WithOwnedParams(t.Context(), nil)
+	if got := Param(httptest.NewRequestWithContext(nilCtx, http.MethodGet, "/", nil), "id"); got != "" {
+		t.Fatalf("Param on nil params = %q, want empty", got)
+	}
+}

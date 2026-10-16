@@ -319,7 +319,7 @@ func wrapHandler(handler http.HandlerFunc) fiber.Handler {
 		// it to the converted request. Doing it here (rather than via a second
 		// r.WithContext inside the bridged handler) keeps a single *http.Request
 		// copy per request instead of two.
-		ctx := router.WithParams(c.Context(), c.AllParams())
+		ctx := router.WithOwnedParams(c.Context(), c.AllParams())
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handler(w, r)
 		})

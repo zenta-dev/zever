@@ -26,6 +26,16 @@ func WithParams(ctx context.Context, params map[string]string) context.Context {
 	return context.WithValue(ctx, paramsKey{}, cp)
 }
 
+// WithOwnedParams is WithParams without the defensive copy, for adapters that
+// build a fresh params map per request and hand it over.
+//
+// The caller transfers ownership: it must not read or mutate params after the
+// call, and must never pass a map it retains or shares (a pooled or cached
+// map would alias across requests). Use WithParams when in doubt.
+func WithOwnedParams(ctx context.Context, params map[string]string) context.Context {
+	return context.WithValue(ctx, paramsKey{}, params)
+}
+
 // Param returns the named route parameter from the request.
 //
 // It returns "" when the request carries no params or the name is absent.
