@@ -238,11 +238,18 @@ func isSpace(c byte) bool {
 }
 
 // isSQLKeyword reports idents that end a placeholder (not a JSONB key).
+// It covers clause keywords plus the row-lock cluster (FOR UPDATE/SHARE,
+// SKIP LOCKED, NOWAIT): a placeholder in `LIMIT ? FOR UPDATE SKIP LOCKED`
+// must rewrite, since FOR is never a bare JSONB key in real queries. KEY is
+// deliberately absent: `payload ? key` is the documented JSONB-operand
+// shape the suite pins.
 func isSQLKeyword(ident string) bool {
 	switch strings.ToUpper(ident) {
-	case "AND", "AS", "EXCEPT", "FETCH", "FROM", "GROUP", "HAVING", "IN",
-		"INTERSECT", "INTO", "JOIN", "LIMIT", "OFFSET", "ON", "OR", "ORDER",
-		"RETURNING", "SET", "UNION", "VALUES", "WHERE", "WINDOW":
+	case "AND", "AS", "DELETE", "EXCEPT", "FETCH", "FOR", "FROM", "GROUP",
+		"HAVING", "IN", "INSERT", "INTERSECT", "INTO", "JOIN", "LIMIT",
+		"LOCK", "LOCKED", "NOWAIT", "OFFSET", "OF", "ON", "OR", "ORDER",
+		"RETURNING", "SELECT", "SET", "SHARE", "SKIP", "UNION", "UPDATE",
+		"USING", "VALUES", "WHERE", "WINDOW":
 		return true
 	}
 
