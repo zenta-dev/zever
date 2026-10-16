@@ -246,3 +246,82 @@ func TestTimeoutUnaryServerInterceptor_HandlerPanicBecomesInternal(t *testing.T)
 		t.Fatalf("code = %v, want Internal (err=%v)", got, err)
 	}
 }
+
+// TestTimeout_LatePanicSwallowed pins that a handler panic landing after the
+// deadline neither propagates to the caller nor corrupts the timeout
+// response: the client already has its 504, and there is no caller left to
+// receive the panic.
+func TestTimeout_LatePanicSwallowed(t *testing.T) {
+	t.Parallel()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	finished := make(chan struct{})
+
+	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		close(started)
+		defer close(finished)
+		<-release
+		panic("late boom")
+	})
+
+	wrapped := Timeout(20 * time.Millisecond)(handler)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("Code = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+	}
+
+	<-started
+	close(release)
+	<-finished
+}
+
+// TestTimeoutWriter_DiscardAndIdempotentHeader pins the discard contract the
+// timeout path relies on: writes after the deadline are dropped (never racing
+// the 504), the first WriteHeader wins, and a header after the deadline is
+// ignored.
+func TestTimeoutWriter_DiscardAndIdempotentHeader(t *testing.T) {
+	t.Parallel()
+
+	t.Run("write after timeout discarded", func(t *testing.T) {
+		t.Parallel()
+
+		tw := &timeoutWriter{header: make(http.Header), timedOut: true}
+		n, err := tw.Write([]byte("late"))
+		if err != nil {
+			t.Fatalf("Write error = %v", err)
+		}
+		if n != len("late") {
+			t.Errorf("Write n = %d, want %d", n, len("late"))
+		}
+		if tw.buf.Len() != 0 {
+			t.Errorf("buffered %d bytes, want 0 (discarded after timeout)", tw.buf.Len())
+		}
+	})
+
+	t.Run("first WriteHeader wins", func(t *testing.T) {
+		t.Parallel()
+
+		tw := &timeoutWriter{header: make(http.Header)}
+		tw.WriteHeader(http.StatusCreated)
+		tw.WriteHeader(http.StatusTeapot)
+		if tw.code != http.StatusCreated {
+			t.Errorf("code = %d, want %d (first wins)", tw.code, http.StatusCreated)
+		}
+	})
+
+	t.Run("WriteHeader after timeout ignored", func(t *testing.T) {
+		t.Parallel()
+
+		tw := &timeoutWriter{header: make(http.Header), timedOut: true}
+		tw.WriteHeader(http.StatusCreated)
+		if tw.code != 0 {
+			t.Errorf("code = %d, want 0 (ignored after timeout)", tw.code)
+		}
+	})
+}

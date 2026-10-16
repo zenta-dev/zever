@@ -110,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `fix(middleware)`: cover panic-redact and timeout-recover paths.
 - `fix(outbox)`: the postgres claim statement put `FOR UPDATE SKIP LOCKED`
   inside an `IN` subquery, which postgres rejects (SQLSTATE 42601) — every
   live claim failed. Selection now runs in a `WITH due AS (...)` CTE feeding
