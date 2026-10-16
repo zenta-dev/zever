@@ -65,6 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on `readyAt`, so each promoter wake-up pops only due entries instead of
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
+- `fix(middleware)`: `core/middleware` `Timeout` and `TimeoutUnaryServerInterceptor`
+  now recover a handler panic on their child goroutine (previously unrecovered,
+  which crashed the process despite an outer `Recover`). The HTTP variant
+  re-panics on the request goroutine; the gRPC variant returns `codes.Internal`.
+  `core/agent` parallel tool fan-out likewise turns a panicking tool into a
+  `Run` error instead of crashing the process.
 
 - `feat(ai)`: `ai.Options` (and `ollama.Options`) gain an optional `Logger *slog.Logger`;
   the anthropic, gemini, ollama and openai adapters send their open-time

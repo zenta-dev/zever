@@ -32,6 +32,10 @@ import (
 // out, so exactly one goroutine ever writes to the real ResponseWriter) is
 // the same one http.TimeoutHandler uses internally.
 //
+// A handler panic that happens before the deadline is re-raised on the
+// request goroutine so an outer Recover handles it; a panic in a handler
+// that already timed out is swallowed (there is no caller left to receive it).
+//
 // Timeout should run inside Recover (Recover outermost) so a panic in a
 // still-running, timed-out handler is still caught, and outside RateLimit
 // so a denied request never starts the timer.
@@ -43,14 +47,31 @@ func Timeout(d time.Duration) func(http.Handler) http.Handler {
 
 			tw := &timeoutWriter{header: make(http.Header)}
 			done := make(chan struct{})
+			panicked := make(chan any, 1)
 
 			go func() {
 				defer close(done)
+
+				// A panic on this goroutine would otherwise kill the process:
+				// Recover upstream only guards the request goroutine. Capture
+				// it and re-panic on the caller's goroutine below.
+				defer func() {
+					if p := recover(); p != nil {
+						panicked <- p
+					}
+				}()
+
 				next.ServeHTTP(tw, r.WithContext(ctx))
 			}()
 
 			select {
 			case <-done:
+				select {
+				case p := <-panicked:
+					panic(p)
+				default:
+				}
+
 				tw.mu.Lock()
 				defer tw.mu.Unlock()
 
@@ -144,6 +165,12 @@ func TimeoutUnaryServerInterceptor(d time.Duration) grpc.UnaryServerInterceptor 
 		done := make(chan result, 1)
 
 		go func() {
+			defer func() {
+				if p := recover(); p != nil {
+					done <- result{err: status.Error(codes.Internal, "internal error")}
+				}
+			}()
+
 			resp, err := handler(ctx, req)
 			done <- result{resp: resp, err: err}
 		}()
