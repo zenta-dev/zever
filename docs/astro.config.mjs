@@ -333,6 +333,8 @@ export default defineConfig({
             { label: "API index", link: "reference/api-index" },
             { label: "Errors", link: "reference/errors" },
             { label: "Benchmarks", link: "reference/benchmarks" },
+            { label: "Minimal profile", link: "reference/minimal-profile" },
+            { label: "Compatibility matrix", link: "reference/compatibility-matrix" },
           ],
         },
       ],

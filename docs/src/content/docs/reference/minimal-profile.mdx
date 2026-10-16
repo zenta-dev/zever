@@ -1,0 +1,51 @@
+---
+title: Minimal runtime profile
+description: What the db/orm/router/config/log floor costs versus the full CLI, and how to reproduce the numbers.
+---
+
+The minimal runtime profile is the smallest dependency set a data-backed service needs: `config` (layered typed config), `core/db` (SQL facade), `orm` (typed builder over `db.DB`), `core/router` (HTTP facade), and `core/log` (logging facade). Adapters resolve by `Register` plus config, so anything outside this set leaves the binary. It is not the same as `zever new --profile minimal`, which is a scaffold preset (bootable floor plus auth/observability/permission/ratelimit); see [Customizing and leaving](../extend/customizing-and-leaving/) for the scaffold counts.
+
+## Numbers (2026-10-16, Go 1.27.2, linux/amd64)
+
+| Profile | `go list -test -deps` packages | Third-party packages | Binary |
+|---|---|---|---|
+| Minimal (`config`, `orm`, `core/db`, `core/router`, `core/log`) | 419 | 185 | above the 63.3 MB floor (embeds the sqlite driver) |
+| Full CLI (`cmd/zever` module) | 1706 | 1396 | 309.7 MB |
+
+Package counts were measured in this repo; binary sizes are cited from [Benchmarks](./benchmarks/) (2026-10-14, same toolchain and arch): full CLI 309.7 MB, slim floor (`--adapters=log,router`) 63.3 MB. The slim floor links only log plus router adapters, so it is the lower bound for the minimal profile: adding the sqlite-backed `db` and `orm` pulls in the embedded sqlite driver and the query builder, landing between the floor and the full CLI. The full CLI is ~4x the minimal package count and ~76% third-party; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs).
+
+## Method
+
+Package counts include stdlib and test dependencies (`-test`), matching the scaffold table's method:
+
+```sh
+# Minimal profile transitive closure (workspace root, sorts and dedups first)
+go list -test -deps ./config/... ./orm/... ./core/db/... ./core/router/... ./core/log/... | sort -u | wc -l
+# Third-party only: first path element containing a dot (excludes stdlib and the repo itself)
+go list -test -deps ./config/... ./orm/... ./core/db/... ./core/router/... ./core/log/... | sort -u | awk -F/ '{print $1}' | grep "\." | wc -l
+# Full CLI closure (cmd/zever is its own module)
+go -C cmd/zever list -test -deps ./... | sort -u | wc -l
+```
+
+Binary sizes:
+
+```sh
+go build -o /tmp/zever-full ./cmd/zever && ls -lh /tmp/zever-full
+/tmp/zever-full build --adapters=log,router --out /tmp/zever-slim && ls -lh /tmp/zever-slim
+```
+
+## Resolve only what you need
+
+```go
+import (
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+)
+
+c := container.New(config.Default())
+db, err := c.DB()
+_ = db
+_ = err
+```
+
+`container.New` is lazy: services never touched are never opened and never weigh on startup. `Close` drains only resolved services in dependency order, so a minimal process shuts down exactly what it started.
