@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and corrupt the file; `OffsetOf` also now counts UTF-16 code units, matching
   the lexer's columns, so astral characters such as emoji no longer shift
   later edits. Found by the new `FuzzFormatIdempotent`.
+- `fix(eventbus,revocation)`: the memory eventbus no longer swallows handler
+  panics silently when `Options.OnPanic` is unset; it logs the panic value and
+  stack through `slog`. The memory revocation store's background pruner now
+  recovers per sweep, logs the panic with its stack, and keeps running instead
+  of dying silently.
 
 ### Changed
 
