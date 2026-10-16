@@ -142,6 +142,10 @@ func TestRunGenerateServer(t *testing.T) {
 		"WriteTimeout:      writeTimeout,",
 		"IdleTimeout:       idleTimeout,",
 		`grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")`,
+		// Opt-in pprof: off by default, loopback-only, own listener.
+		`flag.String("pprof-addr", os.Getenv("PPROF_ADDR")`,
+		"container.StartPprof(pprofAddr, logger)",
+		"pprofSrv.Shutdown(pprofCtx)",
 		// Outbound calls go through the resilience manager's per-dependency guard.
 		"c.Resilience()",
 		"guardedGRPCClient",

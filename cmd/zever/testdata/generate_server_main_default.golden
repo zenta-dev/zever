@@ -342,6 +342,7 @@ func runDoctor() error {
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP address to listen on")
 	grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")
+	pprofAddr := flag.String("pprof-addr", os.Getenv("PPROF_ADDR"), "serve pprof profiles on this loopback address (e.g. 127.0.0.1:6060); empty disables it (env PPROF_ADDR)")
 	doctorOnly := flag.Bool("doctor", false, "resolve every enabled battery, print the JSON report, and exit without serving")
 
 	flag.Parse()
@@ -358,7 +359,7 @@ func main() {
 		return
 	}
 
-	if err := run(*addr, *grpcAddr); err != nil {
+	if err := run(*addr, *grpcAddr, *pprofAddr); err != nil {
 		// The log battery is not necessarily available this early, so the
 		// last-resort failure path writes to stderr directly.
 		_, _ = os.Stderr.WriteString("server: " + err.Error() + "\n")
@@ -367,7 +368,7 @@ func main() {
 	}
 }
 
-func run(addr, grpcAddr string) error {
+func run(addr, grpcAddr, pprofAddr string) error {
 	c, err := app.New()
 	if err != nil {
 		return err
@@ -404,6 +405,21 @@ func run(addr, grpcAddr string) error {
 	// re-reads its file per evaluation when `reload: true`.
 	reloadableLogger := container.NewReloadableLogger(logger)
 	logger = reloadableLogger
+
+	// Opt-in profiling: off unless --pprof-addr / PPROF_ADDR is set, on its
+	// own loopback-only listener (never the public router), so a heap or
+	// goroutine dump needs host access (SSH tunnel, kubectl port-forward).
+	pprofSrv, err := container.StartPprof(pprofAddr, logger)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		pprofCtx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
+		defer cancel()
+
+		_ = pprofSrv.Shutdown(pprofCtx)
+	}()
 
 	serverTLS, err := loadServerTLS()
 	if err != nil {
