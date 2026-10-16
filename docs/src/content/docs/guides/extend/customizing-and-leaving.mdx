@@ -25,6 +25,16 @@ Every file under `generated/` starts with a provenance header recording the back
 
 `.json` specs (`openapi.json`, `mcp.json`) cannot carry a comment without breaking parsers, so they embed the same provenance in a top-level `x-zever-generated` block (`backend`, `schema`) instead. The `zever/annotations.proto` companion copy is vendored wire-stable API and is never stamped.
 
+## Extend around generated code
+
+Never edit `generated/`. Three supported patterns cover every extension point; there is deliberately no partial-file or edit-in-place mechanism, so regeneration stays a pure function of the schema:
+
+1. **Implement the generated interface.** Each service's `service.go` declares a Go interface (one method per RPC) and says so in its own header comment: implement it in your own package and pass it to `Register<Service>Routes` (HTTP) and `New<Service>GRPCServer` (gRPC). Hand-written middleware, decorators, and wrappers compose around that implementation, never inside generated files.
+2. **Start from a write-once stub.** `GenerateServiceStub` renders a compiling `<Service>Impl` (every method returning `Unimplemented`) meant to live outside the generated tree — typically `internal/app/<module>/<service_snake>.go`. It is written once and never regenerated, so filling it in is safe; regeneration only fails you forward when the interface gains methods (the `var _ gen.Service = (*Impl)(nil)` assertion stops compiling until you add them).
+3. **Embed and wrap generated types.** Generated request/response aliases and ORM models are plain Go values — embed them in your own structs or convert at the boundary. For wholly new output shapes, write a custom backend (below) instead of post-processing generated text.
+
+What is explicitly out: editing generated files between runs (the next compile overwrites them, and `--check` will flag the drift as yours to reconcile).
+
 ## Start small: batteries you actually need
 
 `zever new --profile` picks the adapter set so a prototype never pays for batteries it doesn't use. Explicit `--batteries` add to the preset; `--adapters` override its picks.

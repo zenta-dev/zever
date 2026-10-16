@@ -174,7 +174,8 @@ func resolveFieldType(te *ast.TypeExpr, enumByName map[string]*ir.Enum) (ir.Fiel
 	scalar, ok := scalarTypes[te.Name]
 	if !ok {
 		return ir.FieldType{}, diag.Wrap("resolve", te.NamePos, ErrUnresolvedReference,
-			"unknown field type %q (declare relations with has_many/has_one/belongs_to/many_to_many, not as a field)", te.Name)
+			"unknown field type %q%s (declare relations with has_many/has_one/belongs_to/many_to_many, not as a field)",
+			te.Name, hint(te.Name, scalarCandidates(enumByName)))
 	}
 
 	if len(te.Args) > 0 {
@@ -236,7 +237,9 @@ func resolveFieldAttribute(decl *ast.EntityDecl, fd *ast.FieldDecl, attr *ast.At
 
 		return diags
 	default:
-		return diag.List{diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute, "unknown field attribute @%s", attr.Name)}
+		return diag.List{diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
+			"unknown field attribute @%s%s", attr.Name,
+			hint(attr.Name, []string{"primary", "unique", "validate", "default", "renamed_from"}))}
 	}
 }
 
@@ -317,7 +320,8 @@ func resolveDefaultAttribute(attr *ast.Attribute, field *ir.Field) diag.List {
 
 func resolveDefaultCall(v *ast.CallValue, field *ir.Field) diag.List {
 	if v.Name != "now" {
-		return diag.List{diag.Wrap("resolve", v.Pos, ErrInvalidAttribute, "unknown default function %q", v.Name)}
+		return diag.List{diag.Wrap("resolve", v.Pos, ErrInvalidAttribute,
+			"unknown default function %q%s", v.Name, hint(v.Name, []string{"now"}))}
 	}
 
 	if field.Type.Scalar != ir.TTimestamp {
@@ -359,7 +363,8 @@ func resolveDefaultIdent(v *ast.IdentValue, field *ir.Field) diag.List {
 		}
 	}
 
-	return diag.List{diag.Wrap("resolve", v.Pos, ErrUnresolvedReference, "unknown enum value %q for default", v.Name)}
+	return diag.List{diag.Wrap("resolve", v.Pos, ErrUnresolvedReference,
+		"unknown enum value %q for default%s", v.Name, hint(v.Name, field.Type.EnumValues))}
 }
 
 // resolveDefaultLiteral sets field.Default when field's scalar is one of
@@ -385,7 +390,8 @@ func resolveEntitySchema(decl *ast.EntityDecl, module *ir.Module) (string, diag.
 
 	for _, attr := range decl.Attributes {
 		if attr.Name != "schema" {
-			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute, "unknown entity attribute @%s", attr.Name))
+			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
+				"unknown entity attribute @%s%s", attr.Name, hint(attr.Name, []string{"schema"})))
 			continue
 		}
 

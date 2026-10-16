@@ -102,7 +102,8 @@ func resolveOperation(
 		rpc.Returns = &ir.TypeRef{Message: msg}
 	} else {
 		diags = append(diags, diag.Wrap("resolve", rd.ReturnsPos, ErrUnresolvedReference,
-			"rpc %s.%s returns unknown type %q", serviceName, rd.Name, rd.Returns))
+			"rpc %s.%s returns unknown type %q%s", serviceName, rd.Name, rd.Returns,
+			hint(rd.Returns, namedTypeCandidates(entityByName, messageByName))))
 	}
 	// Cross-module return check is performed centrally in CheckCrossModule.
 
@@ -167,7 +168,7 @@ func resolveErrors(items []ast.Value) ([]*ir.ErrorCase, diag.List) {
 			code, ok := ValidErrorCodes[val.Name]
 			if !ok {
 				diags = append(diags, diag.Wrap("resolve", val.Pos, ErrInvalidOption,
-					"unknown error code %q", val.Name))
+					"unknown error code %q%s", val.Name, hint(val.Name, errorCodeCandidates())))
 
 				continue
 			}
@@ -185,7 +186,7 @@ func resolveErrors(items []ast.Value) ([]*ir.ErrorCase, diag.List) {
 			code, ok := ValidErrorCodes[val.Name]
 			if !ok {
 				diags = append(diags, diag.Wrap("resolve", val.Pos, ErrInvalidOption,
-					"unknown error code %q", val.Name))
+					"unknown error code %q%s", val.Name, hint(val.Name, errorCodeCandidates())))
 
 				continue
 			}
@@ -319,7 +320,7 @@ func resolveParam(
 	for _, attr := range pd.Attributes {
 		if attr.Name != "validate" {
 			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
-				"unknown param attribute @%s", attr.Name))
+				"unknown param attribute @%s%s", attr.Name, hint(attr.Name, []string{"validate"})))
 
 			continue
 		}
@@ -350,7 +351,7 @@ func resolveRefParam(pd *ast.ParamDecl, ref *ir.TypeRef) (*ir.Param, diag.List) 
 				pd.Name, ref.Name()))
 		default:
 			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
-				"unknown param attribute @%s", attr.Name))
+				"unknown param attribute @%s%s", attr.Name, hint(attr.Name, []string{"validate"})))
 		}
 	}
 
@@ -386,8 +387,13 @@ func resolveHTTP(rd *ast.RPCDecl) (*ir.HTTPTransport, diag.List) {
 
 		for _, n := range names {
 			if !declared[n] {
+				params := make([]string, 0, len(rd.Params))
+				for _, p := range rd.Params {
+					params = append(params, p.Name)
+				}
+
 				diags = append(diags, diag.Wrap("resolve", opt.PathPos, ErrUnresolvedReference,
-					"http path placeholder {%s} does not match any declared rpc param", n))
+					"http path placeholder {%s} does not match any declared rpc param%s", n, hint(n, params)))
 			}
 		}
 	}
@@ -483,7 +489,8 @@ func resolveAuth(v ast.Value) (*ir.AuthPolicy, diag.List) {
 // resolveAuthCall decodes the required(roles: {...}) call shape.
 func resolveAuthCall(val *ast.CallValue) (*ir.AuthPolicy, diag.List) {
 	if val.Name != "required" {
-		return nil, diag.List{diag.Wrap("resolve", val.Pos, ErrInvalidOption, "unknown auth call %q", val.Name)}
+		return nil, diag.List{diag.Wrap("resolve", val.Pos, ErrInvalidOption,
+			"unknown auth call %q%s", val.Name, hint(val.Name, []string{"required"}))}
 	}
 
 	var diags diag.List
@@ -492,7 +499,8 @@ func resolveAuthCall(val *ast.CallValue) (*ir.AuthPolicy, diag.List) {
 
 	for _, arg := range val.Args {
 		if arg.Name != "roles" {
-			diags = append(diags, diag.Wrap("resolve", arg.Pos, ErrInvalidOption, "unknown auth argument %q", arg.Name))
+			diags = append(diags, diag.Wrap("resolve", arg.Pos, ErrInvalidOption,
+				"unknown auth argument %q%s", arg.Name, hint(arg.Name, []string{"roles"})))
 			continue
 		}
 
@@ -563,7 +571,9 @@ func resolvePermission(v ast.Value, entityByName map[string]*ir.Entity, module *
 
 			ownerFieldName, ownerFieldPos, haveOwnerField = ident.Name, arg.Pos, true
 		default:
-			diags = append(diags, diag.Wrap("resolve", arg.Pos, ErrInvalidOption, "unknown permission argument %q", arg.Name))
+			diags = append(diags, diag.Wrap("resolve", arg.Pos, ErrInvalidOption,
+				"unknown permission argument %q%s", arg.Name,
+				hint(arg.Name, []string{"resource", "owner_field"})))
 		}
 	}
 
@@ -600,7 +610,8 @@ func resolvePermissionResource(
 	entity, ok := entityByName[resourceName]
 	if !ok {
 		diags = append(diags, diag.Wrap("resolve", resourcePos, ErrUnresolvedReference,
-			"permission resource %q is not a known entity", resourceName))
+			"permission resource %q is not a known entity%s", resourceName,
+			hint(resourceName, entityCandidates(entityByName))))
 
 		return diags
 	}
@@ -616,7 +627,8 @@ func resolvePermissionResource(
 	field := entity.FieldByName(ownerFieldName)
 	if field == nil {
 		diags = append(diags, diag.Wrap("resolve", ownerFieldPos, ErrUnresolvedReference,
-			"permission owner_field %q not found on resource entity %s", ownerFieldName, entity.Name))
+			"permission owner_field %q not found on resource entity %s%s", ownerFieldName, entity.Name,
+			hint(ownerFieldName, fieldCandidates(entity))))
 
 		return diags
 	}

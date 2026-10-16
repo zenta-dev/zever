@@ -114,7 +114,8 @@ func resolveRetryPolicy(vals []ast.Value) (ir.RetryPolicy, diag.List) {
 			policy.Backoff = kind
 			policy.Base = base
 		default:
-			diags = append(diags, diag.Wrap("resolve", call.Pos, ErrInvalidOption, "unknown retry call %q", call.Name))
+			diags = append(diags, diag.Wrap("resolve", call.Pos, ErrInvalidOption,
+				"unknown retry call %q%s", call.Name, hint(call.Name, []string{"max_attempts", "backoff"})))
 		}
 	}
 
@@ -168,7 +169,8 @@ func decodeBackoff(call *ast.CallValue) (time.Duration, string, *diag.Diagnostic
 		}
 
 		if arg.Name != "base" {
-			return 0, "", diag.Wrap("resolve", arg.Pos, ErrInvalidOption, "unknown backoff argument %q", arg.Name)
+			return 0, "", diag.Wrap("resolve", arg.Pos, ErrInvalidOption,
+				"unknown backoff argument %q%s", arg.Name, hint(arg.Name, []string{"base"}))
 		}
 
 		dur, ok := arg.Value.(*ast.DurationLit)
