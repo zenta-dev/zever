@@ -164,3 +164,39 @@ func TestTimeoutUnaryServerInterceptor_HandlerErrorPassedThrough(t *testing.T) {
 		t.Fatalf("err = %v, want %v", err, wantErr)
 	}
 }
+
+func TestTimeout_HandlerPanicPropagatesToCaller(t *testing.T) {
+	t.Parallel()
+
+	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("boom")
+	})
+
+	wrapped := Timeout(time.Second)(handler)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	defer func() {
+		if got := recover(); got != "boom" {
+			t.Fatalf("recover() = %v, want boom re-panicked in the caller goroutine", got)
+		}
+	}()
+
+	wrapped.ServeHTTP(rec, req)
+
+	t.Fatal("ServeHTTP returned, want panic")
+}
+
+func TestTimeoutUnaryServerInterceptor_HandlerPanicBecomesInternal(t *testing.T) {
+	t.Parallel()
+
+	handler := func(context.Context, any) (any, error) {
+		panic("boom")
+	}
+
+	_, err := TimeoutUnaryServerInterceptor(time.Second)(t.Context(), nil, &grpc.UnaryServerInfo{}, handler)
+	if got := status.Code(err); got != codes.Internal {
+		t.Fatalf("code = %v, want Internal (err=%v)", got, err)
+	}
+}
