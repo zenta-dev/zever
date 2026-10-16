@@ -638,3 +638,60 @@ func TestCursorBoolFalseRoundTrip(t *testing.T) {
 		t.Fatalf("re-decoded bool = true, want false")
 	}
 }
+
+func TestAfterTuple2And3MatchUntyped(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		desc bool
+	}{{"asc", false}, {"desc", true}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			want2, err := AfterTuple([]AnyColumn[widget]{widgetQty.Col(), widgetID.Col()}, []any{int64(20), "w2"}, tc.desc)
+			if err != nil {
+				t.Fatalf("AfterTuple: %v", err)
+			}
+
+			got2 := AfterTuple2(widgetQty, widgetID, int64(20), "w2", tc.desc)
+			if !reflect.DeepEqual(got2, want2) {
+				t.Errorf("AfterTuple2 = %+v, want %+v", got2, want2)
+			}
+
+			want3, err := AfterTuple([]AnyColumn[widget]{widgetQty.Col(), widgetID.Col(), widgetName.Col()}, []any{int64(20), "w2", "n"}, tc.desc)
+			if err != nil {
+				t.Fatalf("AfterTuple: %v", err)
+			}
+
+			got3 := AfterTuple3(widgetQty, widgetID, widgetName, int64(20), "w2", "n", tc.desc)
+			if !reflect.DeepEqual(got3, want3) {
+				t.Errorf("AfterTuple3 = %+v, want %+v", got3, want3)
+			}
+		})
+	}
+}
+
+func TestAfterTuple2Keyset(t *testing.T) {
+	ctx, conn := newWidgetsDB(t)
+
+	for _, r := range []struct {
+		id  string
+		qty int64
+	}{{"w4", 20}, {"w5", 20}} {
+		if _, err := conn.Exec(ctx, `INSERT INTO widgets (id, name, quantity, bio) VALUES (?, ?, ?, ?)`, r.id, "x", r.qty, nil); err != nil {
+			t.Fatalf("insert %s: %v", r.id, err)
+		}
+	}
+
+	order := []OrderTerm[widget]{widgetQty.Asc(), widgetID.Asc()}
+
+	page2, err := From(widgets).Where(AfterTuple2(widgetQty, widgetID, int64(20), "w2", false)).OrderBy(order...).Limit(2).All(ctx, conn)
+	if err != nil {
+		t.Fatalf("page2: %v", err)
+	}
+
+	assertWidgetIDs(t, page2, "w4", "w5")
+}
