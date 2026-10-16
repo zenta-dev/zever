@@ -37,6 +37,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+### Security
+
+- `docs(security)`: new per-battery threat models under `docs/security/`
+  (`threat-model-<battery>.md` for every Core battery: config, container,
+  db, orm, router, cache, queue, session, auth, crypto, password, secrets,
+  dsl) stating assets, trust boundaries, zever's guarantees, and caller
+  duties — each grounded in the current code, including explicit
+  non-guarantees. New ADR (`docs/adrs/2026-10-16-asymmetric-jwt.md`)
+  proposes EdDSA + RS256 JWT support with algorithm pinning and key-rotation
+  guarantees (proposal only, nothing implemented). Draft-only proposals under
+  `docs/plans/` for an OpenSSF Scorecard workflow and for cosign release
+  signing + SBOM binding (neither wired; both need human approval).
+  `.github/SECURITY.md` gains a no-public-PR rule for unpatched
+  vulnerabilities and a scope section. Docs only; no behavior change.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

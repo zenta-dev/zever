@@ -1,0 +1,58 @@
+# DRAFT (not wired — requires human approval): OpenSSF Scorecard workflow
+
+Do **not** copy this into `.github/workflows/` without maintainer approval.
+It is a proposal for review, referenced from the WS6 security PR.
+
+No Scorecard workflow exists in `.github/workflows/` today (checked:
+`automerge, bench, ci, codeql, dependency-review, deps-sync, docs, eval,
+flake, release, vulncheck`). `codeql.yml` and `dependency-review.yml`
+already cover adjacent ground; Scorecard would add branch-protection,
+token-permissions, and dependency-hygiene scoring.
+
+```yaml
+# DRAFT — docs/plans/scorecard-workflow-draft.yml
+# Proposed: .github/workflows/scorecard.yml (OpenSSF Scorecard).
+# Schedule: weekly + on pushes to main touching go.mod/go.sum/workflows.
+name: scorecard
+
+on:
+  schedule:
+    - cron: "30 2 * * 1" # weekly Monday 02:30 UTC
+  push:
+    branches: [main]
+    paths: ["go.work", "**/go.mod", "**/go.sum", ".github/workflows/**"]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: OpenSSF Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # upload SARIF to code scanning
+      id-token: write # OIDC for Scorecard publish (no PAT needed)
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@v2.4.2
+        with:
+          results_format: sarif
+          results_file: results.sarif
+          publish_results: true
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: scorecard
+```
+
+Open questions for the human reviewer:
+
+1. `publish_results: true` posts scores to the OpenSSF API (public repo
+   data only — fine for this repo, but confirm).
+2. Whether Scorecard findings should gate PRs (suggest: non-gating for one
+   quarter, like `bench.yml`, then revisit).
+3. Pin SHAs above must be re-verified at adoption time.
