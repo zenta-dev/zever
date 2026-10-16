@@ -15,4 +15,3 @@ editors/vscode/package.json	^  "version": "
 docs/src/content/docs/start/installation.mdx	@v
 docs/src/content/docs/start/versioning.mdx	(@|container/|sqlite/)v
 docs/src/content/docs/guides/operate/upgrade.mdx	@v
-docs/src/content/docs/guides/extend/customizing-and-leaving.mdx	backend gogen v

@@ -1,9 +1,411 @@
 {
-  "openapi": "3.0.3",
+  "components": {
+    "schemas": {
+      "shop_Category": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_CheckoutRequest": {
+        "properties": {
+          "gift_note": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "order": {
+            "$ref": "#/components/schemas/shop_CreateOrderRequest"
+          }
+        },
+        "type": "object"
+      },
+      "shop_CreateOrderRequest": {
+        "properties": {
+          "coupon": {
+            "maxLength": 40,
+            "minLength": 1,
+            "type": "string"
+          },
+          "total_cents": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "shop_Order": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "note": {
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "low",
+              "high"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/shop_OrderStatus"
+          },
+          "total_cents": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_OrderItem": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_cents": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_OrderReceipt": {
+        "properties": {
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "total_cents": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "shop_OrderStatus": {
+        "enum": [
+          "pending",
+          "paid",
+          "shipped",
+          "cancelled"
+        ],
+        "type": "string"
+      },
+      "shop_Product": {
+        "properties": {
+          "category_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "headline": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "price_cents": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sku": {
+            "maxLength": 40,
+            "minLength": 1,
+            "type": "string"
+          },
+          "stock": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "weight": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_Profile": {
+        "properties": {
+          "bio": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_Review": {
+        "properties": {
+          "body": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rating": {
+            "format": "int32",
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_Role": {
+        "enum": [
+          "admin",
+          "member"
+        ],
+        "type": "string"
+      },
+      "shop_ShopServiceCheckoutRequest": {
+        "properties": {
+          "req": {
+            "$ref": "#/components/schemas/shop_CheckoutRequest"
+          }
+        },
+        "type": "object"
+      },
+      "shop_ShopServiceCreateProductRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "price_cents": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "shop_ShopServicePatchProductRequest": {
+        "properties": {
+          "stock": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "shop_ShopServiceUpdateProductRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "shop_Tag": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 30,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "shop_User": {
+        "properties": {
+          "age": {
+            "format": "int32",
+            "maximum": 150,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "avatar": {
+            "format": "byte",
+            "type": "string"
+          },
+          "birthday": {
+            "format": "date",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "credit_cents": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nickname": {
+            "nullable": true,
+            "type": "string"
+          },
+          "password_hash": {
+            "type": "string"
+          },
+          "prefs": {
+            "type": "object"
+          },
+          "rating": {
+            "format": "float",
+            "type": "number"
+          },
+          "role": {
+            "$ref": "#/components/schemas/shop_Role"
+          },
+          "score": {
+            "format": "double",
+            "type": "number"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
   "info": {
     "title": "zever API",
     "version": "0.0.0"
   },
+  "openapi": "3.0.3",
   "paths": {
     "/orders": {
       "get": {
@@ -14,8 +416,8 @@
             "name": "user_id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -31,32 +433,32 @@
             "name": "limit",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "properties": {
                     "items": {
-                      "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/shop_Order"
-                      }
+                      },
+                      "type": "array"
                     },
                     "next_cursor": {
                       "type": "string"
                     }
-                  }
+                  },
+                  "type": "object"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -80,14 +482,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_OrderReceipt"
                 }
               }
-            }
+            },
+            "description": "OK"
           },
           "400": {
             "description": "INVALID_ARGUMENT: bad coupon; FAILED_PRECONDITION"
@@ -112,21 +514,21 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_Order"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -145,8 +547,8 @@
             "name": "category_id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -162,32 +564,32 @@
             "name": "limit",
             "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "properties": {
                     "items": {
-                      "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/shop_Product"
-                      }
+                      },
+                      "type": "array"
                     },
                     "next_cursor": {
                       "type": "string"
                     }
-                  }
+                  },
+                  "type": "object"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -209,14 +611,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_Product"
                 }
               }
-            }
+            },
+            "description": "OK"
           },
           "409": {
             "description": "ALREADY_EXISTS: product sku taken"
@@ -241,21 +643,21 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_Product"
                 }
               }
-            }
+            },
+            "description": "OK"
           },
           "403": {
             "description": "PERMISSION_DENIED: no access"
@@ -269,14 +671,14 @@
             "bearerAuth": []
           }
         ],
-        "x-roles": [
-          "admin"
-        ],
         "x-permission": {
           "check": "product.delete",
-          "resource": "Product",
-          "owner_field": "category_id"
-        }
+          "owner_field": "category_id",
+          "resource": "Product"
+        },
+        "x-roles": [
+          "admin"
+        ]
       },
       "get": {
         "operationId": "ShopService_GetProduct",
@@ -286,21 +688,21 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_Product"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         }
       },
@@ -312,8 +714,8 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
@@ -328,14 +730,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_Product"
                 }
               }
-            }
+            },
+            "description": "OK"
           },
           "400": {
             "description": "INVALID_ARGUMENT: negative stock"
@@ -361,8 +763,8 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
@@ -377,14 +779,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/shop_Product"
                 }
               }
-            }
+            },
+            "description": "OK"
           },
           "404": {
             "description": "NOT_FOUND"
@@ -401,406 +803,8 @@
       }
     }
   },
-  "components": {
-    "schemas": {
-      "shop_Category": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "description": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_CheckoutRequest": {
-        "type": "object",
-        "properties": {
-          "gift_note": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "order": {
-            "$ref": "#/components/schemas/shop_CreateOrderRequest"
-          }
-        }
-      },
-      "shop_CreateOrderRequest": {
-        "type": "object",
-        "properties": {
-          "coupon": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40
-          },
-          "total_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "shop_Order": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "note": {
-            "type": "string",
-            "nullable": true
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "low",
-              "high"
-            ]
-          },
-          "status": {
-            "$ref": "#/components/schemas/shop_OrderStatus"
-          },
-          "total_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_OrderItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "order_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          },
-          "product_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_OrderReceipt": {
-        "type": "object",
-        "properties": {
-          "order_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "total_cents": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "shop_OrderStatus": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "paid",
-          "shipped",
-          "cancelled"
-        ]
-      },
-      "shop_Product": {
-        "type": "object",
-        "properties": {
-          "category_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "description": {
-            "type": "string"
-          },
-          "featured": {
-            "type": "boolean"
-          },
-          "headline": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          },
-          "sku": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40
-          },
-          "stock": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "weight": {
-            "type": "number",
-            "format": "double"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_Profile": {
-        "type": "object",
-        "properties": {
-          "bio": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_Review": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "product_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "rating": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1,
-            "maximum": 5
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_Role": {
-        "type": "string",
-        "enum": [
-          "admin",
-          "member"
-        ]
-      },
-      "shop_ShopServiceCheckoutRequest": {
-        "type": "object",
-        "properties": {
-          "req": {
-            "$ref": "#/components/schemas/shop_CheckoutRequest"
-          }
-        }
-      },
-      "shop_ShopServiceCreateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          }
-        }
-      },
-      "shop_ShopServicePatchProductRequest": {
-        "type": "object",
-        "properties": {
-          "stock": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0
-          }
-        }
-      },
-      "shop_ShopServiceUpdateProductRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        }
-      },
-      "shop_Tag": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 30
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "shop_User": {
-        "type": "object",
-        "properties": {
-          "age": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "maximum": 150
-          },
-          "avatar": {
-            "type": "string",
-            "format": "byte"
-          },
-          "birthday": {
-            "type": "string",
-            "format": "date"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "credit_cents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "nickname": {
-            "type": "string",
-            "nullable": true
-          },
-          "password_hash": {
-            "type": "string"
-          },
-          "prefs": {
-            "type": "object"
-          },
-          "rating": {
-            "type": "number",
-            "format": "float"
-          },
-          "role": {
-            "$ref": "#/components/schemas/shop_Role"
-          },
-          "score": {
-            "type": "number",
-            "format": "double"
-          },
-          "verified": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      }
-    },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
-      }
-    }
+  "x-zever-generated": {
+    "backend": "openapi",
+    "schema": "sha256:548bb077d95407638de315faaf513fcefb946598cc3a3627adb4b2c2416e1ebe"
   }
 }
