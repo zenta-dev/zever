@@ -46,6 +46,10 @@ The canonical `app.zen` fixture exercises the first six. Both entities compile u
 
 `dsl/naming` converts names per target: `APIKey` becomes `api_key` in Postgres and SQLite table names (acronym runs stay one word). SQL always binds args and quotes identifiers; dialect gates live with the ORM.
 
+## API documents and client SDKs
+
+The `openapi` backend already emits an OpenAPI 3.0.3 document from the services' HTTP bindings, and `proto` plus `protogogen` emit the protobuf contract for gRPC. Zever does not ship its own client-SDK generator. Feed those artifacts to the generator for your language instead: an OpenAPI generator (for example `openapi-generator`, `oapi-codegen`, or `openapi-typescript`) over the document under `generated/openapi` for REST clients, and `buf generate` (or `protoc`) with the language plugin over `generated/proto` for gRPC and Connect clients. Because both outputs are regenerated and drift-checked by `zever compile --check`, a client built from them stays in step with the schema.
+
 ## Keep output deterministic
 
 Same inputs must give the same bytes on every run.

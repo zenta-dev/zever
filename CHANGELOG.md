@@ -105,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is built on `runtime/pprof` so nothing registers on `http.DefaultServeMux`.
   The observability guide now documents pprof and that metrics leave via OTLP
   (there is no built-in Prometheus `/metrics` endpoint).
+- `feat(mcp)`: `zever-mcp` gains two read-only tools, `zever_check` (validate
+  `.zen` sources, returning `ok` or `file:line:col` diagnostics) and `zever_routes`
+  (the HTTP routes the schema declares, as JSON in the `zever routes --json`
+  shape), both in-process with no `zever` binary needed. The editor-setup guide
+  documents wiring the MCP server into coding agents, the AI guide lists all seven
+  tools, and the backends concept page notes that REST and gRPC client SDKs come
+  from feeding the `openapi` and `proto` outputs to your language's generator.
 
 ### Security
 
