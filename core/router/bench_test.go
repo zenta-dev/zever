@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -93,5 +94,31 @@ func BenchmarkParam(b *testing.B) {
 		if got := Param(r, "id"); got != "42" {
 			b.Fatalf("Param(id) = %q, want 42", got)
 		}
+	}
+}
+
+// BenchmarkWithParams measures attaching route params to a request context,
+// the per-request cost both HTTP drivers pay on routes with path params.
+func BenchmarkWithParams(b *testing.B) {
+	ctx := context.Background()
+	params := map[string]string{"id": "42", "slug": "hello-world"}
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		_ = WithParams(ctx, params)
+	}
+}
+
+// BenchmarkWithOwnedParams is the no-copy variant the drivers use for the
+// fresh per-request map.
+func BenchmarkWithOwnedParams(b *testing.B) {
+	ctx := context.Background()
+	params := map[string]string{"id": "42", "slug": "hello-world"}
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		_ = WithOwnedParams(ctx, params)
 	}
 }

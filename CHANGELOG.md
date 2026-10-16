@@ -144,6 +144,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`install.sh --version <pin>`) instead of `go install .../cmd/zever@<pin>`,
   which fails for every tag that commits `replace` directives in
   `cmd/zever/go.mod` (v0.7.1 and earlier).
+- `perf(router)`: `router.WithOwnedParams` stores a route-params map in the
+  request context without the defensive copy `WithParams` makes (the caller
+  hands over a fresh per-request map). The stdhttp and fiber drivers now use
+  it, cutting the per-request params cost from ~164 ns, 384 B and 3 allocs to
+  ~19 ns, 48 B and 1 alloc. `WithParams` is unchanged. Additive.
 
 ### Changed
 
