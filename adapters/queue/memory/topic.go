@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"sort"
 	"sync"
 	"time"
 
@@ -12,7 +11,7 @@ type topicQueue struct {
 	mu         sync.Mutex
 	ready      []queue.Message
 	head       int
-	delayed    []delayedEntry
+	delayed    delayedHeap
 	inflight   map[queue.MessageID]inflight
 	visHeap    visibilityHeap
 	notify     chan struct{}
@@ -100,29 +99,19 @@ func (t *topicQueue) collectDue() ([]delayedEntry, time.Time, bool) {
 	defer t.mu.Unlock()
 
 	now := time.Now()
-	remaining := make([]delayedEntry, 0, len(t.delayed))
 
 	var due []delayedEntry
 
-	var nextDue time.Time
-
-	for _, e := range t.delayed {
-		if !e.readyAt.After(now) {
-			due = append(due, e)
-		} else {
-			remaining = append(remaining, e)
-
-			if nextDue.IsZero() || e.readyAt.Before(nextDue) {
-				nextDue = e.readyAt
-			}
-		}
+	for len(t.delayed) > 0 && !t.delayed.peek().readyAt.After(now) {
+		due = append(due, t.delayed.pop())
 	}
 
-	t.delayed = remaining
+	var nextDue time.Time
 
-	sort.Slice(due, func(i, j int) bool { return due[i].readyAt.Before(due[j].readyAt) })
-
-	hasMore := len(remaining) > 0
+	hasMore := len(t.delayed) > 0
+	if hasMore {
+		nextDue = t.delayed.peek().readyAt
+	}
 
 	return due, nextDue, hasMore
 }
@@ -141,6 +130,9 @@ func (t *topicQueue) signal() {
 	default:
 	}
 }
+
+// pushDelayedLocked files e on the delayed min-heap. Callers must hold t.mu.
+func (t *topicQueue) pushDelayedLocked(e delayedEntry) { t.delayed.push(e) }
 
 func (t *topicQueue) startPromoterLocked() {
 	if t.promoterOn {
