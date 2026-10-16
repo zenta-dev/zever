@@ -25,7 +25,7 @@ import (
 
 const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
-// handleNoteServiceListNotes handles GET /notes, calling NoteService.ListNotes.
+// handleNoteServiceListNotes handles GET "/notes", calling NoteService.ListNotes.
 func handleNoteServiceListNotes(svc NoteService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -53,7 +53,7 @@ func handleNoteServiceListNotes(svc NoteService) http.HandlerFunc {
 	}
 }
 
-// handleNoteServiceCreateNote handles POST /notes, calling NoteService.CreateNote.
+// handleNoteServiceCreateNote handles POST "/notes", calling NoteService.CreateNote.
 func handleNoteServiceCreateNote(svc NoteService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -98,7 +98,7 @@ func handleNoteServiceCreateNote(svc NoteService) http.HandlerFunc {
 	}
 }
 
-// handleNoteServiceGetNote handles GET /notes/{id}, calling NoteService.GetNote.
+// handleNoteServiceGetNote handles GET "/notes/{id}", calling NoteService.GetNote.
 func handleNoteServiceGetNote(svc NoteService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -126,7 +126,7 @@ func handleNoteServiceGetNote(svc NoteService) http.HandlerFunc {
 	}
 }
 
-// handleNoteServiceUpdateNote handles PATCH /notes/{id}, calling NoteService.UpdateNote.
+// handleNoteServiceUpdateNote handles PATCH "/notes/{id}", calling NoteService.UpdateNote.
 func handleNoteServiceUpdateNote(svc NoteService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -182,7 +182,7 @@ func handleNoteServiceUpdateNote(svc NoteService) http.HandlerFunc {
 	}
 }
 
-// handleNoteServiceDeleteNote handles DELETE /notes/{id}, calling NoteService.DeleteNote.
+// handleNoteServiceDeleteNote handles DELETE "/notes/{id}", calling NoteService.DeleteNote.
 func handleNoteServiceDeleteNote(svc NoteService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -223,7 +223,7 @@ func RegisterNoteServiceRoutes(r router.Router, svc NoteService, a auth.Auth, p 
 	r.Handle("DELETE", "/notes/{id}", authz.Middleware(a, p, NoteServiceDeleteNotePolicy, nil)(handleNoteServiceDeleteNote(svc)).ServeHTTP)
 }
 
-// handleGrpcTaskServiceCreateTask handles POST /grpc-tasks, calling GrpcTaskService.CreateTask.
+// handleGrpcTaskServiceCreateTask handles POST "/grpc-tasks", calling GrpcTaskService.CreateTask.
 func handleGrpcTaskServiceCreateTask(svc GrpcTaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -268,7 +268,7 @@ func handleGrpcTaskServiceCreateTask(svc GrpcTaskService) http.HandlerFunc {
 	}
 }
 
-// handleGrpcTaskServiceGetTask handles GET /grpc-tasks/{id}, calling GrpcTaskService.GetTask.
+// handleGrpcTaskServiceGetTask handles GET "/grpc-tasks/{id}", calling GrpcTaskService.GetTask.
 func handleGrpcTaskServiceGetTask(svc GrpcTaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -296,7 +296,7 @@ func handleGrpcTaskServiceGetTask(svc GrpcTaskService) http.HandlerFunc {
 	}
 }
 
-// handleGrpcTaskServiceDeleteTask handles DELETE /grpc-tasks/{id}, calling GrpcTaskService.DeleteTask.
+// handleGrpcTaskServiceDeleteTask handles DELETE "/grpc-tasks/{id}", calling GrpcTaskService.DeleteTask.
 func handleGrpcTaskServiceDeleteTask(svc GrpcTaskService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

@@ -24,7 +24,7 @@ import (
 
 const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
-// handleUserServiceGetUser handles GET /v1/users/{id}, calling UserService.GetUser.
+// handleUserServiceGetUser handles GET "/v1/users/{id}", calling UserService.GetUser.
 func handleUserServiceGetUser(svc UserService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -52,7 +52,7 @@ func handleUserServiceGetUser(svc UserService) http.HandlerFunc {
 	}
 }
 
-// handleUserServiceListUsers handles GET /v1/users, calling UserService.ListUsers.
+// handleUserServiceListUsers handles GET "/v1/users", calling UserService.ListUsers.
 func handleUserServiceListUsers(svc UserService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -79,7 +79,7 @@ func RegisterUserServiceRoutes(r router.Router, svc UserService, a auth.Auth, p 
 	r.Handle("GET", "/v1/users", authz.Middleware(a, p, UserServiceListUsersPolicy, nil)(handleUserServiceListUsers(svc)).ServeHTTP)
 }
 
-// handleProductServiceGetProduct handles GET /v1/products/{id}, calling ProductService.GetProduct.
+// handleProductServiceGetProduct handles GET "/v1/products/{id}", calling ProductService.GetProduct.
 func handleProductServiceGetProduct(svc ProductService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -107,7 +107,7 @@ func handleProductServiceGetProduct(svc ProductService) http.HandlerFunc {
 	}
 }
 
-// handleProductServiceListProducts handles GET /v1/products, calling ProductService.ListProducts.
+// handleProductServiceListProducts handles GET "/v1/products", calling ProductService.ListProducts.
 func handleProductServiceListProducts(svc ProductService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -135,7 +135,7 @@ func handleProductServiceListProducts(svc ProductService) http.HandlerFunc {
 	}
 }
 
-// handleProductServiceCreateProduct handles POST /v1/products, calling ProductService.CreateProduct.
+// handleProductServiceCreateProduct handles POST "/v1/products", calling ProductService.CreateProduct.
 func handleProductServiceCreateProduct(svc ProductService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -186,7 +186,7 @@ func RegisterProductServiceRoutes(r router.Router, svc ProductService, a auth.Au
 	r.Handle("POST", "/v1/products", authz.Middleware(a, p, ProductServiceCreateProductPolicy, nil)(handleProductServiceCreateProduct(svc)).ServeHTTP)
 }
 
-// handleOrderServiceGetOrder handles GET /v1/orders/{id}, calling OrderService.GetOrder.
+// handleOrderServiceGetOrder handles GET "/v1/orders/{id}", calling OrderService.GetOrder.
 func handleOrderServiceGetOrder(svc OrderService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -214,7 +214,7 @@ func handleOrderServiceGetOrder(svc OrderService) http.HandlerFunc {
 	}
 }
 
-// handleOrderServiceCreateOrder handles POST /v1/orders, calling OrderService.CreateOrder.
+// handleOrderServiceCreateOrder handles POST "/v1/orders", calling OrderService.CreateOrder.
 func handleOrderServiceCreateOrder(svc OrderService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

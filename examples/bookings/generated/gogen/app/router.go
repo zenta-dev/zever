@@ -24,7 +24,7 @@ import (
 
 const maxRequestBodyBytes = document.DefaultMaxSourceBytes
 
-// handleBookingServiceCreateSpace handles POST /spaces, calling BookingService.CreateSpace.
+// handleBookingServiceCreateSpace handles POST "/spaces", calling BookingService.CreateSpace.
 func handleBookingServiceCreateSpace(svc BookingService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -69,7 +69,7 @@ func handleBookingServiceCreateSpace(svc BookingService) http.HandlerFunc {
 	}
 }
 
-// handleBookingServiceListSpaces handles GET /spaces, calling BookingService.ListSpaces.
+// handleBookingServiceListSpaces handles GET "/spaces", calling BookingService.ListSpaces.
 func handleBookingServiceListSpaces(svc BookingService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -86,7 +86,7 @@ func handleBookingServiceListSpaces(svc BookingService) http.HandlerFunc {
 	}
 }
 
-// handleBookingServiceGetSpace handles GET /spaces/{id}, calling BookingService.GetSpace.
+// handleBookingServiceGetSpace handles GET "/spaces/{id}", calling BookingService.GetSpace.
 func handleBookingServiceGetSpace(svc BookingService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -114,7 +114,7 @@ func handleBookingServiceGetSpace(svc BookingService) http.HandlerFunc {
 	}
 }
 
-// handleBookingServiceCreateBooking handles POST /bookings, calling BookingService.CreateBooking.
+// handleBookingServiceCreateBooking handles POST "/bookings", calling BookingService.CreateBooking.
 func handleBookingServiceCreateBooking(svc BookingService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -164,7 +164,7 @@ func handleBookingServiceCreateBooking(svc BookingService) http.HandlerFunc {
 	}
 }
 
-// handleBookingServiceCancelBooking handles DELETE /bookings/{id}, calling BookingService.CancelBooking.
+// handleBookingServiceCancelBooking handles DELETE "/bookings/{id}", calling BookingService.CancelBooking.
 func handleBookingServiceCancelBooking(svc BookingService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -192,7 +192,7 @@ func handleBookingServiceCancelBooking(svc BookingService) http.HandlerFunc {
 	}
 }
 
-// handleBookingServiceAddReview handles POST /reviews, calling BookingService.AddReview.
+// handleBookingServiceAddReview handles POST "/reviews", calling BookingService.AddReview.
 func handleBookingServiceAddReview(svc BookingService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
