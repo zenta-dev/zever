@@ -1,9 +1,200 @@
 {
-  "openapi": "3.0.3",
+  "components": {
+    "schemas": {
+      "Booking": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "guest_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "BookingServiceAddReviewRequest": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "rating": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "space_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BookingServiceCreateBookingRequest": {
+        "properties": {
+          "end_date": {
+            "type": "string"
+          },
+          "space_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BookingServiceCreateSpaceRequest": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": "number"
+          },
+          "lng": {
+            "format": "double",
+            "type": "number"
+          },
+          "price_cents": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Review": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "guest_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rating": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "space_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "Space": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "host_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": "number"
+          },
+          "lng": {
+            "format": "double",
+            "type": "number"
+          },
+          "price_cents": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "User": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "password_hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
   "info": {
     "title": "default",
     "version": "0.0.0"
   },
+  "openapi": "3.0.3",
   "paths": {
     "/bookings": {
       "post": {
@@ -19,14 +210,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Booking"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -45,21 +236,21 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Booking"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -69,8 +260,8 @@
         ],
         "x-permission": {
           "check": "booking.cancel",
-          "resource": "Booking",
-          "owner_field": "guest_id"
+          "owner_field": "guest_id",
+          "resource": "Booking"
         }
       }
     },
@@ -88,14 +279,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Review"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -110,14 +301,14 @@
         "operationId": "BookingService_ListSpaces",
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Space"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -139,14 +330,14 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Space"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -165,21 +356,21 @@
             "name": "id",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Space"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
         },
         "security": [
@@ -190,195 +381,8 @@
       }
     }
   },
-  "components": {
-    "schemas": {
-      "Booking": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "end_date": {
-            "type": "string"
-          },
-          "guest_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "space_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "start_date": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "BookingServiceAddReviewRequest": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string"
-          },
-          "rating": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "space_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "BookingServiceCreateBookingRequest": {
-        "type": "object",
-        "properties": {
-          "end_date": {
-            "type": "string"
-          },
-          "space_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "start_date": {
-            "type": "string"
-          }
-        }
-      },
-      "BookingServiceCreateSpaceRequest": {
-        "type": "object",
-        "properties": {
-          "description": {
-            "type": "string"
-          },
-          "lat": {
-            "type": "number",
-            "format": "double"
-          },
-          "lng": {
-            "type": "number",
-            "format": "double"
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          }
-        }
-      },
-      "Review": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "guest_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "rating": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "space_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "Space": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "description": {
-            "type": "string"
-          },
-          "host_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "lat": {
-            "type": "number",
-            "format": "double"
-          },
-          "lng": {
-            "type": "number",
-            "format": "double"
-          },
-          "price_cents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "User": {
-        "type": "object",
-        "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "password_hash": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      }
-    },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
-      }
-    }
+  "x-zever-generated": {
+    "backend": "openapi",
+    "schema": "sha256:c0da6b3cb3cfc4188c475225a4e9a38751b4aa7112cb50cccf58bbe465aedac2"
   }
 }
