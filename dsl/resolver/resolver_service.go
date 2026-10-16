@@ -370,10 +370,15 @@ func resolveHTTP(rd *ast.RPCDecl) (*ir.HTTPTransport, diag.List) {
 	}
 
 	names, malformed := pathParams(opt.Path)
-	if malformed {
+
+	switch {
+	case !validHTTPPath(opt.Path):
+		diags = append(diags, diag.Wrap("resolve", opt.PathPos, ErrInvalidOption,
+			"http path %q must start with '/' and contain only printable ASCII without spaces", opt.Path))
+	case malformed:
 		diags = append(diags, diag.Wrap("resolve", opt.PathPos, ErrInvalidOption,
 			"http path %q has an unbalanced or empty {} placeholder", opt.Path))
-	} else {
+	default:
 		declared := make(map[string]bool, len(rd.Params))
 		for _, p := range rd.Params {
 			declared[p.Name] = true
@@ -388,6 +393,22 @@ func resolveHTTP(rd *ast.RPCDecl) (*ir.HTTPTransport, diag.List) {
 	}
 
 	return &ir.HTTPTransport{Method: opt.Method, Path: opt.Path, Pos: opt.Pos}, diags
+}
+
+// validHTTPPath reports whether path starts with "/" and holds only printable
+// ASCII (0x21-0x7e), so it is safe to embed in generated source and comments.
+func validHTTPPath(path string) bool {
+	if path == "" || path[0] != '/' {
+		return false
+	}
+
+	for i := 0; i < len(path); i++ {
+		if path[i] < 0x21 || path[i] > 0x7e {
+			return false
+		}
+	}
+
+	return true
 }
 
 // pathParams scans an HTTP path for "{name}" placeholders without regexp.
