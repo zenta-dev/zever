@@ -1,0 +1,87 @@
+name: quickstart
+
+# Executes the quickstart doc
+# (docs/src/content/docs/start/quickstart.mdx) verbatim in a temp directory.
+# If these commands drift from reality, this job fails: fix the doc, not the job.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quickstart-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  quickstart:
+    name: quickstart end to end
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      # Dogfood seam: scaffold against this checkout (local replace
+      # directives) instead of the published modules, so the job tests
+      # this commit even though /tmp sits outside the repo tree.
+      ZEVER_FRAMEWORK_PATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Build zever CLI
+        run: go build -o "$RUNNER_TEMP/zever-bin/zever" ./cmd/zever
+      - name: Quickstart (mirrors docs/start/quickstart)
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/zever-bin:$PATH"
+          zever --version
+          zever new hello --dir "$RUNNER_TEMP/qs/hello" --force
+          cd "$RUNNER_TEMP/qs/hello"
+          cat > schema/app.zen <<'EOF'
+          entity Task {
+            id: uuid @primary
+            title: string @validate(min_len: 1, max_len: 200)
+            done: bool
+            created_at: timestamp @default(now())
+          }
+
+          service TaskService {
+            rpc CreateTask(title: string) -> Task {
+              http: POST "/v1/tasks"
+              auth: required
+            }
+
+            rpc ListTasks() -> Task {
+              http: GET "/v1/tasks"
+              auth: required
+              paginated: true
+            }
+          }
+          EOF
+          zever check schema/app.zen
+          zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen
+          zever db migrate --dry-run --adapter=sqlite schema/app.zen
+          zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
+          go build ./...
+          zever serve > serve.log 2>&1 &
+          SRV=$!
+          trap 'kill $SRV 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS -m 2 localhost:8080/healthz >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS -m 10 localhost:8080/healthz >/dev/null
+          echo "healthz: HTTP 200"
+          zever routes schema/app.zen
+          kill $SRV
+          trap - EXIT
