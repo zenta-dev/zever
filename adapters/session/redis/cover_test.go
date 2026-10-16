@@ -15,7 +15,7 @@ import (
 func plantRaw(t *testing.T, addr, prefix, id, raw string) {
 	t.Helper()
 
-	if err := rawClient(t, addr).Set(t.Context(), prefix+":"+id, raw, time.Hour).Err(); err != nil {
+	if err := rawClient(t, addr).Set(t.Context(), prefix+":"+hashID(id), raw, time.Hour).Err(); err != nil {
 		t.Fatalf("plant: %v", err)
 	}
 }
@@ -53,7 +53,7 @@ func TestCoverGetAppExpiredDeletes(t *testing.T) {
 	if _, err := st.Get(ctx, id); !errors.Is(err, session.ErrNotFound) {
 		t.Fatalf("Get(app-expired) = %v, want ErrNotFound", err)
 	}
-	if n, _ := rawClient(t, opts.Redis.Addr).Exists(ctx, opts.Redis.Prefix+":"+id).Result(); n != 0 {
+	if n, _ := rawClient(t, opts.Redis.Addr).Exists(ctx, opts.Redis.Prefix+":"+hashID(id)).Result(); n != 0 {
 		t.Fatal("expired key not deleted best-effort")
 	}
 }
@@ -99,7 +99,7 @@ func TestCoverSaveZeroExpiryPersists(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	ttl, err := rawClient(t, opts.Redis.Addr).TTL(ctx, opts.Redis.Prefix+":"+id).Result()
+	ttl, err := rawClient(t, opts.Redis.Addr).TTL(ctx, opts.Redis.Prefix+":"+hashID(id)).Result()
 	if err != nil {
 		t.Fatalf("TTL: %v", err)
 	}

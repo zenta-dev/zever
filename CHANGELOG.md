@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+### Security
+
+- **Breaking:** the Redis and DB session stores no longer put the bearer session
+  ID in the storage key: keys are now `<prefix>:<hex sha256(id)>`, so key
+  listings, MONITOR/slow logs, backups and database dumps cannot be replayed as
+  logins. Sessions created by earlier versions are not found under the new
+  keys, so every active Redis/DB session ends once at upgrade (users sign in
+  again). The memory and cookie stores are unaffected.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
