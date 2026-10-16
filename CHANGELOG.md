@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Mutation pilot report at `docs/plans/mutation-report.md` with five new
   mutant-killing tests in `dsl/parser` and `orm/render`.
 
+### Fixed
+
+- `fix(outbox)`: the postgres claim statement put `FOR UPDATE SKIP LOCKED`
+  inside an `IN` subquery, which postgres rejects (SQLSTATE 42601) — every
+  live claim failed. Selection now runs in a `WITH due AS (...)` CTE feeding
+  the `UPDATE`. Found by the new live conformance workflow.
+- `fix(postgres)`: the `?`→`$n` rewriter mistook `LIMIT ? FOR ...` for a
+  JSONB existence check (`FOR` was missing from the keyword list), sending a
+  raw `?` to the server. The row-lock keyword cluster is now recognized
+  (`KEY` stays unlisted so `payload ? key` keeps working).
+
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
   helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
   and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake
