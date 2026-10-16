@@ -7,9 +7,9 @@
 #   Unblock-File .\install.ps1
 #
 # Notes (repo ethos, verified facts):
-# - Binaries come from GitHub releases (or a source build). Never
-#   `go install <module>@version`: the repo commits `replace` directives,
-#   so `go install @version` fails.
+# - Binaries come from GitHub releases (or a source build). `go install
+#   .../cmd/zever@version` only works from v0.7.2 on; earlier tags commit
+#   `replace` directives, so this script installs release binaries.
 # - `zever -V` prints `zever vX.Y.Z`. zever-lsp has no CLI version flag
 #   (stdio-only), so the LSP is matched blindly to the CLI version.
 # - Never hangs: non-interactive shells get an error telling them to re-run
