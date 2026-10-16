@@ -93,6 +93,9 @@ type adapter struct {
 	audience  string
 	maxTTL    time.Duration
 	leeway    time.Duration
+	// now is the clock for Issue, Revoke and claim validation; New sets
+	// time.Now and tests swap it before first use.
+	now func() time.Time
 
 	// parserOpts and revokeOpts are computed once at construction: the
 	// adapter's validation configuration is immutable after New, and
@@ -187,6 +190,7 @@ func New(opts auth.Options) (auth.Auth, error) {
 		audience:   opts.JWT.Audience,
 		maxTTL:     opts.JWT.MaxTTL,
 		leeway:     opts.JWT.Leeway,
+		now:        time.Now,
 		revocation: store,
 		warnings:   warnings,
 	}
@@ -223,6 +227,7 @@ func (a *adapter) parserOptions() []jwtv5.ParserOption {
 	options := []jwtv5.ParserOption{
 		jwtv5.WithExpirationRequired(),
 		jwtv5.WithValidMethods([]string{"HS256"}),
+		jwtv5.WithTimeFunc(func() time.Time { return a.now() }),
 	}
 	if a.issuer != "" {
 		options = append(options, jwtv5.WithIssuer(a.issuer))
@@ -268,7 +273,7 @@ func (a *adapter) Issue(_ context.Context, subject string, custom map[string]any
 		return auth.Token{}, fmt.Errorf("jwt: issue: jti: %w", err)
 	}
 
-	now := time.Now()
+	now := a.now()
 	claims := jwtv5.MapClaims{
 		"jti": hex.EncodeToString(jtiBytes[:]),
 		"sub": subject,
@@ -403,7 +408,7 @@ func (a *adapter) Revoke(ctx context.Context, token string) error {
 		return fmt.Errorf("jwt: revoke: %w", errors.Join(auth.ErrInvalidToken, revocation.ErrNoJTI))
 	}
 
-	now := time.Now()
+	now := a.now()
 	until := now.Add(time.Second)
 	if exp, _ := claims.GetExpirationTime(); exp != nil && exp.After(now) {
 		until = exp.Time

@@ -34,9 +34,11 @@ type store struct {
 	prefix     string
 	ttl        time.Duration
 	maxEntries int
-	closed     atomic.Bool
-	stop       chan struct{}
-	done       chan struct{}
+	// now is the clock; read only under mu. Tests swap it via setClock.
+	now    func() time.Time
+	closed atomic.Bool
+	stop   chan struct{}
+	done   chan struct{}
 }
 
 // New creates an in-memory idempotency Store from opts. Non-positive
@@ -68,6 +70,7 @@ func New(opts idempotency.Options) (idempotency.Store, error) {
 		prefix:     prefix,
 		ttl:        ttl,
 		maxEntries: maxEntries,
+		now:        time.Now,
 		stop:       make(chan struct{}),
 		done:       make(chan struct{}),
 	}
@@ -108,10 +111,10 @@ func (s *store) Begin(ctx context.Context, key string, opts idempotency.BeginOpt
 		ttl = s.ttl
 	}
 
-	now := time.Now()
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	now := s.now()
 
 	if s.closed.Load() {
 		return idempotency.Outcome{}, idempotency.ErrClosed
@@ -158,10 +161,10 @@ func (s *store) Complete(ctx context.Context, key string, fingerprint, result []
 		return err
 	}
 
-	now := time.Now()
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	now := s.now()
 
 	if s.closed.Load() {
 		return idempotency.ErrClosed
@@ -281,10 +284,10 @@ func (s *store) run() {
 }
 
 func (s *store) sweep() {
-	now := time.Now()
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	now := s.now()
 
 	for k, e := range s.entries {
 		if e.expired(now) {
