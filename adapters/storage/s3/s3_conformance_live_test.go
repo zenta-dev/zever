@@ -24,7 +24,7 @@ var liveBuckets = []string{"kit-upload", "kit-download", "kit-exists", "kit-dele
 // ensureLiveBuckets creates each kit bucket, tolerating already-exists: the
 // server persists across kit subtests (and across workflow reruns), so the
 // second factory call must not fail.
-func ensureLiveBuckets(t *testing.T, ctx context.Context, endpoint, region, key, secret string) {
+func ensureLiveBuckets(ctx context.Context, t *testing.T, endpoint, region, key, secret string) {
 	t.Helper()
 
 	cfg, err := config.LoadDefaultConfig(ctx,
@@ -79,7 +79,7 @@ func TestS3ConformanceLive(t *testing.T) {
 	accessKey := liveString("ZEVER_S3_ACCESS_KEY_ID", "minioadmin")
 	secretKey := liveString("ZEVER_S3_SECRET_ACCESS_KEY", "minioadmin")
 
-	ensureLiveBuckets(t, t.Context(), endpoint, region, accessKey, secretKey)
+	ensureLiveBuckets(t.Context(), t, endpoint, region, accessKey, secretKey)
 
 	storagetest.Conformance(t, func(t *testing.T) storage.Storage {
 		t.Helper()
