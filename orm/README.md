@@ -78,6 +78,27 @@ returns `"mysql"` at `migrate.Plan`/`Apply`; unsupported shapes fail
 closed with typed errors, and the remaining gaps (enum value-list
 changes, column defaults) are documented in `orm/migrate/doc.go`.
 
+## Debugging
+
+Three layers, cheapest first:
+
+```go
+stmts, err := orm.From(Users).Where(UserName.Eq("alice")).DebugSQL("sqlite")
+for _, s := range stmts {
+    fmt.Println(s.SQL, s.Args)
+}
+```
+
+`DebugSQL(dialectName)` renders exactly what `All`/`Stream` would hand
+the driver -- same gates, same IN-chunk fan-out (one entry per
+statement) -- without executing or needing a connection. Args stay
+bound, never interpolated; they may hold secrets, so print them only in
+development. `SetQueryLogger` captures every statement orm actually
+executes (process-wide hook, restored via the returned func), and
+`Query.Explain` / `ExplainAnalyze` return the database's own plan for
+the statement (`EXPLAIN ANALYZE` is postgres-only and executes the
+query).
+
 ## Testing
 
 Units run on sqlite `:memory:` (no server). Set `POSTGRES_DSN` for a live

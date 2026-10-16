@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `docs/plans/good-first-issues.md` (draft pool, not filed on
   GitHub) — plus concrete deprecation timelines and Go support
   window in `STABILITY.md`.
-- `feat(dsl)`: diagnostics carry positions plus source excerpts and
+<- `feat(dsl)`: diagnostics carry positions plus source excerpts and
   "did you mean" hints. `diag.Closest`/`HintSuffix` (same thresholds as
   `config`'s suggester) power hints on every unknown type, attribute, field,
   error code, and service/RPC reference in the resolver; `diag.Excerpt`/
@@ -87,6 +87,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   routes` listing with a note that RPCs 404 until handlers are written).
   New `quickstart.yml` CI job runs the same commands verbatim in a temp
   directory so future doc drift fails loudly.
+- `feat(orm)`: new `orm/DIALECTS.md` dialect capability matrix generated
+  from the `orm/dialect` capability methods (sqlite vs postgres, with
+  version floors), pinned by `TestDialectMatrixMatchesDoc` which fails on
+  drift; the same doc carries the end-to-end migration workflow and the
+  destructive-change policy (opt-in drops, lint gate, lossy-rollback
+  warnings). New `Query.DebugSQL(dialectName)` renders the exact SQL +
+  bound args `All`/`Stream` would execute, without a connection (args
+  stay bound; dev-only printing). New `orm/bench` harness comparing the
+  ORM against hand-written SQL on a fixed four-shape query set
+  (`results.txt` committed; GORM/sqlc comparisons scaffolded behind the
+  `ormcompare` tag as `TODO(verify)`).
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
   helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
   and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake

@@ -49,7 +49,7 @@ func (q Query[T, PT]) Stream(ctx context.Context, exec db.DB) iter.Seq2[PT, erro
 			return
 		}
 
-		wheres, err := q.streamWheres(d)
+		wheres, err := q.streamWheres(d, "orm: Query.Stream")
 		if err != nil {
 			yield(nil, err)
 
@@ -86,10 +86,12 @@ func (q Query[T, PT]) Stream(ctx context.Context, exec db.DB) iter.Seq2[PT, erro
 // one Node per IN chunk when planInChunks fans out. Fan-out with
 // result-shaping modifiers is rejected with ErrInListTooLarge (see
 // Stream's doc comment for why each modifier is unsafe across chunks).
-func (q Query[T, PT]) streamWheres(d dialect.Dialect) ([]render.Node, error) {
+// tag is the caller's "orm: ..." prefix for wrapped errors, so shared
+// callers (Stream, DebugSQL) keep their own error attribution.
+func (q Query[T, PT]) streamWheres(d dialect.Dialect, tag string) ([]render.Node, error) {
 	plans, err := planInChunks(q.where.n, dialect.MaxParams(d))
 	if err != nil {
-		return nil, fmt.Errorf("orm: Query.Stream: %w", err)
+		return nil, fmt.Errorf("%s: %w", tag, err)
 	}
 
 	if len(plans) == 1 {
@@ -97,7 +99,7 @@ func (q Query[T, PT]) streamWheres(d dialect.Dialect) ([]render.Node, error) {
 	}
 
 	if q.limit > 0 || q.offset > 0 || len(q.order) > 0 || q.lock != LockNone || q.tablesample != nil {
-		return nil, fmt.Errorf("orm: Query.Stream: %w", ErrInListTooLarge)
+		return nil, fmt.Errorf("%s: %w", tag, ErrInListTooLarge)
 	}
 
 	wheres := make([]render.Node, len(plans))
