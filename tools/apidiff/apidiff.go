@@ -46,6 +46,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	modulesFlag := fs.String("modules", "", "comma-separated module dirs (default: Core tier)")
 	changelogFlag := fs.String("changelog", "", "changelog path (default: <root>/CHANGELOG.md)")
 	allowFlag := fs.String("allowlist", "", "no-baseline allowlist JSON (default: <root>/.github/apidiff-baseline-allowlist.json)")
+	checkPatchFlag := fs.Bool("check-patch", false, "fail when a released patch section carries a **Breaking:** entry (no git needed)")
+	floorFlag := fs.String("floor", "", "grandfather patch sections at or below this version (default: <root>/cmd/zever/VERSION)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -66,6 +68,19 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	changelog := *changelogFlag
 	if changelog == "" {
 		changelog = filepath.Join(root, "CHANGELOG.md")
+	}
+
+	if *checkPatchFlag {
+		floor := *floorFlag
+		if floor == "" {
+			var err error
+			floor, err = versionFloor(filepath.Join(root, "cmd", "zever", "VERSION"))
+			if err != nil {
+				fmt.Fprintf(stderr, "apidiff: read version floor: %v\n", err)
+				return 1
+			}
+		}
+		return runPatchGuard(changelog, floor, stdout, stderr)
 	}
 
 	allowPath := *allowFlag

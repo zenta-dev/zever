@@ -8,6 +8,8 @@
 // ## [Unreleased] in CHANGELOG.md.
 //
 // Usage: apidiff [--root DIR] [--modules a,b,c] [--changelog FILE]
+// apidiff --check-patch [--changelog FILE] fails when a released patch
+// section documents a breaking change.
 package main
 
 import (
