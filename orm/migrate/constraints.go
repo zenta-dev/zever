@@ -119,7 +119,21 @@ func uniqueIndexName(table, column string) string {
 // arbitrary SQL from a hand-edited row. The "IF NOT EXISTS" guard is
 // optional because MySQL has no such clause and its CREATE INDEX statements
 // (and therefore their captured PriorSQL) omit it.
-var createIndexPattern = regexp.MustCompile(`^CREATE (UNIQUE )?INDEX (IF NOT EXISTS )?`)
+var createIndexPattern = regexp.MustCompile(
+	`^CREATE (UNIQUE )?INDEX (IF NOT EXISTS )?` + qualifiedIdentRE + ` ON ` + qualifiedIdentRE +
+		` \(` + quotedIdentRE + `(, ` + quotedIdentRE + `)*\);$`)
+
+// quotedIdentRE matches one identifier as quoteIdent renders it: bare, or
+// wrapped in double quotes or backticks.
+const quotedIdentRE = "(?:\"[A-Za-z_][A-Za-z0-9_]*\"|`[A-Za-z_][A-Za-z0-9_]*`|[A-Za-z_][A-Za-z0-9_]*)"
+
+// qualifiedIdentRE matches an optionally schema-qualified quotedIdentRE.
+const qualifiedIdentRE = "(?:" + quotedIdentRE + "\\.)?" + quotedIdentRE
+
+// storedIdentPattern is the allowlist for a migration row's Table and
+// ObjectName, which are stored already quoted and spliced verbatim into the
+// inverse statement: a hand-edited row must not smuggle in SQL.
+var storedIdentPattern = regexp.MustCompile("^" + qualifiedIdentRE + "$")
 
 // createIndexSQL renders one CREATE INDEX statement, shared by
 // renderCreateIndex (a genuinely missing index) and renderDropIndex (which

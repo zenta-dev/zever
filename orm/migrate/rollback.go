@@ -192,11 +192,27 @@ func lossyRollbackWarning(row migrationRow) string {
 	}
 }
 
+// storedIdentsValid reports whether the row's Table and ObjectName, spliced
+// verbatim into inverse DDL, are plain (optionally qualified/quoted)
+// identifiers. A blank Table is rejected; a blank ObjectName is left to each
+// kind's own check.
+func storedIdentsValid(row migrationRow) bool {
+	if !storedIdentPattern.MatchString(row.Table) {
+		return false
+	}
+
+	return row.ObjectName == "" || storedIdentPattern.MatchString(row.ObjectName)
+}
+
 // inverseConstraintStatement handles the index/foreign-key/nullability kinds
 // inverseStatement delegates to, split out to keep that function's
 // cyclomatic complexity down rather than because these four share much logic
 // with each other.
 func inverseConstraintStatement(dialect string, row migrationRow) (string, bool) {
+	if !storedIdentsValid(row) {
+		return "", false
+	}
+
 	switch row.Kind {
 	case kindCreateIndex:
 		if row.ObjectName == "" {
@@ -287,7 +303,7 @@ func inverseConstraintStatement(dialect string, row migrationRow) (string, bool)
 // ObjectName is used verbatim the same way (see migrationMeta's doc comment).
 // Column names and type spellings are validated and quoted here.
 func inverseStatement(dialect string, row migrationRow) (string, bool) {
-	if row.Table == "" {
+	if !storedIdentsValid(row) {
 		return "", false
 	}
 

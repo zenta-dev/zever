@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `fix(orm/migrate)`: rollback now validates the stored `Table` and
+  `ObjectName` of every `schema_migrations` row as plain (optionally quoted or
+  schema-qualified) identifiers, and the `PriorSQL` allowlist for re-creating a
+  dropped index is end-anchored to the exact `CREATE INDEX` shape this tool
+  generates, so a hand-edited row can no longer splice or append extra
+  statements into a rollback.
 ### Added
 
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
