@@ -86,7 +86,7 @@ func runCheckWith(cfg CheckConfig) error {
 	_, diags := compile.Compile(files)
 
 	if len(diags) > 0 {
-		printDiagnostics(diags)
+		printDiagnosticsWithSources(diags, files)
 	}
 
 	if diags.HasErrors() {

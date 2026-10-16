@@ -42,7 +42,9 @@ func resolveValidateRules(attr *ast.Attribute, scalar ir.ScalarType) ([]ir.Valid
 				continue
 			}
 		default:
-			diags = append(diags, diag.Wrap("resolve", arg.Pos, ErrInvalidAttribute, "unknown validate kind %q", kind))
+			diags = append(diags, diag.Wrap("resolve", arg.Pos, ErrInvalidAttribute,
+				"unknown validate kind %q%s", kind,
+				hint(kind, []string{"format", "min_len", "max_len", "gt", "gte", "lt", "lte"})))
 			continue
 		}
 

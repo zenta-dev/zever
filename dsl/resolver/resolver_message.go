@@ -124,7 +124,9 @@ func resolveFieldForMessage(
 		case "default":
 			diags = append(diags, resolveDefaultAttribute(attr, field)...)
 		default:
-			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute, "unknown message field attribute @%s", attr.Name))
+			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
+				"unknown message field attribute @%s%s", attr.Name,
+				hint(attr.Name, []string{"validate", "default"})))
 		}
 	}
 
@@ -150,7 +152,8 @@ func resolveRefFieldForMessage(fd *ast.FieldDecl, ref *ir.TypeRef) (*ir.Field, d
 				fd.Name, ref.Name()))
 		default:
 			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
-				"unknown message field attribute @%s", attr.Name))
+				"unknown message field attribute @%s%s", attr.Name,
+				hint(attr.Name, []string{"default"})))
 		}
 	}
 

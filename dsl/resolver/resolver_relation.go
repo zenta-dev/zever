@@ -86,7 +86,8 @@ func resolveRelation(owner *ir.Entity, rd *ast.RelationDecl, entityByName map[st
 	target, ok := entityByName[rd.Target]
 	if !ok {
 		return nil, diag.List{diag.Wrap("resolve", rd.TargetPos, ErrUnresolvedReference,
-			"relation %s.%s references unknown entity %q", owner.Name, rd.FieldName, rd.Target)}
+			"relation %s.%s references unknown entity %q%s", owner.Name, rd.FieldName, rd.Target,
+			hint(rd.Target, entityCandidates(entityByName)))}
 	}
 
 	// Cross-module check is performed centrally in CheckCrossModule; not duplicated here.
@@ -151,19 +152,22 @@ func resolveForeignKeyField(
 		}
 
 		return nil, diag.Wrap("resolve", pos, ErrInvalidRelation,
-			"has_many foreign key %q not found on target entity %s", fkName, target.Name)
+			"has_many foreign key %q not found on target entity %s%s", fkName, target.Name,
+			hint(fkName, fieldCandidates(target)))
 	case ir.BelongsTo:
 		if f := owner.FieldByName(fkName); f != nil {
 			return f, nil
 		}
 
 		return nil, diag.Wrap("resolve", pos, ErrInvalidRelation,
-			"belongs_to foreign key %q not found on owning entity %s", fkName, owner.Name)
+			"belongs_to foreign key %q not found on owning entity %s%s", fkName, owner.Name,
+			hint(fkName, fieldCandidates(owner)))
 	case ir.HasOne:
 		f := target.FieldByName(fkName)
 		if f == nil {
 			return nil, diag.Wrap("resolve", pos, ErrInvalidRelation,
-				"has_one foreign key %q not found on target entity %s", fkName, target.Name)
+				"has_one foreign key %q not found on target entity %s%s", fkName, target.Name,
+				hint(fkName, fieldCandidates(target)))
 		}
 
 		if !f.Unique {
@@ -211,7 +215,9 @@ func resolveRelationAttributes(rd *ast.RelationDecl, rel *ir.Relation) (fkName s
 		case "on_delete":
 			resolveOnDeleteAttribute(attr, rel, &diags)
 		default:
-			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidRelation, "unknown relation attribute @%s", attr.Name))
+			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidRelation,
+				"unknown relation attribute @%s%s", attr.Name,
+				hint(attr.Name, []string{"foreign_key", "on_delete"})))
 		}
 	}
 
@@ -307,7 +313,8 @@ func resolveIndex(owner *ir.Entity, decl *ast.IndexDecl) (*ir.Index, diag.List) 
 			}
 
 			diags = append(diags, diag.Wrap("resolve", pos, ErrUnresolvedReference,
-				"index on entity %s references unknown column %q", owner.Name, col))
+				"index on entity %s references unknown column %q%s", owner.Name, col,
+				hint(col, fieldCandidates(owner))))
 
 			continue
 		}
@@ -317,7 +324,8 @@ func resolveIndex(owner *ir.Entity, decl *ast.IndexDecl) (*ir.Index, diag.List) 
 
 	for _, attr := range decl.Attributes {
 		if attr.Name != "unique" {
-			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute, "unknown index attribute @%s", attr.Name))
+			diags = append(diags, diag.Wrap("resolve", attr.Pos, ErrInvalidAttribute,
+				"unknown index attribute @%s%s", attr.Name, hint(attr.Name, []string{"unique"})))
 			continue
 		}
 
