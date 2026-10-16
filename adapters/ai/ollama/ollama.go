@@ -53,6 +53,7 @@ func New(opts ai.Options) (ai.AI, error) {
 		AllowInsecure:      opts.AllowInsecure,
 		AllowPrivate:       opts.AllowPrivate,
 		InsecureSkipVerify: opts.InsecureSkipVerify,
+		Logger:             opts.Logger,
 	})
 }
 
@@ -87,11 +88,16 @@ func NewWithOptions(opts Options) (ai.AI, error) {
 			clientOpts = append(clientOpts, httpclient.WithInsecureSkipVerify(true))
 		}
 
+		logger := opts.Logger
+		if logger == nil {
+			logger = slog.Default()
+		}
+
 		if opts.AllowPrivate {
-			slog.Default().Info("ollama: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+			logger.Info("ollama: allow_private enabled: private, loopback, and link-local addresses can be dialed")
 		}
 		if opts.InsecureSkipVerify {
-			slog.Default().Warn("ollama: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
+			logger.Warn("ollama: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
 		}
 
 		return &adapter{

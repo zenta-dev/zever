@@ -55,7 +55,7 @@ if logger.Enabled(log.LevelDebug) {
 level=INFO msg="request handled" user_id=u_123 duration=12ms
 ```
 
-Prefer `Str`/`Int`/`Dur` over `Any` for hot fields, because `Any` uses reflection. Reserve `Any` for dynamic payloads, and never pass request bodies, headers, or config maps through it. `RequestLogger` emits one line per request (method, path, status, `duration_ms`, plus `request_id` when present); `Recover` logs panics with value and stack, then responds 500. Emit one line per failure, with no duplicates.
+Prefer `Str`/`Int`/`Dur` over `Any` for hot fields, because `Any` uses reflection. Reserve `Any` for dynamic payloads, and never pass request bodies, headers, or config maps through it. `RequestLogger` emits one line per request (method, path, status, `duration_ms` (fractional milliseconds), plus `request_id` when present); `Recover` logs panics with value and stack, then responds 500. Emit one line per failure, with no duplicates.
 
 The API: `Logger` exposes `Debug()`, `Info()`, `Warn()`, `Error()`, `Fatal()`, `With()`, `WithContext(ctx)`, `Enabled(level)`, `Sync()`, and `Name()`. `Event` exposes `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Dur`, `Time`, `Err`, `AnErr(key, err)`, `Any`, `Msg`, `Msgf(format, args...)`, and `Send`. Helpers: `log.ContextWithLogger(ctx, l)`, `log.FromContext(ctx, fallback)`, `log.Open(adapter, opts)`, and `middleware.RequestLogger(logger)`.
 
