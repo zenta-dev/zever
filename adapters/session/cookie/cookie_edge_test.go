@@ -53,15 +53,20 @@ func TestNew_emptyNameAndPath_defaulted(t *testing.T) {
 }
 
 // TestNew_sameSiteNoneMode_explicit proves an explicit SameSiteNoneMode is
-// honored verbatim (New does not rewrite it, even though browsers pair it
-// with Secure).
+// kept and, because browsers reject SameSite=None cookies that are not
+// Secure, forces Secure even when Secure is explicitly disabled.
 func TestNew_sameSiteNoneMode_explicit(t *testing.T) {
 	t.Parallel()
 
-	c := New("sess-id", Options{SameSite: http.SameSiteNoneMode})
+	insecure := false
+	c := New("sess-id", Options{SameSite: http.SameSiteNoneMode, Secure: &insecure})
 
 	if c.SameSite != http.SameSiteNoneMode {
 		t.Fatalf("SameSite = %v, want %v", c.SameSite, http.SameSiteNoneMode)
+	}
+
+	if !c.Secure {
+		t.Fatal("Secure = false, want true (SameSite=None requires Secure)")
 	}
 }
 

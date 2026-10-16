@@ -256,6 +256,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updates into one PR (`tools/gen-dependabot.sh`), and remove the empty stub
   `docs/production.md` (nothing linked to it).
 
+### Security
+
+- `adapters/session/cookie`: `SameSite=None` now forces `Secure`, even when
+  `Secure` is explicitly set to false (browsers reject insecure `SameSite=None`
+  cookies, which silently dropped the session).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
