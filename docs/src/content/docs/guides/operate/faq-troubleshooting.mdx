@@ -1,0 +1,150 @@
+---
+title: FAQ and troubleshooting
+description: Quick answers to the questions that come up most, and a symptom-to-fix list for configuration, adapters, jobs, and the CLI.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Short answers first, then a symptom-to-fix list. Every battery guide also ends with its own troubleshooting section; this page covers the cross-cutting problems.
+
+## FAQ
+
+<details>
+<summary>Does Zever write my business logic?</summary>
+
+No. It compiles `.zen` schemas into infrastructure only: database access, caching, queues, routing, and the other batteries. Your handlers, services, and rules are plain Go you own. See [Customizing and leaving](../../extend/customizing-and-leaving/) for how to step off the generated code.
+</details>
+
+<details>
+<summary>How do I swap an adapter, say sqlite for postgres?</summary>
+
+Change `adapter:` (and its options) in `zever.yaml`, or set `DB_ADAPTER=postgres` and `DB_DSN=...` in the environment, and make sure the adapter is registered. `zever add db/postgres` does the `go.mod` require, the `Register()` call, and the config stanza. No code that uses the `db.DB` interface changes. See [Choosing batteries](../../extend/choosing-batteries/).
+</details>
+
+<details>
+<summary>What is the difference between the queue, the event bus, and the outbox?</summary>
+
+The queue is durable work for one consumer to pop, ack, and retry. The event bus is live fan-out with no durability for offline handlers. The outbox records an event inside your database transaction and delivers it at least once. See the [background jobs overview](../../background/overview/).
+</details>
+
+<details>
+<summary>Do I need Redis?</summary>
+
+Not to start. The `memory` and `sqlite` defaults need nothing. You need a shared backend (Redis, or the `db` adapters on your database) once more than one process must see the same cache, queue, session, lock, or rate-limit state.
+</details>
+
+<details>
+<summary>Is it safe to run <code>zever tinker</code> against production?</summary>
+
+No. `tinker` evaluates arbitrary Go against a live container, is development-only, and prints a warning to stderr before it runs. Never point it at production data.
+</details>
+
+<details>
+<summary>Can I run Zever without the CLI?</summary>
+
+Yes. The runtime packages (`config`, `container`, `core/*`, `adapters/*`) do not import the compiler. The CLI is for scaffolding, compiling schemas, and operating projects; generated code and the runtime build with plain `go build`.
+</details>
+
+<details>
+<summary>How do I turn on shell completion?</summary>
+
+`zever completion bash|zsh|fish|powershell` prints the script; see [Shell completion](../../../reference/cli/#shell-completion-and-generated-docs). It completes `.zen` files, `generate` kinds, `--backend`, `--profile`, and `--adapters`.
+</details>
+
+<details>
+<summary>How do I get a heap or CPU profile from a running server?</summary>
+
+Start the generated server with `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`); it is off by default and loopback-only. See [Profiling with pprof](../observability/#profiling-with-pprof).
+</details>
+
+## Troubleshooting
+
+### Configuration
+
+<details>
+<summary>Startup fails with "unknown field" or "unknown service"</summary>
+
+`config.Load` decodes strictly, so a typo or a removed key fails fast instead of being ignored. Check spelling (file keys are snake_case, such as `max_conns`) against the [config reference](../../../reference/config/) and `zever config show`.
+</details>
+
+<details>
+<summary>An environment variable has no effect</summary>
+
+Env matching is best-effort by design: a variable that does not match a resolved field is silently ignored, so a noisy environment cannot break startup. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. A value that does match but cannot be parsed is an error. Layering is `defaults < file < env`.
+</details>
+
+<details>
+<summary>It connects to sqlite even though I configured postgres</summary>
+
+The file was not found. `Load("")` only probes `zever.yaml`, `zever.yml`, and `zever.json` in the working directory, and falling back to defaults means sqlite. In production, load an explicit path.
+</details>
+
+<details>
+<summary>Auth fails to open with a short or missing JWT secret</summary>
+
+The `jwt` adapter needs a secret of at least 32 bytes and `config.Default()` ships none. Set `AUTH_JWT_SECRET`. The default dev crypto key is public and deterministic: never ship it.
+</details>
+
+### Adapters and the container
+
+<details>
+<summary>An unknown or unregistered adapter error at startup</summary>
+
+The adapter's package was never imported and its `Register()` never called. `zever add <battery>/<adapter>` wires both. The generated server validates every enabled battery at boot and reports the missing ones with did-you-mean hints; `zever doctor` shows the same per battery.
+</details>
+
+<details>
+<summary><code>zever doctor</code> reports FAIL for one battery</summary>
+
+The battery is enabled but cannot resolve from the current config: a missing secret, an unreachable DSN, or an adapter that is not registered in the process running the check. Read the error text, fix the option, and re-run. Doctor only checks batteries enabled in your project config.
+</details>
+
+<details>
+<summary>A test leaves goroutines running</summary>
+
+Close the container: `c.Close(ctx)` stops only the services you resolved, in dependency order. In tests use `t.Cleanup`, or [`zevertest.NewTestContainer`](../testing-your-app/) which does it for you. Note that `t.Context()` is already canceled inside cleanups, so close with a fresh bounded context.
+</details>
+
+### Schemas and codegen
+
+<details>
+<summary><code>zever compile --check</code> fails with drift</summary>
+
+The committed output no longer matches the schema. Regenerate with `zever compile` and commit the result. A differing CLI version in the stamp alone is only a note, not drift.
+</details>
+
+<details>
+<summary>The formatter refuses my file</summary>
+
+`zever fmt` will not rewrite a file with lexical errors (an unterminated string, for example). Fix the error first; `zever check` reports it with a position.
+</details>
+
+### Background work
+
+<details>
+<summary>A dispatched job never runs</summary>
+
+Almost always a topic mismatch between the job's priority and the topics the worker polls, or a `memory` queue split across processes. See [Scheduler and jobs](../../background/scheduler-jobs/#troubleshooting).
+</details>
+
+<details>
+<summary><code>Pop</code> returns an empty error</summary>
+
+`queue.ErrEmpty` means the topic has nothing ready; it is not a failure. Handle it and poll again.
+</details>
+
+<details>
+<summary>Messages are processed twice</summary>
+
+Queues and the outbox deliver at least once, and an un-acked message reappears after the visibility timeout. Make the consumer idempotent with the [idempotency](../../security/lock-idempotency/) battery or the outbox `Inbox`, and ack promptly.
+</details>
+
+## Still stuck?
+
+Run `zever doctor` and `zever config show` (secrets are redacted), then open an issue with the output. Keep raw option maps out of logs and bug reports: print only what `config.RedactedServices` returns.
+
+<CardGrid>
+  <LinkCard title="Configuration" href="../configuration/" description="Layering, env names, and validation." />
+  <LinkCard title="Deployment" href="../deployment/" description="Build, secrets, shutdown, and health probes." />
+  <LinkCard title="Background jobs overview" href="../../background/overview/" description="How the pieces fit." />
+</CardGrid>

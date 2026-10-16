@@ -240,6 +240,7 @@ export default defineConfig({
         {
           label: "Background work",
           items: [
+            { label: "Overview", link: "guides/background/overview" },
             { label: "Queue", link: "guides/background/queue" },
             { label: "Scheduler and jobs", link: "guides/background/scheduler-jobs" },
             { label: "Events and event bus", link: "guides/background/events" },
@@ -274,9 +275,11 @@ export default defineConfig({
             { label: "Feature flags", link: "guides/operate/flags" },
             { label: "Tenants", link: "guides/operate/tenants" },
             { label: "Deployment", link: "guides/operate/deployment" },
+            { label: "Deploy to Kubernetes", link: "guides/operate/kubernetes" },
             { label: "Upgrade", link: "guides/operate/upgrade" },
             { label: "Migration", link: "guides/operate/migration" },
             { label: "Test your app", link: "guides/operate/testing-your-app" },
+            { label: "FAQ and troubleshooting", link: "guides/operate/faq-troubleshooting" },
           ],
         },
         {
@@ -292,6 +295,7 @@ export default defineConfig({
         {
           label: "Extend",
           items: [
+            { label: "Choosing batteries", link: "guides/extend/choosing-batteries" },
             { label: "Write a plugin", link: "guides/extend/write-a-plugin" },
             { label: "Customizing and leaving", link: "guides/extend/customizing-and-leaving" },
             { label: "Editor setup", link: "guides/extend/editor-setup" },

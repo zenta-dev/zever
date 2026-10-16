@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs`: a background jobs overview (how jobs, queue, worker, scheduler, outbox,
+  event bus, workflows and sagas fit together), a battery and adapter decision
+  guide, a Kubernetes deployment guide with Deployment, Service, PodDisruptionBudget,
+  HorizontalPodAutoscaler, ConfigMap and Secret manifests, and an FAQ with a
+  cross-cutting troubleshooting list. Docs only.
 ### Security
 
 - `fix(orm/migrate)`: rollback now validates the stored `Table` and
