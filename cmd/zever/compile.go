@@ -538,7 +538,7 @@ func printDiagnostics(diags diag.List) {
 func printDiagnosticsWithSources(diags diag.List, sources map[string]string) {
 	for _, d := range diags.Sorted() {
 		rendered := diag.Render(d, sources)
-		msg := rendered
+		var msg string
 		// Color by severity if present.
 		switch d.Severity {
 		case diag.SeverityError:
