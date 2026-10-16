@@ -728,7 +728,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, fuzz-smoke]
     steps:
       - name: Aggregate results
         run: |
