@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
+  helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
+  and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake
+  `Clock` and deterministic `IDs`, and an in-process HTTP `Client`. The testing
+  guide documents it, and CI gains a 20s-per-target fuzz smoke job over the DSL
+  lexer, parser, resolver and the new formatter idempotence target.
+
+### Fixed
+
+- `fix(dsl/format)`: the formatter wrote gap edits at rune columns instead of the
+  byte offsets `Apply` expects, so a multi-byte character earlier on a line
+  (a non-ASCII string literal) made it insert whitespace inside the character
+  and corrupt the file; `OffsetOf` also now counts UTF-16 code units, matching
+  the lexer's columns, so astral characters such as emoji no longer shift
+  later edits. Found by the new `FuzzFormatIdempotent`.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

@@ -7,6 +7,45 @@ import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 Zever apps test without Docker, network, or shared state. `config.Default()` picks zero-infra adapters (memory, sqlite, local, log, noop), the container resolves them lazily, and every test below runs offline and deterministic. Patterns here mirror the runnable samples in `docs/examples/testing_test.go` and the todo example's `internal/api/api_test.go`.
 
+## Start from zevertest
+
+`github.com/zenta-dev/zever/zevertest` bundles the setup below into three small helpers. `NewTestContainer` registers the zero-infrastructure adapters, builds a container from `config.Default()`, gives it a per-test sqlite file and storage directory under `t.TempDir()`, silences logging and observability, sets a test JWT secret, and closes it in `t.Cleanup`. `Clock` and `IDs` make time and identifiers deterministic, and `Client` drives any `http.Handler` in-process.
+
+```go
+import (
+	"net/http"
+	"testing"
+
+	"github.com/zenta-dev/zever/zevertest"
+)
+
+func TestCreateThing(t *testing.T) {
+	c := zevertest.NewTestContainer(t)
+
+	r, err := c.Router()
+	if err != nil {
+		t.Fatalf("Router: %v", err)
+	}
+	ids := zevertest.NewIDs("thing") // thing-000001, thing-000002, ...
+	r.Handle("POST", "/things", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"` + ids.Next() + `"}`))
+	})
+
+	api := zevertest.NewClient(t, r).WithBearer("token")
+
+	var out struct{ ID string }
+	api.Post("/things", map[string]string{"name": "x"}).
+		RequireStatus(http.StatusCreated).
+		JSON(&out)
+	if out.ID != "thing-000001" {
+		t.Fatalf("id = %q", out.ID)
+	}
+}
+```
+
+Use `zevertest.NewClock(start)` where code takes a `func() time.Time` (`Clock.Func()`), then `Advance` instead of sleeping. `WithConfig(func(*config.Config))` tweaks the config and `WithRegister(func())` registers extra adapters; the rest of this page shows what the helpers do under the hood.
+
 ## Open a container per test
 
 Register the adapters under test, open a container from `config.Default()`, and close it in `t.Cleanup`. Closing only shuts down services the test actually resolved, in dependency order.
