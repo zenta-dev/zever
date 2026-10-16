@@ -1,0 +1,157 @@
+# Live conformance + core coverage gate.
+#
+# The hermetic conformance job in ci.yml runs every kit against
+# memory/local-backed fakes (miniredis, sqlite, stubs). This workflow runs
+# the SAME kits against REAL services in containers — postgres:17,
+# redis:7, and S3-compatible minio — catching divergences the fakes hide
+# (real Lua scripts, real TTL expiry, real S3 error shapes).
+#
+# Fork-safe by construction: no secrets, no GHCR, no paid features. Every
+# live test skips when its env var is unset (never fake infra for
+# conformance), so the jobs pass on any runner with docker and clearly
+# require docker otherwise. Requires: docker (service containers).
+# Cannot be verified without docker — see TODO(verify) in the PR.
+#
+# The coverage-core job pins every core/<battery> root package at its
+# current measured statement-coverage floor (tools/coverage-core.sh,
+# ratchet-up-only). It needs no services.
+
+name: conformance-live
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conformance-live-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  postgres:
+    name: postgres conformance (live)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: zever
+          POSTGRES_PASSWORD: zever
+          POSTGRES_DB: zever_test
+        options: >-
+          --health-cmd "pg_isready -U zever -d zever_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      POSTGRES_DSN: postgres://zever:zever@localhost:5432/zever_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: db/postgres conformance + integration (live)
+        run: go -C adapters/db/postgres test -count=1 ./...
+      - name: orm postgres integration (live)
+        run: go -C orm test -count=1 ./...
+      - name: queue/db, scheduler/postgres, workflow/db, outbox live (live)
+        run: |
+          set -euo pipefail
+          go -C adapters/queue/db test -count=1 ./...
+          go -C adapters/scheduler/postgres test -count=1 ./...
+          go -C adapters/workflow/db test -count=1 ./...
+          go -C adapters/outbox/db test -count=1 ./...
+
+  redis:
+    name: redis conformance (live)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+        ports:
+          - 6379:6379
+    env:
+      ZEVER_REDIS_ADDR: localhost:6379
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: cache/redis conformance (live + hermetic)
+        run: go -C adapters/cache/redis test -count=1 ./...
+      - name: queue/redis conformance (live + hermetic)
+        run: go -C adapters/queue/redis test -count=1 ./...
+
+  s3:
+    name: s3 conformance (live minio)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env:
+      ZEVER_S3_ENDPOINT: http://localhost:9000
+      ZEVER_S3_URL_BASE: http://localhost:9000
+      ZEVER_S3_REGION: us-east-1
+      ZEVER_S3_ACCESS_KEY_ID: minioadmin
+      ZEVER_S3_SECRET_ACCESS_KEY: minioadmin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Start minio (S3-compatible)
+        run: |
+          set -euo pipefail
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:9000/minio/health/live >/dev/null; then
+              echo "minio live after ${i}x5s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "minio never became live" >&2
+          docker logs minio || true
+          exit 1
+      - name: storage/s3 conformance (live + hermetic)
+        run: go -C adapters/storage/s3 test -count=1 ./...
+
+  coverage-core:
+    name: core coverage floor
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: per-package coverage floor (ratchet-up-only)
+        run: tools/coverage-core.sh

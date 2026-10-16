@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ci(test)`: live conformance workflow (`.github/workflows/conformance-live.yml`)
+  running the shared kits against real services in containers — postgres:17,
+  redis:7, S3-compatible minio — via new skip-gated live tests
+  (`ZEVER_REDIS_ADDR`, `ZEVER_S3_ENDPOINT`; postgres reuses the existing
+  `POSTGRES_DSN` suites), plus a per-package Core coverage floor
+  (`tools/coverage-core.sh`, ratchet-up-only) and a nightly long-fuzz workflow
+  with cross-night corpus reuse (`.github/workflows/fuzz-nightly.yml`).
+  Mutation pilot report at `docs/plans/mutation-report.md` with five new
+  mutant-killing tests in `dsl/parser` and `orm/render`.
+
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
   helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
   and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake
