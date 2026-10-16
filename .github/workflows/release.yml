@@ -22,17 +22,16 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write # attach dist/* + sbom/*.json to the tag release
-  id-token: write # OIDC minting for actions/attest-build-provenance
-  attestations: write # write SLSA provenance for binaries + SBOMs
-  actions: write # upload (binaries/sbom) and download (publish) release artifacts
+# Least privilege: nothing by default; only the publish job gets write scopes.
+permissions: {}
 
 jobs:
   binaries:
     name: build ${{ matrix.goos }}-${{ matrix.goarch }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: true
       matrix:
@@ -85,6 +84,8 @@ jobs:
     name: sbom shard ${{ matrix.shard }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: true
       matrix:
@@ -116,6 +117,10 @@ jobs:
     needs: [binaries, sbom]
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # attach dist/* + sbom/*.json to the tag release
+      id-token: write # OIDC minting for actions/attest-build-provenance
+      attestations: write # write SLSA provenance for binaries + SBOMs
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

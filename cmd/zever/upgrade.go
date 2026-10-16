@@ -54,6 +54,10 @@ const upgradeSumsName = "SHA256SUMS.txt"
 // DefaultUpgradeTimeout bounds release metadata and asset downloads.
 const DefaultUpgradeTimeout = 30 * time.Second
 
+// maxUpgradeDownload caps one downloaded release asset (the CLI binary is
+// roughly 200 MiB), so a hostile or broken server cannot exhaust memory.
+const maxUpgradeDownload = 512 << 20
+
 // upgradeActionCurrent reports that the installed version already matches the
 // target, so there is nothing to install.
 const upgradeActionCurrent = "current"
@@ -528,6 +532,12 @@ func verifyUpgradeChecksum(data []byte, sumsText, asset string) error {
 // fetchUpgradeURL downloads url with a bounded timeout, failing on
 // non-200 statuses and network errors.
 func fetchUpgradeURL(ctx context.Context, url string) ([]byte, error) {
+	return fetchUpgradeURLLimit(ctx, url, maxUpgradeDownload)
+}
+
+// fetchUpgradeURLLimit is fetchUpgradeURL with an explicit body cap; a body
+// larger than maxBytes is an error rather than a truncated success.
+func fetchUpgradeURLLimit(ctx context.Context, url string, maxBytes int64) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("zever upgrade: build request: %w", err)
@@ -546,9 +556,13 @@ func fetchUpgradeURL(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("zever upgrade: GET %s: unexpected status %s", url, resp.Status)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("zever upgrade: read %s: %w", url, err)
+	}
+
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("zever upgrade: %s exceeds the %d byte download limit", url, maxBytes)
 	}
 
 	return data, nil

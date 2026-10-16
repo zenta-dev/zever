@@ -76,16 +76,18 @@ jobs:
         with:
           go-version-file: go.work
       - name: Install benchstat
-        run: go install golang.org/x/perf/cmd/benchstat@latest
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e # x/perf has no tags; pinned pseudo-version
       - name: Download head results
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bench-*-${{ github.sha }}
           merge-multiple: true
       - name: Compare with base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin ${{ github.base_ref }} --depth=1 || true
+          git fetch origin "$BASE_REF" --depth=1 || true
           git stash -u || true
-          git checkout -q origin/${{ github.base_ref }} -- orm container 2>/dev/null || true
+          git checkout -q "origin/$BASE_REF" -- orm container 2>/dev/null || true
           go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-base.txt || true
           benchstat bench-base.txt bench-orm.txt bench-container.txt || true
