@@ -1,0 +1,72 @@
+---
+title: Flag reference
+description: Feature-flag adapters, config keys, options, defaults, and error index for the flag battery.
+---
+
+Typed feature flags with per-request targeting context. `flag` resolves `Bool`, `String`, `Int`, and `JSON` values; a missing key returns your fallback with a nil error, so a lookup can never take the app down. Full how-to: [Feature flags guide](../../guides/operate/flags/).
+
+## Adapters
+
+| Adapter | Module | Register | Default |
+|---|---|---|---|
+| `static` | `github.com/zenta-dev/zever/adapters/flag/static` | `static.Register()` | Yes |
+| `firebase` | `github.com/zenta-dev/zever/adapters/flag/firebase` | `firebase.Register()` | No |
+
+Resolve through the container with `c.Flag()`. Swapping backends is a config change: set `flag.adapter`, no code change.
+
+## Configuration
+
+Service key: `flag`. File example:
+
+```yaml title="zever.yaml"
+flag:
+  adapter: static
+  options:
+    static:
+      path: flags.json
+      reload: true
+```
+
+```sh
+FLAG_ADAPTER=static
+```
+
+Env rule: `FLAG_<FIELD>=value`, uppercase, no prefix (for example `FLAG_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](./config/).
+
+## Options
+
+Options nest under the adapter name. Authority for types and defaults: [Config reference](./config/#flag).
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `static.path` | string | `""` | Flag file path; empty means an empty flag set |
+| `static.reload` | boolean | `false` | Enables file reloading |
+| `firebase.project_id` | string | `""` | Firebase project ID (required by the adapter) |
+| `firebase.service_account` | string | `""` | Path to the service account JSON key file (required by the adapter) |
+| `firebase.timeout` | duration | `30s` | Operation timeout; zero means the default, negative fails validation |
+
+Keys are validated for shape and length (`ValidateKey`: 1..256 bytes, no control characters or `DEL`).
+
+## Errors
+
+Every sentinel below is a package-level `ErrXxx` in `core/flag` (see `errors.go`). Branch with `errors.Is`, never by message text.
+
+| Sentinel | Cause | Fix |
+|---|---|---|
+| `ErrClosed` | Client used after `Close` | Open a new client; do not reuse the closed one |
+| `ErrNilFactory` | `Register` called with a nil factory | Pass a non-nil constructor |
+| `ErrDuplicateAdapter` | Same adapter registered twice | Register each adapter once; check for a duplicate `Register` call |
+| `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
+| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `static.Register()`) before `Open` |
+| `ErrInvalidAdapter` | Empty adapter name to `ParseAdapter` | Pass a non-empty adapter name |
+| `ErrInvalidOptions` | `Options.Validate` failed (for example negative `firebase.timeout`) | Keep `firebase.timeout >= 0`; adapters validate their own required fields |
+| `ErrInvalidKey` | Flag key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the key length only, never the key itself |
+
+A missing flag key is not an error: the lookup returns the caller-supplied fallback.
+
+## Related
+
+- [Feature flags guide](../../guides/operate/flags/) for targeting context and reload behavior.
+- [Config reference](./config/#flag) for the full option table and layering rules.
+- [Adapters matrix](./adapters-matrix/) for every service, adapter module, and container accessor.
+- [Errors](./errors/) for the repo-wide message format, wrapping, and branching conventions.

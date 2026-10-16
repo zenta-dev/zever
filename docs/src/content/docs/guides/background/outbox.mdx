@@ -97,7 +97,7 @@ The relay is not started here. `Start` publishes stored messages through the sam
 - Processed rows older than `retention` are deleted.
 - `Status()` reports `Pending`, `Processed`, `Failed`, `LastError`, and `Stalled` (oldest pending waits too long).
 - Any number of replicas can relay one table without double-publishing. If a replica crashes mid-publish, the row returns to pending when its `lock_seconds` lease expires.
-- When an observability provider is wired (`Options.Provider`, which `container.Outbox()` injects), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans (see [Outbox Ops](../../../digging-deeper/outbox-ops/)).
+- When an observability provider is wired (`Options.Provider`, which `container.Outbox()` injects), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans (see [Outbox Ops](./outbox-ops/)).
 
 ## Configure the outbox
 
@@ -168,7 +168,7 @@ func openStore() error {
 }
 ```
 
-`Outbox()` resolves lazily and caches; on error the cache clears so the next call retries. It also injects the resolved `observability.Provider` into `Options.Provider`, so a container-opened store emits the relay metrics and spans described in [Outbox Ops](../../../digging-deeper/outbox-ops/) without extra wiring. The container-opened store records messages but cannot `Start` its relay, because core `Options` carry no `Publisher`. Wire one through the adapter constructor (`OpenFromDB` in `adapters/outbox/db`, `New` in `adapters/outbox/cdc` and `adapters/outbox/memory`), as above.
+`Outbox()` resolves lazily and caches; on error the cache clears so the next call retries. It also injects the resolved `observability.Provider` into `Options.Provider`, so a container-opened store emits the relay metrics and spans described in [Outbox Ops](./outbox-ops/) without extra wiring. The container-opened store records messages but cannot `Start` its relay, because core `Options` carry no `Publisher`. Wire one through the adapter constructor (`OpenFromDB` in `adapters/outbox/db`, `New` in `adapters/outbox/cdc` and `adapters/outbox/memory`), as above.
 
 ## Production checklist
 
@@ -225,5 +225,5 @@ Fix: set `wal_level=logical` and align the names. Live tests run with `POSTGRES_
   <LinkCard title="Queue" href="../queue/" description="Durable delivery with ack and retry for must-run work." />
   <LinkCard title="Workflows" href="../workflows/" description="Durable multi-step runs." />
   <LinkCard title="Observability" href="../../operate/observability/" description="Trace context injected at Record time." />
-  <LinkCard title="Outbox Ops" href="../../../digging-deeper/outbox-ops/" description="Relay metrics, alerting, DLQ runbook, stalled readiness." />
+  <LinkCard title="Outbox Ops" href="./outbox-ops/" description="Relay metrics, alerting, DLQ runbook, stalled readiness." />
 </CardGrid>

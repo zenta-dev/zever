@@ -1,0 +1,74 @@
+---
+title: Session reference
+description: Session-store adapters, config keys, options, defaults, and error index for the session battery.
+---
+
+Server-side session store. `session` creates, reads, saves, and deletes sessions with TTL expiry; expired sessions read as missing. It is not a cookie jar and does not mint client tokens itself. After authentication succeeds, call `Rotate` so a pre-login ID can never become authenticated (session fixation). Full how-to: [Sessions guide](../../guides/http/sessions/).
+
+## Adapters
+
+| Adapter | Module | Register | Default |
+|---|---|---|---|
+| `memory` | `github.com/zenta-dev/zever/adapters/session/memory` | `memory.Register()` | Yes |
+| `redis` | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.Register()` | No |
+| `db` | `github.com/zenta-dev/zever/adapters/session/db` | `db.Register()` | No |
+
+Resolve through the container with `c.Session()`. `memory` does not survive restarts; use a shared store beyond local dev. The `session/cookie` package is a stdlib cookie builder helper, not a registry adapter. Swapping backends is a config change: set `session.adapter`, no code change.
+
+## Configuration
+
+Service key: `session`. File example:
+
+```yaml title="zever.yaml"
+session:
+  adapter: redis
+  options:
+    ttl: 900000000000
+    redis:
+      addr: localhost:6379
+```
+
+```sh
+SESSION_ADAPTER=redis
+```
+
+Env rule: `SESSION_<FIELD>=value`, uppercase, no prefix (for example `SESSION_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](./config/).
+
+## Options
+
+Authority for types and defaults: [Config reference](./config/#session).
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `ttl` | duration | `15m` | Default session lifetime; zero means the default, negative fails |
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing; default shares one pool per exact DSN |
+| `redis.prefix` | string | `""` | Key prefix for Redis session data |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+
+Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](./config/#redis-connection-options).
+
+Session IDs are 256-bit bearer secrets (64 hex characters). They must never be logged or echoed; `ValidateID` rejects malformed IDs without revealing them.
+
+## Errors
+
+Every sentinel below is a package-level `ErrXxx` in `core/session` (see `errors.go`). Branch with `errors.Is`, never by message text.
+
+| Sentinel | Cause | Fix |
+|---|---|---|
+| `ErrNotFound` | Session does not exist or has expired (expired reads as missing) | Treat as logged-out: start a new session |
+| `ErrClosed` | Store used after `Close` | Open a new store; do not reuse the closed one |
+| `ErrNilFactory` | `Register` called with a nil factory | Pass a non-nil constructor |
+| `ErrDuplicateAdapter` | Same adapter registered twice | Register each adapter once; check for a duplicate `Register` call |
+| `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
+| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `memory.Register()`) before `Open` |
+| `ErrInvalidAdapter` | Empty adapter name to `ParseAdapter` | Pass a non-empty adapter name |
+| `ErrInvalidOptions` | `Options.Validate` failed (negative `ttl`, bad Redis address or prefix) | Fix the named field |
+| `ErrInvalidID` | Malformed session ID | Reject the request; the error carries the ID length only, never the ID |
+
+## Related
+
+- [Sessions guide](../../guides/http/sessions/) for cookies, CSRF defense, and the store API.
+- [Config reference](./config/#session) for the full option table and layering rules.
+- [Adapters matrix](./adapters-matrix/) for every service, adapter module, and container accessor.
+- [Errors](./errors/) for the repo-wide message format, wrapping, and branching conventions.

@@ -218,6 +218,6 @@ export const NAV = [
 export const FOOTER_COLS = [
   { title: 'Start', links: [['Installation', 'start/installation'], ['Configuration', 'guides/operate/configuration'], ['Directory structure', 'start/project-layout'], ['Deployment', 'guides/operate/deployment']] },
   { title: 'Learn', links: [['Booking API tutorial', 'tutorials/build-a-booking-api'], ['Schema DSL', 'reference/zen-syntax'], ['Container', 'concepts/container'], ['Query builder', 'guides/data/query-builder']] },
-  { title: 'Reference', links: [['CLI', 'reference/cli'], ['Config', 'reference/config'], ['Adapters matrix', 'reference/adapters-matrix'], ['Agent skill', 'reference/agent-skill']] },
+  { title: 'Reference', links: [['CLI', 'reference/cli'], ['Config', 'reference/config'], ['Adapters matrix', 'reference/adapters-matrix'], ['Agent skill', 'guides/extend/agent-skill']] },
   { title: 'Project', links: [['Contribute', 'contribute'], ['Upgrade', 'guides/operate/upgrade']] },
 ];
