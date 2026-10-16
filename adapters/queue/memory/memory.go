@@ -119,7 +119,7 @@ func (a *memoryAdapter) enqueue(
 	if delay <= 0 {
 		t.ready = append(t.ready, msg)
 	} else {
-		t.delayed = append(t.delayed, delayedEntry{
+		t.pushDelayedLocked(delayedEntry{
 			msg:     msg,
 			readyAt: time.Now().Add(delay),
 		})

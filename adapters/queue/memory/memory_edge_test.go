@@ -2,6 +2,7 @@ package memory
 
 import (
 	"testing"
+	"time"
 
 	"github.com/zenta-dev/zever/core/queue"
 )
@@ -79,5 +80,52 @@ func TestMemory_Length_unknownTopicZero(t *testing.T) {
 	}
 	if !empty {
 		t.Error("IsEmpty(unknown) = false, want true")
+	}
+}
+
+func TestDelayedHeapOrder(t *testing.T) {
+	t.Parallel()
+
+	tq := newTopicQueue()
+	base := time.Now().Add(-time.Hour)
+	offsets := []int{5, 1, 9, 3, 7, 2, 8, 0, 6, 4, 3}
+
+	for _, o := range offsets {
+		tq.pushDelayedLocked(delayedEntry{
+			msg:     queue.NewMessage("t", queue.Payload([]byte("x")), nil),
+			readyAt: base.Add(time.Duration(o) * time.Second),
+		})
+	}
+
+	due, _, hasMore := tq.collectDue()
+	if hasMore {
+		t.Fatalf("hasMore = true, want false")
+	}
+
+	if len(due) != len(offsets) {
+		t.Fatalf("due len = %d, want %d", len(due), len(offsets))
+	}
+
+	for i := 1; i < len(due); i++ {
+		if due[i].readyAt.Before(due[i-1].readyAt) {
+			t.Fatalf("due[%d] before due[%d]: not sorted", i, i-1)
+		}
+	}
+}
+
+func TestDelayedHeapNextDue(t *testing.T) {
+	t.Parallel()
+
+	tq := newTopicQueue()
+	now := time.Now()
+	soon, later := now.Add(time.Hour), now.Add(2*time.Hour)
+
+	for _, at := range []time.Time{later, now.Add(-time.Second), soon} {
+		tq.pushDelayedLocked(delayedEntry{msg: queue.NewMessage("t", queue.Payload([]byte("x")), nil), readyAt: at})
+	}
+
+	due, next, hasMore := tq.collectDue()
+	if len(due) != 1 || !hasMore || !next.Equal(soon) {
+		t.Fatalf("collectDue = %d due, next=%v, more=%v; want 1, %v, true", len(due), next, hasMore, soon)
 	}
 }
