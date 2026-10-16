@@ -228,7 +228,8 @@ func run(args []string) error {
 				printFmtUsage(flag.NewFlagSet("fmt", flag.ContinueOnError))
 				return nil
 			case "doctor":
-				printDoctorUsage(flag.NewFlagSet("doctor", flag.ContinueOnError))
+				fs, _, _ := newDoctorFlagSet()
+				printDoctorUsage(fs)
 				return nil
 			case "config":
 				printConfigUsage(flag.NewFlagSet("config", flag.ContinueOnError))
@@ -319,7 +320,7 @@ func printRoutesUsage(fs *flag.FlagSet) {
 		bold("Flags:"),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever routes schema/app.zen"))
@@ -342,7 +343,7 @@ func printExplainUsage(fs *flag.FlagSet) {
 		bold("Flags:"),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain UserService.GetUser schema/app.zen"))
@@ -365,7 +366,7 @@ func printBoundariesUsage(fs *flag.FlagSet) {
 		bold("Flags:"),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever check-boundaries schema/*.zen"))
@@ -387,7 +388,7 @@ func printGraphUsage(fs *flag.FlagSet) {
 		bold("Flags:"),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever graph schema/*.zen"))

@@ -210,7 +210,7 @@ func runGenerateEntity(args []string) error {
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(fs.Output(), entityUsage)
-		fs.PrintDefaults()
+		printFlagDefaults(fs)
 	}
 
 	positional, rest := splitPositionals(args, 2)

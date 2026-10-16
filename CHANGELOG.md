@@ -224,6 +224,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hands over a fresh per-request map). The stdhttp and fiber drivers now use
   it, cutting the per-request params cost from ~164 ns, 384 B and 3 allocs to
   ~19 ns, 48 B and 1 alloc. `WithParams` is unchanged. Additive.
+- `fix(cli)`: shell completion actually works. Cobra's hidden `__complete`
+  command, which the generated bash/zsh/fish/powershell scripts call, is now
+  routed to Cobra instead of failing as an unknown subcommand, and completes
+  `.zen` files, `generate` kinds, `--backend`, `--profile` and `--adapters`
+  values, and `--config` files.
 
 ### Changed
 
@@ -270,6 +275,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the closing hint no longer suggests `git push --tags`; new
   `--verify-proxy` asks the module proxy to resolve each module at the tag,
   retrying while the proxy catches up.
+- `feat(cli)`: every usage screen now lists flags in `--name` style and ends
+  with the global flags (including `--json`); `zever help doctor` shows the
+  real `--config` / `--strict` flags instead of an empty list, and
+  `doctor`, `fmt`, `config show` and `new` document their flags in
+  `--help` and completion.
 
 ## [v0.7.1] - 2026-10-15
 

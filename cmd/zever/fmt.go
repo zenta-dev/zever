@@ -34,7 +34,7 @@ func printFmtUsage(fs *flag.FlagSet) {
 		bold("Flags:"),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever fmt schema/*.zen")+dim("        # list files needing formatting"))

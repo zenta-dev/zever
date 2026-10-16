@@ -126,6 +126,11 @@ func newInspectCmds() []*cobra.Command {
 		},
 	}
 
+	// Documented for --help and shell completion; the legacy parser stays
+	// authoritative (DisableFlagParsing), as with compile above.
+	doctorCmd.Flags().String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
+	doctorCmd.Flags().Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
+
 	configCmd := &cobra.Command{
 		Use:   "config",
 		Short: "Inspect resolved config",
@@ -163,7 +168,11 @@ func newInspectCmds() []*cobra.Command {
 			return runConfigShow(args)
 		},
 	}
+	configShowCmd.Flags().String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
 	configCmd.AddCommand(configShowCmd)
+
+	fmtCmd.Flags().BoolP("write", "w", false, "rewrite files in place instead of listing them")
+	fmtCmd.Flags().BoolP("list", "l", false, "list files that would change (default behavior; accepted for gofmt-familiarity)")
 
 	routesCmd := &cobra.Command{
 		Use:   "routes <files...>",

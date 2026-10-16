@@ -62,7 +62,7 @@ func printDoctorUsage(fs *flag.FlagSet) {
 		_, _ = fmt.Fprintln(fs.Output(), body)
 	}
 
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor")+dim("  # verify enabled project batteries"))
@@ -72,6 +72,17 @@ func printDoctorUsage(fs *flag.FlagSet) {
 	if shouldShowHint() {
 		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever doctor' after editing ZEVER_* env"))
 	}
+}
+
+// newDoctorFlagSet declares the doctor flags once, shared by argv parsing and
+// every help path so `zever help doctor` lists the real flags.
+func newDoctorFlagSet() (fs *flag.FlagSet, configPath *string, strict *bool) {
+	fs = flag.NewFlagSet("doctor", flag.ContinueOnError)
+	configPath = fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
+	strict = fs.Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
+	fs.Usage = func() { printDoctorUsage(fs) }
+
+	return fs, configPath, strict
 }
 
 // runDoctor builds a Container from config.Load(path) (which discovers
@@ -86,7 +97,7 @@ func printDoctorUsage(fs *flag.FlagSet) {
 // (exit 1) when any fails, and a flagUsageError (exit 2) on flag misuse.
 func runDoctor(args []string) error {
 	if hasHelpFlag(args) {
-		fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
+		fs, _, _ := newDoctorFlagSet()
 		fs.Usage = func() { printDoctorUsage(fs) }
 		// Proof: fs.Usage() calls printDoctorUsage(fs) verbatim, so output is
 		// identical to a direct call while also covering the Usage closure.
@@ -96,10 +107,7 @@ func runDoctor(args []string) error {
 	}
 
 	args = peelInteractive(args)
-	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
-	configPath := fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
-	strict := fs.Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
-	fs.Usage = func() { printDoctorUsage(fs) }
+	fs, configPath, strict := newDoctorFlagSet()
 
 	if err := rejectUnknownFlags("doctor", args, []string{"config", "strict"}); err != nil {
 		return &flagUsageError{err: err}

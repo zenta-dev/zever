@@ -93,7 +93,7 @@ func runDBRollback(args []string) error {
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(fs.Output(), rollbackHelp)
-		fs.PrintDefaults()
+		printFlagDefaults(fs)
 	}
 
 	if err := fs.Parse(args); err != nil {
