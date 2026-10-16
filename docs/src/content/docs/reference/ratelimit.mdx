@@ -1,0 +1,75 @@
+---
+title: Ratelimit reference
+description: Rate-limiter adapters, config keys, options, defaults, and error index for the ratelimit battery.
+---
+
+Token-bucket rate limiting. `ratelimit` allows or denies keyed requests through `Limiter`, with `Decision` values carrying `Allowed`, `RetryAfter`, and `Remaining`. It is not HTTP middleware: callers map denials to 429 and choose fail-open behavior on error. Full how-to: [Ratelimit guide](../../guides/security/ratelimit/).
+
+## Adapters
+
+| Adapter | Module | Register | Default |
+|---|---|---|---|
+| `memory` | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | Yes |
+| `redis` | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | No |
+
+Resolve through the container with `c.RateLimit()`. Use `redis` when limits must be shared across replicas; a `memory` limiter is per-instance. Swapping backends is a config change: set `ratelimit.adapter`, no code change.
+
+## Configuration
+
+Service key: `ratelimit`. `rate` and `burst` are required. File example:
+
+```yaml title="zever.yaml"
+ratelimit:
+  adapter: memory
+  options:
+    rate: 100
+    burst: 200
+```
+
+```sh
+RATELIMIT_ADAPTER=memory
+```
+
+Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix (for example `RATELIMIT_ADAPTER`). A non-empty `options` block replaces the default options wholesale, so repeat `rate` and `burst`; env variables overlay one field at a time. Full layering rules: [Config reference](./config/).
+
+## Options
+
+Authority for types and defaults: [Config reference](./config/#ratelimit).
+
+| Key | Type | Default | Notes |
+|---|---|---|---|
+| `rate` | number | `10` (config default) | Token refill rate per second; must be > 0 and finite |
+| `burst` | integer | `20` (config default) | Maximum bucket size; must be > 0 |
+| `idle_ttl` | duration | `10m` | Idle entry TTL; zero means the adapter default, negative fails |
+| `sweep_interval` | duration | `1m` | Idle-entry sweep interval; zero means the adapter default, negative fails |
+| `max_entries` | integer | `1000` | Bucket-table bound in the memory adapter before LRU eviction; non-positive means the default |
+| `trusted_proxies` | list of string | `[]` | CIDRs (or bare IPs) of proxies whose `X-Forwarded-For` headers are honored; empty trusts none |
+| `redis.prefix` | string | `""` | Key prefix for Redis ratelimit data |
+| `redis.url` | string | `""` | Reserved and currently ignored |
+
+Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](./config/#redis-connection-options).
+
+Keys are validated for shape and length (`ValidateKey`: 1..256 bytes, no control characters, `CR`/`LF`/`DEL` rejected). Key errors never echo the key itself, since keys may be IPs. Costs are validated with `ValidateCost`: tokens and burst must be > 0 and finite; a cost above burst is capped, not an error.
+
+## Errors
+
+Every sentinel below is a package-level `ErrXxx` in `core/ratelimit` (see `errors.go`). Branch with `errors.Is`, never by message text.
+
+| Sentinel | Cause | Fix |
+|---|---|---|
+| `ErrClosed` | Limiter used after close | Open a new limiter; do not reuse the closed one |
+| `ErrNilFactory` | `Register` called with a nil factory | Pass a non-nil constructor |
+| `ErrDuplicateAdapter` | Same adapter registered twice | Register each adapter once; check for a duplicate `Register` call |
+| `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
+| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `memory.Register()`) before `Open` |
+| `ErrInvalidAdapter` | Empty adapter name to `ParseAdapter` | Pass a non-empty adapter name |
+| `ErrInvalidOptions` | `Options.Validate` failed (bad `rate`/`burst`, negative TTLs, bad Redis address or prefix, bad `trusted_proxies` entry) | Fix the named field; blank or unparsable proxy entries name the entry |
+| `ErrInvalidKey` | Rate-limit key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the length only, never the key |
+| `ErrInvalidCost` | Token cost or burst not > 0 or not finite | Pass a positive finite cost |
+
+## Related
+
+- [Ratelimit guide](../../guides/security/ratelimit/) for per-path limits and sharing across replicas.
+- [Config reference](./config/#ratelimit) for the full option table and layering rules.
+- [Adapters matrix](./adapters-matrix/) for every service, adapter module, and container accessor.
+- [Errors](./errors/) for the repo-wide message format, wrapping, and branching conventions.

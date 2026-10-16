@@ -149,7 +149,7 @@ exit:0
 | Database | `zever db migrate` |
 | Database | `zever db rollback` |
 | Database | `zever db seed` |
-| Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../../digging-deeper/outbox-ops/)) |
+| Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../../guides/background/outbox-ops/)) |
 | Operations | `zever uninstall` (remove the `zever` and `zever-lsp` binaries; `--dry-run`, `--keep-lsp`, `--yes`/`--force`) |
 | Operations | `zever upgrade` (upgrade the `zever` binary to the latest release; `--version`, `--check`, `--dry-run`, `--yes`/`--force`) |
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
@@ -247,7 +247,7 @@ non-negative. `dlq purge` needs an adapter that implements
 `does not support message deletion` rather than deleting nothing. Run
 these from a deploy box with database access, not from every replica.
 Metrics, alert rules, and the full runbook are in
-[Outbox Ops](../../digging-deeper/outbox-ops/).
+[Outbox Ops](../../guides/background/outbox-ops/).
 
 ### `zever uninstall`
 
@@ -354,4 +354,4 @@ the same TTY rules as `uninstall`; `--json` emits the envelope.
 - [LSP and Tooling](../../guides/extend/editor-setup/) for editor-side inspection
 - [Config Reference](../config/) for `config show` output
 - [Backends](../../concepts/backends/) for `compile` outputs
-- [Outbox Ops](../../digging-deeper/outbox-ops/) for `zever outbox` in context
+- [Outbox Ops](../../guides/background/outbox-ops/) for `zever outbox` in context
