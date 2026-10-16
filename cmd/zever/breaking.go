@@ -93,7 +93,7 @@ func printBreakingUsage(fs *flag.FlagSet) {
 		bold("Flags:"),
 	)
 	_, _ = fmt.Fprintln(fs.Output(), body)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever breaking schema-old/*.zen -- schema/*.zen"))

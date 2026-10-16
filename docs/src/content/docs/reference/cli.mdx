@@ -312,7 +312,11 @@ the same TTY rules as `uninstall`; `--json` emits the envelope.
 
 - `zever completion <shell>` prints that shell's completion script to
   stdout; redirect into the completions dir, e.g.
-  `zever completion bash > /etc/bash_completion.d/zever`.
+  `zever completion bash > /etc/bash_completion.d/zever`. The scripts
+  complete dynamically: `.zen` files for the schema commands, the
+  `generate` kinds, `--backend` (comma lists), `--profile`, `--adapters`
+  (`battery=adapter` for `new`, `battery` or `battery/adapter` for `build`)
+  and `--config` files.
 - `zever docs --dir <dir>` writes one man page plus one markdown file per
   command into `<dir>`; build stripped release binaries with
   `make build-release` (`-trimpath -ldflags="-s -w"`).

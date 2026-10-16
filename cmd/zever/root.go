@@ -118,6 +118,12 @@ func useCobra(args []string) bool {
 	first := ""
 	rest := []string{}
 
+	// Cobra's hidden dynamic-completion commands, invoked by the scripts
+	// `zever completion <shell>` generates.
+	if len(args) > 0 && (args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd) {
+		return true
+	}
+
 	for i, a := range args {
 		if globalFlagToken(a) {
 			continue
@@ -247,11 +253,11 @@ zever applications built from .zen schemas.`,
 		},
 	}
 
-	root.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, "guided prompts where supported (also ZEVER_INTERACTIVE=1)")
-	root.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
-	root.PersistentFlags().Bool("no-color", false, "disable ANSI styling")
-	root.PersistentFlags().BoolVar(&showJSON, "json", false, "machine-readable JSON envelope output (also ZEVER_JSON=1)")
-	root.PersistentFlags().BoolVar(&showV, "V", false, "print the CLI version (alias for --version)")
+	root.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, usageInteractive)
+	root.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, usageQuiet)
+	root.PersistentFlags().Bool("no-color", false, usageNoColor)
+	root.PersistentFlags().BoolVar(&showJSON, "json", false, usageJSON)
+	root.PersistentFlags().BoolVar(&showV, "V", false, usageV)
 
 	root.PersistentPreRun = func(cmd *cobra.Command, _ []string) {
 		if interactive || envInteractive() {
@@ -302,6 +308,8 @@ zever applications built from .zen schemas.`,
 	// header (printUsage, main.go): both paths start with usageHeader
 	// (suggest.go). Subcommand help keeps the default template.
 	root.SetHelpTemplate(usageHeader + "\n\n" + root.HelpTemplate())
+
+	registerCompletions(root)
 
 	return root
 }

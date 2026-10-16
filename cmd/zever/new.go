@@ -200,7 +200,7 @@ func newNewFlagSet() *flag.FlagSet {
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
-		fs.PrintDefaults()
+		printFlagDefaults(fs)
 	}
 
 	return fs
@@ -210,7 +210,7 @@ func newNewFlagSet() *flag.FlagSet {
 // defaults) to fs.Output, for the legacy `zever help new` path.
 func printNewUsage(fs *flag.FlagSet) {
 	_, _ = fmt.Fprintf(fs.Output(), newUsage+"\n", defaultFrameworkVersion)
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 }
 
 // runNew scaffolds a new project from flags, with one opt-in interactive

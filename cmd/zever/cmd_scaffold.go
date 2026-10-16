@@ -54,6 +54,8 @@ db/seed entrypoints, and internal/app wiring.`,
 	cmd.Flags().Bool("force", false, "scaffold into a non-empty directory anyway")
 	cmd.Flags().Bool("dry-run", false, "print the scaffold plan without writing any files")
 	cmd.Flags().String("profile", "", "scaffold profile: minimal (bootable floor only), api, or full (every battery)")
+	cmd.Flags().String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber)")
+	cmd.Flags().String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache)")
 
 	return cmd
 }

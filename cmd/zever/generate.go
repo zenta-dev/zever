@@ -246,7 +246,7 @@ func printBoxedUsage(fs *flag.FlagSet, header, usage, body string, examples []us
 		_, _ = fmt.Fprintln(fs.Output(), joined)
 	}
 
-	fs.PrintDefaults()
+	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	for _, ex := range examples {
