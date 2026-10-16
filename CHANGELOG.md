@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+- Docs: `start/versioning` and `start/project-layout` no longer carry stale
+  module counts (about 180 modules; 176 workspace `use` entries).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
