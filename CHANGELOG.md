@@ -167,6 +167,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regenerated (unstamped and v0.6.1/v0.7.0 stamps are gone) and
   `make compile-check` now gates every example, not just `examples/todo`.
 
+### Security
+
+- `core/middleware`: `Recover` and `RecoverUnaryServerInterceptor` now log the
+  panic value with credentials scrubbed (URL userinfo, bearer/basic tokens,
+  `password`/`token`/`api_key`-style pairs, long opaque IDs) and capped at
+  1 KiB, so secrets embedded in panic messages stay out of log sinks.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

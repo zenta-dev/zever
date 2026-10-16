@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"runtime/debug"
 
@@ -26,7 +25,8 @@ type errorBody struct {
 var errorBodyCodec = codec.JSONCodec[errorBody]{}
 
 // Recover returns HTTP middleware that recovers a panicking handler, logs the
-// panic value with a stack trace via logger, and responds 500 with the fixed
+// panic value (credentials scrubbed, length capped) with a stack trace via
+// logger, and responds 500 with the fixed
 // error shape -- instead of the panic crashing the whole process, which is
 // what happens with no recovery middleware in the request path.
 //
@@ -40,7 +40,7 @@ func Recover(logger log.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if p := recover(); p != nil {
 					logger.Error().
-						Str("panic", fmt.Sprint(p)).
+						Str("panic", redactPanicValue(p)).
 						Str("stack", string(debug.Stack())).
 						Msg("panic recovered")
 
@@ -75,7 +75,7 @@ func RecoverUnaryServerInterceptor(logger log.Logger) grpc.UnaryServerIntercepto
 		defer func() {
 			if p := recover(); p != nil {
 				logger.Error().
-					Str("panic", fmt.Sprint(p)).
+					Str("panic", redactPanicValue(p)).
 					Str("stack", string(debug.Stack())).
 					Str("method", info.FullMethod).
 					Msg("panic recovered")
