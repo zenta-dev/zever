@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/zenta-dev/zever/core/ai"
@@ -70,7 +71,7 @@ func (l *Loop) dispatchParallel(ctx context.Context, calls []ai.ToolCall) ([]str
 
 			dispatched[i] = true
 
-			res, err := l.dispatch(ctx, call)
+			res, err := l.safeDispatch(ctx, call)
 			if err != nil {
 				select {
 				case errCh <- err:
@@ -105,4 +106,17 @@ func (l *Loop) dispatchParallel(ctx context.Context, calls []ai.ToolCall) ([]str
 	}
 
 	return out, nil
+}
+
+// safeDispatch runs dispatch, converting a tool panic into an error so a
+// misbehaving tool aborts the batch instead of crashing the process from a
+// fan-out goroutine.
+func (l *Loop) safeDispatch(ctx context.Context, call ai.ToolCall) (res string, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("agent: tool %q panicked: %v", call.Name, p)
+		}
+	}()
+
+	return l.dispatch(ctx, call)
 }

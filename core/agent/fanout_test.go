@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -118,5 +119,35 @@ func TestRun_sequentialByDefault(t *testing.T) {
 
 	if len(order) != 1 {
 		t.Fatalf("handler ran %d times, want 1", len(order))
+	}
+}
+
+func TestRun_parallelToolPanicBecomesError(t *testing.T) {
+	client := &scriptedAI{responses: []ai.Generation{
+		{ToolCalls: []ai.ToolCall{
+			{ID: "1", Name: "ok"},
+			{ID: "2", Name: "boom"},
+		}},
+	}}
+
+	boom := Tool{
+		Name: "boom",
+		Handler: func(context.Context, map[string]any) (string, error) {
+			panic("kaboom")
+		},
+	}
+
+	l, err := New(client, Options{
+		Model:       "m",
+		MaxParallel: 2,
+		Tools:       []Tool{echoTool("ok"), boom},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	_, err = l.Run(t.Context(), nil)
+	if err == nil || !strings.Contains(err.Error(), "kaboom") {
+		t.Fatalf("Run() error = %v, want an error naming the panic", err)
 	}
 }
