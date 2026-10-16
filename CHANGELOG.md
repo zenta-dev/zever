@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the lexer's columns, so astral characters such as emoji no longer shift
   later edits. Found by the new `FuzzFormatIdempotent`.
 
+### Changed
+
+- `perf(queue)`: the memory queue adapter keeps delayed messages in a min-heap
+  on `readyAt`, so each promoter wake-up pops only due entries instead of
+  rescanning and reallocating the whole delayed set (100k delayed messages:
+  one wake-up now ~370 ns, 1 alloc).
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

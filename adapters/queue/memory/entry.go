@@ -11,6 +11,61 @@ type delayedEntry struct {
 	readyAt time.Time
 }
 
+// delayedHeap is a min-heap of delayedEntry ordered by readyAt, so the next
+// due message is always at index 0.
+type delayedHeap []delayedEntry
+
+// push inserts e, sifting up to restore readyAt order.
+func (h *delayedHeap) push(e delayedEntry) {
+	*h = append(*h, e)
+
+	s := *h
+	for i := len(s) - 1; i > 0; {
+		p := (i - 1) / 2
+		if !s[i].readyAt.Before(s[p].readyAt) {
+			break
+		}
+
+		s[i], s[p] = s[p], s[i]
+		i = p
+	}
+}
+
+// pop removes and returns the earliest entry. Callers must check length first.
+func (h *delayedHeap) pop() delayedEntry {
+	old := *h
+	first := old[0]
+	n := len(old) - 1
+
+	old[0] = old[n]
+	old[n] = delayedEntry{}
+	s := old[:n]
+	*h = s
+
+	for i := 0; ; {
+		l, r, m := 2*i+1, 2*i+2, i
+		if l < n && s[l].readyAt.Before(s[m].readyAt) {
+			m = l
+		}
+
+		if r < n && s[r].readyAt.Before(s[m].readyAt) {
+			m = r
+		}
+
+		if m == i {
+			break
+		}
+
+		s[i], s[m] = s[m], s[i]
+		i = m
+	}
+
+	return first
+}
+
+// peek returns the earliest entry without removing it.
+func (h *delayedHeap) peek() delayedEntry { return (*h)[0] }
+
 type visibilityEntry struct {
 	id       queue.MessageID
 	deadline time.Time
