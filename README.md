@@ -13,22 +13,43 @@ One framework. Every backend concern. Zero rewiring.
 [![golangci-lint](https://img.shields.io/badge/golangci--lint-enabled-brightgreen)](.golangci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-## Why zever
+## What is zever
 
-Every Go backend re-solves the same plumbing: database access, caching, queues,
-routing, auth, config. **zever** lets you describe your services once in a small
-schema file (`.zen`, proto-inspired) and compiles that into the infrastructure
-around them. It never generates or dictates your business logic, only the
-plumbing that logic runs on.
+zever is a schema-driven scaffolding compiler for Go. You describe entities
+and services once in a small schema file (`.zen`, proto-inspired); zever
+compiles it into the backend plumbing around your logic: a typed ORM, SQL
+migrations, OpenAPI, routes. It never generates or dictates business logic —
+only the infrastructure that logic runs on.
 
-- **Schema in, plumbing out.** One `.zen` file drives validation, a typed ORM,
-  OpenAPI, migrations, and routes.
-- **Swap infrastructure with config.** Every backend concern (db, cache, queue,
-  auth, storage, ...) is a small interface with swappable adapters. Moving from
-  sqlite to Postgres, or memory to Redis, is a config change.
-- **Runs with zero infrastructure.** Defaults are sqlite, in-memory and local
-  adapters, so you can start without Docker or external services.
-- **Your logic stays yours.** No generated business code to fight or regenerate over.
+Every backend concern (db, cache, queue, auth, storage, ...) is one small
+interface with swappable adapters, resolved lazily through a shared
+container. Moving from sqlite to Postgres, or memory to Redis, is a config
+change, not a code change. Defaults are zero-infra (sqlite, in-memory,
+local), so tests and first runs need no Docker or external services.
+
+## Who is it for
+
+- Go teams building service backends who want one typed schema driving the
+  database, the API, and the docs, instead of hand-wiring each layer.
+- Teams that have outgrown copy-pasted `chi` + `sqlc` wiring and want
+  adapter swaps without rewrites.
+- Teams that want generated plumbing they own and run themselves — not a
+  hosted platform.
+
+If you write no Go, or you want someone else to run your infrastructure,
+zever is the wrong tool (see [What zever will not do](#what-zever-will-not-do)).
+
+## Why not sqlc / ent / Goa / Encore / plain chi+sqlc
+
+| Instead of ... | zever differs by ... | Pick the other when ... |
+| --- | --- | --- |
+| `sqlc` | one `.zen` schema drives ORM + migrations + OpenAPI + routes, not just queries from SQL you already wrote | you already own your SQL and want thin generated queries with no framework to adopt |
+| `ent` | adapters swap by config; no generated business code to work around | you want rich entity-graph modeling with built-in privacy/migration rules in Go |
+| `Goa` | the schema also owns persistence (ORM, migrations), not just the API surface | API design is the center and you want a mature design-language-to-code pipeline |
+| `Encore` | generated code you own and run anywhere; no platform lock-in | you want hosting, deploys, previews, and observability out of the box |
+| plain `chi` + `sqlc` | one schema change regenerates every layer consistently | the service is small enough that framework surface costs more than it saves |
+
+Honest version with details: [docs/comparison.md](docs/comparison.md).
 
 ## Install
 
@@ -103,6 +124,41 @@ zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
 You now have a typed ORM, an OpenAPI document, and a sqlite database with a
 `tasks` table, all derived from that one schema.
 
+The `zenorm` backend turns the `Task` entity above into typed Go (excerpt
+from `generated/zenorm/orm/gen/app/app.go`, produced by
+`go run ./cmd/zever compile --backend=zenorm --out ./generated schema/app.zen`
+with zever v0.7.1):
+
+```go
+// Tasks is the orm.Table for Task, generated from the "Task" entity.
+var Tasks = orm.NewTable[Task]("tasks", []string{"id", "title", "done", "created_at"})
+
+// TaskCols holds typed orm.Column/orm.NullableColumn references for Task,
+// used to build type-safe predicates, order terms and assignments.
+var TaskCols = struct {
+	ID        orm.Column[Task, string]
+	Title     orm.Column[Task, string]
+	Done      orm.Column[Task, bool]
+	CreatedAt orm.Column[Task, time.Time]
+}{
+	ID:        orm.NewColumn[Task, string]("tasks", "id"),
+	Title:     orm.NewColumn[Task, string]("tasks", "title"),
+	Done:      orm.NewColumn[Task, bool]("tasks", "done"),
+	CreatedAt: orm.NewColumn[Task, time.Time]("tasks", "created_at"),
+}
+
+// Task mirrors the "Task" entity declared in the schema.
+type Task struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Done      bool      `json:"done"`
+	CreatedAt time.Time `json:"created_at"`
+}
+```
+
+(The full file also generates a `Scan` method reading rows in
+`Tasks.Columns()` order and a `Columns()` helper.)
+
 **See a full running server.** `examples/todo` is a small auth-gated notes API
 (HTTP on `:8080`, gRPC on `:9090`):
 
@@ -136,6 +192,41 @@ adapters. Adapters register explicitly via each adapter module's `Register()`
 call, and a shared container resolves and caches
 each one lazily on first use. Swapping an adapter means changing configuration,
 not code.
+
+### Core vs Extended batteries
+
+Batteries are split into two stability tiers (full lists in
+[STABILITY.md](STABILITY.md)):
+
+- **Core** (toward the 1.0 promise — breaks are minimized, called out in
+  release notes, and need maintainer review): `config`, `container`, `db`,
+  `orm`, `router`, `cache`, `queue`, `session`, `auth`, `crypto`,
+  `password`, `secrets`, and the `dsl` compiler frontend.
+- **Extended** (everything else — `storage`, `payment`, `search`,
+  `vectorstore`, `ai`, `workflow`, ... — may still break freely in `0.x`
+  with release-note docs).
+
+Pre-1.0, `0.x` releases may contain breaking changes; they are documented
+in release notes.
+
+## What zever will not do
+
+- **Write your business logic.** Generated code is plumbing (tables,
+  columns, routes, API shapes). What a `CreateTask` *does* is always your
+  code.
+- **Run or host your code.** `zever serve` and `zever dev` run locally.
+  There is no cloud platform, no deploy target, no managed control plane.
+- **Touch production for you.** `zever tinker` evaluates arbitrary Go
+  against a live container and is development-only; `zever dev` is local
+  watch-mode only. Never point either at production data.
+- **Hide SQL from you.** The ORM is a typed query builder over `db.DB`,
+  not raw strings; features a dialect lacks fail closed instead of
+  emitting wrong SQL.
+- **Log your secrets.** Raw option maps never hit logs; config redacts
+  through `RedactedServices`/`Redact`.
+- **Grow public interfaces casually.** Adding a method to a public battery
+  interface breaks every implementer, so extensions ship as new
+  interfaces instead.
 
 ## Configuration and wiring
 
