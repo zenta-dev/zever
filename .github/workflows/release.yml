@@ -166,3 +166,5 @@ jobs:
           cache: false
       - name: GOWORK=off go install cmd/zever@tag
         run: bash tools/verify-go-install.sh "${GITHUB_REF_NAME}"
+      - name: Module proxy resolves every module at the tag
+        run: bash tools/tag-release.sh --verify-proxy "${GITHUB_REF_NAME}"
