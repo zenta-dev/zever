@@ -361,6 +361,34 @@ jobs:
       - name: out-of-tree proof module (standalone, outside go.work)
         run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
+  # Fuzz smoke: a short run of the DSL frontend fuzz targets (lexer, parser,
+  # resolver, formatter idempotence). Not a soak: it catches regressions that
+  # the committed seed corpus plus 20s of mutation can reach. Failing inputs
+  # are written under testdata/fuzz and should be committed with the fix.
+  fuzz-smoke:
+    name: fuzz smoke (dsl)
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Fuzz DSL targets
+        working-directory: dsl
+        run: |
+          set -euo pipefail
+          for target in lexer:FuzzLex parser:FuzzParse resolver:FuzzResolve format:FuzzFormatIdempotent; do
+            pkg="${target%%:*}"; fn="${target##*:}"
+            echo "== ${pkg} ${fn}"
+            go test -run '^$' -fuzz "^${fn}\$" -fuzztime 20s "./${pkg}"
+          done
+
   # Nested module gate: tools/zever-lsp is a separate Go module, so the
   # root jobs above never compile or test it. Mirrors the fast gate.
   lsp:
