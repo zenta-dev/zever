@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rescanning and reallocating the whole delayed set (100k delayed messages:
   one wake-up now ~370 ns, 1 alloc).
 
+### Security
+
+- `container`: resolving the postgres `db` service now logs a warning when the
+  DSN leaves TLS optional (`sslmode` unset, `prefer` or `allow`) toward a
+  non-loopback host outside a dev `ZEVER_ENV` (dev, test, development), since
+  those modes fall back to plaintext. The message never includes DSN content.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking
