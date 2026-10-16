@@ -389,6 +389,28 @@ jobs:
             go test -run '^$' -fuzz "^${fn}\$" -fuzztime 20s "./${pkg}"
           done
 
+  # Scaffold gate: `zever new` -> go mod tidy -> build/vet/test, plus
+  # golangci-lint under the scaffold's own .golangci.yml, so a fresh project
+  # always starts green. Installs golangci-lint so the lint leg of the test runs.
+  scaffold:
+    name: scaffold builds, tests and lints
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Install golangci-lint
+        run: make setup-golangci-lint && echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Scaffold, build, vet, test and lint
+        run: go -C cmd/zever test -count=1 -run 'TestRunNewScaffoldsAndBuilds' ./...
+
   # Nested module gate: tools/zever-lsp is a separate Go module, so the
   # root jobs above never compile or test it. Mirrors the fast gate.
   lsp:
