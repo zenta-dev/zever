@@ -204,7 +204,7 @@ require (
 	github.com/chromedp/chromedp v0.20.1 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/cloudflare/cloudflare-go/v7 v7.12.0 // indirect
+	github.com/cloudflare/cloudflare-go/v7 v7.13.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
