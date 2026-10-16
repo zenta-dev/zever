@@ -1,6 +1,7 @@
 // Package redis provides a Redis-backed session.Store.
 //
-// Sessions are stored as a single JSON value per key (prefix + ":" + id).
+// Sessions are stored as a single JSON value per key (prefix + ":" +
+// hex(sha256(id)); the bearer ID itself never reaches Redis).
 // Redis enforces absolute expiry at write time via SET EX: unlike the memory
 // adapter's background sweeper, no access is needed for a session to expire.
 // Save preserves the original absolute ExpiresAt with a WATCH/MULTI/EXEC
@@ -13,6 +14,8 @@ package redis
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -102,8 +105,18 @@ func redactAddr(addr string) string {
 	return redisopt.RedactAddr(addr)
 }
 
+// key returns the Redis key for id. The session ID is a bearer token, so the
+// key holds its SHA-256 hex digest rather than the ID itself: a leaked key
+// listing, MONITOR stream, slow log or backup cannot be replayed as a login.
 func (s *store) key(id string) string {
-	return s.prefix + ":" + id
+	return s.prefix + ":" + hashID(id)
+}
+
+// hashID returns the lowercase hex SHA-256 of a session ID.
+func hashID(id string) string {
+	sum := sha256.Sum256([]byte(id))
+
+	return hex.EncodeToString(sum[:])
 }
 
 func unixNano(t time.Time) int64 {

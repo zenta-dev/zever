@@ -216,7 +216,7 @@ func TestExpiry(t *testing.T) {
 		t.Fatalf("Get after expiry err = %v, want ErrNotFound", err)
 	}
 
-	if n := raw.Exists(ctx, opts.Redis.Prefix+":"+s.ID).Val(); n != 0 {
+	if n := raw.Exists(ctx, opts.Redis.Prefix+":"+hashID(s.ID)).Val(); n != 0 {
 		t.Fatalf("Exists after expiry = %d, want 0", n)
 	}
 }
@@ -302,7 +302,7 @@ func TestSave_keepsExpiry(t *testing.T) {
 		t.Fatalf("Save moved CreatedAt to %v, want %v", got.CreatedAt, s.CreatedAt)
 	}
 
-	ttl, err := raw.TTL(ctx, opts.Redis.Prefix+":"+s.ID).Result()
+	ttl, err := raw.TTL(ctx, opts.Redis.Prefix+":"+hashID(s.ID)).Result()
 	if err != nil {
 		t.Fatalf("TTL err = %v, want nil", err)
 	}
@@ -354,7 +354,7 @@ func TestGet_corruptRecord(t *testing.T) {
 		t.Fatalf("Create err = %v, want nil", err)
 	}
 
-	if perr := raw.Set(ctx, opts.Redis.Prefix+":"+s.ID, []byte("{not-json"), time.Hour).Err(); perr != nil {
+	if perr := raw.Set(ctx, opts.Redis.Prefix+":"+hashID(s.ID), []byte("{not-json"), time.Hour).Err(); perr != nil {
 		t.Fatalf("plant garbage err = %v, want nil", perr)
 	}
 
@@ -385,7 +385,7 @@ func TestSave_corruptOverwrites(t *testing.T) {
 		t.Fatalf("Create err = %v, want nil", err)
 	}
 
-	if perr := raw.Set(ctx, opts.Redis.Prefix+":"+s.ID, []byte("{not-json"), time.Hour).Err(); perr != nil {
+	if perr := raw.Set(ctx, opts.Redis.Prefix+":"+hashID(s.ID), []byte("{not-json"), time.Hour).Err(); perr != nil {
 		t.Fatalf("plant garbage err = %v, want nil", perr)
 	}
 
@@ -417,7 +417,7 @@ func TestDefaultPrefix(t *testing.T) {
 		t.Fatalf("Create err = %v, want nil", err)
 	}
 
-	if n := raw.Exists(ctx, "sess:"+s.ID).Val(); n != 1 {
+	if n := raw.Exists(ctx, "sess:"+hashID(s.ID)).Val(); n != 1 {
 		t.Fatalf("Exists sess:%s... = %d, want 1 (default prefix)", s.ID[:8], n)
 	}
 }
