@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs(readme)`: positioning rewrite at the top of `README.md` (what/whom,
+  why-not table for sqlc/ent/Goa/Encore/plain chi+sqlc, real `zenorm`
+  output, Core vs Extended tiers, "What zever will not do") plus a new
+  honest `docs/comparison.md`.
 - `ci(test)`: live conformance workflow (`.github/workflows/conformance-live.yml`)
   running the shared kits against real services in containers — postgres:17,
   redis:7, S3-compatible minio — via new skip-gated live tests
