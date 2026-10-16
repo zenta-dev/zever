@@ -123,11 +123,12 @@ jobs:
       - name: Start minio (S3-compatible)
         run: |
           set -euo pipefail
+          # minio/minio left Docker Hub; quay.io is the canonical mirror.
           docker run -d --name minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
+            quay.io/minio/minio:latest server /data
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:9000/minio/health/live >/dev/null; then
               echo "minio live after ${i}x5s"

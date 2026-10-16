@@ -32,7 +32,7 @@ func TestQueueConformanceLive(t *testing.T) {
 			t.Fatalf("FlushDB() error = %v", err)
 		}
 
-		q, err := New(queue.Options{Addr: addr})
+		q, err := New(queue.Options{Addr: addr, PollTimeout: queuetest.DefaultPollTimeout})
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}
