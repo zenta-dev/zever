@@ -321,3 +321,50 @@ func TestPrunerTickFiresPruneOnce(t *testing.T) {
 		t.Error("pruneOnce dropped live entry")
 	}
 }
+
+func setClock(s *store, now func() time.Time) {
+	s.mu.Lock()
+	s.now = now
+	s.mu.Unlock()
+}
+
+func TestRevocationExpiresOnInjectedClock(t *testing.T) {
+	t.Parallel()
+
+	si, err := New(Options{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	t.Cleanup(func() { _ = si.Close() })
+
+	s, ok := si.(*store)
+	if !ok {
+		t.Fatalf("New() returned %T, want *store", si)
+	}
+
+	cur := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	setClock(s, func() time.Time { return cur })
+
+	if err := s.Revoke(t.Context(), "j", cur.Add(time.Minute)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+
+	if got, _ := s.IsRevoked(t.Context(), "j"); !got {
+		t.Fatal("IsRevoked() = false before expiry, want true")
+	}
+
+	cur = cur.Add(2 * time.Minute)
+
+	if got, _ := s.IsRevoked(t.Context(), "j"); got {
+		t.Fatal("IsRevoked() = true after expiry, want false")
+	}
+
+	// An until already in the past on the fake clock is a no-op.
+	if err := s.Revoke(t.Context(), "late", cur.Add(-time.Second)); err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+
+	if got, _ := s.IsRevoked(t.Context(), "late"); got {
+		t.Fatal("IsRevoked(late) = true, want false")
+	}
+}
