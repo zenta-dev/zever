@@ -72,12 +72,12 @@ func TestExpiryReclaim(t *testing.T) {
 
 	setClock(s, func() time.Time { return cur })
 
-	if _, err := s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl}); err != nil {
+	if _, err = s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl}); err != nil {
 		t.Fatalf("Begin: %v", err)
 	}
 
 	// Live record: a second claim reports in-progress, not a fresh claim.
-	if out, err := s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl}); err == nil && !out.Replay {
+	if out, beginErr := s.Begin(ctx, "key-expire", idempotency.BeginOptions{TTL: ttl}); beginErr == nil && !out.Replay {
 		t.Fatal("re-Begin before expiry claimed fresh")
 	}
 
