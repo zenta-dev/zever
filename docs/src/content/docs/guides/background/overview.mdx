@@ -1,0 +1,67 @@
+---
+title: Background jobs overview
+description: How jobs, the queue, workers, the scheduler, the outbox, the event bus, workflows, and sagas fit together, and which one to reach for.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Zever has no single "jobs framework". Background work is a handful of small batteries, each solving one problem, and they compose through the [container](../../../concepts/container/). This page is the map: what each piece does, how a job travels from your handler to a worker, and how to pick between them.
+
+## The moving parts
+
+```text
+ HTTP handler / schedule tick
+        |
+   job.Dispatcher  ---- pushes onto ---->  queue.Queue  (memory | redis | db)
+                                                  |
+                                          job.Worker pops, runs the registered
+                                          handler, then acks or nacks
+```
+
+| Piece | What it is | Where to read more |
+|---|---|---|
+| `queue.Queue` | Durable per-topic transport: push, pop, ack, nack, with a visibility timeout. | [Queue](../queue/) |
+| `job.Dispatcher` | Wraps the resolved queue. `Dispatch(ctx, "SendConfirmation", args)` JSON-encodes args onto the topic named after the job's priority. | [Scheduler and jobs](../scheduler-jobs/) |
+| `job.Worker` | Polls topics in order and runs the handler registered with `job.Register`. Retry policy and priority are set at registration. | [Scheduler and jobs](../scheduler-jobs/) |
+| `scheduler.Scheduler` | Fires registered job names on cron specs through the dispatcher. It does not run work itself. | [Scheduler and jobs](../scheduler-jobs/) |
+| `outbox.Store` | Records an event in the same database transaction as your data, then a relay publishes it at least once. | [Outbox](../outbox/) |
+| `eventbus.EventBus` | In-process or Redis fan-out for notify-style signals. No durability for offline handlers. | [Events and event bus](../events/) |
+| `workflow.Workflow` | Durable multi-step runs that resume after a restart: start, signal, query, cancel. | [Workflows](../workflows/) |
+| Saga | Multi-resource operations with reverse compensation or roll-forward after a pivot step, on the workflow battery. | [Saga](../saga/) |
+| `webhook.Webhook` | Signed outbound delivery to registered targets, over HTTP or the retrying queue. | [Webhooks](../webhooks/) |
+
+`Job()` has no adapter of its own. `c.Job()` builds a `*job.Dispatcher` over the already-resolved queue, and `c.Scheduler()` resolves that dispatcher, so the scheduler, dispatcher, and worker all share one process-wide queue instead of opening new connections.
+
+## Run it: server and worker
+
+A server and a worker are separate processes that each build their own container from the same config. The scaffold gives you both entrypoints (`cmd/server`, `cmd/worker`); `zever generate worker` regenerates the worker from your schema's `job` declarations, and `zever queue:work` and `zever schedule:run` run the pieces on their own.
+
+The queue adapter decides what is possible:
+
+- `memory`: web, worker, and scheduler ticks must live in one process. Fine for tests and a single binary. Jobs die with the process.
+- `redis` or `db`: the server enqueues and any number of worker processes pop. This is the production shape. Scale workers independently of web.
+
+The scheduler is not a durable timeline: ticks that fire while the process is down are skipped. Make handlers idempotent and guard overlapping or multi-host ticks with a locker (see the checklist in [Scheduler and jobs](../scheduler-jobs/)).
+
+## Which one do I use?
+
+| You want to... | Use | Because |
+|---|---|---|
+| Send an email, push, or webhook after the request returns | `job.Dispatcher` + a queue worker | Survives restarts, retries with backoff. |
+| Run something every night or every five minutes | Scheduler dispatching a job | Cron triggers; the job does the work. |
+| Publish "booking created" so it is never lost if the row commits | Outbox | The event is written in the same transaction as the row. |
+| Tell other in-process listeners something happened (cache bust, metrics) | Event bus | Cheap fan-out; nothing depends on it running. |
+| Run a multi-day, multi-step process that must resume mid-way | Workflow | State persists across restarts. |
+| Reserve, charge, and issue across systems with undo on failure | Saga | Compensation in reverse order. |
+| Notify a customer's server with a verifiable signature | Webhook | Per-target secrets and HMAC signatures. |
+
+Two rules of thumb. If losing the work is not acceptable, it goes on a queue or the outbox, never the event bus. If delivery can happen twice (queues and the outbox are at least once), the consumer must be idempotent: use the [idempotency and lock](../../security/lock-idempotency/) batteries or the outbox `Inbox`.
+
+## Related
+
+<CardGrid>
+  <LinkCard title="Queue" href="../queue/" description="Adapters, visibility timeout, ack and nack." />
+  <LinkCard title="Scheduler and jobs" href="../scheduler-jobs/" description="Register, dispatch, and schedule jobs." />
+  <LinkCard title="Outbox" href="../outbox/" description="Transactional events with at-least-once delivery." />
+  <LinkCard title="Outbox operations" href="../../../digging-deeper/outbox-ops/" description="Metrics, alerts, and the DLQ runbook." />
+</CardGrid>
