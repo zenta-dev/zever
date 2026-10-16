@@ -91,7 +91,7 @@ Wrap from the outside in:
 
 | Constructor | Behavior |
 |---|---|
-| `RequestLogger(logger)` | One line per request: method, path, status, `duration_ms`, plus `request_id` when present. |
+| `RequestLogger(logger)` | One line per request: method, path, status, `duration_ms` (fractional milliseconds), plus `request_id` when present. |
 | `Recover(logger)` | Recovers panics, logs value and stack, responds 500 `{"error":"internal error"}`. Logs only if the handler already committed. |
 | `RateLimit(limiter, keyFunc, opts...)` | Denies with 429 JSON and `Retry-After` (ceiled seconds). Key func defaults to `RemoteAddrKey` (client IP). |
 | `Tracing(provider)` | Span per request named by path, `http.request.method`/`url.path` attributes, `http.response.status_code` set on completion, span error on 5xx; `http.request` counter tagged by `http.request.method`/`http.response.status_code`. |

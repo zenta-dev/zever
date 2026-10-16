@@ -3,6 +3,7 @@ package ollama
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -42,6 +43,9 @@ type Options struct {
 	// Transport overrides the HTTP round tripper. Nil means http.DefaultTransport.
 	// Tests use a hand-fake transport; production leaves it nil.
 	Transport http.RoundTripper `json:"-" toml:"-" yaml:"-"`
+	// Logger receives the open-time notices for AllowPrivate and
+	// InsecureSkipVerify. Nil means slog.Default().
+	Logger *slog.Logger `json:"-" toml:"-" yaml:"-"`
 }
 
 // ErrInvalidAddr is returned when Options.Addr fails endpoint validation.

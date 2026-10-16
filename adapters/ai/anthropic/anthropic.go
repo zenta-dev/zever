@@ -49,11 +49,16 @@ func New(opts ai.Options) (ai.AI, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("ai: open anthropic: %w", err)
 	}
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	if opts.AllowPrivate {
-		slog.Default().Info("anthropic: allow_private enabled: private, loopback, and link-local addresses can be dialed")
+		logger.Info("anthropic: allow_private enabled: private, loopback, and link-local addresses can be dialed")
 	}
 	if opts.InsecureSkipVerify {
-		slog.Default().Warn("anthropic: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
+		logger.Warn("anthropic: insecure_skip_verify enabled: TLS certificate verification is off; use only for testing")
 	}
 	clientOpts := []option.RequestOption{
 		option.WithAPIKey(opts.APIKey),

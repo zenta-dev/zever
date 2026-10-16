@@ -17,6 +17,7 @@ type fakeEvent struct {
 	strs   map[string]string
 	ints   map[string]int
 	int64s map[string]int64
+	floats map[string]float64
 	msg    string
 }
 
@@ -25,6 +26,7 @@ func newFakeEvent() *fakeEvent {
 		strs:   make(map[string]string),
 		ints:   make(map[string]int),
 		int64s: make(map[string]int64),
+		floats: make(map[string]float64),
 	}
 }
 
@@ -43,7 +45,10 @@ func (e *fakeEvent) Int64(key string, val int64) log.Event {
 	return e
 }
 
-func (e *fakeEvent) Float64(string, float64) log.Event { return e }
+func (e *fakeEvent) Float64(key string, val float64) log.Event {
+	e.floats[key] = val
+	return e
+}
 
 func (e *fakeEvent) Bool(string, bool) log.Event { return e }
 
@@ -167,13 +172,17 @@ func TestRequestLoggerLogsFields(t *testing.T) {
 		t.Errorf("status = %d, want %d", got, http.StatusCreated)
 	}
 
-	ms, ok := ev.int64s["duration_ms"]
+	ms, ok := ev.floats["duration_ms"]
 	if !ok {
-		t.Fatal("duration_ms missing")
+		t.Fatal("duration_ms missing or not a float")
 	}
 
 	if ms < 0 {
-		t.Errorf("duration_ms = %d, want >= 0", ms)
+		t.Errorf("duration_ms = %v, want >= 0", ms)
+	}
+
+	if _, isInt := ev.int64s["duration_ms"]; isInt {
+		t.Error("duration_ms must not be logged as an int")
 	}
 
 	if _, ok := ev.strs["request_id"]; ok {
