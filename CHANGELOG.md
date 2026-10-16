@@ -152,6 +152,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: `start/versioning` and `start/project-layout` no longer carry stale
   module counts (about 180 modules; 176 workspace `use` entries).
 
+### Security
+
+- `container`: resolving the postgres `db` service now logs a warning when the
+  DSN leaves TLS optional (`sslmode` unset, `prefer` or `allow`) toward a
+  non-loopback host outside a dev `ZEVER_ENV` (dev, test, development), since
+  those modes fall back to plaintext. The message never includes DSN content.
+
 ## [v0.7.1] - 2026-10-15
 
 ### Breaking

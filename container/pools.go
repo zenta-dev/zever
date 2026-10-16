@@ -434,6 +434,8 @@ func (c *Container) openDB() (db.DB, error) {
 
 	switch db.Adapter(adapterName) {
 	case db.Postgres:
+		c.warnPostgresSSLMode(opts.DSN, os.Getenv)
+
 		key, ok := postgresPoolKey(opts.DSN)
 		if !ok {
 			return openService("db", adapterName, db.ParseAdapter, db.Open, opts)
