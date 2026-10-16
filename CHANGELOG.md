@@ -44,6 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with cross-night corpus reuse (`.github/workflows/fuzz-nightly.yml`).
   Mutation pilot report at `docs/plans/mutation-report.md` with five new
   mutant-killing tests in `dsl/parser` and `orm/render`.
+- `docs(process)`: new contributor docs — `docs/architecture.md`
+  (compiler pipeline, container, registries, conformance kits),
+  `docs/ai-assisted-development.md` (how AI assistance is reviewed),
+  and `docs/plans/good-first-issues.md` (draft pool, not filed on
+  GitHub) — plus concrete deprecation timelines and Go support
+  window in `STABILITY.md`.
 
 ### Fixed
 
@@ -55,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSONB existence check (`FOR` was missing from the keyword list), sending a
   raw `?` to the server. The row-lock keyword cluster is now recognized
   (`KEY` stays unlisted so `payload ? key` keeps working).
-
 - `feat(zevertest)`: new `github.com/zenta-dev/zever/zevertest` module with test
   helpers: `NewTestContainer(t)` (zero-infrastructure adapters, per-test sqlite
   and storage under `t.TempDir()`, quiet logging, closed on cleanup), a fake

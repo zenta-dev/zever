@@ -111,6 +111,12 @@ require Go 1.27+ and fail on older toolchains. A toolchain bump updates
 `go.work`, every `go.mod`, and the README/CONTRIBUTING requirement notes
 together (see the release checklist in `.github/CONTRIBUTING.md`).
 
+Support window: the floor is the pinned toolchain only — no older minor
+is supported or tested. When the floor moves, the bump ships in a single
+release with all pins updated together (same checklist); the `CHANGELOG.md`
+entry names the new floor so scaffolded projects (`zever new`,
+`zever upgrade`) can follow it.
+
 ## Deprecation policy
 
 Removing or breaking an exported identifier takes at least one minor
@@ -124,6 +130,19 @@ release of warning:
 Pre-1.0 Extended packages are exempt (they break freely with release
 notes); pre-1.0 Core follows the window on a best-effort basis and always
 with release notes.
+
+### Timelines (concrete)
+
+| Situation | Deprecation ships in | Earliest removal |
+|---|---|---|
+| Pre-1.0 (`0.y`) | `0.y` with `// Deprecated:`, replacement, removal target, `CHANGELOG.md` note | Next minor `0.y+1` |
+| Post-1.0 Core | major-line minor with marker + note | Next major (SemVer) |
+| Post-1.0 Extended | release notes only (no window promised) | Any later minor |
+
+Worked example (pre-1.0): marked deprecated in `0.8.0`, removable no
+earlier than `0.9.0`. The removal PR must reference the deprecation
+entry and carry its own `**Breaking:**` note where the `apidiff` gate
+requires it.
 
 ### Kid-less JWT tokens
 
