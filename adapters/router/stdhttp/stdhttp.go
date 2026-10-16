@@ -278,7 +278,7 @@ func buildHandler(path string, mws []func(http.Handler) http.Handler, handler ht
 			params[n] = r.PathValue(n)
 		}
 
-		handler(w, r.WithContext(router.WithParams(r.Context(), params)))
+		handler(w, r.WithContext(router.WithOwnedParams(r.Context(), params)))
 	})
 
 	for i := len(mws) - 1; i >= 0; i-- {
