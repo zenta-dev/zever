@@ -64,7 +64,7 @@ func liveString(env, fallback string) string {
 }
 
 // TestS3ConformanceLive runs the shared storage conformance kit against a
-// real S3-compatible server (e.g. minio in the conformance-live CI
+// real S3-compatible server (Adobe S3Mock in the conformance-live CI
 // workflow). Skipped unless ZEVER_S3_ENDPOINT names the server, so local
 // runs without docker stay green. Stub-transport coverage lives in
 // s3_test.go; never fake infra for conformance.
