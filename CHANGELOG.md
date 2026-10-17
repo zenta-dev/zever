@@ -98,6 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `core/<battery>/reference_test.go`; three page moves with redirects
   (`digging-deeper` strays to `guides/`, `agent-skill` to `guides/extend/`);
   full quadrant map proposed in `docs/plans/pr-ws8.md`.
+- `feat(container)`: opt-in pprof for generated servers. `container.StartPprof`
+  serves the runtime profiles under `/debug/pprof/` on a separate, loopback-only
+  listener (a non-loopback address fails startup), and the generated server
+  turns it on with `--pprof-addr` / `PPROF_ADDR` (off by default). The handler
+  is built on `runtime/pprof` so nothing registers on `http.DefaultServeMux`.
+  The observability guide now documents pprof and that metrics leave via OTLP
+  (there is no built-in Prometheus `/metrics` endpoint).
 
 ### Security
 
