@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/cloudflare/cloudflare-go/v7 v7.13.0
-	github.com/zenta-dev/zever/core/cdn v0.7.1
+	github.com/zenta-dev/zever/core/cdn v0.7.2
 )
 
 require (
@@ -12,7 +12,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/cdn => ../../../core/cdn

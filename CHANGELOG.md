@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.2] - 2026-10-17
+
 ### Added
 
 - `docs`: a background jobs overview (how jobs, queue, worker, scheduler, outbox,

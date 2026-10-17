@@ -16,9 +16,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.38.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 // indirect
-	github.com/zenta-dev/zever/core/log v0.7.1 // indirect
-	github.com/zenta-dev/zever/core/storage v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
+	github.com/zenta-dev/zever/core/log v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/storage v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 )
 
 replace github.com/zenta-dev/zever/adapters/media/local => ../local
@@ -33,9 +33,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
 	github.com/aws/smithy-go v1.28.5
-	github.com/zenta-dev/zever/core/media v0.7.1
-	github.com/zenta-dev/zever/shared/codec v0.7.1
-	github.com/zenta-dev/zever/shared/s3opts v0.7.1
+	github.com/zenta-dev/zever/core/media v0.7.2
+	github.com/zenta-dev/zever/shared/codec v0.7.2
+	github.com/zenta-dev/zever/shared/s3opts v0.7.2
 )
 
 replace github.com/zenta-dev/zever/core/media => ../../../core/media

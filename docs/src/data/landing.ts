@@ -1,6 +1,6 @@
 /** Single source of truth for landing content. Counts are derived, never hard-coded. */
 
-export const VERSION = 'v0.7.1';
+export const VERSION = 'v0.7.2';
 // Installer scripts only exist on main (they postdate the v0.6.1 tag),
 // so fetch them from main; they still install pinned VERSION binaries.
 export const INSTALL_REF = 'main';

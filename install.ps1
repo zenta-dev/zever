@@ -1,7 +1,7 @@
 # install.ps1 - install the zever CLI and zever-lsp on Windows from GitHub releases.
 #
 # Run with:
-#   powershell -ExecutionPolicy Bypass -File install.ps1 -Version v0.7.1
+#   powershell -ExecutionPolicy Bypass -File install.ps1 -Version v0.7.2
 #
 # If the file was downloaded from the web, unblock it first:
 #   Unblock-File .\install.ps1
@@ -20,7 +20,7 @@
 #   never when NO_COLOR is set or -NoColor is passed.
 [CmdletBinding()]
 param(
-  [string]$Version = "v0.7.1",
+  [string]$Version = "v0.7.2",
   [string]$Prefix = (Join-Path $HOME ".local"),
   [switch]$Yes,
   [switch]$Force,
@@ -101,7 +101,7 @@ Install the zever CLI and zever-lsp from GitHub releases.
 Usage: install.ps1 [-Version vX.Y.Z] [-Prefix DIR] [-Yes] [-Force] [-DryRun]
                    [-Quiet] [-NoColor] [-Help]
 
-  -Version  version to install (default: v0.7.1)
+  -Version  version to install (default: v0.7.2)
   -Prefix   install prefix, binaries go to DIR\bin (default: `$HOME\.local)
   -Yes      accept upgrade/downgrade prompts without asking
   -Force    re-install even when the target version is already installed
@@ -115,7 +115,7 @@ Usage: install.ps1 [-Version vX.Y.Z] [-Prefix DIR] [-Yes] [-Force] [-DryRun]
   -Help     print this help and exit
 
 Examples:
-  powershell -ExecutionPolicy Bypass -File install.ps1 -Version v0.7.1 -Yes
+  powershell -ExecutionPolicy Bypass -File install.ps1 -Version v0.7.2 -Yes
   .\install.ps1 -Prefix "$HOME\.local" -DryRun
 "@
 }

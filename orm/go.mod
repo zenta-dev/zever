@@ -4,12 +4,12 @@ go 1.27.2
 
 require (
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/zenta-dev/zever/adapters/db/postgres v0.7.1
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.1
-	github.com/zenta-dev/zever/core/db v0.7.1
-	github.com/zenta-dev/zever/dsl v0.7.1
-	github.com/zenta-dev/zever/shared/lrucache v0.7.1
-	github.com/zenta-dev/zever/shared/retry v0.7.1
+	github.com/zenta-dev/zever/adapters/db/postgres v0.7.2
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.2
+	github.com/zenta-dev/zever/core/db v0.7.2
+	github.com/zenta-dev/zever/dsl v0.7.2
+	github.com/zenta-dev/zever/shared/lrucache v0.7.2
+	github.com/zenta-dev/zever/shared/retry v0.7.2
 )
 
 require (
@@ -22,7 +22,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

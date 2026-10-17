@@ -3,9 +3,9 @@ module github.com/zenta-dev/zever/adapters/geo/google
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/geo v0.7.1
-	github.com/zenta-dev/zever/shared/endpoint v0.7.1
-	github.com/zenta-dev/zever/shared/httpclient v0.7.1
+	github.com/zenta-dev/zever/core/geo v0.7.2
+	github.com/zenta-dev/zever/shared/endpoint v0.7.2
+	github.com/zenta-dev/zever/shared/httpclient v0.7.2
 	googlemaps.github.io/maps v1.7.0
 )
 
@@ -14,8 +14,8 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.1 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
