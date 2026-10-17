@@ -355,13 +355,74 @@ func runCompile(args []string) error { //nolint:gocyclo
 	})
 }
 
+// compileSchemaWithDefaults resolves the backend selection (explicit flag,
+// ZEVER_BACKENDS, or GenerateDefaultBackends), compiles one shared schema,
+// and auto-adds proto/protogogen when a default selection meets a schema
+// declaring services. It returns the schema result, the final backend spec,
+// and diagnostics for the caller to report. The schema directory defaults
+// to the project layout when schemaDir is empty.
+func compileSchemaWithDefaults(files map[string]string, schemaDir, backendsSpec, outDir string) (*compile.Result, string, diag.List, error) {
+	backendsSpec, defaulted := resolveBackendSpec(backendsSpec)
+
+	if schemaDir == "" {
+		schemaDir = defaultSchemaDir
+		if pc, err := loadProjectConfig(); err == nil {
+			schemaDir = pc.SchemaDir
+		}
+	}
+
+	backends, err := resolveBackends(backendsSpec, computeBackendRoots(outDir))
+	if err != nil {
+		return nil, backendsSpec, nil, err
+	}
+
+	result, diags := compile.WithSchemaDir(files, schemaDir, backends...)
+
+	if !diags.HasErrors() && defaulted && schemaDeclaresServices(result.Schema) {
+		if missing := missingGRPCBackends(backendsSpec); len(missing) > 0 {
+			extra, err := resolveBackends(strings.Join(missing, ","), computeBackendRoots(outDir))
+			if err != nil {
+				return result, backendsSpec, diags, err
+			}
+
+			second, secondDiags := compile.WithSchemaDir(files, schemaDir, extra...)
+			if secondDiags.HasErrors() {
+				// An auto-added backend failed on its own (e.g. protogogen
+				// shelling out to a go tool the calling project does not
+				// declare): keep the base outputs and surface the cause as
+				// warnings, so the pipeline stays green but the skip is
+				// visible. The fix (declaring the tool, as `zever new`
+				// scaffolds do) belongs to the project, not the schema.
+				for _, d := range secondDiags {
+					warn := *d
+					warn.Severity = diag.SeverityWarning
+
+					diags = append(diags, &warn)
+				}
+
+				return result, backendsSpec, diags, nil
+			}
+
+			backendsSpec = withGRPCBackends(backendsSpec)
+
+			if result.Outputs == nil {
+				result.Outputs = map[string]map[string][]byte{}
+			}
+
+			for name, backendFiles := range second.Outputs {
+				result.Outputs[name] = backendFiles
+			}
+		}
+	}
+
+	return result, backendsSpec, diags, nil
+}
+
 // runCompileWith compiles cfg.Files through the requested backends (one
 // shared resolved schema, a single compile.WithSchemaDir call) and writes
 // each backend's output under cfg.OutDir/<backend>/. It prints diagnostics
 // to stderr and a success summary to cfg.Out.
 func runCompileWith(cfg CompileConfig) error {
-	backendsSpec, defaulted := resolveBackendSpec(cfg.Backends)
-
 	outDir := cfg.OutDir
 	if outDir == "" {
 		outDir = "./generated"
@@ -374,7 +435,12 @@ func runCompileWith(cfg CompileConfig) error {
 		return fmt.Errorf("zever compile: %w", err)
 	}
 
-	backends, err := resolveBackends(backendsSpec, computeBackendRoots(outDir))
+	schemaDir := defaultSchemaDir
+	if pc, err := loadProjectConfig(); err == nil {
+		schemaDir = pc.SchemaDir
+	}
+
+	result, backendsSpec, diags, err := compileSchemaWithDefaults(files, schemaDir, cfg.Backends, outDir)
 	if err != nil {
 		if shouldShowHint() {
 			if s := closest(strings.TrimSpace(strings.Split(backendsSpec, ",")[0]), allBackends); s != "" {
@@ -384,13 +450,6 @@ func runCompileWith(cfg CompileConfig) error {
 
 		return err
 	}
-
-	schemaDir := defaultSchemaDir
-	if pc, err := loadProjectConfig(); err == nil {
-		schemaDir = pc.SchemaDir
-	}
-
-	result, diags := compile.WithSchemaDir(files, schemaDir, backends...)
 
 	if len(diags) > 0 {
 		printDiagnosticsWithSources(diags, files)
@@ -411,28 +470,6 @@ func runCompileWith(cfg CompileConfig) error {
 		}
 
 		return err
-	}
-
-	// A default selection grows proto/protogogen when the schema declares
-	// services: every resolved operation carries a gRPC transport, so the
-	// protobuf outputs belong to the default pipeline only then. Explicit
-	// --backend selections are honored exactly.
-	if defaulted && schemaDeclaresServices(result.Schema) {
-		if missing := missingGRPCBackends(backendsSpec); len(missing) > 0 {
-			if extra, err := resolveBackends(strings.Join(missing, ","), computeBackendRoots(outDir)); err == nil {
-				if second, secondDiags := compile.WithSchemaDir(files, schemaDir, extra...); !secondDiags.HasErrors() {
-					backendsSpec = withGRPCBackends(backendsSpec)
-
-					if result.Outputs == nil {
-						result.Outputs = map[string]map[string][]byte{}
-					}
-
-					for name, backendFiles := range second.Outputs {
-						result.Outputs[name] = backendFiles
-					}
-				}
-			}
-		}
 	}
 
 	// Stamp every output with the schema provenance (version+hash) before it

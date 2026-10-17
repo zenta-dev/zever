@@ -133,6 +133,10 @@ func runGenerate(args []string) error { //nolint:gocyclo
 					return runGenerateAdapter(nil)
 				}
 			}
+		} else {
+			// Non-interactive bare `zever generate` runs the full pipeline:
+			// compile with the default backend set, stamp, write, scaffold.
+			return runGenerateFull(nil)
 		}
 
 		printGenerateUsage()
@@ -171,8 +175,23 @@ func runGenerate(args []string) error { //nolint:gocyclo
 	// interactiveMode side effect (covered by TestCoverRunGenerateSubcommands).
 	default:
 		if strings.HasPrefix(sub, "-") {
-			// Legacy flags-before-positionals form of `generate module`.
+			// Flag-first pipeline form (`zever generate --diff`, `--check,
+			// --backend, --out, --strict, -h/--help): the full pipeline
+			// owns these flags. Anything else keeps the legacy
+			// flags-before-positionals form of `generate module`.
+			if isGeneratePipelineFlag(sub) {
+				return runGenerateFull(args)
+			}
+
 			return runGenerateModule(args)
+		}
+
+		// Bare pipeline with explicit schema paths (`zever generate
+		// schema/app.zen`): a module/entity name is always a bare
+		// identifier, so anything carrying a path separator, a dot, or a
+		// .zen suffix is a file argument for the full pipeline.
+		if looksLikeSchemaPath(sub) {
+			return runGenerateFull(args)
 		}
 
 		printGenerateUsage()
@@ -199,6 +218,8 @@ func printGenerateUsage() {
 		"",
 		usage,
 		"",
+		dim("Bare ")+cmd("zever generate")+dim(" runs the full pipeline: compile with the default backend set, stamp, write, scaffold."),
+		"",
 		bold("Subcommands:"),
 		line("module <name>", "Scaffold schema/<name>/<name>.zen"),
 		line("entity <module> <name>", "Append an entity declaration to a module .zen"),
@@ -217,6 +238,31 @@ func printGenerateUsage() {
 	} else {
 		_, _ = fmt.Fprintln(os.Stderr, body)
 	}
+}
+
+// isGeneratePipelineFlag reports whether a leading flag belongs to the bare
+// `zever generate` pipeline (rather than the legacy flags-before-positionals
+// form of `generate module`).
+func isGeneratePipelineFlag(arg string) bool {
+	name := strings.TrimLeft(arg, "-")
+	if i := strings.IndexByte(name, '='); i >= 0 {
+		name = name[:i]
+	}
+
+	switch name {
+	case "backend", "out", "diff", "check", "strict", "h", "help":
+		return true
+	}
+
+	return false
+}
+
+// looksLikeSchemaPath reports whether a `zever generate` positional is a
+// schema file argument rather than a subcommand word or module/entity
+// name: names are bare identifiers, so a separator, a dot, or a .zen
+// suffix means a path.
+func looksLikeSchemaPath(arg string) bool {
+	return strings.HasSuffix(arg, ".zen") || strings.ContainsAny(arg, `/.\`)
 }
 
 // usageExample is one Examples row of a boxed usage screen: the command
