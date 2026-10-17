@@ -17,7 +17,7 @@ import (
 // logic and is always regenerated.
 //
 // GRPCPolicies() (grpc.go) is deliberately NOT merged in here: the
-// authz.UnaryServerInterceptor it feeds is attached once, at grpc.Server
+// authz.UnaryServerInterceptorStrict it feeds is attached once, at grpc.Server
 // construction time, which necessarily happens before RegisterModule (this
 // function needs an already-constructed *grpc.Server to register services
 // on) -- so merging every module's GRPCPolicies() into one map is still the

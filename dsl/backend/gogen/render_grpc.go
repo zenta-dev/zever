@@ -105,6 +105,14 @@ func renderPolicies(b *strings.Builder, data moduleModel) {
 
 	for _, svc := range data.Services {
 		for _, op := range svc.Operations {
+			if op.Public {
+				hasAny = true
+
+				fmt.Fprintf(&mapEntries, "\t\t%s.%s_%s_FullMethodName: {},\n", data.PBAlias, svc.Name, op.Name)
+
+				continue
+			}
+
 			if !op.needsPolicy() {
 				continue
 			}
@@ -127,19 +135,20 @@ func renderPolicies(b *strings.Builder, data moduleModel) {
 		fmt.Fprintf(b, "// GRPCPolicies returns the authz.Policy for every gRPC method this module's\n")
 		fmt.Fprintf(b, "// services declare an auth:/permission: requirement for, keyed by the real\n")
 		fmt.Fprintf(b, "// generated FullMethodName. No operation in this module declares one, so\n")
-		fmt.Fprintf(b, "// this always returns an empty map -- authz.UnaryServerInterceptor treats a\n")
-		fmt.Fprintf(b, "// method with no map entry as unrestricted, matching this module's schema.\n")
+		fmt.Fprintf(b, "// this always returns an empty map -- authz.UnaryServerInterceptorStrict\n")
+		fmt.Fprintf(b, "// denies every method with no map entry (fail-closed).\n")
 		b.WriteString("func GRPCPolicies() map[string]authz.Policy {\n\treturn map[string]authz.Policy{}\n}\n\n")
 
 		return
 	}
 
 	b.WriteString("// GRPCPolicies returns the authz.Policy for every gRPC method this module's\n")
-	b.WriteString("// services declare an auth:/permission: requirement for, keyed by the real\n")
+	b.WriteString("// services declare an auth:/permission: requirement for (auth: none maps to\n")
+	b.WriteString("// an empty, explicitly public policy), keyed by the real\n")
 	b.WriteString("// generated FullMethodName constant (the exact string\n")
 	b.WriteString("// grpc.UnaryServerInfo.FullMethod carries for that method at runtime).\n")
 	b.WriteString("// Merge every generated module package's GRPCPolicies() into one map before\n")
-	b.WriteString("// passing it to authz.UnaryServerInterceptor: one interceptor, attached once\n")
+	b.WriteString("// passing it to authz.UnaryServerInterceptorStrict: one interceptor, attached once\n")
 	b.WriteString("// per grpc.Server, must cover every service registered on it.\n")
 	b.WriteString("func GRPCPolicies() map[string]authz.Policy {\n")
 	b.WriteString("\treturn map[string]authz.Policy{\n")

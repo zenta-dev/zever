@@ -262,6 +262,11 @@ type opModel struct {
 	// references ir at all, only the runtime authz.Policy struct.
 	Auth       *ir.AuthPolicy
 	Permission *ir.PermissionCheck
+	// Public is true when the schema wrote an explicit `auth: none`: the
+	// operation is deliberately unauthenticated and is listed in
+	// GRPCPolicies() with an empty authz.Policy, so strict interceptors
+	// (which deny unlisted methods) still serve it.
+	Public bool
 	// SingleRefParam is true when op has exactly one param and it is a ref
 	// (Params[0].IsRef) -- mirrors proto backend's singleRefParam exactly
 	// (dsl/backend/proto/render_service.go): when true, RequestType
@@ -386,6 +391,7 @@ func newOpModel(op *ir.Operation) opModel {
 		Paginated:      op.Paginated,
 		Auth:           op.Auth,
 		Permission:     op.Permission,
+		Public:         op.AuthDeclared && op.Auth == nil && op.Permission == nil,
 		SingleRefParam: singleRefParam,
 	}
 

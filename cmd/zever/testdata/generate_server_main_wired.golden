@@ -527,12 +527,19 @@ func run(addr, grpcAddr, pprofAddr string) error {
 		policies[k] = v
 	}
 
+	// The interceptor is fail-closed (authz.UnaryServerInterceptorStrict):
+	// any gRPC method without a policy entry is denied. Operations declared
+	// "auth: none" in the schema carry an explicit empty policy via
+	// GRPCPolicies(); the standard health check is listed here so
+	// orchestrator probes keep working.
+	policies[healthpb.Health_Check_FullMethodName] = authz.Policy{}
+
 	grpcOpts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			middleware.RecoverUnaryServerInterceptor(logger),
 			middleware.TracingUnaryServerInterceptor(obs),
 			middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey),
-			authz.UnaryServerInterceptor(authInst, permInst, policies),
+			authz.UnaryServerInterceptorStrict(authInst, permInst, policies),
 		),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionIdle: DefaultGRPCMaxConnectionIdle,

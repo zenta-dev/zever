@@ -128,11 +128,12 @@ var BookingServiceAddReviewPolicy = authz.Policy{
 }
 
 // GRPCPolicies returns the authz.Policy for every gRPC method this module's
-// services declare an auth:/permission: requirement for, keyed by the real
+// services declare an auth:/permission: requirement for (auth: none maps to
+// an empty, explicitly public policy), keyed by the real
 // generated FullMethodName constant (the exact string
 // grpc.UnaryServerInfo.FullMethod carries for that method at runtime).
 // Merge every generated module package's GRPCPolicies() into one map before
-// passing it to authz.UnaryServerInterceptor: one interceptor, attached once
+// passing it to authz.UnaryServerInterceptorStrict: one interceptor, attached once
 // per grpc.Server, must cover every service registered on it.
 func GRPCPolicies() map[string]authz.Policy {
 	return map[string]authz.Policy{

@@ -109,7 +109,7 @@ func newGRPCFixture(t *testing.T) *grpcParityFixture {
 	return &grpcParityFixture{
 		impl:        impl,
 		grpc:        genshop.NewShopServiceGRPCServer(impl),
-		interceptor: authz.UnaryServerInterceptor(authInst, checker, genshop.GRPCPolicies()),
+		interceptor: authz.UnaryServerInterceptorStrict(authInst, checker, genshop.GRPCPolicies()),
 		http:        r,
 		auth:        authInst,
 		queue:       q,
