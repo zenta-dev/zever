@@ -148,6 +148,7 @@ use (
 	./examples/showcase
 	./examples/todo
 	./orm
+	./serve
 	./shared/apperror
 	./shared/cas
 	./shared/codec
@@ -332,6 +333,7 @@ replace github.com/zenta-dev/zever/examples/demoapp v0.7.2 => ./examples/demoapp
 replace github.com/zenta-dev/zever/examples/showcase v0.7.2 => ./examples/showcase
 replace github.com/zenta-dev/zever/examples/todo v0.7.2 => ./examples/todo
 replace github.com/zenta-dev/zever/orm v0.7.2 => ./orm
+replace github.com/zenta-dev/zever/serve v0.7.2 => ./serve
 replace github.com/zenta-dev/zever/shared/apperror v0.7.2 => ./shared/apperror
 replace github.com/zenta-dev/zever/shared/cas v0.7.2 => ./shared/cas
 replace github.com/zenta-dev/zever/shared/codec v0.7.2 => ./shared/codec
