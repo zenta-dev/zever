@@ -9,14 +9,19 @@
 #   3. no list entry is a truncated duplicate of the entry right after it;
 #   4. continuation lines are indented by an even number of spaces.
 # Usage: tools/changelog-lint.sh [CHANGELOG.md]
+# Also lints .changelog/unreleased/*.md fragments (same entry rules), so
+# parallel PRs can carry entries without touching CHANGELOG.md.
 set -euo pipefail
 
 file="${1:-$(cd "$(dirname "$0")/.." && pwd)/CHANGELOG.md}"
+root="$(cd "$(dirname "$file")" && pwd)"
+fragdir="$root/.changelog/unreleased"
 if [ ! -f "$file" ]; then
   echo "error: $file not found" >&2
   exit 1
 fi
 
+lint_one() {
 awk '
 function fail(msg) { printf "%s:%d: %s\n", FILENAME, NR, msg; bad = 1 }
 /^## \[/ {
@@ -56,4 +61,19 @@ function fail(msg) { printf "%s:%d: %s\n", FILENAME, NR, msg; bad = 1 }
   if (index(line, "**Breaking:**") > 0) fail("**Breaking:** must only appear as the entry prefix")
 }
 END { exit bad }
-' "$file" && echo "changelog-lint: ok"
+' "$1"
+}
+
+lint_one "$file"
+
+if [ -d "$fragdir" ]; then
+  for frag in "$fragdir"/*.md; do
+    case "$(basename "$frag")" in
+      README.md) continue ;;
+    esac
+    [ -e "$frag" ] || continue
+    lint_one "$frag"
+  done
+fi
+
+echo "changelog-lint: ok"
