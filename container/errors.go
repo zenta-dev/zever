@@ -3,12 +3,23 @@ package container
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/zenta-dev/zever/core/outbox"
 )
 
 // ErrTransactorUnsupported reports a db adapter that lacks transaction support.
 var ErrTransactorUnsupported = errors.New("container: transactor unsupported")
+
+// ErrDuplicateRef reports two Provide calls for the same service/name.
+var ErrDuplicateRef = errors.New("container: duplicate provider ref")
+
+// ErrNotWired reports a Ref with no provider: either resolved directly or
+// required as a non-Optional dependency.
+var ErrNotWired = errors.New("container: dependency not wired")
+
+// ErrDependencyCycle reports providers that depend on each other in a loop.
+var ErrDependencyCycle = errors.New("container: dependency cycle")
 
 // ErrCloseTimeout reports a service whose Close did not finish in time.
 var ErrCloseTimeout = errors.New("container: close timed out")
@@ -167,4 +178,91 @@ func (e PublisherSetterError) Error() string {
 // Unwrap returns ErrPublisherSetterUnsupported.
 func (e PublisherSetterError) Unwrap() error {
 	return ErrPublisherSetterUnsupported
+}
+
+// DuplicateRefError names two Provide calls for the same service/name.
+// First and Second are the declaration sites (file:line) captured by each
+// Provide call.
+type DuplicateRefError struct {
+	Service string
+	Name    string
+	First   string
+	Second  string
+}
+
+// Error describes the duplicated Ref and both declaration sites.
+func (e DuplicateRefError) Error() string {
+	return fmt.Sprintf("container: duplicate provider for %s (first at %s, second at %s): provide each service/name once",
+		e.refLabel(), e.First, e.Second)
+}
+
+// refLabel renders the service[/name] address without option content.
+func (e DuplicateRefError) refLabel() string {
+	if e.Name == "" || e.Name == "default" {
+		return e.Service
+	}
+
+	return e.Service + "/" + e.Name
+}
+
+// Unwrap returns ErrDuplicateRef.
+func (e DuplicateRefError) Unwrap() error {
+	return ErrDuplicateRef
+}
+
+// NotWiredError names a Ref with no provider. When a dependent required it,
+// Dependent names the dependent's service[/name] and Site its declaration
+// site; a direct Get of an unwired Ref leaves those empty. Fix always hints
+// the repair.
+type NotWiredError struct {
+	Service   string
+	Name      string
+	Dependent string
+	Site      string
+	Fix       string
+}
+
+// Error describes the missing Ref, the dependent that required it, and the
+// fix.
+func (e NotWiredError) Error() string {
+	label := e.Service
+	if e.Name != "" && e.Name != "default" {
+		label += "/" + e.Name
+	}
+
+	if e.Dependent == "" {
+		return fmt.Sprintf("container: no provider for %s: %s", label, e.Fix)
+	}
+
+	return fmt.Sprintf("container: no provider for %s required by %s (declared at %s): %s",
+		label, e.Dependent, e.Site, e.Fix)
+}
+
+// Unwrap returns ErrNotWired.
+func (e NotWiredError) Unwrap() error {
+	return ErrNotWired
+}
+
+// DependencyCycleError names providers that depend on each other in a loop.
+// Path lists the cycle as service[/name] labels in dependency order.
+type DependencyCycleError struct {
+	Service string
+	Name    string
+	Path    []string
+}
+
+// Error describes the cycle and its path.
+func (e DependencyCycleError) Error() string {
+	label := e.Service
+	if e.Name != "" && e.Name != "default" {
+		label += "/" + e.Name
+	}
+
+	return fmt.Sprintf("container: dependency cycle through %s: break the loop (%s)",
+		label, strings.Join(e.Path, " -> "))
+}
+
+// Unwrap returns ErrDependencyCycle.
+func (e DependencyCycleError) Unwrap() error {
+	return ErrDependencyCycle
 }

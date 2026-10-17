@@ -11,6 +11,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 )
 
@@ -25,3 +26,5 @@ replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

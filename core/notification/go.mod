@@ -4,16 +4,9 @@ go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/adapters/notification/log v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
-
-replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
-
-replace github.com/zenta-dev/zever/adapters/notification/log => ../../adapters/notification/log
-
-replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
-
-replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -27,3 +20,13 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 )
+
+replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
+
+replace github.com/zenta-dev/zever/adapters/notification/log => ../../adapters/notification/log
+
+replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
+
+replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

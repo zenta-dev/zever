@@ -36,6 +36,7 @@ require (
 	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
@@ -100,3 +101,5 @@ replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observab
 replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../embedded
 
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

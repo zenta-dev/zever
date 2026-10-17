@@ -213,7 +213,13 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 	totalLazy := 0
 	for i := 0; i < typ.NumField(); i++ {
 		name := typ.Field(i).Name
-		if name == "cfg" || name == "pluginsMu" || name == "plugins" || name == "pools" || name == "rootCtx" || name == "cancelRoot" {
+		if name == "cfg" || name == "pluginsMu" || name == "plugins" || name == "pools" || name == "rootCtx" || name == "cancelRoot" ||
+			name == "provDefs" || name == "provOrder" || name == "provErrs" || name == "provMu" || name == "provVals" ||
+			name == "env" || name == "envErr" {
+			// prov* is the explicit Provide registry (see provide.go):
+			// declaration state and resolution cache, not lazy
+			// services. Provided instances close through the provider
+			// band in Close, pinned by TestProvideCloseOrder.
 			continue
 		}
 		totalLazy++

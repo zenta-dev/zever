@@ -20,7 +20,10 @@ SBOM ?= sbom.json
 # .claude/worktrees holds agent harness checkouts, not repo modules: without
 # the exclusion the list balloons past ARG_MAX, `printf` fails, and every
 # *-all loop silently tests nothing (false green).
-ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -exec dirname {} \; | sort)
+# Go's own tooling ignores testdata trees; compile-fail fixture modules
+# (container/testdata/compilefail/*) must fail `go build` by design, so
+# they are excluded here like the harness checkouts above.
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
 
 # Matrix sharding: stable round-robin slice of ALL_MODULES. Defaults
 # (TOTAL=1) expand to exactly ALL_MODULES.

@@ -18,6 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 // indirect
 	github.com/aws/smithy-go v1.28.5 // indirect
 	github.com/zenta-dev/zever/core/log v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 )
 
@@ -41,3 +42,5 @@ replace github.com/zenta-dev/zever/adapters/storage/local => ../local
 replace github.com/zenta-dev/zever/core/log => ../../../core/log
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

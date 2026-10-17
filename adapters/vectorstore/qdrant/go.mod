@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
@@ -26,3 +27,5 @@ replace github.com/zenta-dev/zever/shared/endpoint => ../../../shared/endpoint
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

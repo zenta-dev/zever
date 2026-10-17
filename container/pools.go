@@ -145,6 +145,15 @@ type poolSnapshot struct {
 // key. It is safe for concurrent use: first opener builds while concurrent
 // borrowers wait on the entry channel (same shape as lazy.go); a build
 // failure evicts the key so the next access retries.
+//
+// Sharing rule: the registry key is the normalized DSN alone (exact string
+// for postgres, cleaned path for sqlite), so the same DSN always shares
+// one pool no matter which service or instance borrows it. Ref identity
+// (service/name, see provide.go) is attribution, not keying: every
+// successful borrow records the borrowing service for diagnostics
+// (PoolStatus, PoolMismatches) and Close dedup, but never splits a pool.
+// :memory: and empty DSNs never share (see isMemorySQLite,
+// coreDSNPoolKey).
 type poolRegistry struct {
 	mu    sync.Mutex
 	pools map[string]*poolEntry

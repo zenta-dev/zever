@@ -67,6 +67,7 @@ func TestGeneratedOutputCompiles(t *testing.T) {
 		"github.com/zenta-dev/zever/core/db => " + filepath.Join(repo, "core", "db"),
 		"github.com/zenta-dev/zever/dsl => " + repo + "/dsl",
 		"github.com/zenta-dev/zever/shared/lrucache => " + filepath.Join(repo, "shared", "lrucache"),
+		"github.com/zenta-dev/zever/shared/ref => " + filepath.Join(repo, "shared", "ref"),
 		"github.com/zenta-dev/zever/shared/registry => " + filepath.Join(repo, "shared", "registry"),
 		"github.com/zenta-dev/zever/shared/retry => " + filepath.Join(repo, "shared", "retry"),
 		"github.com/zenta-dev/zever/adapters/db/postgres => " + filepath.Join(repo, "adapters", "db", "postgres"),

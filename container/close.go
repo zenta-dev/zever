@@ -259,6 +259,20 @@ func (c *Container) Close(ctx context.Context) error {
 		tryClose("rag", v)
 	}
 
+	// Explicitly wired providers close before the legacy bands, in
+	// reverse dependency order (dependents first), labeled service[/name].
+	// Pointer dedup is shared with the bands below: a provided instance
+	// that is also the legacy singleton closes once.
+	if len(c.provDefs) > 0 {
+		snaps := c.providerSnapshots()
+		names := c.providerSnapshotNames()
+		for i := range snaps {
+			if snaps[i].ok {
+				tryClose(names[i], snaps[i].v)
+			}
+		}
+	}
+
 	snaps := c.snapshots()
 	names := snapshotServiceNames()
 	for i := range snaps {

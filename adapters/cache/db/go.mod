@@ -25,6 +25,7 @@ require (
 	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	golang.org/x/sync v0.24.0 // indirect
@@ -63,3 +64,5 @@ replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 replace github.com/zenta-dev/zever/adapters/cache/memory => ../memory
 
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

@@ -11,6 +11,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/molecule-man/go-brrr v1.1.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 )
@@ -33,3 +34,5 @@ replace github.com/zenta-dev/zever/core/router => ../../../core/router
 replace github.com/zenta-dev/zever/adapters/router/stdhttp => ../stdhttp
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

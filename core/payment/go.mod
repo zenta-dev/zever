@@ -6,6 +6,7 @@ require (
 	github.com/zenta-dev/zever/adapters/payment/stub v0.7.2
 	github.com/zenta-dev/zever/core/idempotency v0.7.2
 	github.com/zenta-dev/zever/shared/providersopt v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
 
@@ -27,3 +28,5 @@ replace github.com/zenta-dev/zever/adapters/idempotency/memory => ../../adapters
 replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 
 replace github.com/zenta-dev/zever/core/db => ../db
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

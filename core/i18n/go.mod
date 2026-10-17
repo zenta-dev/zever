@@ -5,6 +5,7 @@ go 1.27.2
 require (
 	github.com/zenta-dev/zever/adapters/i18n/embed v0.7.2
 	github.com/zenta-dev/zever/shared/endpoint v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
 
@@ -18,3 +19,5 @@ replace (
 replace github.com/zenta-dev/zever/adapters/i18n/embed => ../../adapters/i18n/embed
 
 replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

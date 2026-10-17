@@ -9,6 +9,12 @@
 # those modules this script adds temporary replaces pointing at the local
 # siblings, tidies, drops the temporary replaces again and (with -diff)
 # compares against the original go.mod/go.sum, restoring them afterwards.
+# The temporary set covers the transitive intra-repo closure (parsed from
+# sibling go.mod files without loading the module graph), so newly added
+# sibling modules resolve locally too. Tidy records the closure in new
+# indirect requires; those are dropped again before the diff because the
+# committed file must stay proxy-resolvable for `go install` targets:
+# direct intra-repo requires remain enforced by `make modgraph-check`.
 # Modules that still carry replaces get a plain `go mod tidy`.
 set -euo pipefail
 
@@ -23,6 +29,33 @@ deps="$(sed -En "s|^[[:space:]]*(require[[:space:]]+)?(${prefix}[^[:space:]]+)[[
 if [ -z "$deps" ]; then
   exec go mod tidy "$@"
 fi
+
+# Expand deps to the transitive intra-repo closure by parsing sibling
+# go.mod files. No module graph is loaded, so siblings without a proxy
+# release yet (e.g. newly added leaf modules) still resolve.
+deps="$(sed -En "s|^[[:space:]]*(require[[:space:]]+)?(${prefix}[^[:space:]]+)[[:space:]]+v.*|\2|p" go.mod | sort -u)"
+deps="$(echo "$deps" | tr '\n' ' ')"
+changed=1
+while [ "$changed" = 1 ]; do
+  changed=0
+  for d in $deps; do
+    dir="$root/${d#"$prefix"}"
+    if [ -f "$dir/go.mod" ]; then
+      sub="$(sed -En "s|^[[:space:]]*(require[[:space:]]+)?(${prefix}[^[:space:]]+)[[:space:]]+v.*|\2|p" "$dir/go.mod" | sort -u)"
+      for s in $sub; do
+        case " $deps " in
+          *" $s "*) ;;
+          *) deps="$deps $s"; changed=1 ;;
+        esac
+      done
+    fi
+  done
+done
+
+# Snapshot the committed intra-repo requires: tidy records the closure in
+# new indirect requires, which are dropped again below so the committed
+# file keeps resolving from the proxy for `go install` targets.
+orig_requires="$(sed -En "s|^[[:space:]]*(require[[:space:]]+)?(${prefix}[^[:space:]]+)[[:space:]]+v.*|\2|p" go.mod | sort -u)"
 
 tmp="$(mktemp -d)"
 cp go.mod "$tmp/go.mod"
@@ -48,6 +81,19 @@ if ! go mod tidy; then
   restore
   exit 1
 fi
+
+# Drop tidy-added intra-repo requires that were not originally present,
+# keeping the committed file proxy-resolvable (see header comment). Direct
+# intra-repo requires stay enforced by `make modgraph-check`.
+new_requires="$(sed -En "s|^[[:space:]]*(require[[:space:]]+)?(${prefix}[^[:space:]]+)[[:space:]]+v.*|\2|p" go.mod | sort -u)"
+orig_spaced="$(echo "$orig_requires" | tr '\n' ' ')"
+for r in $new_requires; do
+  case " $orig_spaced " in
+    *" $r "*) ;;
+    *) go mod edit "-droprequire=$r" ;;
+  esac
+done
+
 go mod edit "${drop[@]}"
 
 if [ "${1:-}" = "-diff" ]; then

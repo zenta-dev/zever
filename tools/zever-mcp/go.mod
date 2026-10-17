@@ -7,3 +7,5 @@ require github.com/zenta-dev/zever/dsl v0.7.2
 require github.com/robfig/cron/v3 v3.0.1 // indirect
 
 replace github.com/zenta-dev/zever/dsl => ../../dsl
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

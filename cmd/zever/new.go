@@ -1352,6 +1352,7 @@ var sharedModuleDirs = []string{
 	"shared/providersopt",
 	"shared/redisclient",
 	"shared/redisopt",
+	"shared/ref",
 	"shared/registry",
 	"shared/retry",
 	"shared/s3opts",

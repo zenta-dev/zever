@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/core/job v0.7.2
 	github.com/zenta-dev/zever/core/log v0.7.2
 	github.com/zenta-dev/zever/core/queue v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
 
@@ -66,3 +67,5 @@ replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters
 replace github.com/zenta-dev/zever/core/observability => ../observability
 
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

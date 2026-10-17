@@ -5,6 +5,7 @@ go 1.27.2
 require (
 	github.com/zenta-dev/zever/adapters/storage/local v0.7.2
 	github.com/zenta-dev/zever/core/log v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
 
@@ -18,3 +19,5 @@ replace (
 replace github.com/zenta-dev/zever/adapters/storage/local => ../../adapters/storage/local
 
 replace github.com/zenta-dev/zever/adapters/log/noop => ../../adapters/log/noop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

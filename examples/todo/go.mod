@@ -315,6 +315,7 @@ require (
 	github.com/zenta-dev/zever/shared/outboxbridge v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
@@ -346,3 +347,5 @@ replace github.com/zenta-dev/zever/core/agent => ../../core/agent
 replace github.com/zenta-dev/zever/core/rag => ../../core/rag
 
 replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref
