@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,21 +22,13 @@ func scaffoldTestConfig(t *testing.T, version string) NewConfig {
 	}
 }
 
-// TestRunNewWritesCIWorkflow proves `zever new` scaffolds a CI workflow that
+// TestRecipeCIWorkflow proves the `zever add ci` recipe template
 // regenerates derived code and gates drift with `zever compile --check`, so
-// every new project gets the eject/drift gate from day one.
-func TestRunNewWritesCIWorkflow(t *testing.T) {
+// every project gets the eject/drift gate the day it opts in.
+func TestRecipeCIWorkflow(t *testing.T) {
 	t.Parallel()
 
-	cfg := scaffoldTestConfig(t, "v0.6.1")
-
-	written, err := writeNewProject("zever new", cfg)
-	if err != nil {
-		t.Fatalf("writeNewProject: %v", err)
-	}
-
-	rel := filepath.Join(".github", "workflows", "ci.yml")
-	content := readFile(t, filepath.Join(cfg.OutDir, rel))
+	content := renderCIGitHubWorkflow("1.24", "v0.6.1", "zenorm,proto,atlas")
 
 	for _, fragment := range []string{
 		"zever compile --check",
@@ -52,19 +45,7 @@ func TestRunNewWritesCIWorkflow(t *testing.T) {
 	}
 
 	if strings.Contains(content, "go install") {
-		t.Errorf("scaffolded ci.yml must not use go install (uninstallable before the first release that ships replace-free cmd/zever):\n%s", content)
-	}
-
-	found := false
-
-	for _, path := range written {
-		if path == filepath.Join(cfg.OutDir, rel) {
-			found = true
-		}
-	}
-
-	if !found {
-		t.Errorf("ci.yml not in written list: %v", written)
+		t.Errorf("scaffolded ci.yml must not use go install (uninstallable before the first release that ships a replace-free cmd/zever):\n%s", content)
 	}
 }
 
@@ -74,13 +55,7 @@ func TestRunNewWritesCIWorkflow(t *testing.T) {
 func TestRenderCIWorkflowLocalCheckoutPinsLatest(t *testing.T) {
 	t.Parallel()
 
-	cfg := scaffoldTestConfig(t, pseudoVersionZero)
-
-	if _, err := writeNewProject("zever new", cfg); err != nil {
-		t.Fatalf("writeNewProject: %v", err)
-	}
-
-	content := readFile(t, filepath.Join(cfg.OutDir, ".github", "workflows", "ci.yml"))
+	content := renderCIGitHubWorkflow(defaultGoVersion, pseudoVersionZero, "zenorm,proto,atlas")
 
 	if !strings.Contains(content, "install.sh") || strings.Contains(content, "--version") {
 		t.Errorf("local-checkout ci.yml should run install.sh without --version:\n%s", content)
@@ -88,5 +63,63 @@ func TestRenderCIWorkflowLocalCheckoutPinsLatest(t *testing.T) {
 
 	if strings.Contains(content, pseudoVersionZero) {
 		t.Errorf("local-checkout ci.yml leaks pseudo-version:\n%s", content)
+	}
+}
+
+// TestRecipeFilesCI proves the ci recipe writes exactly the workflow file
+// with valid content.
+func TestRecipeFilesCI(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/shop\n\ngo 1.24\n"), 0o600); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	files, err := recipeFiles("ci")
+	if err != nil {
+		t.Fatalf("recipeFiles(ci): %v", err)
+	}
+
+	if len(files) != 1 || files[0].rel != filepath.Join(".github", "workflows", "ci.yml") {
+		t.Fatalf("ci recipe files = %v, want the workflow only", files)
+	}
+
+	if !strings.Contains(files[0].content, "zever compile --check") {
+		t.Fatalf("ci recipe content lacks the drift gate:\n%s", files[0].content)
+	}
+}
+
+// TestRecipeFilesDocker proves the docker recipe writes the Dockerfile and
+// .dockerignore with the reference content, and never copies config.
+func TestRecipeFilesDocker(t *testing.T) {
+	dir := t.TempDir()
+	withWorkingDir(t, dir)
+
+	files, err := recipeFiles("docker")
+	if err != nil {
+		t.Fatalf("recipeFiles(docker): %v", err)
+	}
+
+	if len(files) != 2 {
+		t.Fatalf("docker recipe files = %v, want Dockerfile + .dockerignore", files)
+	}
+
+	for _, f := range files {
+		if f.rel == "Dockerfile" {
+			for _, fragment := range []string{
+				"FROM golang:", "distroless", "USER nonroot", "HEALTHCHECK", "/healthz",
+			} {
+				if !strings.Contains(f.content, fragment) {
+					t.Errorf("Dockerfile lacks %q", fragment)
+				}
+			}
+
+			for _, banned := range []string{"zever.yaml", ".env", "SECRET", "ENV DB_"} {
+				if strings.Contains(f.content, banned) {
+					t.Errorf("Dockerfile must not contain %q", banned)
+				}
+			}
+		}
 	}
 }

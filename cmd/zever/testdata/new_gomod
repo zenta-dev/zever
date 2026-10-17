@@ -4,11 +4,7 @@ go 1.24
 
 require github.com/zenta-dev/zever/container v1.2.3
 require github.com/zenta-dev/zever/config v1.2.3
-require github.com/zenta-dev/zever/core/job v1.2.3
-require github.com/zenta-dev/zever/core/agent v1.2.3
-require github.com/zenta-dev/zever/core/rag v1.2.3
-require github.com/zenta-dev/zever/core/authz v1.2.3
-require github.com/zenta-dev/zever/core/middleware v1.2.3
+require github.com/zenta-dev/zever/serve v1.2.3
 require github.com/zenta-dev/zever/orm v1.2.3
 
 // Version pins keeping every transitive framework module at the same
@@ -106,9 +102,11 @@ require github.com/zenta-dev/zever/adapters/webhook/http v1.2.3 // indirect
 require github.com/zenta-dev/zever/adapters/webhook/queue v1.2.3 // indirect
 require github.com/zenta-dev/zever/adapters/workflow/db v1.2.3 // indirect
 require github.com/zenta-dev/zever/adapters/workflow/memory v1.2.3 // indirect
+require github.com/zenta-dev/zever/core/agent v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/ai v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/analytics v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/auth v1.2.3 // indirect
+require github.com/zenta-dev/zever/core/authz v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/billing v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/cache v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/cdn v1.2.3 // indirect
@@ -121,10 +119,12 @@ require github.com/zenta-dev/zever/core/flag v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/geo v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/i18n v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/idempotency v1.2.3 // indirect
+require github.com/zenta-dev/zever/core/job v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/lock v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/log v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/mailer v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/media v1.2.3 // indirect
+require github.com/zenta-dev/zever/core/middleware v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/notification v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/observability v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/outbox v1.2.3 // indirect
@@ -132,6 +132,7 @@ require github.com/zenta-dev/zever/core/password v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/payment v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/permission v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/queue v1.2.3 // indirect
+require github.com/zenta-dev/zever/core/rag v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/ratelimit v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/resilience v1.2.3 // indirect
 require github.com/zenta-dev/zever/core/router v1.2.3 // indirect

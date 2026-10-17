@@ -25,7 +25,7 @@ func runGoInDir(t *testing.T, dir string, args ...string) {
 
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go toolchain on PATH: %v", err)
+		t.Skip("no go toolchain on PATH")
 	}
 
 	// The scaffold resolves dependencies over the network, so a transient
@@ -56,30 +56,6 @@ func runGoInDir(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// isTransientGoFailure reports whether go tool output looks like a flaky
-// network/proxy error rather than a deterministic resolution or build error.
-func isTransientGoFailure(out string) bool {
-	for _, marker := range []string{
-		"i/o timeout",
-		"TLS handshake timeout",
-		"connection reset by peer",
-		"connection refused",
-		"unexpected EOF",
-		"no such host",
-		"Client.Timeout exceeded",
-		"503 Service Unavailable",
-		"502 Bad Gateway",
-		"504 Gateway Timeout",
-		"429 Too Many Requests",
-	} {
-		if strings.Contains(out, marker) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // repoRootAbs returns this repository's own root, the framework checkout
 // every test below replaces against (there is no tagged release to depend on
 // any other way).
@@ -94,11 +70,149 @@ func repoRootAbs(t *testing.T) string {
 	return root
 }
 
+// serveStubGoMod is the minimal module file for the serve API stub used
+// until the serve stream merges: it carries the exact spec'd surface
+// (Module, Main, Run, Worker) so scaffold builds prove API compatibility.
+const serveStubGoMod = `module github.com/zenta-dev/zever/serve
+
+go 1.27.2
+
+require (
+	github.com/zenta-dev/zever/container v0.0.0
+	github.com/zenta-dev/zever/core/router v0.0.0
+)
+`
+
+// serveStubSource implements the spec'd serve surface against the real
+// container: Main/Run build the container, mount every module on the
+// resolved router and return; Worker builds the container and returns.
+const serveStubSource = `package serve
+
+import (
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/router"
+)
+
+// Module is one mountable unit of a generated server.
+type Module interface {
+	Name() string
+	Mount(r router.Router, c *container.Container) error
+}
+
+// Option customizes one Main/Run/Worker call.
+type Option func(*options)
+
+type options struct{}
+
+// Main runs a generated server to completion.
+func Main(providers []container.Provider, modules func(*container.Container) []Module, opts ...Option) error {
+	c := container.New(nil, providers...)
+
+	r, err := c.Router()
+	if err != nil {
+		return err
+	}
+
+	for _, m := range modules(c) {
+		if err := m.Mount(r, c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Run boots a generated server to completion.
+func Run(providers []container.Provider, modules func(*container.Container) []Module, opts ...Option) error {
+	return Main(providers, modules, opts...)
+}
+
+// Worker runs a queue/scheduler worker to completion.
+func Worker(providers []container.Provider, opts ...Option) error {
+	_ = container.New(nil, providers...)
+
+	return nil
+}
+`
+
+// writeServeStub materialises the serve API stub into dir, for scaffolds
+// whose checkout predates the merged serve module.
+func writeServeStub(t *testing.T, dir string) {
+	t.Helper()
+
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatalf("mkdir serve stub: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(serveStubGoMod), 0o600); err != nil {
+		t.Fatalf("write serve stub go.mod: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "serve.go"), []byte(serveStubSource), 0o600); err != nil {
+		t.Fatalf("write serve stub source: %v", err)
+	}
+}
+
+// pointServeAtStub rewrites the scaffold go.mod's serve replace to the stub
+// dir, so offline tidy/build resolve the spec'd API without the merged
+// serve module. It does nothing when the checkout already ships serve.
+func pointServeAtStub(t *testing.T, repoRoot, scaffoldDir string) {
+	t.Helper()
+
+	if _, err := os.Stat(filepath.Join(repoRoot, "serve", "go.mod")); err == nil {
+		return
+	}
+
+	stubDir := filepath.Join(scaffoldDir, "servestub")
+	writeServeStub(t, stubDir)
+
+	gomodPath := filepath.Join(scaffoldDir, "go.mod")
+
+	data, err := os.ReadFile(gomodPath) // test fixture path
+	if err != nil {
+		t.Fatalf("read scaffold go.mod: %v", err)
+	}
+
+	var out []string
+
+	replaced := false
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "replace github.com/zenta-dev/zever/serve ") {
+			rel, err := filepath.Rel(scaffoldDir, stubDir)
+			if err != nil {
+				t.Fatalf("rel stub: %v", err)
+			}
+
+			rel = filepath.ToSlash(rel)
+			if !strings.HasPrefix(rel, ".") && !filepath.IsAbs(rel) {
+				rel = "./" + rel
+			}
+
+			out = append(out, "replace github.com/zenta-dev/zever/serve => "+rel)
+			replaced = true
+
+			continue
+		}
+
+		out = append(out, line)
+	}
+
+	if !replaced {
+		t.Fatal("scaffold go.mod has no serve replace to repoint")
+	}
+
+	if err := os.WriteFile(gomodPath, []byte(strings.Join(out, "\n")), 0o600); err != nil { //nolint:gosec // test temp dir
+		t.Fatalf("write scaffold go.mod: %v", err)
+	}
+}
+
 // --- runNew tests ---
 
-// TestRunNewScaffoldsAndBuilds is the strongest possible proof the scaffold
-// is genuinely buildable, not just syntactically plausible: it runs the real
-// `go mod tidy` and `go build ./...` against the freshly scaffolded project.
+// TestRunNewScaffoldsAndBuilds is the strongest possible proof the minimal
+// scaffold is genuinely buildable, not just syntactically plausible: it runs
+// the real `go mod tidy` and `go build ./...` (plus vet and test) against
+// the freshly scaffolded project.
 func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 	if testing.Short() {
 		t.Skip("go mod tidy + go build is slow")
@@ -109,32 +223,45 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	if err := runNew([]string{"acme"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
 	out := filepath.Join(workDir, "acme")
 
-	// Every file lands at exactly the location ProjectConfig's defaults
-	// assume, so zero zever.yaml/.json overrides are needed.
+	// The minimal tree: go.mod, schema, server main, typed wiring, the
+	// sample module, env files, gitignore and README. Nothing heavier.
 	for _, rel := range []string{
 		"go.mod",
 		filepath.Join(defaultSchemaDir, "app.zen"),
 		filepath.Join(defaultServerEntry, "main.go"),
-		filepath.Join(defaultWorkerEntry, "main.go"),
-		filepath.Join(defaultSeedEntry, "main.go"),
-		filepath.Join("internal", "app", "app.go"),
+		filepath.Join("internal", "app", "wiring.go"),
+		filepath.Join("internal", "service", "hello", "service.go"),
+		".env",
+		".env.example",
 		".gitignore",
 		"README.md",
-		"Dockerfile",
-		".dockerignore",
-		"Makefile",
-		".golangci.yml",
-		".editorconfig",
-		filepath.Join(".github", "dependabot.yml"),
 	} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Fatalf("expected %s to exist: %v", rel, err)
+		}
+	}
+
+	// Heavier files are opt-in recipes now, never defaults.
+	for _, rel := range []string{
+		filepath.Join(defaultWorkerEntry, "main.go"),
+		filepath.Join(defaultSeedEntry, "main.go"),
+		"Dockerfile",
+		"compose.yaml",
+		"Makefile",
+		filepath.Join(".github", "workflows", "ci.yml"),
+	} {
+		if _, err := os.Stat(filepath.Join(out, rel)); !os.IsNotExist(err) {
+			t.Fatalf("expected no %s in the minimal scaffold", rel)
 		}
 	}
 
@@ -143,25 +270,38 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 	for _, fragment := range []string{
 		"module acme",
 		"replace github.com/zenta-dev/zever/container => ",
+		"replace github.com/zenta-dev/zever/serve => ",
 		"require github.com/zenta-dev/zever/container ",
 		"require github.com/zenta-dev/zever/config ",
+		"require github.com/zenta-dev/zever/serve ",
+		"require github.com/zenta-dev/zever/orm ",
 		"require github.com/zenta-dev/zever/core/log ",
 		"require github.com/zenta-dev/zever/core/router ",
+		"require github.com/zenta-dev/zever/core/db ",
+		"require github.com/zenta-dev/zever/core/observability ",
+		"require github.com/zenta-dev/zever/core/ratelimit ",
 		"require github.com/zenta-dev/zever/adapters/log/slog ",
 		"require github.com/zenta-dev/zever/adapters/router/stdhttp ",
-		"require github.com/zenta-dev/zever/core/auth ",
-		"require github.com/zenta-dev/zever/adapters/auth/jwt ",
-		"require github.com/zenta-dev/zever/core/permission ",
-		"require github.com/zenta-dev/zever/adapters/permission/noop ",
-		"require github.com/zenta-dev/zever/core/observability ",
-		"require github.com/zenta-dev/zever/adapters/observability/stdout ",
-		"require github.com/zenta-dev/zever/core/db ",
 		"require github.com/zenta-dev/zever/adapters/db/sqlite ",
-		"require github.com/zenta-dev/zever/core/ratelimit ",
+		"require github.com/zenta-dev/zever/adapters/observability/stdout ",
 		"require github.com/zenta-dev/zever/adapters/ratelimit/memory ",
 	} {
 		if !strings.Contains(gomod, fragment) {
 			t.Fatalf("go.mod lacks %q:\n%s", fragment, gomod)
+		}
+	}
+
+	// Dropped with the worker entrypoint and friends: no job/authz/rag
+	// requires in the minimal tree.
+	for _, banned := range []string{
+		"require github.com/zenta-dev/zever/core/job ",
+		"require github.com/zenta-dev/zever/core/agent ",
+		"require github.com/zenta-dev/zever/core/rag ",
+		"require github.com/zenta-dev/zever/core/authz ",
+		"require github.com/zenta-dev/zever/core/middleware ",
+	} {
+		if strings.Contains(gomod, banned) {
+			t.Fatalf("go.mod must not contain %q:\n%s", banned, gomod)
 		}
 	}
 
@@ -170,23 +310,205 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 		t.Fatalf("scaffolded schema lacks a starter entity:\n%s", schema)
 	}
 
+	wiring := readFile(t, filepath.Join(out, "internal", "app", "wiring.go"))
+	for _, fragment := range []string{
+		"func Providers() []container.Provider",
+		"func Modules() func(*container.Container) []serve.Module",
+		"container.Provide(DB,",
+		"container.Provide(Log,",
+		"container.Provide(Router,",
+		"container.Provide(Observability,",
+		"container.Provide(RateLimit,",
+		"var DB = db.DefaultRef()",
+		"var Log = log.DefaultRef()",
+		"var Router = router.DefaultRef()",
+		"var Observability = observability.DefaultRef()",
+		"var RateLimit = ratelimit.DefaultRef()",
+	} {
+		if !strings.Contains(wiring, fragment) {
+			t.Fatalf("wiring.go lacks %q:\n%s", fragment, wiring)
+		}
+	}
+
+	mainSrc := readFile(t, filepath.Join(out, defaultServerEntry, "main.go"))
+	if !strings.Contains(mainSrc, "serve.Main(app.Providers(), app.Modules())") {
+		t.Fatalf("server main.go does not call serve.Main with Providers and Modules:\n%s", mainSrc)
+	}
+
+	pointServeAtStub(t, repoRoot, out)
+
 	runGoInDir(t, out, "mod", "tidy")
 	runGoInDir(t, out, "build", "./...")
 	// The scaffold must also vet and test clean, not just compile: this is
 	// the CI gate that a fresh `zever new` project stays green.
 	runGoInDir(t, out, "vet", "./...")
 	runGoInDir(t, out, "test", "./...")
+}
 
-	// The shipped .golangci.yml must be valid and the fresh scaffold must lint
-	// clean under it (only when golangci-lint is installed).
-	if lint, err := exec.LookPath("golangci-lint"); err == nil {
-		for _, args := range [][]string{{"config", "verify"}, {"run", "./..."}} {
-			cmd := exec.CommandContext(t.Context(), lint, args...)
-			cmd.Dir = out
+// TestScaffoldGoModMinimalRequires is the E3 audit: after `go mod tidy`,
+// the scaffold's go.mod must require no adapter module that wiring.go does
+// not import. Transitive adapter deps (stdhttp's default log/noop) resolve
+// through the wired adapters' own modules, never as direct requires.
+func TestScaffoldDepsMinimal(t *testing.T) {
+	if testing.Short() {
+		t.Skip("go mod tidy + go list is slow")
+	}
 
-			if combined, runErr := cmd.CombinedOutput(); runErr != nil {
-				t.Fatalf("golangci-lint %s in scaffold: %v\n%s", strings.Join(args, " "), runErr, combined)
-			}
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	if err := runNew([]string{"auditapp", "--with", "cache"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	out := filepath.Join(workDir, "auditapp")
+	pointServeAtStub(t, repoRoot, out)
+	runGoInDir(t, out, "mod", "tidy")
+
+	wiring := readFile(t, filepath.Join(out, "internal", "app", "wiring.go"))
+	wf, err := parseWiringFile(wiring)
+	if err != nil {
+		t.Fatalf("parse scaffold wiring.go: %v", err)
+	}
+
+	imported := map[string]bool{}
+	for _, imp := range wf.imports {
+		if strings.HasPrefix(imp.path, frameworkModulePath+"/adapters/") {
+			imported[imp.path] = true
+		}
+	}
+
+	gomod := readFile(t, filepath.Join(out, "go.mod"))
+
+	for _, line := range strings.Split(gomod, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "// indirect") {
+			continue
+		}
+
+		fields := strings.Fields(trimmed)
+		if len(fields) == 0 {
+			continue
+		}
+
+		if fields[0] == "require" {
+			fields = fields[1:]
+		}
+
+		if len(fields) < 2 || !strings.HasPrefix(fields[0], frameworkModulePath+"/adapters/") {
+			continue
+		}
+
+		if !imported[fields[0]] {
+			t.Errorf("tidied go.mod directly requires adapter module %q not imported by wiring.go", fields[0])
+		}
+	}
+
+	want := map[string]bool{
+		frameworkModulePath + "/adapters/db/sqlite":            true,
+		frameworkModulePath + "/adapters/log/slog":             true,
+		frameworkModulePath + "/adapters/router/stdhttp":       true,
+		frameworkModulePath + "/adapters/observability/stdout": true,
+		frameworkModulePath + "/adapters/ratelimit/memory":     true,
+		frameworkModulePath + "/adapters/cache/memory":         true,
+	}
+
+	for path := range imported {
+		if !want[path] {
+			t.Errorf("unexpected wiring import %q for --with cache scaffold", path)
+		}
+
+		if !strings.Contains(gomod, "\t"+path+" ") && !strings.Contains(gomod, "require "+path+" ") {
+			t.Errorf("tidied go.mod lacks require for wired adapter %q", path)
+		}
+	}
+}
+
+// TestRunNewPrintsExactlyThreeNextSteps pins the summary contract: exactly
+// three numbered next steps, no more.
+func TestRunNewPrintsExactlyThreeNextSteps(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	out := captureStdout(t, func() {
+		if err := runNew([]string{"stepapp", "--no-tidy"}); err != nil {
+			t.Fatalf("runNew: %v", err)
+		}
+	})
+
+	for _, want := range []string{"1.", "2.", "3."} {
+		if !strings.Contains(out, want) {
+			t.Errorf("summary lacks step %q:\n%s", want, out)
+		}
+	}
+
+	if strings.Contains(out, "4.") {
+		t.Errorf("summary must print exactly 3 next steps, found a fourth:\n%s", out)
+	}
+}
+
+// TestRunNewWritesEnvFiles proves `zever new` writes .env with a random dev
+// secret and .env.example generated from the wired Options structs.
+func TestRunNewWritesEnvFiles(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	if err := runNew([]string{"envapp", "--no-tidy"}); err != nil {
+		t.Fatalf("runNew: %v", err)
+	}
+
+	out := filepath.Join(workDir, "envapp")
+
+	env := readFile(t, filepath.Join(out, ".env"))
+	secret := ""
+	for _, line := range strings.Split(env, "\n") {
+		if v, ok := strings.CutPrefix(line, "AUTH_JWT_SECRET="); ok {
+			secret = v
+		}
+	}
+
+	if len(secret) != 64 {
+		t.Fatalf("AUTH_JWT_SECRET must be 32 random bytes as hex (64 chars), got %q", secret)
+	}
+
+	for _, c := range secret {
+		if c >= '0' && c <= '9' || c >= 'a' && c <= 'f' {
+			continue
+		}
+
+		t.Fatalf("AUTH_JWT_SECRET must be lowercase hex, got %q", secret)
+	}
+
+	example := readFile(t, filepath.Join(out, ".env.example"))
+	for _, fragment := range []string{
+		"# --- db (adapter sqlite) ---",
+		"DB_ADAPTER=sqlite",
+		"# --- log (adapter slog) ---",
+		"LOG_ADAPTER=slog",
+		"# --- router (adapter stdhttp) ---",
+		"ROUTER_ADAPTER=stdhttp",
+		"DB_MAXCONNS=",
+	} {
+		if !strings.Contains(example, fragment) {
+			t.Errorf(".env.example lacks %q:\n%s", fragment, example)
 		}
 	}
 }
@@ -252,6 +574,10 @@ func TestRunNewAutoDetectsFrameworkCheckout(t *testing.T) {
 
 	withWorkingDir(t, sandbox)
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	if err := runNew([]string{"gamma"}); err != nil {
 		t.Fatalf("runNew (auto-detect): %v", err)
 	}
@@ -269,6 +595,10 @@ func TestRunNewAutoDetectsFrameworkCheckout(t *testing.T) {
 func TestRunNewNoFrameworkCheckoutFound(t *testing.T) {
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
 
 	if err := runNew([]string{"delta"}); err != nil {
 		t.Fatalf("expected zever new to default to cwd and succeed, got: %v", err)
@@ -315,6 +645,10 @@ func TestRunNewFrameworkVersionSkipsReplace(t *testing.T) {
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	if err := runNew([]string{"zeta", "--framework-version", "v1.2.3"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
@@ -339,6 +673,10 @@ func TestRunNewModuleAndDirOverrides(t *testing.T) {
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
 
 	err := runNew([]string{
 		"eta",
@@ -370,6 +708,10 @@ func TestRunNewExistingProjectSkipsGoMod(t *testing.T) {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	if err := runNew([]string{"sub"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
@@ -380,20 +722,24 @@ func TestRunNewExistingProjectSkipsGoMod(t *testing.T) {
 		t.Fatalf("expected no go.mod inside an existing project scaffold")
 	}
 
-	server := readGenerated(t, filepath.Join(out, defaultServerEntry, "main.go"))
-	if !strings.Contains(server, `"example.com/existing/internal/app"`) {
-		t.Fatalf("server main.go does not import the existing module's app package:\n%s", server)
+	wiring := readGenerated(t, filepath.Join(out, "internal", "app", "wiring.go"))
+	if !strings.Contains(wiring, `"example.com/existing/internal/service/hello"`) {
+		t.Fatalf("wiring.go does not import the existing module's hello package:\n%s", wiring)
 	}
 }
 
-// TestRunNewScaffoldsMinimalAppWiring proves the default (flag-driven)
-// `zever new` wires exactly coreBatteries into internal/app/app.go -- not the
-// full ~32-service config.Default() map.
-func TestRunNewScaffoldsMinimalAppWiring(t *testing.T) {
+// TestRunNewScaffoldsMinimalWiring proves the default (flag-driven)
+// `zever new` wires exactly the minimal stack (db, log, router) into
+// internal/app/wiring.go -- not the full ~36-service config.Default() map.
+func TestRunNewScaffoldsMinimalWiring(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
 
 	if err := runNew([]string{"zeta"}); err != nil {
 		t.Fatalf("runNew: %v", err)
@@ -406,25 +752,21 @@ func TestRunNewScaffoldsMinimalAppWiring(t *testing.T) {
 		}
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "zeta", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "zeta", "internal", "app", "wiring.go"))
 
-	// Default scaffold is floor plus boot-required batteries so the
-	// generated server resolves out of the box (P3-2).
-	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
-	for _, b := range want {
-		if !strings.Contains(appGo, "/"+b+"/") {
-			t.Errorf("app.go missing boot service %q", b)
+	for _, b := range []string{"db", "log", "observability", "ratelimit", "router"} {
+		if !strings.Contains(wiring, "/"+b+"/") {
+			t.Errorf("wiring.go missing minimal service %q", b)
 		}
 	}
 
-	// A service outside the core set (e.g. "search") must not appear by
+	// A service outside the minimal set (e.g. "search") must not appear by
 	// default -- proves the scaffold is minimal, not "all of them".
-	if strings.Contains(appGo, "/search/") {
-		t.Fatalf("app.go unexpectedly wires non-core service \"search\"")
+	if strings.Contains(wiring, "/search/") {
+		t.Fatalf("wiring.go unexpectedly wires non-core service \"search\"")
 	}
 }
 
-// TestRunNewWritesConfigSchema proves `zever new` scaffolds a
 // TestRunNewWritesNoConfigFiles proves `zever new` scaffolds no config
 // files at all: service configuration is env-only, so neither zever.yaml
 // nor zever.schema.json is emitted.
@@ -433,6 +775,10 @@ func TestRunNewWritesNoConfigFiles(t *testing.T) {
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
 
 	if err := runNew([]string{"zeta"}); err != nil {
 		t.Fatalf("runNew: %v", err)
@@ -447,35 +793,45 @@ func TestRunNewWritesNoConfigFiles(t *testing.T) {
 	}
 }
 
-// TestRunNewAppGoImportsMatchBatteries proves app.go's adapter imports are
-// exactly the selected batteries, because both are rendered from the same
-// NewConfig.Batteries.
-func TestRunNewAppGoImportsMatchBatteries(t *testing.T) {
+// TestRunNewWiringImportsMatchBatteries proves wiring.go's adapter imports
+// are exactly the selected batteries, because both are rendered from the
+// same NewConfig.Batteries.
+func TestRunNewWiringImportsMatchBatteries(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	if err := runNew([]string{"theta"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	app := readFile(t, filepath.Join(workDir, "theta", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "theta", "internal", "app", "wiring.go"))
 
-	for _, sel := range coreBatterySelections() {
-		alias, path, call := adapterBinding(sel)
+	for _, sel := range []batterySelection{
+		{Battery: "db", Adapter: "sqlite"},
+		{Battery: "log", Adapter: "slog"},
+		{Battery: "observability", Adapter: "stdout"},
+		{Battery: "ratelimit", Adapter: "memory"},
+		{Battery: "router", Adapter: "stdhttp"},
+	} {
+		alias, path, _ := adapterBinding(sel)
 
-		for _, marker := range []string{`"` + path + `"`, alias + ` "` + path + `"`, call} {
-			if !strings.Contains(app, marker) {
-				t.Errorf("app.go missing %q for core service %q:\n%s", marker, sel.Battery, app)
+		for _, marker := range []string{`"` + path + `"`, alias + ` "` + path + `"`, "container.Provide("} {
+			if !strings.Contains(wiring, marker) {
+				t.Errorf("wiring.go missing %q for service %q:\n%s", marker, sel.Battery, wiring)
 			}
 		}
 	}
 
-	// cache is not core and nothing generated resolves c.Cache(), so it must
-	// not be imported by default.
-	if strings.Contains(app, "adapters/cache/memory") {
-		t.Fatalf("app.go unexpectedly imports adapters/cache/memory with no cache service selected:\n%s", app)
+	// cache is not in the minimal set and nothing generated resolves
+	// c.Cache(), so it must not be imported by default.
+	if strings.Contains(wiring, "adapters/cache/memory") {
+		t.Fatalf("wiring.go unexpectedly imports adapters/cache/memory with no cache service selected:\n%s", wiring)
 	}
 }
 
@@ -600,6 +956,25 @@ func TestBatteriesForAddsCacheOnOverride(t *testing.T) {
 	}
 }
 
+// TestDefaultBatteriesAreMinimalStack pins the default set: db, log and
+// router, nothing more.
+func TestDefaultBatteriesAreMinimalStack(t *testing.T) {
+	t.Parallel()
+
+	got := batteriesFor(nil, "")
+
+	want := []string{"db", "log", "observability", "ratelimit", "router"}
+	if len(got) != len(want) {
+		t.Fatalf("batteriesFor(nil, \"\") = %v, want %v", got, want)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("batteriesFor(nil, \"\") = %v, want %v", got, want)
+		}
+	}
+}
+
 // TestNonCoreBatteryNamesExcludesCore pins the wizard offer list: every core
 // service absent, sorted, and covering the rest of the service universe.
 func TestNonCoreBatteryNamesExcludesCore(t *testing.T) {
@@ -620,9 +995,6 @@ func TestNonCoreBatteryNamesExcludesCore(t *testing.T) {
 	}
 }
 
-// TestAllServiceAdaptersMatchDefault is the drift guard: every service the
-// runtime knows must appear in allServiceAdapters with the live default
-// adapter, and vice versa.
 // TestNestedModuleDirsMatchCheckout pins nestedModuleDirs against the
 // checkout: every adapters/<battery>/<adapter> go.mod must be listed, and
 // every listed directory must contain a go.mod. Without this, scaffolded
@@ -731,18 +1103,6 @@ func TestAllServiceAdaptersMatchDefault(t *testing.T) {
 	}
 }
 
-// TestQuickstartBackends pins the default sample and the override join.
-func TestQuickstartBackends(t *testing.T) {
-	if got := quickstartBackends(NewConfig{}); got != "zenorm,proto,atlas" {
-		t.Fatalf("default quickstartBackends = %q", got)
-	}
-
-	cfg := NewConfig{Backends: []string{"gogen", "openapi"}}
-	if got := quickstartBackends(cfg); got != "gogen,openapi" {
-		t.Fatalf("override quickstartBackends = %q", got)
-	}
-}
-
 // TestRenderNewGoModGolden pins the exact bytes of a version-pinned go.mod
 // (no checkout paths, so the output is deterministic).
 func TestRenderNewGoModGolden(t *testing.T) {
@@ -763,16 +1123,20 @@ func TestRenderNewGoModGolden(t *testing.T) {
 // TestRenderNewReadmeMentionsZever pins the rename: no "zengo" may survive
 // in user-facing scaffold text.
 func TestRenderNewReadmeMentionsZever(t *testing.T) {
-	readme := renderNewReadme("acme", "zenorm,proto,atlas")
+	readme := renderNewReadme("acme")
 
 	if strings.Contains(readme, "zengo") {
 		t.Fatalf("README still mentions zengo:\n%s", readme)
 	}
 
-	for _, fragment := range []string{"# acme", "zever compile --backend=zenorm,proto,atlas", "zever serve"} {
+	for _, fragment := range []string{"# acme", "zever compile --backend=zenorm,proto,atlas", "zever serve", "curl localhost:8080/hello"} {
 		if !strings.Contains(readme, fragment) {
 			t.Fatalf("README lacks %q:\n%s", fragment, readme)
 		}
+	}
+
+	if strings.Count(readme, "```bash") != 1 {
+		t.Fatalf("README must hold exactly one 4-command quickstart block:\n%s", readme)
 	}
 }
 
@@ -813,7 +1177,7 @@ func TestWriteNewProjectRefusesClobber(t *testing.T) {
 		ModulePath:       "example.com/acme",
 		GoVersion:        "1.24",
 		FrameworkVersion: "v1.2.3",
-		Batteries:        coreBatteries,
+		Batteries:        minimalScaffoldBatteries,
 	}
 
 	if err := os.MkdirAll(filepath.Join(out, "schema"), 0o750); err != nil {
@@ -926,6 +1290,100 @@ func TestParseAdaptersFlag(t *testing.T) {
 	})
 }
 
+// TestParseWithFlag pins --with parsing: bare names and battery=adapter
+// pins unify, sorted and de-duplicated, unknown names fail closed with
+// hints.
+func TestParseWithFlag(t *testing.T) {
+	t.Run("mixed", func(t *testing.T) {
+		batteries, overrides, err := parseWithFlag("queue,db=postgres,db")
+		if err != nil {
+			t.Fatalf("parseWithFlag: %v", err)
+		}
+
+		if len(batteries) != 2 || batteries[0] != "db" || batteries[1] != "queue" {
+			t.Fatalf("parseWithFlag batteries = %v, want [db queue]", batteries)
+		}
+
+		if overrides["db"] != "postgres" {
+			t.Fatalf("parseWithFlag overrides = %v, want db=postgres", overrides)
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		batteries, overrides, err := parseWithFlag("")
+		if err != nil {
+			t.Fatalf("parseWithFlag: %v", err)
+		}
+
+		if len(batteries) != 0 || len(overrides) != 0 {
+			t.Fatalf("parseWithFlag = (%v, %v), want empty", batteries, overrides)
+		}
+	})
+
+	t.Run("malformed", func(t *testing.T) {
+		if _, _, err := parseWithFlag("db="); err == nil {
+			t.Fatal("expected an error for a malformed entry")
+		}
+	})
+
+	t.Run("unknown battery hints", func(t *testing.T) {
+		if _, _, err := parseWithFlag("cach"); err == nil {
+			t.Fatal("expected an error for an unknown battery")
+		} else if !strings.Contains(err.Error(), "cache") {
+			t.Fatalf("error %q lacks a did-you-mean hint", err)
+		}
+	})
+
+	t.Run("unknown adapter hints", func(t *testing.T) {
+		if _, _, err := parseWithFlag("db=oracle"); err == nil {
+			t.Fatal("expected an error for an unknown adapter")
+		} else if !strings.Contains(err.Error(), "sqlite") && !strings.Contains(err.Error(), "postgres") {
+			t.Fatalf("error %q lacks choices", err)
+		}
+	})
+}
+
+// TestProfileReplacementHint pins the --profile deprecation: each preset
+// names its --with replacement.
+func TestProfileReplacementHint(t *testing.T) {
+	t.Parallel()
+
+	for _, profile := range []string{"minimal", "api", "full"} {
+		hint := profileReplacementHint(profile)
+		if !strings.Contains(hint, "--with") {
+			t.Errorf("profileReplacementHint(%q) = %q, want a --with replacement", profile, hint)
+		}
+	}
+}
+
+// TestRunNewProfileAliasPrintsReplacement proves --profile still works but
+// announces its --with replacement on stderr.
+func TestRunNewProfileAliasPrintsReplacement(t *testing.T) {
+	repoRoot := repoRootAbs(t)
+	workDir := t.TempDir()
+	withWorkingDir(t, workDir)
+	t.Setenv(zeverFrameworkPathEnv, repoRoot)
+
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	errOut := captureStderr(t, func() {
+		if err := runNew([]string{"profapp", "--profile", "api", "--no-tidy"}); err != nil {
+			t.Fatalf("runNew --profile api: %v", err)
+		}
+	})
+
+	if !strings.Contains(errOut, "--with") {
+		t.Fatalf("expected a --with replacement notice on stderr, got:\n%s", errOut)
+	}
+
+	wiring := readFile(t, filepath.Join(workDir, "profapp", "internal", "app", "wiring.go"))
+	if !strings.Contains(wiring, "adapters/queue/memory") {
+		t.Fatalf("profile api did not wire the queue battery:\n%s", wiring)
+	}
+}
+
 // TestBatteryAdapters pins the picker's adapter universe: derived from
 // nestedModuleDirs, default first, covering every known service, with the
 // password dir exception mapped back to argon2id.
@@ -976,9 +1434,9 @@ func TestBatteryAdapters(t *testing.T) {
 	}
 }
 
-// TestRunNewBatteriesFlagScaffoldsExtras proves --batteries extends the
-// floor set in both app.go and go.mod without any prompting.
-func TestRunNewBatteriesFlagScaffoldsExtras(t *testing.T) {
+// TestRunNewWithFlagScaffoldsExtras proves --with extends the minimal set
+// in both wiring.go and go.mod without any prompting.
+func TestRunNewWithFlagScaffoldsExtras(t *testing.T) {
 	resetInteractiveMode(t)
 
 	repoRoot := repoRootAbs(t)
@@ -986,15 +1444,19 @@ func TestRunNewBatteriesFlagScaffoldsExtras(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	if err := runNew([]string{"flagapp", "--batteries", "db,cache"}); err != nil {
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	if err := runNew([]string{"flagapp", "--with", "cache"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "flagapp", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "flagapp", "internal", "app", "wiring.go"))
 
 	for _, want := range []string{"log", "router", "db", "cache"} {
-		if !strings.Contains(appGo, "/"+want+"/") {
-			t.Errorf("app.go missing service %q", want)
+		if !strings.Contains(wiring, "/"+want+"/") {
+			t.Errorf("wiring.go missing service %q", want)
 		}
 	}
 
@@ -1010,10 +1472,10 @@ func TestRunNewBatteriesFlagScaffoldsExtras(t *testing.T) {
 	}
 }
 
-// TestRunNewAdaptersFlagOverrides proves --adapters steers the adapter
-// pick and implies its battery, so --adapters db=postgres alone scaffolds
-// db on postgres.
-func TestRunNewAdaptersFlagOverrides(t *testing.T) {
+// TestRunNewWithAdapterPinOverrides proves --with steers the adapter pick
+// and implies its battery, so --with db=postgres alone scaffolds db on
+// postgres.
+func TestRunNewWithAdapterPinOverrides(t *testing.T) {
 	resetInteractiveMode(t)
 
 	repoRoot := repoRootAbs(t)
@@ -1021,14 +1483,18 @@ func TestRunNewAdaptersFlagOverrides(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	if err := runNew([]string{"adaptapp", "--adapters", "db=postgres"}); err != nil {
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	if err := runNew([]string{"adaptapp", "--with", "db=postgres"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "adaptapp", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "adaptapp", "internal", "app", "wiring.go"))
 
-	if !strings.Contains(appGo, "adapters/db/postgres") {
-		t.Fatalf("app.go lacks the postgres adapter wiring:\n%s", appGo)
+	if !strings.Contains(wiring, "adapters/db/postgres") {
+		t.Fatalf("wiring.go lacks the postgres adapter wiring:\n%s", wiring)
 	}
 
 	gomod := readFile(t, filepath.Join(workDir, "adaptapp", "go.mod"))
@@ -1042,10 +1508,9 @@ func TestRunNewAdaptersFlagOverrides(t *testing.T) {
 	}
 }
 
-// TestRunNewFlagOnlyMatchesFloorGolden proves the flags/floor path is
-// byte-identical to the historical floor-only scaffold: no flags means no
-// battery drift.
-func TestRunNewFlagOnlyMatchesFloorGolden(t *testing.T) {
+// TestRunNewBatteriesFlagStillWorks proves the legacy --batteries flag keeps
+// working (unified under --with internally).
+func TestRunNewBatteriesFlagStillWorks(t *testing.T) {
 	resetInteractiveMode(t)
 
 	repoRoot := repoRootAbs(t)
@@ -1053,20 +1518,18 @@ func TestRunNewFlagOnlyMatchesFloorGolden(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	if err := runNew([]string{"floorapp"}); err != nil {
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	if err := runNew([]string{"legacyapp", "--batteries", "cache", "--adapters", "cache=redis"}); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "floorapp", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "legacyapp", "internal", "app", "wiring.go"))
 
-	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
-	for _, b := range want {
-		if !strings.Contains(appGo, "/"+b+"/") {
-			t.Errorf("app.go missing boot service %q", b)
-		}
-	}
-	if strings.Contains(appGo, "/search/") {
-		t.Fatalf("app.go unexpectedly wires non-core service \"search\"")
+	if !strings.Contains(wiring, "adapters/cache/redis") {
+		t.Fatalf("wiring.go lacks the redis adapter wiring:\n%s", wiring)
 	}
 }
 
@@ -1083,7 +1546,7 @@ func TestListBatteries(t *testing.T) {
 		}
 	})
 
-	for _, want := range []string{"BATTERY", "db sqlite", "log slog (floor)", "router stdhttp (floor)"} {
+	for _, want := range []string{"BATTERY", "db sqlite", "log slog", "router stdhttp"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("list output missing %q:\n%s", want, out)
 		}
@@ -1094,8 +1557,8 @@ func TestListBatteries(t *testing.T) {
 	}
 }
 
-// TestRunNewYesSkipsPicker proves -y/--yes stays on the floor+flags path
-// even when interactive input was requested globally.
+// TestRunNewYesSkipsPicker proves -y/--yes stays on the flags path even
+// when interactive input was requested globally.
 func TestRunNewYesSkipsPicker(t *testing.T) {
 	resetInteractiveMode(t)
 	interactiveMode = true
@@ -1105,18 +1568,21 @@ func TestRunNewYesSkipsPicker(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	stubPickerFuncs(t, nil, nil, true)
 
 	if err := runNew([]string{"yesapp", "-y"}); err != nil {
 		t.Fatalf("runNew -y: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "yesapp", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "yesapp", "internal", "app", "wiring.go"))
 
-	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
-	for _, b := range want {
-		if !strings.Contains(appGo, "/"+b+"/") {
-			t.Errorf("-y app.go missing boot service %q", b)
+	for _, b := range []string{"db", "log", "observability", "ratelimit", "router"} {
+		if !strings.Contains(wiring, "/"+b+"/") {
+			t.Errorf("-y wiring.go missing minimal service %q", b)
 		}
 	}
 }
@@ -1188,8 +1654,8 @@ func stubPickerFuncs(t *testing.T, batteries []string, adapters map[string]strin
 	}
 }
 
-// TestRunNewPickerStubbed proves the wizard feeds batteriesFor and the
-// adapter overrides: canned picks land in zever.yaml and go.mod.
+// TestRunNewPickerStubbed proves the wizard feeds the minimal set plus
+// picks: canned picks land in wiring.go and go.mod.
 func TestRunNewPickerStubbed(t *testing.T) {
 	stubPromptTTY(t, true)
 	setPromptInteractive(t)
@@ -1200,14 +1666,18 @@ func TestRunNewPickerStubbed(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
 	if err := runNew([]string{"pickapp", "--interactive"}); err != nil {
 		t.Fatalf("runNew --interactive: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "pickapp", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "pickapp", "internal", "app", "wiring.go"))
 
-	if !strings.Contains(appGo, "adapters/db/postgres") {
-		t.Fatalf("app.go lacks the picked postgres adapter wiring:\n%s", appGo)
+	if !strings.Contains(wiring, "adapters/db/postgres") {
+		t.Fatalf("wiring.go lacks the picked postgres adapter wiring:\n%s", wiring)
 	}
 
 	gomod := readFile(t, filepath.Join(workDir, "pickapp", "go.mod"))
@@ -1218,8 +1688,7 @@ func TestRunNewPickerStubbed(t *testing.T) {
 }
 
 // TestRunNewFlagsSkipPickerPrompts is the flag-parity proof: with
-// --batteries and --adapters covering every prompt, the wizard must not
-// prompt at all.
+// --with covering every prompt, the wizard must not prompt at all.
 func TestRunNewFlagsSkipPickerPrompts(t *testing.T) {
 	stubPromptTTY(t, true)
 	setPromptInteractive(t)
@@ -1230,192 +1699,19 @@ func TestRunNewFlagsSkipPickerPrompts(t *testing.T) {
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
 
-	args := []string{"parityapp", "--interactive", "--batteries", "db", "--adapters", "db=postgres"}
+	prevTidy := runGoModTidyFunc
+	runGoModTidyFunc = func(string, string) error { return nil }
+	t.Cleanup(func() { runGoModTidyFunc = prevTidy })
+
+	args := []string{"parityapp", "--interactive", "--with", "db=postgres"}
 	if err := runNew(args); err != nil {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(workDir, "parityapp", "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(workDir, "parityapp", "internal", "app", "wiring.go"))
 
-	if !strings.Contains(appGo, "adapters/db/postgres") {
-		t.Fatalf("app.go lacks the postgres adapter wiring:\n%s", appGo)
-	}
-}
-
-// TestRenderNewDockerfileReference pins the reference Dockerfile contract:
-// multi-stage golang builder to distroless nonroot, non-root USER, EXPOSE,
-// ENTRYPOINT, HEALTHCHECK on /healthz, binary copied, no secrets baked, no
-// absolute local paths, no config file copied (config is env-only).
-func TestRenderNewDockerfileReference(t *testing.T) {
-	t.Parallel()
-
-	dockerfile := renderNewDockerfile("1.27")
-
-	for _, fragment := range []string{
-		"FROM golang:1.27-trixie AS builder",
-		"FROM gcr.io/distroless/static-debian13:nonroot",
-		"org.opencontainers.image.title",
-		"org.opencontainers.image.version",
-		"org.opencontainers.image.revision",
-		"org.opencontainers.image.source",
-		"USER nonroot",
-		"EXPOSE 8080 9090",
-		`ENTRYPOINT ["/app/server"]`,
-		"HEALTHCHECK",
-		"/healthz",
-		"./cmd/server",
-	} {
-		if !strings.Contains(dockerfile, fragment) {
-			t.Errorf("Dockerfile lacks %q:\n%s", fragment, dockerfile)
-		}
-	}
-
-	for _, banned := range []string{
-		"SECRET", "PASSWORD", "API_KEY", "TOKEN=",
-		"ENV DB_", "ENV ZEVER_",
-		"COPY /home/", "COPY /Users/", "COPY C:\\",
-		"--password", "--token",
-		"COPY zever.yaml", "COPY .env",
-	} {
-		if strings.Contains(dockerfile, banned) {
-			t.Errorf("Dockerfile must not contain %q:\n%s", banned, dockerfile)
-		}
-	}
-}
-
-// TestRenderNewDockerfileDefaultsGoVersion pins the empty-version fallback
-// to defaultGoVersion so a NewConfig without resolution still renders a
-// valid builder tag.
-func TestRenderNewDockerfileDefaultsGoVersion(t *testing.T) {
-	t.Parallel()
-
-	got := renderNewDockerfile("")
-	if !strings.Contains(got, "FROM golang:"+defaultGoVersion) {
-		t.Fatalf("empty goVersion did not fall back to %q:\n%s", defaultGoVersion, got)
-	}
-}
-
-// TestRenderNewDockerignore pins the build-context exclusions: local sqlite
-// files, build output, VCS metadata and JS deps never ship.
-func TestRenderNewDockerignore(t *testing.T) {
-	t.Parallel()
-
-	for _, fragment := range []string{"*.db", "dist/", ".git/", "node_modules/"} {
-		if !strings.Contains(newDockerignore, fragment) {
-			t.Errorf(".dockerignore lacks %q:\n%s", fragment, newDockerignore)
-		}
-	}
-}
-
-// TestRunNewWritesDockerScaffold proves `zever new` emits Dockerfile +
-// .dockerignore with the reference content.
-func TestRunNewWritesDockerScaffold(t *testing.T) {
-	repoRoot := repoRootAbs(t)
-	workDir := t.TempDir()
-	withWorkingDir(t, workDir)
-	t.Setenv(zeverFrameworkPathEnv, repoRoot)
-
-	if err := runNew([]string{"dockapp"}); err != nil {
-		t.Fatalf("runNew: %v", err)
-	}
-
-	out := filepath.Join(workDir, "dockapp")
-
-	dockerfile := readFile(t, filepath.Join(out, "Dockerfile"))
-	for _, fragment := range []string{
-		"FROM golang:",
-		"distroless",
-		"USER nonroot",
-		"HEALTHCHECK",
-		"/healthz",
-	} {
-		if !strings.Contains(dockerfile, fragment) {
-			t.Errorf("scaffolded Dockerfile lacks %q:\n%s", fragment, dockerfile)
-		}
-	}
-
-	dockerignore := readFile(t, filepath.Join(out, ".dockerignore"))
-	for _, fragment := range []string{"*.db", "dist/", ".git/", "node_modules/"} {
-		if !strings.Contains(dockerignore, fragment) {
-			t.Errorf("scaffolded .dockerignore lacks %q:\n%s", fragment, dockerignore)
-		}
-	}
-}
-
-// TestRenderNewComposePostgresRedis pins the compose contract: app + db +
-// redis services, health-gated depends_on, env-carried secrets, no baked
-// credentials.
-func TestRenderNewComposePostgresRedis(t *testing.T) {
-	t.Parallel()
-	got := renderNewCompose([]batterySelection{{Battery: "db", Adapter: "postgres"}, {Battery: "cache", Adapter: "redis"}})
-	for _, fragment := range []string{
-		"services:", "image: postgres:", "image: redis:", "depends_on:",
-		"DB_DSN", "CACHE_URL: redis://redis:6379", "service_healthy", "pgdata:", "redisdata:",
-		"docker compose up --build",
-	} {
-		if !strings.Contains(got, fragment) {
-			t.Errorf("compose lacks %q:\n%s", fragment, got)
-		}
-	}
-	for _, banned := range []string{"API_KEY", "TOKEN=", "ENV DB_", "COPY /home/"} {
-		if strings.Contains(got, banned) {
-			t.Errorf("compose must not contain %q:\n%s", banned, got)
-		}
-	}
-	if strings.Contains(got, "devsecret123") || strings.Contains(got, "password123") {
-		t.Errorf("compose must not bake literal credentials:\n%s", got)
-	}
-}
-
-// TestRenderNewComposeCanonicalDB pins the compose contract for the
-// canonical "db" adapter name: search=db provisions postgres just like the
-// legacy postgres alias, while legacy sqlite stays local-only.
-func TestRenderNewComposeCanonicalDB(t *testing.T) {
-	t.Parallel()
-	got := renderNewCompose([]batterySelection{{Battery: "search", Adapter: "db"}})
-	if !strings.Contains(got, "image: postgres:") {
-		t.Errorf("compose for search=db lacks postgres service:\n%s", got)
-	}
-	gotLegacy := renderNewCompose([]batterySelection{{Battery: "search", Adapter: "postgres"}})
-	if got != gotLegacy {
-		t.Errorf("compose for search=db differs from search=postgres:\n%s\n---\n%s", got, gotLegacy)
-	}
-	if got := renderNewCompose([]batterySelection{{Battery: "search", Adapter: "sqlite"}}); got != "" {
-		t.Errorf("expected empty compose for search=sqlite, got:\n%s", got)
-	}
-}
-
-// TestRenderNewComposeEmptyWhenLocal proves all-local picks emit no file.
-func TestRenderNewComposeEmptyWhenLocal(t *testing.T) {
-	t.Parallel()
-	if got := renderNewCompose([]batterySelection{{Battery: "db", Adapter: "sqlite"}, {Battery: "cache", Adapter: "memory"}}); got != "" {
-		t.Fatalf("expected empty compose, got:\n%s", got)
-	}
-}
-
-// TestRunNewWritesComposeWhenPostgres proves `zever new` emits compose.yaml
-// for external picks and omits it for local-only scaffolds.
-func TestRunNewWritesComposeWhenPostgres(t *testing.T) {
-	repoRoot := repoRootAbs(t)
-	workDir := t.TempDir()
-	withWorkingDir(t, workDir)
-	t.Setenv(zeverFrameworkPathEnv, repoRoot)
-
-	if err := runNew([]string{"pgapp", "--adapters", "db=postgres"}); err != nil {
-		t.Fatalf("runNew: %v", err)
-	}
-	compose := readFile(t, filepath.Join(workDir, "pgapp", "compose.yaml"))
-	if !strings.Contains(compose, "image: postgres:") {
-		t.Fatalf("compose.yaml lacks postgres service:\n%s", compose)
-	}
-
-	workDir2 := t.TempDir()
-	withWorkingDir(t, workDir2)
-	if err := runNew([]string{"liteapp"}); err != nil {
-		t.Fatalf("runNew: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(workDir2, "liteapp", "compose.yaml")); !os.IsNotExist(err) {
-		t.Fatalf("expected no compose.yaml for local scaffold, stat err = %v", err)
+	if !strings.Contains(wiring, "adapters/db/postgres") {
+		t.Fatalf("wiring.go lacks the postgres adapter wiring:\n%s", wiring)
 	}
 }
 
@@ -1442,6 +1738,97 @@ func TestBatterySelectionsAdaptersMap(t *testing.T) {
 
 	if got := cfg.batterySelections()[0].Adapter; got != "sqlite" {
 		t.Fatalf("legacy DBAdapter lost to the map: %q", got)
+	}
+}
+
+// TestRefVarName pins the Ref var naming: short batteries uppercase, named
+// instances append the title-cased name.
+func TestRefVarName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		battery, name, want string
+	}{
+		{"db", "", "DB"},
+		{"db", "default", "DB"},
+		{"db", "analytics", "DBAnalytics"},
+		{"cache", "", "Cache"},
+		{"cache", "sessions", "CacheSessions"},
+		{"router", "default", "Router"},
+		{"log", "", "Log"},
+	}
+
+	for _, tc := range cases {
+		if got := refVarName(tc.battery, tc.name); got != tc.want {
+			t.Errorf("refVarName(%q, %q) = %q, want %q", tc.battery, tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestFactoryExprShapes pins the provider factory shapes: direct New for
+// core-Options adapters, WrapNoErr/WrapNoOpts for infallible ctors,
+// closures for embedded-DB adapters, and fail-closed for helpers.
+func TestFactoryExprShapes(t *testing.T) {
+	t.Parallel()
+
+	direct, err := factoryExpr(batterySelection{Battery: "db", Adapter: "postgres"}, "dbpostgres", "\t\t")
+	if err != nil || direct != "dbpostgres.New" {
+		t.Errorf("db/postgres = %q, %v; want dbpostgres.New", direct, err)
+	}
+
+	noErr, err := factoryExpr(batterySelection{Battery: "log", Adapter: "slog"}, "logslog", "\t\t")
+	if err != nil || noErr != "container.WrapNoErr(logslog.New)" {
+		t.Errorf("log/slog = %q, %v", noErr, err)
+	}
+
+	noOpts, err := factoryExpr(batterySelection{Battery: "log", Adapter: "noop"}, "lognoop", "\t\t")
+	if err != nil || noOpts != "container.WrapNoOpts(lognoop.New)" {
+		t.Errorf("log/noop = %q, %v", noOpts, err)
+	}
+
+	embedded, err := factoryExpr(batterySelection{Battery: "cache", Adapter: "db"}, "cachedb", "\t\t")
+	if err != nil || !strings.Contains(embedded, "cachedb.New(cachedb.Options{Options: o})") {
+		t.Errorf("cache/db = %q, %v", embedded, err)
+	}
+
+	if _, err := factoryExpr(batterySelection{Battery: "session", Adapter: "cookie"}, "sessioncookie", "\t\t"); err == nil {
+		t.Error("session/cookie must fail closed with a hand-wire hint")
+	} else if !strings.Contains(err.Error(), "cookie") {
+		t.Errorf("session/cookie error lacks guidance: %v", err)
+	}
+}
+
+// TestRenderWiringContentMinimal pins the wiring.go bytes for the minimal
+// stack: three Ref vars, three Provide entries, hello import.
+func TestRenderWiringContentMinimal(t *testing.T) {
+	t.Parallel()
+
+	content, err := renderWiringContent("test", "example.com/acme", []batterySelection{
+		{Battery: "db", Adapter: "sqlite"},
+		{Battery: "log", Adapter: "slog"},
+		{Battery: "observability", Adapter: "stdout"},
+		{Battery: "ratelimit", Adapter: "memory"},
+		{Battery: "router", Adapter: "stdhttp"},
+	})
+	if err != nil {
+		t.Fatalf("renderWiringContent: %v", err)
+	}
+
+	for _, fragment := range []string{
+		"var DB = db.DefaultRef()",
+		"var Log = log.DefaultRef()",
+		"var Router = router.DefaultRef()",
+		"var Observability = observability.DefaultRef()",
+		"var RateLimit = ratelimit.DefaultRef()",
+		"container.Provide(DB, dbsqlite.New)",
+		"container.WrapNoErr(logslog.New)",
+		"container.Provide(Router, routerstdhttp.New)",
+		`"example.com/acme/internal/service/hello"`,
+		"hello.New()",
+	} {
+		if !strings.Contains(string(content), fragment) {
+			t.Errorf("wiring.go lacks %q:\n%s", fragment, content)
+		}
 	}
 }
 

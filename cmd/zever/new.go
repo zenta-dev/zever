@@ -2,26 +2,28 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 const newUsage = `zever new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force]
-                     [--interactive] [--batteries a,b] [--adapters b1=a1,b2=a2] [--profile minimal|api|full]
-                     [-y|--yes] [--list-batteries] [--no-tidy] [--dry-run]
+                      [--with a,b=c] [--yes] [--list-batteries] [--no-tidy] [--dry-run]
 
 Scaffolds a brand new, buildable zever application from scratch: a fresh
-go.mod, a starter schema/app.zen (one User entity), cmd/server + cmd/worker +
-db/seed entrypoints, and internal/app/app.go, all at the exact default
+go.mod, a starter schema/app.zen, cmd/server/main.go,
+internal/app/wiring.go and internal/service/hello, at exactly the default
 locations project.go's ProjectConfig assumes -- so every other zever
 subcommand (serve, dev, queue:work, db migrate/seed, tinker) works against
 the new project with no zever.yaml/.json needed.
@@ -35,26 +37,22 @@ scaffold automatically replaces against that local checkout instead --
 there is no flag for this since it only ever applies to framework
 development, never to an ordinary project.
 
-What is NOT generated: real HTTP route handlers and real job logic. Every
-entrypoint this command writes has the same TODO-stub ceiling as
-` + "`zever generate server`" + `/` + "`worker`" + `/` + "`seed`" + `: this gets you to a buildable,
+What is NOT generated: real HTTP route handlers beyond the sample hello
+endpoint, and real job logic. Every entrypoint this command writes has the
+same TODO-stub ceiling as ` + "`zever generate server`" + `/` + "`worker`" + `/` + "`seed`" + `: this gets you to a buildable,
 runnable skeleton in one command, not to a finished app.
 
-Battery picker (OPT-IN only): without --interactive this command never
-prompts and scaffolds the floor set (log+router) plus whatever --batteries
-and --adapters select. Pass --interactive for the huh wizard (TTY
-required): a MultiSelect over every known battery (floor pre-selected),
-then one adapter Select per picked non-floor battery. Every prompt answer
-has a flag: --batteries skips the battery prompt, --adapters b=a skips
-that battery's adapter prompt, and -y/--yes skips the whole wizard.
---list-batteries prints the battery/default-adapter table and exits.
-
-Start-small profiles (--profile): minimal scaffolds the bootable floor set
-only; api adds cache, queue, session, password, scheduler, outbox,
-idempotency and lock; full wires every battery that resolves from config
-alone (all but ai, geo and i18n, which need an API key, dataset or FS; add
-those with "zever add"). Explicit --batteries add to the preset, --adapters
-override its picks.
+Battery picker (--with): without --interactive this command never prompts
+and scaffolds the minimal stack (db+log+router) plus whatever --with
+selects. --with takes a comma-separated list of batteries with optional
+adapter pins (e.g. --with cache,queue=redis). Pass --interactive for the
+huh wizard (TTY required): a MultiSelect over every known battery (minimal
+stack pre-selected), then one adapter Select per picked non-floor
+battery. Every prompt answer has a flag: --with skips the battery prompt,
+--with b=a skips that battery's adapter prompt, and -y/--yes skips the
+whole wizard. --list-batteries prints the battery/default-adapter table
+and exits. --profile is a deprecated alias: it prints the equivalent
+--with form and then behaves as before.
 
 Flags:`
 
@@ -156,23 +154,6 @@ type NewConfig struct {
 	Adapters map[string]string
 }
 
-// defaultNewBackends is the historical sample --backend list suggested to a
-// freshly scaffolded project when no narrower set was picked (i.e. the
-// flag-driven `zever new` path, which has no backend-picking flags of its
-// own).
-var defaultNewBackends = []string{"zenorm", "proto", "atlas"}
-
-// quickstartBackends returns cfg.Backends joined with "," if set, or the
-// default sample otherwise -- the single place the README/next-steps
-// quickstart command's --backend value is computed.
-func quickstartBackends(cfg NewConfig) string {
-	if len(cfg.Backends) == 0 {
-		return strings.Join(defaultNewBackends, ",")
-	}
-
-	return strings.Join(cfg.Backends, ",")
-}
-
 // newNewFlagSet builds the stdlib flag set for `zever new`: the single
 // source for runNew parsing and for help/usage printers, so help can never
 // drift from the real flags.
@@ -185,9 +166,10 @@ func newNewFlagSet() *flag.FlagSet {
 	fs.Bool("force", false, "scaffold into a non-empty directory anyway")
 	fs.Bool("interactive", false, "run the opt-in battery picker wizard (TTY required)")
 	fs.Bool("i", false, "alias for --interactive")
-	fs.String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache)")
-	fs.String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber)")
-	fs.String("profile", "", "scaffold profile: minimal (bootable floor only), api (+cache/queue/session/password/scheduler/outbox/idempotency/lock), or full (every battery that resolves from config alone; not ai/geo/i18n)")
+	fs.String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache); prefer --with")
+	fs.String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber); prefer --with")
+	fs.String("with", "", "comma-separated batteries with optional adapter pins (e.g. --with cache,queue=redis); replaces --batteries/--adapters")
+	fs.String("profile", "", "deprecated alias: prints the equivalent --with form, then behaves as before (minimal|api|full)")
 	fs.Bool("yes", false, "skip all prompts, scaffold floor+flags only")
 	fs.Bool("y", false, "alias for --yes")
 	fs.Bool("list-batteries", false, "print the battery/default-adapter table to stdout and exit")
@@ -257,31 +239,43 @@ func runNew(args []string) error {
 		outDir = "./" + name
 	}
 
-	// Flag-parity inputs: --batteries selects extra batteries, --adapters
-	// overrides per-battery adapters (and implies its batteries, the same
-	// way a cache override already implies "cache" in batteriesFor).
-	// --profile selects a start-small preset (minimal/api/full); explicit
-	// --batteries add to the preset.
+	// Flag-parity inputs: --with selects extra batteries with optional
+	// adapter pins (e.g. --with cache,db=postgres), unifying the legacy
+	// --batteries and --adapters flags, which keep working. --profile is a
+	// deprecated alias that prints its --with replacement and behaves as
+	// before; explicit --with/--batteries add to the preset.
+	withBatteries, withAdapters, err := parseWithFlag(flagString("with"))
+	if err != nil {
+		return err
+	}
+
 	optional, err := parseBatteriesFlag(flagString("batteries"))
 	if err != nil {
 		return err
 	}
 
-	profileBase, err := profileBatteries(flagString("profile"))
-	if err != nil {
-		return err
+	if len(withBatteries) > 0 {
+		optional = mergeBatteries(optional, withBatteries)
 	}
 
-	if flagString("profile") != "" || flagString("batteries") != "" {
-		// A preset or an explicit list answers the battery prompt: merge
-		// them into a non-nil preselection so the picker (if active) skips
-		// straight to per-battery adapter prompts.
+	if profile := flagString("profile"); profile != "" {
+		_, _ = fmt.Fprintln(os.Stderr, formatHint(profileReplacementHint(profile)))
+
+		profileBase, profileErr := profileBatteries(profile)
+		if profileErr != nil {
+			return profileErr
+		}
+
 		optional = mergeBatteries(optional, profileBase)
 	}
 
 	overrides, err := parseAdaptersFlag(flagString("adapters"))
 	if err != nil {
 		return err
+	}
+
+	for b, a := range withAdapters {
+		overrides[b] = a
 	}
 
 	for b := range overrides {
@@ -292,8 +286,9 @@ func runNew(args []string) error {
 
 	// The picker is strictly opt-in: only --interactive (or the global
 	// interactive mode / env) enters it, and -y/--yes always skips it.
-	// Flag-supplied answers survive into the wizard: --batteries skips the
-	// battery prompt, --adapters skips that battery's adapter prompt.
+	// Flag-supplied answers survive into the wizard: --with/--batteries
+	// skips the battery prompt, --with b=a/--adapters skips that battery's
+	// adapter prompt.
 	if wantNewPicker(fs) {
 		picked, pickedAdapters, pickerErr := runBatteryPicker(optional, overrides)
 		if pickerErr != nil {
@@ -407,7 +402,7 @@ var runGoModTidyFunc = runGoModTidy
 func runGoModTidy(tag, dir string) error {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		return fmt.Errorf("%s: go toolchain not found on PATH, run `go mod tidy` in %q manually: %w", tag, dir, err)
+		return fmt.Errorf("%s: go toolchain not found on PATH, install Go (https://go.dev/doc/install) then run `go mod tidy` in %q manually: %w", tag, dir, err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTidyTimeout)
@@ -418,7 +413,12 @@ func runGoModTidy(tag, dir string) error {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s: go mod tidy in %q failed, run `go mod tidy` in %q manually: %w: %s", tag, dir, dir, err, strings.TrimSpace(string(out)))
+		trimmed := strings.TrimSpace(string(out))
+		if trimmed == "" {
+			trimmed = err.Error()
+		}
+
+		return fmt.Errorf("%s: go mod tidy in %q failed: %s: %w: %s", tag, dir, tidyFailureHint(string(out), dir), err, trimmed)
 	}
 
 	return nil
@@ -479,7 +479,7 @@ func parseBatteriesFlag(raw string) ([]string, error) {
 		}
 
 		if _, ok := allServiceAdapters[name]; !ok {
-			return nil, fmt.Errorf("zever new: unknown battery %q in --batteries (see --list-batteries)", name)
+			return nil, unknownBatteryError("zever new", name)
 		}
 
 		set[name] = true
@@ -493,6 +493,88 @@ func parseBatteriesFlag(raw string) ([]string, error) {
 	sort.Strings(out)
 
 	return out, nil
+}
+
+// parseWithFlag parses --with (comma-separated batteries with optional
+// adapter pins, e.g. "cache,db=postgres") into a battery list plus an
+// adapter override map. It unifies the legacy --batteries and --adapters
+// grammars: a bare name selects a battery, name=adapter pins its adapter
+// (and implies the battery). Unknown batteries and adapters fail closed
+// with the choices listed. Empty means "no extras, no overrides".
+func parseWithFlag(raw string) ([]string, map[string]string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, map[string]string{}, nil
+	}
+
+	set := map[string]bool{}
+	overrides := map[string]string{}
+
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		battery, adapter, hasAdapter := strings.Cut(part, "=")
+		battery = strings.TrimSpace(battery)
+		adapter = strings.TrimSpace(adapter)
+
+		if battery == "" || (hasAdapter && adapter == "") {
+			return nil, nil, fmt.Errorf("zever new: malformed --with entry %q, want battery or battery=adapter", part)
+		}
+
+		if _, ok := allServiceAdapters[battery]; !ok {
+			return nil, nil, unknownBatteryError("zever new", battery)
+		}
+
+		set[battery] = true
+
+		if !hasAdapter {
+			continue
+		}
+
+		choices := adaptersForBattery(battery)
+		found := false
+
+		for _, c := range choices {
+			if c == adapter {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return nil, nil, unknownAdapterError("zever new", battery, adapter, choices)
+		}
+
+		overrides[battery] = adapter
+	}
+
+	out := make([]string, 0, len(set))
+	for name := range set {
+		out = append(out, name)
+	}
+
+	sort.Strings(out)
+
+	return out, overrides, nil
+}
+
+// profileReplacementHint names the --with form replacing a deprecated
+// --profile value, so the alias stays usable while steering callers off
+// it. Unknown profiles still fail in profileBatteries; this only covers
+// the message for known ones (and echoes the input otherwise).
+func profileReplacementHint(profile string) string {
+	extras, err := profileBatteries(profile)
+	if err != nil {
+		return fmt.Sprintf("--profile %q is deprecated, use --with instead (see --list-batteries)", profile)
+	}
+
+	if len(extras) == 0 {
+		return "--profile minimal is deprecated, use --with (bare, for the minimal db+log+router stack) instead"
+	}
+
+	return fmt.Sprintf("--profile %q is deprecated, use --with %s instead", profile, strings.Join(extras, ","))
 }
 
 // parseAdaptersFlag parses --adapters (comma-separated battery=adapter
@@ -520,7 +602,7 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 		}
 
 		if _, known := allServiceAdapters[battery]; !known {
-			return nil, fmt.Errorf("zever new: unknown battery %q in --adapters (see --list-batteries)", battery)
+			return nil, unknownBatteryError("zever new", battery)
 		}
 
 		choices := adaptersForBattery(battery)
@@ -534,8 +616,7 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 		}
 
 		if !found {
-			return nil, fmt.Errorf("zever new: unknown adapter %q for battery %q (choices: %s)",
-				adapter, battery, strings.Join(choices, ", "))
+			return nil, unknownAdapterError("zever new", battery, adapter, choices)
 		}
 
 		out[battery] = adapter
@@ -1003,13 +1084,18 @@ func defaultServiceAdapter(name string) string {
 	return ""
 }
 
-// scaffoldBootBatteries are the zero-infra batteries every generated
-// server entrypoint unconditionally resolves (see serverTemplate's
-// c.Auth/c.Permission/c.Observability/c.DB/c.Router/c.Log calls plus the
-// default-on c.RateLimit wiring). `zever new` always includes them so
-// /healthz and /readyz pass out of the box; `zever generate server`'s
-// floor (coreBatteries) stays minimal for existing projects.
-var scaffoldBootBatteries = []string{"auth", "db", "observability", "permission", "ratelimit"}
+// minimalScaffoldBatteries is the fixed, always-scaffolded battery set: the
+// minimal stack every generated server boots. db (sqlite) persists the
+// sample entity, log (slog) is the stdlib logger, router (stdhttp) is the
+// net/http router, observability (stdout) backs serve's tracing middleware
+// and ratelimit (memory) backs its rate-limit middleware -- serve resolves
+// all five unconditionally at boot, so omitting any of them fails `zever
+// serve` with an unknown-adapter error. Anything beyond this is added via
+// `zever new --with` (or `zever add` later, or with service env plus one
+// Provider entry in wiring.go).
+var minimalScaffoldBatteries = []string{
+	"db", "log", "observability", "ratelimit", "router",
+}
 
 // apiProfileBatteries are the extras the "api" start-small profile adds on
 // top of the boot set: the batteries a JSON API with background jobs needs,
@@ -1033,11 +1119,13 @@ var apiProfileBatteries = []string{
 var fullProfileSkipped = map[string]bool{"ai": true, "geo": true, "i18n": true}
 
 // profileBatteries resolves a --profile name to its extra batteries (on top
-// of the floor+boot set batteriesFor always includes). "" means no profile
-// was passed (nil extras, no behavior change); "minimal" is the boot set
-// alone; "api" adds apiProfileBatteries; "full" covers every known service.
-// Unknown names fail closed listing the choices. Results are sorted and
-// freshly allocated, safe for callers to merge and sort further.
+// of the minimal stack batteriesFor always includes). "" means no profile
+// was passed (nil extras, no behavior change); "minimal" is the minimal
+// stack alone; "api" adds apiProfileBatteries; "full" covers every known
+// service. Unknown names fail closed listing the choices. Results are
+// sorted and freshly allocated, safe for callers to merge and sort
+// further. --profile is deprecated (see profileReplacementHint); --with
+// takes the same battery lists directly.
 func profileBatteries(profile string) ([]string, error) {
 	switch profile {
 	case "":
@@ -1067,11 +1155,12 @@ func profileBatteries(profile string) ([]string, error) {
 	}
 }
 
-// batteriesFor merges coreBatteries with optional (developer-picked)
-// batteries, adding "cache" whenever cacheAdapter is a real override --
-// explicit intent to use caching even when "cache" wasn't itself picked.
+// batteriesFor merges minimalScaffoldBatteries with optional
+// (developer-picked) batteries, adding "cache" whenever cacheAdapter is a
+// real override -- explicit intent to use caching even when "cache" wasn't
+// itself picked.
 func batteriesFor(optional []string, cacheAdapter string) []string {
-	batteries := mergeBatteries(mergeBatteries(coreBatteries, scaffoldBootBatteries), optional)
+	batteries := mergeBatteries(minimalScaffoldBatteries, optional)
 
 	if cacheAdapter != "" {
 		batteries = mergeBatteries(batteries, []string{"cache"})
@@ -1207,7 +1296,11 @@ func writeNewSeedFiles(tag string, cfg NewConfig, write func(rel string, content
 // writeNewProject materialises a planned new project on disk, at exactly the
 // paths ProjectConfig's defaults assume. It is THE single file-writing path
 // for scaffolding: runNew (flags) and the TUI screens (Wave 3) both converge
-// here, so every scaffold writes the same tree.
+// here, so every scaffold writes the same minimal tree: go.mod,
+// schema/app.zen, cmd/server/main.go, internal/app/wiring.go,
+// internal/service/hello, .env, .env.example, .gitignore and README.md.
+// Heavier files (worker, seed, Docker, CI, lint, compose, k8s) are opt-in
+// `zever add` recipes, not defaults.
 func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 	written := make([]string, 0, 10)
 
@@ -1238,16 +1331,18 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, err
 	}
 
-	appContent, err := renderAppContent(tag, cfg.batterySelections())
+	selections := cfg.batterySelections()
+
+	wiringContent, err := renderWiringContent(tag, cfg.ModulePath, selections)
 	if err != nil {
 		return nil, err
 	}
 
-	if writeErr := write(filepath.Join("internal", "app", "app.go"), appContent); writeErr != nil {
+	if writeErr := write(filepath.Join("internal", "app", "wiring.go"), wiringContent); writeErr != nil {
 		return nil, writeErr
 	}
 
-	serverContent, err := renderGoFile(tag, "server main.go", serverTemplate, serverData{ModulePath: cfg.ModulePath})
+	serverContent, err := renderGoFile(tag, "server main.go", newServerMainTemplate, struct{ ModulePath string }{cfg.ModulePath})
 	if err != nil {
 		return nil, err
 	}
@@ -1256,71 +1351,33 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
-	workerContent, err := renderGoFile(tag, "worker main.go", workerTemplate, buildWorkerData(cfg.ModulePath, &ir.Schema{}))
+	helloContent, err := renderGoFile(tag, "hello service", helloServiceTemplate, struct{ ModulePath string }{cfg.ModulePath})
 	if err != nil {
 		return nil, err
 	}
 
-	if writeErr := write(filepath.Join(defaultWorkerEntry, "main.go"), workerContent); writeErr != nil {
+	if writeErr := write(filepath.Join("internal", "service", "hello", "service.go"), helloContent); writeErr != nil {
 		return nil, writeErr
 	}
 
-	if seedErr := writeNewSeedFiles(tag, cfg, write); seedErr != nil {
-		return nil, seedErr
+	devEnv, err := renderDevEnv(selections)
+	if err != nil {
+		return nil, err
+	}
+
+	if writeErr := write(".env", devEnv); writeErr != nil {
+		return nil, writeErr
+	}
+
+	if writeErr := write(".env.example", renderEnvExample(selections)); writeErr != nil {
+		return nil, writeErr
 	}
 
 	if writeErr := write(".gitignore", []byte(newGitignore)); writeErr != nil {
 		return nil, writeErr
 	}
 
-	if writeErr := write("Dockerfile", []byte(renderNewDockerfile(cfg.GoVersion))); writeErr != nil {
-		return nil, writeErr
-	}
-
-	if writeErr := write(".dockerignore", []byte(newDockerignore)); writeErr != nil {
-		return nil, writeErr
-	}
-
-	cliPin := cfg.FrameworkVersion
-	if cliPin == "" || cliPin == pseudoVersionZero {
-		// Local checkouts have no published version to install from; CI
-		// installs the installer's default (newest) release instead.
-		cliPin = "latest"
-	}
-
-	if writeErr := write(filepath.Join(".github", "workflows", "ci.yml"),
-		[]byte(renderCIGitHubWorkflow(cfg.GoVersion, cliPin, quickstartBackends(cfg)))); writeErr != nil {
-		return nil, writeErr
-	}
-
-	for _, f := range []struct {
-		rel     string
-		content string
-	}{
-		{"Makefile", renderNewMakefile(quickstartBackends(cfg))},
-		{".golangci.yml", newGolangciYml},
-		{".editorconfig", newEditorconfig},
-		{filepath.Join(".github", "dependabot.yml"), newDependabotYml},
-	} {
-		if writeErr := write(f.rel, []byte(f.content)); writeErr != nil {
-			return nil, writeErr
-		}
-	}
-
-	if compose := renderNewCompose(cfg.batterySelections()); compose != "" {
-		if writeErr := write("compose.yaml", []byte(compose)); writeErr != nil {
-			return nil, writeErr
-		}
-	}
-
-	if writeErr := write("README.md", []byte(renderNewReadme(cfg.Name, quickstartBackends(cfg)))); writeErr != nil {
-		return nil, writeErr
-	}
-
-	// app.go's DefaultDBPath is data/app.db; keeping the directory in the
-	// tree means the scaffolded binaries run without a mkdir first (as
-	// zever extract already does for extracted services).
-	if writeErr := write(filepath.Join("data", ".gitkeep"), nil); writeErr != nil {
+	if writeErr := write("README.md", []byte(renderNewReadme(cfg.Name))); writeErr != nil {
 		return nil, writeErr
 	}
 
@@ -1459,19 +1516,12 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 	direct = append(direct,
 		frameworkModulePath+"/container",
 		frameworkModulePath+"/config",
-		// The worker entrypoint always resolves the job dispatcher types,
-		// so core/job ships with every scaffold, selected or not.
-		frameworkModulePath+"/core/job",
-		// The container always wires the agent loop and RAG engine over the
-		// resolved backends, so core/agent and core/rag ship with every
-		// scaffold, selected or not.
-		frameworkModulePath+"/core/agent",
-		frameworkModulePath+"/core/rag",
-		// Generated server entrypoints always wire authz + middleware.
-		frameworkModulePath+"/core/authz",
-		frameworkModulePath+"/core/middleware",
+		// serve.Main boots the generated server from the typed Providers
+		// plus the project Modules; every scaffold wires through it.
+		frameworkModulePath+"/serve",
 		// The default zenorm backend emits packages importing the orm
-		// module, so every scaffold that compiles entities requires it.
+		// module, so every scaffold that compiles entities requires it
+		// (pinned by TestNewScaffoldGoModRequiresOrm).
 		frameworkModulePath+"/orm",
 	)
 	direct = append(direct, corePaths...)
@@ -1571,6 +1621,14 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 		// core/eval is not a service battery but container's graph needs it.
 		add("core/eval")
 
+		// The server and worker entrypoints always wire the agent loop and
+		// RAG engine types, authz policies, middleware and the job
+		// dispatcher: pin them with the release even though the minimal
+		// scaffold does not import them directly.
+		for _, extra := range []string{"core/agent", "core/authz", "core/job", "core/middleware", "core/rag"} {
+			add(extra)
+		}
+
 		for _, dir := range nestedModuleDirs {
 			add(dir)
 		}
@@ -1623,237 +1681,24 @@ entity User {
 `, name)
 }
 
-// newGitignore mirrors the one real rule a fresh project needs (the local
-// sqlite file db migrate creates is never committed) plus the generated-code
-// directory a fresh project has no reason to check in.
-const newGitignore = `# The local sqlite database is created by ` + "`zever db migrate`" + `; never commit it.
-/data/*.db
+// newGitignore keeps secrets and local state out of git: the dev .env file
+// (random per project, never commit it), the local sqlite database, and
+// the generated-code directory a fresh project has no reason to check in.
+const newGitignore = `# Local dev secrets. Generated per project by ` + "`zever new`" + `; never commit.
+.env
+.env.local
+
+# The local sqlite database is created at runtime; never commit it.
+*.db
 
 # Regenerated from schema/*.zen by ` + "`zever compile`" + ` -- see README.
 /generated/
 `
 
-// newDockerignore keeps build context small and secrets out of the image:
-// local sqlite files, build output, VCS metadata and JS deps never ship.
-const newDockerignore = `# Local sqlite databases created by ` + "`zever db migrate`" + `.
-*.db
-
-# Build output.
-dist/
-
-# VCS metadata.
-.git/
-
-# JS deps (docs tooling only, never part of the Go image).
-node_modules/
-`
-
-// renderNewDockerfile returns the reference Dockerfile for a scaffolded
-// project: multi-stage golang builder -> distroless nonroot runtime,
-// HEALTHCHECK against the scaffolded /healthz endpoint. goVersion selects the builder tag
-// (golang:<ver>-trixie); empty falls back to defaultGoVersion. The output
-// carries no secrets and no absolute local paths.
-func renderNewDockerfile(goVersion string) string {
-	if goVersion == "" {
-		goVersion = defaultGoVersion
-	}
-
-	return fmt.Sprintf(`# Scaffolded by `+"`zever new`"+`. Reference production image.
-#
-# Build with: docker build -t app .
-# Run with: docker run --rm -p 8080:8080 -p 9090:9090 app
-# Config via environment (never baked in): docker run -e DB_DSN=... app
-
-FROM golang:%s-trixie AS builder
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
-
-FROM busybox:1.36.1-musl AS busybox
-
-FROM gcr.io/distroless/static-debian13:nonroot
-# OCI image labels; pass at build time, e.g.
-#   docker build --build-arg VERSION=1.2.3 --build-arg REVISION=$(git rev-parse HEAD) \
-#     --build-arg SOURCE=https://github.com/acme/app -t app .
-ARG TITLE=app
-ARG VERSION=dev
-ARG REVISION=unknown
-ARG SOURCE=
-LABEL org.opencontainers.image.title="${TITLE}" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.revision="${REVISION}" \
-      org.opencontainers.image.source="${SOURCE}"
-WORKDIR /app
-COPY --from=busybox /bin/wget /usr/bin/wget
-COPY --from=builder /out/server /app/server
-EXPOSE 8080 9090
-USER nonroot:nonroot
-ENTRYPOINT ["/app/server"]
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
-`, goVersion)
-}
-
-// renderCIGitHubWorkflow returns the scaffolded project's CI workflow: it
-// installs the pinned zever CLI release binary, regenerates derived code from the schema,
-// gates drift with `zever compile --check` (proving compile is
-// deterministic on regenerating projects, and gating committed-output drift
-// for teams that check in generated/), then builds and tests. cliPin is the
-// release pin (see writeNewProject: "latest" for local checkouts, which
-// omits --version, the release tag otherwise); backends is the --backend value
-// for both compile invocations. The CLI is installed from the release
-// binary via install.sh: `go install` of cmd/zever only works from the
-// release that ships a replace-free cmd/zever/go.mod (v0.7.2), so scaffolds
-// pinned to older versions could not build.
-func renderCIGitHubWorkflow(goVersion, cliPin, backends string) string {
-	if goVersion == "" {
-		goVersion = defaultGoVersion
-	}
-
-	installVersion := ""
-	if cliPin != "" && cliPin != "latest" {
-		installVersion = " --version " + cliPin
-	}
-
-	return fmt.Sprintf(`# Scaffolded by `+"`zever new`"+`. Regenerate derived code, gate drift, build and test.
-#
-# The regenerate step keeps fresh clones green when generated/ is gitignored
-# (the default). Teams that commit generated/ instead (see
-# "Customizing and leaving zever" in the docs) can drop the regenerate step:
-# `+"`zever compile --check`"+` alone then fails the build on drift.
-name: ci
-
-on:
-  push:
-  pull_request:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '%s'
-      - name: Install zever CLI
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSfL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh -s -- --yes%s
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Regenerate from schema
-        run: zever compile --backend=%s --out ./generated schema/*.zen
-      - name: Drift gate (committed generated/ must match the schema)
-        run: zever compile --check --backend=%s --out ./generated schema/*.zen
-      - name: Build
-        run: go build ./...
-      - name: Test
-        run: go test ./...
-`, goVersion, installVersion, backends, backends)
-}
-
-// renderNewCompose returns compose.yaml for a scaffolded project, or ""
-// when no picked battery needs external infra. Postgres picks (db,
-// search, vectorstore, workflow) add a db service; redis picks (cache, queue,
-// session, ratelimit, lock, eventbus, idempotency) share one redis
-// service. Env carries secrets at run time (never baked in); per-battery
-// URL vars point at the compose services.
-//
-// The canonical "db" adapter name always provisions postgres: it selects
-// the backend by DSN at runtime (empty means embedded sqlite), and the
-// compose db service is what a postgres DSN points at. Legacy alias names
-// ("postgres", "pgvector") provision it too; legacy "sqlite" never does.
-func renderNewCompose(sel []batterySelection) string {
-	needsPG := false
-	redisBatteries := []string{}
-
-	for _, s := range sel {
-		switch {
-		case s.Battery == "db" && s.Adapter == "postgres":
-			needsPG = true
-		case (s.Battery == "search" && (s.Adapter == "db" || s.Adapter == "postgres")) ||
-			(s.Battery == "vectorstore" && (s.Adapter == "db" || s.Adapter == "pgvector")) ||
-			(s.Battery == "workflow" && (s.Adapter == "db" || s.Adapter == "postgres")):
-			needsPG = true
-		case (s.Battery == "cache" || s.Battery == "queue" || s.Battery == "session" ||
-			s.Battery == "ratelimit" || s.Battery == "lock" || s.Battery == "eventbus" ||
-			s.Battery == "idempotency") && s.Adapter == "redis":
-			redisBatteries = append(redisBatteries, s.Battery)
-		}
-	}
-
-	if !needsPG && len(redisBatteries) == 0 {
-		return ""
-	}
-
-	var b strings.Builder
-	b.WriteString("# Scaffolded by `zever new`. External services for local prod-like runs.\n")
-	b.WriteString("#\n")
-	b.WriteString("# Up with: docker compose up --build\n")
-	b.WriteString("# Secrets via environment (never baked in): DB_PASSWORD=... docker compose up --build\n")
-	b.WriteString("#\n")
-	b.WriteString("# Worker uses the same image:\n")
-	b.WriteString("#   docker compose run --rm app ./worker\n")
-	b.WriteString("services:\n")
-	b.WriteString("  app:\n")
-	b.WriteString("    build: .\n")
-	b.WriteString("    ports:\n")
-	b.WriteString("      - \"8080:8080\"\n")
-	b.WriteString("      - \"9090:9090\"\n")
-	if needsPG || len(redisBatteries) > 0 {
-		b.WriteString("    depends_on:\n")
-		if needsPG {
-			b.WriteString("      db:\n        condition: service_healthy\n")
-		}
-		if len(redisBatteries) > 0 {
-			b.WriteString("      redis:\n        condition: service_healthy\n")
-		}
-	}
-	b.WriteString("    environment:\n")
-	if needsPG {
-		b.WriteString("      DB_DSN: postgres://app:${DB_PASSWORD:-devsecret}@db:5432/app?sslmode=disable\n")
-	}
-	for _, battery := range redisBatteries {
-		b.WriteString("      " + strings.ToUpper(battery) + "_URL: redis://redis:6379\n")
-	}
-	if needsPG {
-		b.WriteString("  db:\n")
-		b.WriteString("    image: postgres:16-bookworm\n")
-		b.WriteString("    environment:\n")
-		b.WriteString("      POSTGRES_USER: app\n")
-		b.WriteString("      POSTGRES_PASSWORD: ${DB_PASSWORD:-devsecret}\n")
-		b.WriteString("      POSTGRES_DB: app\n")
-		b.WriteString("    volumes:\n")
-		b.WriteString("      - pgdata:/var/lib/postgresql/data\n")
-		b.WriteString("    healthcheck:\n")
-		b.WriteString("      test: [\"CMD-SHELL\", \"pg_isready -U app\"]\n")
-		b.WriteString("      interval: 5s\n")
-		b.WriteString("      timeout: 3s\n")
-		b.WriteString("      retries: 10\n")
-	}
-	if len(redisBatteries) > 0 {
-		b.WriteString("  redis:\n")
-		b.WriteString("    image: redis:7-alpine\n")
-		b.WriteString("    volumes:\n")
-		b.WriteString("      - redisdata:/data\n")
-		b.WriteString("    healthcheck:\n")
-		b.WriteString("      test: [\"CMD\", \"redis-cli\", \"ping\"]\n")
-		b.WriteString("      interval: 5s\n")
-		b.WriteString("      timeout: 3s\n")
-		b.WriteString("      retries: 10\n")
-	}
-	b.WriteString("volumes:\n")
-	if needsPG {
-		b.WriteString("  pgdata:\n")
-	}
-	if len(redisBatteries) > 0 {
-		b.WriteString("  redisdata:\n")
-	}
-	return b.String()
-}
-
-// renderNewReadme is a genuine quickstart, not filler: every command in it
-// is one a freshly scaffolded project can actually run, in order.
-func renderNewReadme(name, backends string) string {
+// renderNewReadme is a genuine quickstart, not filler: exactly four
+// commands, each one a freshly scaffolded project can actually run, in
+// order.
+func renderNewReadme(name string) string {
 	const backtick = "`"
 
 	tmpl := `# %[1]s
@@ -1862,58 +1707,47 @@ A zever application, scaffolded by ` + backtick + `zever new` + backtick + `. On
 (` + backtick + `schema/app.zen` + backtick + `) is the source of truth; the ` + backtick + `zever` + backtick + ` CLI turns it into a
 query builder, a Protobuf service definition and the SQL schema, and
 everything else is resolved from a ` + backtick + `container.Container` + backtick + ` built in
-` + backtick + `internal/app/app.go` + backtick + `.
+` + backtick + `internal/app/wiring.go` + backtick + `.
 
 ## Quickstart
 
 ` + "```bash" + `
-# ` + "`go mod tidy`" + ` already ran during ` + "`zever new`" + ` (pass --no-tidy to skip);
-# re-run it only after editing go.mod.
-# turn schema/app.zen into a query builder (generated/zenorm/orm/gen/app), a
-# Protobuf service definition (generated/proto) and SQL DDL
-zever compile --backend=%[2]s schema/app.zen
+# turn schema/app.zen into a query builder, a Protobuf service definition
+# and SQL DDL
+zever compile --backend=zenorm,proto,atlas schema/app.zen
 
 # create the sqlite database from the schema (safe to re-run)
-zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
+zever db migrate --adapter=sqlite --dsn=app.db schema/app.zen
 
-# run the HTTP API (-addr to change the listen address)
+# run the HTTP API, then try the sample endpoint
 zever serve
-
-# in another shell: the job worker + embedded scheduler
-zever queue:work
-
-# watch schema and server source; recompile and restart on change
-zever dev
+curl localhost:8080/hello
 ` + "```" + `
-
-## Docker
-
-` + "```bash" + `
-docker build -t %[1]s .
-docker run --rm -p 8080:8080 -p 9090:9090 %[1]s
-` + "```" + `
-
-Pass config at runtime via environment (never baked into the image),
-e.g. ` + backtick + `docker run -e DB_DSN=... %[1]s` + backtick + `. The image
-healthchecks ` + backtick + `GET /healthz` + backtick + `.
 
 ## What's here, and what's not
 
 - ` + backtick + `schema/app.zen` + backtick + ` -- one starter ` + backtick + `User` + backtick + ` entity. Extend it with
   ` + backtick + `zever generate entity/job/schedule` + backtick + `.
-- ` + backtick + `cmd/server/main.go` + backtick + `, ` + backtick + `cmd/worker/main.go` + backtick + `,
-  ` + backtick + `db/seed/main.go` + backtick + ` -- thin entrypoints, the same shape
-  ` + backtick + `zever generate server/worker/seed` + backtick + ` produce.
-- ` + backtick + `internal/app/app.go` + backtick + ` -- the one place this project selects its
-  adapters and builds its container.
+- ` + backtick + `cmd/server/main.go` + backtick + ` -- the thin entrypoint; it calls
+  ` + backtick + `serve.Main` + backtick + ` with the providers and modules below.
+- ` + backtick + `internal/app/wiring.go` + backtick + ` -- the one place this project selects its
+  adapters: one ` + backtick + `Ref` + backtick + ` var plus one ` + backtick + `container.Provide` + backtick + ` entry per
+  service instance. Add batteries later with ` + backtick + `zever add <battery>` + backtick + `, which only
+  inserts entries here and never rewrites your code.
+- ` + backtick + `internal/service/hello/service.go` + backtick + ` -- the sample module mounted
+  by ` + backtick + `wiring.Modules` + backtick + ` (` + backtick + `GET /hello` + backtick + `). Replace it with real
+  modules as the app grows.
+- ` + backtick + `.env` + backtick + ` / ` + backtick + `.env.example` + backtick + ` -- local config. ` + backtick + `.env` + backtick + `
+  holds per-project dev secrets (never commit it); ` + backtick + `.env.example` + backtick + `
+  documents every key (generated from the adapter Options structs).
 
-Route handlers and job bodies are **not** generated -- add RPCs and jobs to
-the schema, then wire the actual logic by hand, same TODO-stub ceiling as
-every ` + backtick + `zever generate` + backtick + ` scaffold. ` + backtick + `zever new` + backtick + ` gets you to a buildable,
-runnable skeleton in one command, not to a finished app.
+Need a worker, seed, Dockerfile, CI, lint, compose or k8s manifests?
+` + backtick + `zever add worker|seed|docker|ci|lint|compose|k8s` + backtick + ` writes them from
+templates when you need them -- the default scaffold stays minimal on
+purpose.
 `
 
-	return fmt.Sprintf(tmpl, name, backends)
+	return fmt.Sprintf(tmpl, name)
 }
 
 // printNewDryRun prints the scaffold plan without writing anything.
@@ -1945,9 +1779,8 @@ func printNewSummary(cfg NewConfig, written []string) {
 	next := joinLines(
 		bold("Next steps:"),
 		"  "+dim("1.")+"  "+cmd("cd "+cfg.OutDir),
-		"  "+dim("2.")+"  "+cmd("zever compile --backend="+quickstartBackends(cfg)+" schema/app.zen"),
-		"  "+dim("3.")+"  "+cmd("zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen"),
-		"  "+dim("4.")+"  "+cmd("zever serve"),
+		"  "+dim("2.")+"  "+cmd("zever serve"),
+		"  "+dim("3.")+"  "+cmd("curl localhost:8080/hello"),
 	)
 
 	_, _ = fmt.Fprintln(os.Stdout, "")
@@ -1961,4 +1794,667 @@ func printNewSummary(cfg NewConfig, written []string) {
 	if shouldShowHint() {
 		_, _ = fmt.Fprintln(os.Stderr, formatHint(hintFor("new")))
 	}
+}
+
+// --- typed wiring scaffold (wiring.go, server main, hello, env files) ---
+
+// wiringTemplateData is wiringTemplate's render input: RefVars declares one
+// Ref var per wired instance, Providers holds one container.Provide entry
+// per instance, and the import lists pin exactly the used modules.
+type wiringTemplateData struct {
+	ModulePath     string
+	AdapterImports []moduleImport
+	CoreImports    []string
+	RefVars        []wiringRefVar
+	Providers      []string
+}
+
+// wiringRefVar is one Ref var declaration: Name is the exported var name
+// (DB, DBAnalytics), Doc its one-line comment, Expr the initializer
+// (db.DefaultRef(), db.Ref("analytics")).
+type wiringRefVar struct {
+	Name string
+	Doc  string
+	Expr string
+}
+
+// noErrAdapters names adapter dirs whose New takes Options but returns only
+// the service (no error): the wiring wraps them in container.WrapNoErr.
+// Verified against the checkout; add the dir here when an adapter gains or
+// loses an error return.
+var noErrAdapters = map[string]bool{
+	"log/slog":    true,
+	"log/zerolog": true,
+	"log/pretty":  true,
+}
+
+// noOptsAdapters names adapter dirs whose New takes no arguments at all:
+// the wiring wraps them in container.WrapNoOpts.
+var noOptsAdapters = map[string]bool{
+	"log/noop":           true,
+	"observability/noop": true,
+	"billing/stub":       true,
+}
+
+// embeddedDBAdapters names adapter dirs whose New takes an adapter-local
+// Options embedding the battery Options (as field Options): the wiring
+// closes over the core Options and nests them. Verified against the
+// checkout; every entry's Options struct embeds the core one.
+var embeddedDBAdapters = map[string]bool{
+	"cache/db":           true,
+	"session/db":         true,
+	"outbox/db":          true,
+	"outbox/cdc":         true,
+	"queue/db":           true,
+	"idempotency/db":     true,
+	"search/db":          true,
+	"workflow/db":        true,
+	"scheduler/postgres": true,
+	"resilience/redis":   true,
+}
+
+// coreServiceTypes maps batteries with embedded-DB or mapped adapters to
+// their core interface and Options type names, used in the generated
+// factory closure signatures. Plain (core-Options) adapters need no entry:
+// type inference reads them off the adapter New.
+var coreServiceTypes = map[string][2]string{
+	"cache":       {"Cache", "Options"},
+	"session":     {"Store", "Options"},
+	"outbox":      {"Store", "Options"},
+	"queue":       {"Queue", "Options"},
+	"idempotency": {"Store", "Options"},
+	"search":      {"Search", "Options"},
+	"workflow":    {"Workflow", "Options"},
+	"scheduler":   {"Scheduler", "Options"},
+	"resilience":  {"Manager", "Options"},
+	"secrets":     {"Secrets", "Options"},
+}
+
+// mappedAdapters names adapter dirs whose local Options cannot embed the
+// core Options but map field-for-field: the wiring builds them explicitly.
+// The mapped field list is per adapter, verified against the checkout.
+var mappedAdapters = map[string]map[string]string{
+	"secrets/env": {"Prefix": "o.Prefix"},
+}
+
+// blockedAdapters names adapter dirs with no standalone provider factory:
+// wiring them needs hand-written code, so `zever add` fails closed with
+// the documented alternative instead of emitting code that cannot compile.
+var blockedAdapters = map[string]string{
+	"session/cookie": "the cookie adapter is a response helper, not a session store; pick memory, redis or db instead",
+	"secrets/vault":  "the vault adapter needs hand-wired credentials; wire it in wiring.go with container.Provide and secrets Options",
+	"crypto/kms":     "the kms adapter needs hand-wired key material; wire it in wiring.go with container.Provide and kms Options",
+}
+
+// factoryExpr returns the container.Provide factory expression for one
+// battery selection, or an error for blocked adapters. alias is the
+// adapter import alias (see adapterBinding), dir the adapter module dir.
+// ind indents the entry line: multi-line closures hang their body one
+// level deeper and close at ind.
+//
+//nolint:unparam // every generated entry sits at two tabs today; ind documents the invariant for hand-indented files.
+func factoryExpr(sel batterySelection, alias, ind string) (string, error) {
+	dir := adapterDirName(sel)
+
+	if reason, blocked := blockedAdapters[dir]; blocked {
+		return "", fmt.Errorf("zever add: battery %q adapter %q cannot be auto-wired: %s", sel.Battery, sel.Adapter, reason)
+	}
+
+	if noOptsAdapters[dir] {
+		return "container.WrapNoOpts(" + alias + ".New)", nil
+	}
+
+	if noErrAdapters[dir] {
+		return "container.WrapNoErr(" + alias + ".New)", nil
+	}
+
+	if fields, mapped := mappedAdapters[dir]; mapped {
+		types, ok := coreServiceTypes[sel.Battery]
+		if !ok {
+			return "", fmt.Errorf("zever add: battery %q adapter %q has no mapped factory", sel.Battery, sel.Adapter)
+		}
+
+		sets := make([]string, 0, len(fields))
+		for field, src := range fields {
+			sets = append(sets, field+": "+src)
+		}
+
+		sort.Strings(sets)
+
+		return fmt.Sprintf("func(o %s.Options) (%s.%s, error) {\n%s\treturn %s.New(%s.Options{%s})\n%s}",
+			sel.Battery, sel.Battery, types[0], ind, alias, alias, strings.Join(sets, ", "), ind), nil
+	}
+
+	if embeddedDBAdapters[dir] {
+		types, ok := coreServiceTypes[sel.Battery]
+		if !ok {
+			return "", fmt.Errorf("zever add: battery %q adapter %q has no embedded factory", sel.Battery, sel.Adapter)
+		}
+
+		return fmt.Sprintf("func(o %s.Options) (%s.%s, error) {\n%s\treturn %s.New(%s.Options{Options: o})\n%s}",
+			sel.Battery, sel.Battery, types[0], ind, alias, alias, ind), nil
+	}
+
+	return alias + ".New", nil
+}
+
+// refVarName returns the exported Ref var name for a battery instance:
+// the title-cased battery for the default instance (DB, Cache, RateLimit),
+// plus the title-cased instance name for named ones (DBAnalytics).
+// Well-known initialisms and compounds match config.Config's field names
+// (DB, RateLimit); anything else uppercases the first letter only.
+func refVarName(battery, name string) string {
+	capitalize := func(s string) string {
+		if s == "" {
+			return s
+		}
+
+		return strings.ToUpper(s[:1]) + s[1:]
+	}
+
+	base := capitalize(battery)
+	if canon, ok := map[string]string{"db": "DB", "ratelimit": "RateLimit"}[battery]; ok {
+		base = canon
+	}
+
+	if name == "" || name == "default" {
+		return base
+	}
+
+	inst := capitalize(name)
+	if inst == "Db" {
+		inst = "DB"
+	}
+
+	return base + inst
+}
+
+// wiringTemplate is the one place a project selects its adapters: one Ref
+// var plus one container.Provide entry per service instance, all explicit
+// so the file stays greppable and `zever add` can edit it with go/ast.
+// Adapter packages expose constructors but never self-register, so wiring
+// is an explicit import plus a Provide entry; config comes from the
+// environment at boot (see serve.Main). This file is scaffolded once and
+// then user-owned: `zever add` only inserts Provider entries idempotently
+// and never rewrites user code (see R1).
+const wiringTemplate = `// Package app wires this project's service instances.
+//
+// The Ref vars below name each wired instance; Providers builds them from
+// the named adapter constructors; Modules mounts the project's serve
+// modules. Add batteries with ` + "`zever add <battery>`" + `: it only inserts Ref
+// vars and Provider entries here and never rewrites your code. Tune an
+// instance with container.WithOptions entries in Providers.
+package app
+
+import (
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/serve"
+{{range .CoreImports}}	"{{.}}"
+{{end}}{{range .AdapterImports}}	{{.Alias}} {{printf "%q" .Path}}
+{{end}}
+	"{{.ModulePath}}/internal/service/hello"
+)
+{{range .RefVars}}
+// {{.Name}} {{.Doc}}
+var {{.Name}} = {{.Expr}}{{end}}
+
+// Providers returns every wired service instance, in declaration order.
+// The container validates the graph (duplicate refs, missing deps,
+// cycles) and resolves each instance lazily on first use.
+func Providers() []container.Provider {
+	return []container.Provider{
+{{range .Providers}}		{{.}},
+{{end}}	}
+}
+
+// Modules returns the serve modules mounted at boot, after the shared
+// gRPC server is built: each module registers its routes (and gRPC
+// services) on the resolved router via Mount.
+func Modules() func(*container.Container) []serve.Module {
+	return func(*container.Container) []serve.Module {
+		return []serve.Module{
+			hello.New(),
+		}
+	}
+}
+`
+
+// renderWiringContent renders wiringTemplate for exactly the given battery
+// selections (floor + picks, nothing more): one named adapter import plus
+// Provide entry per selection, one Ref var per instance, sorted
+// deterministically.
+func renderWiringContent(tag, modulePath string, selections []batterySelection) ([]byte, error) {
+	sorted := append([]batterySelection(nil), selections...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Battery != sorted[j].Battery {
+			return sorted[i].Battery < sorted[j].Battery
+		}
+
+		return sorted[i].Adapter < sorted[j].Adapter
+	})
+
+	adapterImports := make([]moduleImport, 0, len(sorted))
+	coreSeen := map[string]bool{}
+	coreImports := []string{}
+	refVars := make([]wiringRefVar, 0, len(sorted))
+	providers := make([]string, 0, len(sorted))
+
+	for _, s := range sorted {
+		alias, path, _ := adapterBinding(s)
+		adapterImports = append(adapterImports, moduleImport{Alias: alias, Path: path})
+
+		if core := coreModulePath(s.Battery); !coreSeen[core] {
+			coreSeen[core] = true
+			coreImports = append(coreImports, core)
+		}
+
+		varName := refVarName(s.Battery, "default")
+		refVars = append(refVars, wiringRefVar{
+			Name: varName,
+			Doc:  fmt.Sprintf("names the default %s instance (%s adapter).", s.Battery, s.Adapter),
+			Expr: s.Battery + ".DefaultRef()",
+		})
+
+		factory, err := factoryExpr(s, alias, "\t\t")
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", tag, err)
+		}
+
+		providers = append(providers, "container.Provide("+varName+", "+factory+")")
+	}
+
+	sort.Slice(adapterImports, func(i, j int) bool { return adapterImports[i].Path < adapterImports[j].Path })
+	sort.Strings(coreImports)
+
+	return renderGoFile(tag, "wiring.go", wiringTemplate, wiringTemplateData{
+		ModulePath:     modulePath,
+		AdapterImports: adapterImports,
+		CoreImports:    coreImports,
+		RefVars:        refVars,
+		Providers:      providers,
+	})
+}
+
+// newServerMainTemplate is the whole server entrypoint: parse nothing,
+// wire nothing, just hand the typed Providers and Modules to serve.Main.
+// serve returns the error; main owns the exit path (stderr + non-zero).
+const newServerMainTemplate = `// Command server runs this project's HTTP API.
+//
+// Scaffolded by ` + "`zever new`" + `. It is deliberately thin: serve.Main owns
+// boot, signal handling and graceful shutdown; everything with behaviour
+// worth testing belongs in a package of its own.
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/zenta-dev/zever/serve"
+
+	"{{.ModulePath}}/internal/app"
+)
+
+func main() {
+	if err := serve.Main(app.Providers(), app.Modules()); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
+		os.Exit(1)
+	}
+}
+`
+
+// helloServiceTemplate is the sample module mounted by wiring.Modules: a
+// real GET /hello endpoint (not a TODO stub) proving the router, log and
+// container wiring resolve end to end. Replace it with real modules as the
+// app grows.
+const helloServiceTemplate = `// Package hello is the sample module mounted by wiring.Modules: a real
+// GET /hello endpoint proving the router, log and container wiring resolve
+// end to end. Replace it with real modules as the app grows.
+package hello
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/router"
+)
+
+// Service is the sample module: it carries no state, resolving the logger
+// per request from the container so tests can swap providers freely.
+type Service struct{}
+
+// New builds the sample module.
+func New() *Service {
+	return &Service{}
+}
+
+// Name identifies the module in serve boot errors and logs.
+func (s *Service) Name() string {
+	return "hello"
+}
+
+// Mount registers GET /hello on r, resolving the logger from c.
+func (s *Service) Mount(r router.Router, c *container.Container) error {
+	var logger log.Logger
+
+	logger, err := c.Log()
+	if err != nil {
+		return err
+	}
+
+	r.Handle(http.MethodGet, "/hello", func(w http.ResponseWriter, req *http.Request) {
+		logger.Info().Str("path", req.URL.Path).Msg("hello")
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"hello": "world"})
+	})
+
+	return nil
+}
+`
+
+// envKeyName maps a struct field name to its env key segment: upper-cased,
+// matching the canonical <SERVICE>_<FIELD> form the README documents
+// (DB_MAXCONNS, AUTH_JWT_SECRET). ApplyEnv resolves the same field through
+// either spelling, so generated keys always round-trip.
+func envKeyName(field string) string {
+	return strings.ToUpper(field)
+}
+
+// envScalarValue formats one Options scalar for .env.example: strings
+// verbatim, bools and integers plainly, durations in "5s" form. It mirrors
+// ApplyEnv's coercions so every emitted value re-parses.
+func envScalarValue(v reflect.Value) (string, bool) {
+	if v.Type() == reflect.TypeOf(time.Duration(0)) {
+		if d, ok := v.Interface().(time.Duration); ok {
+			return d.String(), true
+		}
+
+		return "", false
+	}
+
+	switch kind := v.Kind(); kind { //nolint:exhaustive // default rejects every kind the env generator doesn't emit
+	case reflect.String:
+		return v.String(), true
+	case reflect.Bool:
+		return strconv.FormatBool(v.Bool()), true
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(v.Int(), 10), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(v.Uint(), 10), true
+	case reflect.Float32, reflect.Float64:
+		return strconv.FormatFloat(v.Float(), 'f', -1, 64), true
+	default:
+		return "", false
+	}
+}
+
+// addressableCopy returns an addressable copy of the struct value in opts,
+// so embedded fields can be addressed for recursion. Non-structs yield an
+// invalid Value.
+func addressableCopy(opts any) reflect.Value {
+	v := reflect.Indirect(reflect.ValueOf(opts))
+	if !v.IsValid() || v.Kind() != reflect.Struct {
+		return reflect.Value{}
+	}
+
+	cp := reflect.New(v.Type())
+	cp.Elem().Set(v)
+
+	return cp.Elem()
+}
+
+// appendEnvKeys walks one Options struct value into out as KEY=DEFAULT
+// lines under prefix+sep: flat scalars directly, one nesting level as
+// PREFIX_OUTER_INNER (mirroring ApplyEnv), skipping json:"-" fields and
+// types with no env string form. sep is "_" for default instances and "__"
+// for named ones (SERVICE__NAME__FIELD).
+func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
+	v := addressableCopy(opts)
+	if !v.IsValid() {
+		return
+	}
+
+	t := v.Type()
+
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" {
+			continue
+		}
+
+		tag := sf.Tag.Get("json")
+		if tag == "-" {
+			continue
+		}
+
+		f := v.Field(i)
+
+		if sf.Anonymous && f.Kind() == reflect.Struct {
+			appendEnvKeys(out, prefix, sep, f.Addr().Interface())
+
+			continue
+		}
+
+		if f.Kind() == reflect.Struct && f.Type() != reflect.TypeOf(time.Duration(0)) {
+			nested := f
+			for j := 0; j < nested.Type().NumField(); j++ {
+				nsf := nested.Type().Field(j)
+				if nsf.PkgPath != "" || nsf.Tag.Get("json") == "-" {
+					continue
+				}
+
+				nf := nested.Field(j)
+
+				val, ok := envScalarValue(nf)
+				if !ok {
+					continue
+				}
+
+				_, _ = fmt.Fprintf(out, "%s%s%s%s%s=%s\n", prefix, sep, envKeyName(sf.Name), sep, envKeyName(nsf.Name), val)
+			}
+
+			continue
+		}
+
+		val, ok := envScalarValue(f)
+		if !ok {
+			continue
+		}
+
+		_, _ = fmt.Fprintf(out, "%s%s%s=%s\n", prefix, sep, envKeyName(sf.Name), val)
+	}
+}
+
+// renderEnvExample generates .env.example from the Options structs of the
+// wired batteries: every key, default and type comment, straight from
+// config.DefaultOptions, so the file cannot drift from what ApplyEnv
+// resolves. Copy it to .env and fill secrets for local runs.
+func renderEnvExample(selections []batterySelection) []byte {
+	var b strings.Builder
+
+	b.WriteString("# Managed by `zever new` and `zever add`. Copy to .env and fill secrets.\n")
+	b.WriteString("# Keys are <SERVICE>_<FIELD> (default instance) or <SERVICE>__<NAME>__<FIELD> (named).\n")
+	b.WriteString("# Defaults shown; every value re-parses via ApplyEnv. Adapter extras\n")
+	b.WriteString("# (e.g. CACHE_TABLE) follow the same SERVICE_FIELD rule; tune the rest\n")
+	b.WriteString("# with container.WithOptions in internal/app/wiring.go.\n")
+
+	sorted := append([]batterySelection(nil), selections...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Battery != sorted[j].Battery {
+			return sorted[i].Battery < sorted[j].Battery
+		}
+
+		return sorted[i].Adapter < sorted[j].Adapter
+	})
+
+	for _, s := range sorted {
+		fmt.Fprintf(&b, "\n# --- %s (adapter %s) ---\n", s.Battery, s.Adapter)
+		fmt.Fprintf(&b, "%s_ADAPTER=%s\n", strings.ToUpper(s.Battery), s.Adapter)
+
+		if opts := config.DefaultOptions(s.Battery, ""); opts != nil {
+			appendEnvKeys(&b, strings.ToUpper(s.Battery), "_", opts)
+		}
+	}
+
+	return []byte(b.String())
+}
+
+// devSecretFields marks Options field names that carry secret material and
+// are safe to pre-fill with random dev values: they never change adapter
+// selection or routing (DSN/PATH/URL are excluded), so a random value can
+// never break boot. Compare case-insensitively against the upper-cased
+// field name.
+var devSecretFields = []string{"SECRET", "PASSWORD", "TOKEN"}
+
+// isDevSecretField reports whether an upper-cased field name carries secret
+// material per devSecretFields.
+func isDevSecretField(upper string) bool {
+	for _, marker := range devSecretFields {
+		if strings.Contains(upper, marker) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// collectDevSecrets walks one Options struct value, returning KEY=random
+// lines for empty secret-like fields under prefix (one nesting level,
+// mirroring appendEnvKeys). Non-empty secret fields already carry a default
+// and need no generated value.
+func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
+	v := addressableCopy(opts)
+	if !v.IsValid() {
+		return
+	}
+
+	t := v.Type()
+
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" || sf.Tag.Get("json") == "-" {
+			continue
+		}
+
+		f := v.Field(i)
+
+		if sf.Anonymous && f.Kind() == reflect.Struct {
+			collectDevSecrets(out, prefix, f.Addr().Interface())
+
+			continue
+		}
+
+		if f.Kind() == reflect.Struct && f.Type() != reflect.TypeOf(time.Duration(0)) {
+			nested := f
+			for j := 0; j < nested.Type().NumField(); j++ {
+				nsf := nested.Type().Field(j)
+				if nsf.PkgPath != "" || nsf.Tag.Get("json") == "-" {
+					continue
+				}
+
+				nf := nested.Field(j)
+				if nf.Kind() != reflect.String || nf.String() != "" {
+					continue
+				}
+
+				if !isDevSecretField(envKeyName(nsf.Name)) {
+					continue
+				}
+
+				secret, err := randomHex(32)
+				if err != nil {
+					continue
+				}
+
+				_, _ = fmt.Fprintf(out, "%s_%s_%s=%s\n", prefix, envKeyName(sf.Name), envKeyName(nsf.Name), secret)
+			}
+
+			continue
+		}
+
+		if f.Kind() != reflect.String || f.String() != "" {
+			continue
+		}
+
+		if !isDevSecretField(envKeyName(sf.Name)) {
+			continue
+		}
+
+		secret, err := randomHex(32)
+		if err != nil {
+			continue
+		}
+
+		_, _ = fmt.Fprintf(out, "%s_%s=%s\n", prefix, envKeyName(sf.Name), secret)
+	}
+}
+
+// randomHex returns n random bytes as hex, for per-project dev secrets.
+// Failure (no OS entropy) is a hard error: secrets must never silently
+// fall back to deterministic values.
+func randomHex(n int) (string, error) {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("zever new: rand: %w", err)
+	}
+
+	return hex.EncodeToString(buf), nil
+}
+
+// renderDevEnv generates .env: random per-project dev secrets for every
+// empty secret-like field of the wired batteries, plus a pre-generated
+// AUTH_JWT_SECRET so `zever add auth` works with zero extra steps. Dev
+// only: rotate real values for production. Never commit this file.
+func renderDevEnv(selections []batterySelection) ([]byte, error) {
+	var b strings.Builder
+
+	b.WriteString("# Local dev secrets. Generated per project by `zever new`; never commit.\n")
+	b.WriteString("# Dev only: set real values via the environment in production.\n")
+
+	sorted := append([]batterySelection(nil), selections...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Battery != "db" && sorted[j].Battery == "db" {
+			return false
+		}
+
+		if sorted[i].Battery != sorted[j].Battery {
+			return sorted[i].Battery < sorted[j].Battery
+		}
+
+		return sorted[i].Adapter < sorted[j].Adapter
+	})
+
+	for _, s := range sorted {
+		if opts := config.DefaultOptions(s.Battery, ""); opts != nil {
+			var section strings.Builder
+			collectDevSecrets(&section, strings.ToUpper(s.Battery), opts)
+
+			if section.Len() > 0 {
+				fmt.Fprintf(&b, "\n# %s secrets\n", s.Battery)
+				b.WriteString(section.String())
+			}
+		}
+	}
+
+	hasAuth := false
+
+	for _, s := range sorted {
+		if s.Battery == "auth" {
+			hasAuth = true
+		}
+	}
+
+	if !hasAuth {
+		secret, err := randomHex(32)
+		if err != nil {
+			return nil, err
+		}
+
+		b.WriteString("\n# Pre-generated so `zever add auth` works with zero extra steps.\n")
+		fmt.Fprintf(&b, "AUTH_JWT_SECRET=%s\n", secret)
+	}
+
+	return []byte(b.String()), nil
 }
