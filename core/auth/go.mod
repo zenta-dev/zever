@@ -9,6 +9,7 @@ require (
 	github.com/zenta-dev/zever/shared/endpoint v0.7.2
 	github.com/zenta-dev/zever/shared/redisclient v0.7.2
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
 
@@ -33,3 +34,5 @@ replace github.com/zenta-dev/zever/shared/redisopt => ../../shared/redisopt
 replace github.com/zenta-dev/zever/adapters/session/memory => ../../adapters/session/memory
 
 replace github.com/zenta-dev/zever/core/db => ../db
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

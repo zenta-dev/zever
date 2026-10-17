@@ -15,6 +15,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/observability v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
@@ -44,3 +45,5 @@ replace github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../msgspan
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

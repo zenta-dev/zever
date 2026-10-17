@@ -27,6 +27,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -35,3 +36,5 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 )
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

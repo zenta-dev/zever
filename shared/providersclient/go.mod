@@ -22,3 +22,5 @@ require (
 replace github.com/zenta-dev/zever/shared/httpclient => ../httpclient
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

@@ -5,6 +5,7 @@ go 1.27.2
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	golang.org/x/image v0.45.0 // indirect
 )
@@ -22,3 +23,5 @@ replace github.com/zenta-dev/zever/adapters/media/ffmpeg => ../ffmpeg
 replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

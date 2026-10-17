@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.2
+	github.com/zenta-dev/zever/adapters/queue/db v0.7.2
 	github.com/zenta-dev/zever/config v0.7.2
 	github.com/zenta-dev/zever/core/agent v0.7.2
 	github.com/zenta-dev/zever/core/ai v0.7.2
@@ -48,9 +49,54 @@ require (
 	github.com/zenta-dev/zever/shared/dbconn v0.7.2
 	github.com/zenta-dev/zever/shared/grpcclient v0.7.2
 	github.com/zenta-dev/zever/shared/outboxbridge v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 	go.uber.org/goleak v1.3.0
 	google.golang.org/grpc v1.83.2
+)
+
+require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.11.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/zenta-dev/zever/adapters/db/postgres v0.7.2 // indirect
+	github.com/zenta-dev/zever/adapters/log/noop v0.7.2 // indirect
+	github.com/zenta-dev/zever/orm v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/mcpclient v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
+	go.opentelemetry.io/otel v1.47.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
+	go.opentelemetry.io/otel/metric v1.47.0 // indirect
+	go.opentelemetry.io/otel/trace v1.47.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
+	modernc.org/libc v1.77.1 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.12.1 // indirect
+	modernc.org/sqlite v1.60.1 // indirect
 )
 
 replace (
@@ -178,45 +224,10 @@ replace github.com/zenta-dev/zever/shared/mcpclient => ../shared/mcpclient
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../shared/traceprop
 
-require (
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/go-logr/logr v1.4.4 // indirect
-	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
-	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/httpclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/mcpclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
-	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel v1.47.0 // indirect
-	go.opentelemetry.io/otel/log v1.47.0 // indirect
-	go.opentelemetry.io/otel/metric v1.47.0 // indirect
-	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
-	modernc.org/libc v1.77.1 // indirect
-	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.60.1 // indirect
-)
-
 replace github.com/zenta-dev/zever/adapters/billing/stub => ../adapters/billing/stub
 
 replace github.com/zenta-dev/zever/adapters/password/argon2 => ../adapters/password/argon2
 
 replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../adapters/scheduler/embedded
+
+replace github.com/zenta-dev/zever/shared/ref => ../shared/ref

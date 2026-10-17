@@ -62,3 +62,5 @@ replace github.com/zenta-dev/zever/shared/redisopt => ../shared/redisopt
 replace github.com/zenta-dev/zever/shared/registry => ../shared/registry
 
 replace github.com/zenta-dev/zever/shared/retry => ../shared/retry
+
+replace github.com/zenta-dev/zever/shared/ref => ../shared/ref

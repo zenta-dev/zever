@@ -27,6 +27,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
@@ -63,3 +64,5 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
 
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observability/noop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

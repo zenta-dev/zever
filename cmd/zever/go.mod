@@ -308,6 +308,7 @@ require (
 	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisclient v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/s3opts v0.7.2 // indirect

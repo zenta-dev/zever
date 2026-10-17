@@ -77,6 +77,7 @@ require (
 	github.com/zenta-dev/zever/shared/outboxbridge v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -247,3 +248,5 @@ replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient
 replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
 
 replace github.com/zenta-dev/zever/shared/outboxbridge => ../../shared/outboxbridge
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

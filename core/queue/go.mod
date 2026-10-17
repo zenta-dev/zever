@@ -7,6 +7,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.7.2
 	github.com/zenta-dev/zever/core/observability v0.7.2
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2
+	github.com/zenta-dev/zever/shared/ref v0.7.2
 	github.com/zenta-dev/zever/shared/registry v0.7.2
 )
 
@@ -38,3 +39,5 @@ replace github.com/zenta-dev/zever/core/observability => ../observability
 replace github.com/zenta-dev/zever/shared/msgspan => ../../shared/msgspan
 
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

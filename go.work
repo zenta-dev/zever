@@ -166,6 +166,7 @@ use (
 	./shared/providersopt
 	./shared/redisclient
 	./shared/redisopt
+	./shared/ref
 	./shared/registry
 	./shared/retry
 	./shared/s3opts
@@ -277,6 +278,8 @@ replace github.com/zenta-dev/zever/adapters/workflow/memory v0.7.2 => ./adapters
 replace github.com/zenta-dev/zever/cmd/zever v0.7.2 => ./cmd/zever
 replace github.com/zenta-dev/zever/config v0.7.2 => ./config
 replace github.com/zenta-dev/zever/container v0.7.2 => ./container
+replace github.com/zenta-dev/zever/container/testdata/compilefail/sealed v0.7.2 => ./container/testdata/compilefail/sealed
+replace github.com/zenta-dev/zever/container/testdata/compilefail/wrongdep v0.7.2 => ./container/testdata/compilefail/wrongdep
 replace github.com/zenta-dev/zever/core/agent v0.7.2 => ./core/agent
 replace github.com/zenta-dev/zever/core/ai v0.7.2 => ./core/ai
 replace github.com/zenta-dev/zever/core/analytics v0.7.2 => ./core/analytics
@@ -347,6 +350,7 @@ replace github.com/zenta-dev/zever/shared/providersclient v0.7.2 => ./shared/pro
 replace github.com/zenta-dev/zever/shared/providersopt v0.7.2 => ./shared/providersopt
 replace github.com/zenta-dev/zever/shared/redisclient v0.7.2 => ./shared/redisclient
 replace github.com/zenta-dev/zever/shared/redisopt v0.7.2 => ./shared/redisopt
+replace github.com/zenta-dev/zever/shared/ref v0.7.2 => ./shared/ref
 replace github.com/zenta-dev/zever/shared/registry v0.7.2 => ./shared/registry
 replace github.com/zenta-dev/zever/shared/retry v0.7.2 => ./shared/retry
 replace github.com/zenta-dev/zever/shared/s3opts v0.7.2 => ./shared/s3opts

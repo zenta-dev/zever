@@ -14,6 +14,7 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
@@ -38,3 +39,5 @@ replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

@@ -18,3 +18,5 @@ require (
 )
 
 replace github.com/zenta-dev/zever/shared/traceprop => ../traceprop
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

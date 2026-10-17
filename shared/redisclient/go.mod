@@ -14,3 +14,5 @@ require (
 )
 
 replace github.com/zenta-dev/zever/shared/redisopt => ../redisopt
+
+replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref

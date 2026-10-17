@@ -114,20 +114,105 @@ type Container struct {
 	// pools.go). Borrowers resolve through it on exact-DSN matches.
 	pools *poolRegistry
 
+	// provDefs holds one entry per Provide call, keyed by service/name. It
+	// is written once by New and read-only after, so resolution reads it
+	// without locking. Empty (nil) when New received no providers, in
+	// which case every accessor takes the legacy config path.
+	provDefs map[refKey]*provider
+	// provOrder is the declaration order of provDefs, the deterministic
+	// tiebreak for eager builds, Wired, and Close.
+	provOrder []refKey
+	// provErrs records graph validation findings (duplicate Refs, missing
+	// deps, cycles) per dependent Ref, plus failed eager builds. Get
+	// surfaces them at resolution; validation itself opens nothing.
+	provErrs map[refKey]error
+
+	provMu sync.Mutex
+	// provVals caches successful provider resolutions. A failed build is
+	// evicted, so the next resolution retries (same contract as lazy.go).
+	provVals map[refKey]*provEntry
+
+	// env is the process environment resolved once by New (see
+	// config.FromEnv). Every provider build seeds its Options from the
+	// service defaults and overlays env before WithOptions appliers run.
+	// envErr records a failed resolution and fails every provider
+	// build; the legacy config path never consults it.
+	env    config.Env
+	envErr error
+
 	pluginsMu sync.Mutex
 	plugins   map[string]*pluginEntry
 }
 
 func (c *Container) sealed() {}
 
-// New builds a Container from cfg. Nothing is opened yet: every service
-// resolves on first use. A nil cfg falls back to config.Default().
-func New(cfg *config.Config) *Container {
+// New builds a Container from cfg and optional explicit wiring. Nothing
+// opens yet except Eager providers: every other service resolves on first
+// use, whether through a Provider (see Provide) or the legacy config path.
+// A nil cfg falls back to config.Default().
+//
+// The process environment resolves once here (see config.FromEnv) and
+// seeds every provided Ref: service defaults from DefaultOptions overlaid
+// by ApplyEnv, then WithOptions appliers. An unreadable environment fails
+// provider builds; legacy accessors never consult it.
+//
+// The full provider graph is validated at construction (duplicate Refs,
+// missing non-Optional dependencies, dependency cycles); findings are
+// recorded per Ref and surfaced by Get and the provider-backed accessors,
+// so validation never opens anything. With zero providers the legacy path
+// serves every accessor exactly as before.
+func New(cfg *config.Config, providers ...Provider) *Container {
 	if cfg == nil {
 		cfg = config.Default()
 	}
 
 	root, cancel := context.WithCancel(context.WithoutCancel(context.Background()))
 
-	return &Container{cfg: cfg, rootCtx: root, cancelRoot: cancel, pools: newPoolRegistry()}
+	c := &Container{cfg: cfg, rootCtx: root, cancelRoot: cancel, pools: newPoolRegistry()}
+	c.env, c.envErr = config.FromEnv()
+
+	if len(providers) == 0 {
+		return c
+	}
+
+	defs := make([]*provider, 0, len(providers))
+
+	for _, p := range providers {
+		if p == nil {
+			continue
+		}
+
+		if def, ok := p.(*provider); ok {
+			defs = append(defs, def)
+			c.provOrder = append(c.provOrder, def.key)
+		}
+	}
+
+	c.provDefs = make(map[refKey]*provider, len(defs))
+
+	for _, def := range defs {
+		if _, dup := c.provDefs[def.key]; !dup {
+			c.provDefs[def.key] = def
+		}
+	}
+
+	c.provErrs = validateProviders(defs)
+	c.provVals = make(map[refKey]*provEntry)
+
+	for _, key := range c.provOrder {
+		def, ok := c.provDefs[key]
+		if !ok || !def.eager {
+			continue
+		}
+
+		if _, bad := c.provErrs[key]; bad {
+			continue
+		}
+
+		if _, err := c.resolveProvider(key); err != nil {
+			c.provErrs[key] = err
+		}
+	}
+
+	return c
 }

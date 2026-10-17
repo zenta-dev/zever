@@ -6,6 +6,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
 	github.com/casbin/govaluate v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 )
 
@@ -19,3 +20,5 @@ replace github.com/zenta-dev/zever/core/permission => ../../../core/permission
 replace github.com/zenta-dev/zever/adapters/permission/noop => ../noop
 
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

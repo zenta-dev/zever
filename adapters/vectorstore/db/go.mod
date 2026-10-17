@@ -24,6 +24,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	golang.org/x/sync v0.24.0 // indirect
@@ -58,3 +59,5 @@ replace github.com/zenta-dev/zever/shared/lrucache => ../../../shared/lrucache
 replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
+
+replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

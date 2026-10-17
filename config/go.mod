@@ -160,6 +160,7 @@ require (
 	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
@@ -175,3 +176,5 @@ replace github.com/zenta-dev/zever/adapters/billing/stub => ../adapters/billing/
 replace github.com/zenta-dev/zever/adapters/password/argon2 => ../adapters/password/argon2
 
 replace github.com/zenta-dev/zever/adapters/scheduler/embedded => ../adapters/scheduler/embedded
+
+replace github.com/zenta-dev/zever/shared/ref => ../shared/ref
