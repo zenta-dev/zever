@@ -1,7 +1,7 @@
 # Showcase production image: static binary on distroless.
 # Build from repo root: docker build -f examples/showcase/Dockerfile .
 # Run: docker run -p 8080:8080 -p 9090:9090 -e AUTH_JWT_SECRET=<32+bytes> showcase
-FROM golang:1.27.1-bookworm AS builder
+FROM golang:1.27.1-trixie AS builder
 WORKDIR /src
 COPY config/ ./config/
 COPY container/ ./container/

@@ -1383,6 +1383,20 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
+	for _, f := range []struct {
+		rel     string
+		content string
+	}{
+		{"Makefile", renderNewMakefile(quickstartBackends(cfg))},
+		{".golangci.yml", newGolangciYml},
+		{".editorconfig", newEditorconfig},
+		{filepath.Join(".github", "dependabot.yml"), newDependabotYml},
+	} {
+		if writeErr := write(f.rel, []byte(f.content)); writeErr != nil {
+			return nil, writeErr
+		}
+	}
+
 	if compose := renderNewCompose(cfg.batterySelections()); compose != "" {
 		if writeErr := write("compose.yaml", []byte(compose)); writeErr != nil {
 			return nil, writeErr
@@ -1740,7 +1754,7 @@ node_modules/
 // project: multi-stage golang builder -> distroless nonroot runtime,
 // HEALTHCHECK against the scaffolded /healthz endpoint, zever.yaml copied
 // alongside the binary. goVersion selects the builder tag
-// (golang:<ver>-bookworm); empty falls back to defaultGoVersion. The output
+// (golang:<ver>-trixie); empty falls back to defaultGoVersion. The output
 // carries no secrets and no absolute local paths.
 func renderNewDockerfile(goVersion string) string {
 	if goVersion == "" {
@@ -1753,7 +1767,7 @@ func renderNewDockerfile(goVersion string) string {
 # Run with: docker run --rm -p 8080:8080 -p 9090:9090 app
 # Config via environment (never baked in): docker run -e DB_DSN=... app
 
-FROM golang:%s-bookworm AS builder
+FROM golang:%s-trixie AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -1762,7 +1776,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server 
 
 FROM busybox:1.36.1-musl AS busybox
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot
+# OCI image labels; pass at build time, e.g.
+#   docker build --build-arg VERSION=1.2.3 --build-arg REVISION=$(git rev-parse HEAD) \
+#     --build-arg SOURCE=https://github.com/acme/app -t app .
+ARG TITLE=app
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG SOURCE=
+LABEL org.opencontainers.image.title="${TITLE}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.source="${SOURCE}"
 WORKDIR /app
 COPY --from=busybox /bin/wget /usr/bin/wget
 COPY --from=builder /out/server /app/server

@@ -131,6 +131,10 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 		"README.md",
 		"Dockerfile",
 		".dockerignore",
+		"Makefile",
+		".golangci.yml",
+		".editorconfig",
+		filepath.Join(".github", "dependabot.yml"),
 	} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Fatalf("expected %s to exist: %v", rel, err)
@@ -171,6 +175,23 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 
 	runGoInDir(t, out, "mod", "tidy")
 	runGoInDir(t, out, "build", "./...")
+	// The scaffold must also vet and test clean, not just compile: this is
+	// the CI gate that a fresh `zever new` project stays green.
+	runGoInDir(t, out, "vet", "./...")
+	runGoInDir(t, out, "test", "./...")
+
+	// The shipped .golangci.yml must be valid and the fresh scaffold must lint
+	// clean under it (only when golangci-lint is installed).
+	if lint, err := exec.LookPath("golangci-lint"); err == nil {
+		for _, args := range [][]string{{"config", "verify"}, {"run", "./..."}} {
+			cmd := exec.CommandContext(t.Context(), lint, args...)
+			cmd.Dir = out
+
+			if combined, runErr := cmd.CombinedOutput(); runErr != nil {
+				t.Fatalf("golangci-lint %s in scaffold: %v\n%s", strings.Join(args, " "), runErr, combined)
+			}
+		}
+	}
 }
 
 // TestRunNewRefusesNonEmptyDirWithoutForce covers the collision-protection
@@ -1351,8 +1372,12 @@ func TestRenderNewDockerfileReference(t *testing.T) {
 	dockerfile := renderNewDockerfile("1.27")
 
 	for _, fragment := range []string{
-		"FROM golang:1.27-bookworm AS builder",
-		"FROM gcr.io/distroless/static-debian12:nonroot",
+		"FROM golang:1.27-trixie AS builder",
+		"FROM gcr.io/distroless/static-debian13:nonroot",
+		"org.opencontainers.image.title",
+		"org.opencontainers.image.version",
+		"org.opencontainers.image.revision",
+		"org.opencontainers.image.source",
 		"USER nonroot",
 		"EXPOSE 8080 9090",
 		`ENTRYPOINT ["/app/server"]`,
