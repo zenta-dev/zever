@@ -69,7 +69,7 @@ var portedCommands = []string{
 	"new", "add", "generate", "extract",
 	"compile", "check", "breaking", "fmt", "doctor", "config",
 	"routes", "explain", "check-boundaries", "check:boundaries", "graph",
-	"serve", "dev", "queue:work", "schedule:run", "tinker",
+	"serve", "dev", "worker", "queue:work", "schedule", "schedule:run", "tinker",
 	"db", "outbox", "completion", "docs", "uninstall", "upgrade", "build",
 }
 
@@ -231,7 +231,13 @@ zever applications built from .zen schemas.`,
 			}
 
 			if len(args) == 0 {
-				printUsage()
+				// ONE help renderer: bare `zever` prints exactly what
+				// `zever --help` prints (the Cobra tree with groups),
+				// then exits 1 via errMissingSubcommand (main maps it
+				// to exit 1; --help itself exits 0).
+				if err := cmd.Help(); err != nil {
+					return err
+				}
 
 				return errMissingSubcommand
 			}
@@ -290,6 +296,20 @@ zever applications built from .zen schemas.`,
 		root.AddCommand(c)
 	}
 
+	// Canonical space-form commands. The legacy colon spellings from
+	// newRuntimeCmds stay registered but hidden: existing scripts keep
+	// working, --help shows only the canonical form, and the suggestion
+	// list (topLevelNames, from the Cobra tree) still offers both.
+	for _, c := range root.Commands() {
+		switch c.Name() {
+		case "queue:work", "schedule:run":
+			c.Hidden = true
+		}
+	}
+
+	root.AddCommand(newWorkerCmd())
+	root.AddCommand(newScheduleCmd())
+
 	root.AddCommand(newDBCmd())
 
 	root.AddCommand(newOutboxCmd())
@@ -303,6 +323,41 @@ zever applications built from .zen schemas.`,
 	root.AddCommand(newUninstallCmd())
 	root.AddCommand(newUpgradeCmd())
 	root.AddCommand(newBuildCmd())
+
+	// Command groups in --help. Start holds the first commands a new
+	// project touches; Build holds scaffolding/validation; Data holds the
+	// database family; Run & ops holds the runtime and operations loop.
+	// Anything unlisted (compile, breaking, routes, explain, graph,
+	// config, check-boundaries, outbox, completion, docs, build,
+	// uninstall, extract, plus the hidden legacy spellings) renders under
+	// Cobra's default Additional Commands section.
+	root.AddGroup(
+		&cobra.Group{ID: "start", Title: "Start:"},
+		&cobra.Group{ID: "build", Title: "Build:"},
+		&cobra.Group{ID: "data", Title: "Data:"},
+		&cobra.Group{ID: "run", Title: "Run & ops:"},
+	)
+
+	groupOf := map[string]string{
+		"new":      "start",
+		"dev":      "start",
+		"add":      "build",
+		"generate": "build",
+		"fmt":      "build",
+		"check":    "build",
+		"db":       "data",
+		"serve":    "run",
+		"worker":   "run",
+		"schedule": "run",
+		"doctor":   "run",
+		"upgrade":  "run",
+	}
+
+	for _, c := range root.Commands() {
+		if g, ok := groupOf[c.Name()]; ok {
+			c.GroupID = g
+		}
+	}
 
 	// Unify the `zever --help` header with the unknown-command usage
 	// header (printUsage, main.go): both paths start with usageHeader

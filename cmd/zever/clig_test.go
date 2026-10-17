@@ -31,8 +31,8 @@ func executeRoot(t *testing.T, args ...string) (stdout, stderr string, err error
 var cligCommands = []string{
 	"new", "add", "compile", "doctor", "config", "routes", "check",
 	"breaking", "fmt", "explain", "check-boundaries", "graph",
-	"generate", "extract", "serve", "dev", "queue:work",
-	"schedule:run", "tinker", "db", "outbox", "completion", "docs",
+	"generate", "extract", "serve", "dev", "worker", "queue:work",
+	"schedule", "schedule:run", "tinker", "db", "outbox", "completion", "docs",
 }
 
 func TestCligCommandDocs(t *testing.T) {

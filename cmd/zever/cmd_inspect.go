@@ -106,11 +106,10 @@ func newInspectCmds() []*cobra.Command {
 	}
 
 	doctorCmd := &cobra.Command{
-		Use:   "doctor [--config PATH] [--strict]",
+		Use:   "doctor [--strict]",
 		Short: "Verify enabled project batteries resolve",
-		Long:  "Verify the project's enabled batteries by resolving every service from config and reporting OK/FAIL per battery.",
+		Long:  "Verify the project's wired batteries by resolving every service from env config and reporting OK/FAIL per battery.",
 		Example: `  zever doctor
-  zever doctor --config zever.yaml
   zever doctor -i`,
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -128,15 +127,13 @@ func newInspectCmds() []*cobra.Command {
 
 	// Documented for --help and shell completion; the legacy parser stays
 	// authoritative (DisableFlagParsing), as with compile above.
-	doctorCmd.Flags().String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
 	doctorCmd.Flags().Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
 
 	configCmd := &cobra.Command{
-		Use:   "config",
-		Short: "Inspect resolved config",
-		Long:  "Inspect the resolved zever config (redacted).",
-		Example: `  zever config show
-  zever config show --config zever.yaml`,
+		Use:                "config",
+		Short:              "Inspect resolved config",
+		Long:               "Inspect the resolved zever config (redacted).",
+		Example:            `  zever config show`,
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			for _, a := range args {
@@ -150,11 +147,10 @@ func newInspectCmds() []*cobra.Command {
 	}
 
 	configShowCmd := &cobra.Command{
-		Use:   "show [--config PATH]",
-		Short: "Print the resolved config, redacted",
-		Long:  "Print the resolved config, redacted, one adapter header per battery with redacted option fields.",
-		Example: `  zever config show
-  zever config show --config zever.yaml`,
+		Use:                "show",
+		Short:              "Print the resolved config, redacted",
+		Long:               "Print the resolved config, redacted, one adapter header per battery with redacted option fields.",
+		Example:            `  zever config show`,
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := printHelpIfRequested(cmd, args); err != nil {
@@ -168,7 +164,6 @@ func newInspectCmds() []*cobra.Command {
 			return runConfigShow(args)
 		},
 	}
-	configShowCmd.Flags().String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
 	configCmd.AddCommand(configShowCmd)
 
 	fmtCmd.Flags().BoolP("write", "w", false, "rewrite files in place instead of listing them")
@@ -195,10 +190,12 @@ func newInspectCmds() []*cobra.Command {
 	}
 
 	explainCmd := &cobra.Command{
-		Use:   "explain <Service.Operation|Module.Service.Operation> <files...>",
-		Short: "Print an operation's declaration location and summary",
-		Long:  "Print an operation's declaration location and a compact summary (transports, errors, auth, permission).",
-		Example: `  zever explain UserService.GetUser schema/app.zen
+		Use:   "explain [Service|Service/Name|Service.Operation|Module.Service.Operation] [files...]",
+		Short: "Print the wiring graph or an operation summary",
+		Long:  "Print the wiring graph (refs, drivers, typed dependencies, env keys per ref), optionally scoped to one service or service/name ref, or print one operation's declaration location and summary for a dotted path.",
+		Example: `  zever explain
+  zever explain db
+  zever explain UserService.GetUser schema/app.zen
   zever explain billing.OrderService.GetOrder schema/*.zen`,
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

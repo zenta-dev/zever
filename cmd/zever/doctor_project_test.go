@@ -50,10 +50,11 @@ func doctorEnabledRows(t *testing.T, out string) []string {
 // adapters, but every known battery is checked, never a file-listed subset.
 func TestDoctorChecksAllBatteries(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out})
+	err := runDoctorWith(DoctorConfig{Out: &out})
 	if err == nil {
 		t.Fatal("runDoctorWith two-battery fixture: got nil error, want non-nil (auth/jwt has no secret)")
 	}
@@ -78,10 +79,11 @@ func TestDoctorChecksAllBatteries(t *testing.T) {
 // no --strict flag needed.
 func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", doctorFailingBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorFailingBatteryFixture)
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out})
+	err := runDoctorWith(DoctorConfig{Out: &out})
 	if err == nil {
 		t.Fatal("runDoctorWith failing battery: got nil error, want non-nil for exit 1")
 	}
@@ -105,10 +107,11 @@ func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 // registered adapter, instead of surfacing only as a resolve error.
 func TestDoctorAdaptersRowSuggestsOnTypo(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", doctorTypoBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorTypoBatteryFixture)
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
 		t.Fatal("runDoctorWith typo adapter: got nil error, want non-nil")
 	}
 
@@ -255,10 +258,11 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 	jbuf := mustJSONMode(t)
 
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
+	t.Chdir(dir)
 
 	var human bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err == nil {
+	if err := runDoctorWith(DoctorConfig{Out: &human, JSON: true}); err == nil {
 		t.Fatal("runDoctorWith JSON two-battery fixture: got nil error, want non-nil (auth/jwt has no secret)")
 	}
 
@@ -306,10 +310,11 @@ func TestDoctorSurfacesPoolMismatch(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "shared.db")
 	fixture := "CACHE_ADAPTER=db\nCACHE_DSN=" + file + "\nDB_ADAPTER=sqlite\nDB_PATH=" + file + "\nDB_MAXCONNS=5\n"
-	cfgPath := writeInspectFixture(t, dir, ".env", fixture)
+	writeInspectFixture(t, dir, ".env", fixture)
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
 		t.Fatal("runDoctorWith shared-pool fixture: got nil error, want non-nil (unconfigured batteries fail)")
 	}
 
@@ -335,10 +340,11 @@ func TestDoctorJSONCarriesPoolWarnings(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "shared.db")
 	fixture := "CACHE_ADAPTER=db\nCACHE_DSN=" + file + "\nDB_ADAPTER=sqlite\nDB_PATH=" + file + "\nDB_MAXCONNS=5\n"
-	cfgPath := writeInspectFixture(t, dir, ".env", fixture)
+	writeInspectFixture(t, dir, ".env", fixture)
+	t.Chdir(dir)
 
 	var human bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err == nil {
+	if err := runDoctorWith(DoctorConfig{Out: &human, JSON: true}); err == nil {
 		t.Fatal("runDoctorWith JSON shared-pool fixture: got nil error, want non-nil (unconfigured batteries fail)")
 	}
 

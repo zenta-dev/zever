@@ -15,13 +15,12 @@ import (
 )
 
 // DoctorConfig carries every input runDoctorWith needs. Screen agents build
-// it from huh forms; the flag shell (runDoctor) builds it from argv. An
-// empty ConfigPath resolves service config from .env/.env.local discovery
-// plus the process environment; a non-empty one layers that dotenv file in
-// between. A nil Out defaults to os.Stdout.
+// it from huh forms; the flag shell (runDoctor) builds it from argv. Service
+// config always resolves from .env/.env.local discovery plus the process
+// environment (see config.FromEnv): there is no --config file flag. A nil
+// Out defaults to os.Stdout.
 type DoctorConfig struct {
-	ConfigPath string
-	Out        io.Writer
+	Out io.Writer
 	// Strict is retained for flag compatibility: since P3-3 any failing
 	// battery returns a non-nil error (exit 1) with or without it, so
 	// `zever doctor` gates CI/pre-deploy pipelines by default.
@@ -33,14 +32,14 @@ type DoctorConfig struct {
 // printDoctorUsage prints styled help for `zever doctor`.
 func printDoctorUsage(fs *flag.FlagSet) {
 	header := title("zever doctor") + dim(" — verify project batteries")
-	usage := bold("Usage:") + "  " + cmd("zever doctor") + dim(" [--config PATH] [--strict]") + dim("  •  -i for guided prompts")
+	usage := bold("Usage:") + "  " + cmd("zever doctor") + dim(" [--strict]") + dim("  •  -i for guided prompts")
 
 	body := joinLines(
 		header,
 		"",
 		usage,
 		"",
-		"Every known battery is checked, resolved from service",
+		"Every wired battery is checked, resolved from service",
 		"env (<SERVICE>_<FIELD>, e.g. DB_ADAPTER, AUTH_JWT_SECRET).",
 		"In a project with a server entrypoint the",
 		"checks run inside the built server ("+cmd("go run <entry> --doctor")+")",
@@ -64,8 +63,7 @@ func printDoctorUsage(fs *flag.FlagSet) {
 	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor")+dim("  # verify enabled project batteries"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor --config .env"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor")+dim("  # verify wired project batteries"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor -i")+dim("  # guided mode"))
 
 	if shouldShowHint() {
@@ -75,13 +73,12 @@ func printDoctorUsage(fs *flag.FlagSet) {
 
 // newDoctorFlagSet declares the doctor flags once, shared by argv parsing and
 // every help path so `zever help doctor` lists the real flags.
-func newDoctorFlagSet() (fs *flag.FlagSet, configPath *string, strict *bool) {
+func newDoctorFlagSet() (fs *flag.FlagSet, strict *bool) {
 	fs = flag.NewFlagSet("doctor", flag.ContinueOnError)
-	configPath = fs.String("config", "", "optional dotenv file path (default: .env/.env.local discovery + process env)")
 	strict = fs.Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
 	fs.Usage = func() { printDoctorUsage(fs) }
 
-	return fs, configPath, strict
+	return fs, strict
 }
 
 // runDoctor builds a Container from the resolved service config (see
@@ -95,7 +92,7 @@ func newDoctorFlagSet() (fs *flag.FlagSet, configPath *string, strict *bool) {
 // (exit 1) when any fails, and a flagUsageError (exit 2) on flag misuse.
 func runDoctor(args []string) error {
 	if hasHelpFlag(args) {
-		fs, _, _ := newDoctorFlagSet()
+		fs, _ := newDoctorFlagSet()
 		fs.Usage = func() { printDoctorUsage(fs) }
 		// Proof: fs.Usage() calls printDoctorUsage(fs) verbatim, so output is
 		// identical to a direct call while also covering the Usage closure.
@@ -105,9 +102,9 @@ func runDoctor(args []string) error {
 	}
 
 	args = peelInteractive(args)
-	fs, configPath, strict := newDoctorFlagSet()
+	fs, strict := newDoctorFlagSet()
 
-	if err := rejectUnknownFlags("doctor", args, []string{"config", "strict"}); err != nil {
+	if err := rejectUnknownFlags("doctor", args, []string{"strict"}); err != nil {
 		return &flagUsageError{err: err}
 	}
 
@@ -115,7 +112,7 @@ func runDoctor(args []string) error {
 		return &flagUsageError{err: fmt.Errorf("zever doctor: %w", err)}
 	}
 
-	return runDoctorWith(DoctorConfig{ConfigPath: *configPath, Strict: *strict, JSON: jsonMode})
+	return runDoctorWith(DoctorConfig{Strict: *strict, JSON: jsonMode})
 }
 
 // doctorChecksFor builds the battery check table for runDoctorWith.
@@ -209,9 +206,9 @@ type doctorScope struct {
 // resolveDoctorScope plans which batteries to check. Service configuration
 // is env-only, so no file lists the enabled set: every known battery is
 // checked (nil enabled). The server entrypoint still comes from the project
-// layout: when a built server exists the checks run inside it.
-func resolveDoctorScope(configPath string) doctorScope {
-	_ = configPath
+// layout (defaults overlaid by ZEVER_* env): when a built server exists the
+// checks run inside it.
+func resolveDoctorScope() doctorScope {
 	scope := doctorScope{source: "cli"}
 
 	entry := defaultServerEntry
@@ -233,6 +230,11 @@ func resolveDoctorScope(configPath string) doctorScope {
 // registers only its adapter subset; the adapters meta-check is scoped to
 // the enabled set so it stays green there). In deterministic name order.
 // The "config" row always runs.
+//
+// When the container carries explicit providers (see container.Provide),
+// only their Wired refs are checked: unwired services are the project's
+// choice, not failures. The CLI builds its container from env alone with no
+// providers, so Wired is empty there and every known battery is checked.
 func localDoctorRows(c *container.Container, resolved *config.Config, enabled map[string]bool) []doctorRow {
 	checks := doctorChecksFor(c, resolved)
 	if _, ok := checks["adapters"]; ok {
@@ -242,8 +244,32 @@ func localDoctorRows(c *container.Container, resolved *config.Config, enabled ma
 	}
 
 	names := make([]string, 0, len(checks))
+
+	// wired scopes the check to explicit providers when the container has
+	// any: a Wired label is "service" for a default instance or
+	// "service/name" for a named one, so the service head selects the row.
+	wired := map[string]bool{}
+	for _, label := range c.Wired() {
+		head := label
+		if i := strings.IndexByte(label, '/'); i >= 0 {
+			head = label[:i]
+		}
+
+		wired[head] = true
+	}
+
 	for name := range checks {
-		if name == "config" || name == "adapters" || enabled == nil || enabled[name] {
+		if name == "config" || name == "adapters" {
+			names = append(names, name)
+
+			continue
+		}
+
+		if len(wired) > 0 && !wired[name] {
+			continue
+		}
+
+		if enabled == nil || enabled[name] {
 			names = append(names, name)
 		}
 	}
@@ -329,9 +355,18 @@ func runDoctorWith(cfg DoctorConfig) error {
 func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	resolved, err := resolveServiceConfig(cfg.ConfigPath)
+	resolved, err := resolveServiceConfig("")
 	if err != nil {
-		return fmt.Errorf("zever doctor: load config %q: %w", cfg.ConfigPath, err)
+		// resolveServiceConfig already fused env+dotenv; re-read the env
+		// for the exact-key typo hint (best-effort: a hint failure keeps
+		// the wrapped error, which already carries the did-you-mean).
+		if env, eenv := config.FromEnv(); eenv == nil {
+			if hint := envTypoHint(env, err); hint != "" {
+				return fmt.Errorf("zever doctor: resolve config from env: %w\n%s", err, hint)
+			}
+		}
+
+		return fmt.Errorf("zever doctor: resolve config from env: %w", err)
 	}
 
 	c := container.New(resolved)
@@ -341,7 +376,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 		_ = c.Close(closeCtx)
 	}()
 
-	scope := resolveDoctorScope(cfg.ConfigPath)
+	scope := resolveDoctorScope()
 
 	var rows []doctorRow
 	local := false
