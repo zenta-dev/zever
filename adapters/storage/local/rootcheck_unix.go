@@ -23,11 +23,11 @@ func checkDefaultRoot(root string) error {
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() {
-		return errors.New("not a plain directory")
+		return errors.New("local: root is not a plain directory")
 	}
 
 	if st, ok := fi.Sys().(*syscall.Stat_t); ok && int(st.Uid) != os.Getuid() {
-		return errors.New("owned by another user")
+		return errors.New("local: root is owned by another user")
 	}
 
 	return nil

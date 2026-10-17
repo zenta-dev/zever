@@ -20,7 +20,7 @@ func checkDefaultRoot(root string) error {
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() {
-		return errors.New("not a plain directory")
+		return errors.New("local: root is not a plain directory")
 	}
 
 	return nil
