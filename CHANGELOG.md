@@ -227,6 +227,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version-specific `replace` lines into `go.work`, so the workspace resolves
   `cmd/zever` (which commits no replaces) before the release tags exist.
   `--check-pins` verifies the block.
+- `tools/check-doc-snippets.sh`: compiled snippet checks mirror the `go.work` release-pin replaces.
 - `fix(middleware)`: cover panic-redact and timeout-recover paths.
 - `fix(outbox)`: the postgres claim statement put `FOR UPDATE SKIP LOCKED`
   inside an `IN` subquery, which postgres rejects (SQLSTATE 42601) — every
