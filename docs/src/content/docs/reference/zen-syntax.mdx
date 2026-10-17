@@ -166,7 +166,7 @@ service UserService {
 | Option | Value | Effect |
 |---|---|---|
 | `http:` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, then `"/path/{param}"` | HTTP binding. Every `{param}` needs a same-named RPC input. |
-| `auth:` | `required` or `none` | Authentication. Every RPC must declare `auth:` or `permission:`; an RPC with neither fails to resolve (secure by default), so write `auth: none` for a public route. |
+| `auth:` | `required` or `none` | Authentication. Every RPC must declare `auth:` or `permission:`; an RPC with neither fails to resolve (secure by default), so write `auth: none` for a public route. Generated gRPC servers are fail-closed: `auth: none` operations are listed with an explicit empty policy, and any unlisted method is denied. |
 | `permission:` | `check("action", resource: Entity, owner_field: field)` | Authorization. `resource` must be an entity, `owner_field` one of its fields. |
 | `errors:` | `{ code, code("message") }` | Declared error codes (table below). Duplicates are rejected. |
 | `paginated:` | `true` or `false` | `true` adds `cursor`/`limit` request fields and a `<Op>Response` page (`items`, `next_cursor`) to one RPC, on both HTTP and gRPC. |

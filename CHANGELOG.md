@@ -121,6 +121,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Breaking:** `fix(authz)!`: generated servers are now fail-closed on gRPC.
+  `zever generate server` (and the `examples/` servers) attach
+  `authz.UnaryServerInterceptorStrict` instead of the fail-open
+  `authz.UnaryServerInterceptor`, so a gRPC method with no policy entry is
+  denied with `PermissionDenied` rather than served publicly. The gogen
+  backend now lists every `auth: none` operation in `GRPCPolicies()` with an
+  explicit empty `authz.Policy{}`, and the generated server lists the gRPC
+  health check the same way. Migration: regenerate with `zever compile` and
+  `zever generate server`; mark every intentionally public operation with
+  `auth: none` in its `.zen` schema (an operation with no `auth:` or
+  `permission:` already failed to compile). Hand-wired servers must switch
+  to `UnaryServerInterceptorStrict` and add an empty `authz.Policy{}` entry
+  for any other unary method (custom services, health) they want reachable
+  without a policy. `authz.UnaryServerInterceptor` itself is unchanged and
+  stays available for incremental adoption.
+
 - `fix(orm/migrate)`: rollback now validates the stored `Table` and
   `ObjectName` of every `schema_migrations` row as plain (optionally quoted or
   schema-qualified) identifiers, and the `PriorSQL` allowlist for re-creating a

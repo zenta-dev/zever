@@ -39,6 +39,9 @@ type ResourceIDer interface {
 }
 
 // UnaryServerInterceptor enforces per-method policies, passing requests without a policy straight to the handler.
+// This is fail-open on a missing policy entry: prefer UnaryServerInterceptorStrict
+// (what generated servers wire) so a method forgotten from the policy map is
+// denied instead of silently public.
 // For a method with a PermissionCheck, the resource id is read from the
 // request when it implements ResourceIDer, and is "" otherwise.
 func UnaryServerInterceptor(a auth.Auth, p permission.Checker, policies map[string]Policy) grpc.UnaryServerInterceptor {
@@ -75,8 +78,9 @@ func UnaryServerInterceptor(a auth.Auth, p permission.Checker, policies map[stri
 // without a policy as permission-denied instead of passing them through.
 // For a listed method it delegates to UnaryServerInterceptor, so allow-path
 // behavior is identical. Use for services where every method must be
-// explicitly allowlisted; the legacy interceptor stays fail-open on misses
-// for incremental adoption.
+// explicitly allowlisted -- generated servers use it, listing an explicitly
+// public (auth: none) method with an empty Policy. The legacy interceptor
+// stays fail-open on misses for incremental adoption.
 func UnaryServerInterceptorStrict(a auth.Auth, p permission.Checker, policies map[string]Policy) grpc.UnaryServerInterceptor {
 	legacy := UnaryServerInterceptor(a, p, policies)
 	return func(

@@ -140,7 +140,7 @@ func run(addr, grpcAddr string) error {
 			middleware.RecoverUnaryServerInterceptor(logger),
 			middleware.TracingUnaryServerInterceptor(obs),
 			middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey),
-			authz.UnaryServerInterceptor(authInst, permInst, policies),
+			authz.UnaryServerInterceptorStrict(authInst, permInst, policies),
 		),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionIdle: DefaultGRPCMaxConnectionIdle,

@@ -60,6 +60,6 @@ func Build(a auth.Auth) (*Wiring, error) {
 		Service:     svc,
 		Checker:     checker,
 		Policies:    policies,
-		Interceptor: authz.UnaryServerInterceptor(a, checker, policies),
+		Interceptor: authz.UnaryServerInterceptorStrict(a, checker, policies),
 	}, nil
 }

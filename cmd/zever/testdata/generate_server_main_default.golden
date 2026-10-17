@@ -521,6 +521,13 @@ func run(addr, grpcAddr, pprofAddr string) error {
 	// package's own GRPCPolicies() is merged into one map here first.
 	policies := map[string]authz.Policy{}
 
+	// The interceptor is fail-closed (authz.UnaryServerInterceptorStrict):
+	// any gRPC method without a policy entry is denied. Operations declared
+	// "auth: none" in the schema carry an explicit empty policy via
+	// GRPCPolicies(); the standard health check is listed here so
+	// orchestrator probes keep working.
+	policies[healthpb.Health_Check_FullMethodName] = authz.Policy{}
+
 	// TODO: pass .zen schema files to 'zever generate server' to wire
 	// GRPCPolicies()/RegisterModule for every declared module automatically,
 	// e.g.: zever generate server schema/*.zen
@@ -530,7 +537,7 @@ func run(addr, grpcAddr, pprofAddr string) error {
 			middleware.RecoverUnaryServerInterceptor(logger),
 			middleware.TracingUnaryServerInterceptor(obs),
 			middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey),
-			authz.UnaryServerInterceptor(authInst, permInst, policies),
+			authz.UnaryServerInterceptorStrict(authInst, permInst, policies),
 		),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionIdle: DefaultGRPCMaxConnectionIdle,
