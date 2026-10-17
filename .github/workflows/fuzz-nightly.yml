@@ -80,7 +80,7 @@ jobs:
           set -euo pipefail
           echo "== session FuzzValidateID (${FUZZTIME})"
           go -C core/session test -run '^$' -fuzz '^FuzzValidateID$' -fuzztime "$FUZZTIME" .
-          for fn in FuzzDecodeFile FuzzSetOptionField FuzzMatchService; do
+          for fn in FuzzParseDotEnv FuzzSetOptionField FuzzMatchService FuzzApplyEnvSecretScrub; do
             echo "== config ${fn} (${FUZZTIME})"
             go -C config test -run '^$' -fuzz "^${fn}\$" -fuzztime "$FUZZTIME" .
           done

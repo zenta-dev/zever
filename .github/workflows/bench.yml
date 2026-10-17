@@ -82,12 +82,42 @@ jobs:
         with:
           pattern: bench-*-${{ github.sha }}
           merge-multiple: true
-      - name: Compare with base branch
+      - name: Compare with base branch (5% regression signal, non-gating)
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           git fetch origin "$BASE_REF" --depth=1 || true
           git stash -u || true
           git checkout -q "origin/$BASE_REF" -- orm container 2>/dev/null || true
-          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-base.txt || true
-          benchstat bench-base.txt bench-orm.txt bench-container.txt || true
+          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-base-orm.txt || true
+          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./container/... 2>&1 | tee bench-base-container.txt || true
+          git checkout -q HEAD -- orm container 2>/dev/null || true
+          # 5% regression signal per hot-path module (user requirement: <5%
+          # regression; security never sacrificed). benchstat prints a +N%
+          # delta only for statistically significant changes (insignificant
+          # ones render as ~), so any +N% line with N > 5 is a real signal.
+          # Warning only — shared runners are noisy, so this workflow stays
+          # advisory by design (continue-on-error above); follow up on
+          # repeated warnings, never gate merges on one sample. No
+          # per-request reflection may be introduced by anyone; these numbers
+          # watch the trend.
+          signal_regressions() {
+            base="$1"; head="$2"; label="$3"
+            if [ ! -f "$head" ]; then
+              echo "no head results for $label, skipping"
+              return 0
+            fi
+            echo "== benchstat $label: $base vs $head"
+            benchstat "$base" "$head" > "benchstat-$label.txt" 2>&1 || true
+            cat "benchstat-$label.txt"
+            grep -E '\+[0-9]+\.[0-9]+%' "benchstat-$label.txt" 2>/dev/null | while IFS= read -r line; do
+              delta="$(printf '%s' "$line" | grep -oE '\+[0-9]+\.[0-9]+%' | head -n 1 | tr -d '+%')"
+              if awk -v d="$delta" 'BEGIN { exit !(d + 0 > 5.0) }'; then
+                echo "::warning::perf regression >5% in $label (+$delta%): $line"
+              fi
+            done
+            return 0
+          }
+          signal_regressions bench-base-orm.txt bench-orm.txt orm
+          signal_regressions bench-base-container.txt bench-container.txt container
+          exit 0

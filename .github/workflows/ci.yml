@@ -770,12 +770,78 @@ jobs:
       - name: Tested doc samples (docs/examples, outside go.work)
         run: GOWORK=off go -C docs/examples test -count=1 ./...
 
+  # Compile-fail gate (stream G): every misuse fixture under
+  # container/testdata/compilefail/* is an own tiny module (excluded from
+  # go.work, ignored via testdata) that MUST fail `go build`, proving
+  # typed-Ref misuse does not compile. A fixture that starts compiling means
+  # the type-level guard regressed. Message-level assertions live in
+  # container/compilefail_test.go; this job asserts the build outcome.
+  # Local mirror: `make compilefail-check`.
+  compilefail:
+    name: compile-fail fixtures
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Assert misuse fixtures fail to build
+        run: make compilefail-check
+
+  # .env fuzz smoke (stream G): a short run of stream A's config parser fuzz
+  # targets (60s each). Not a soak: it catches regressions the committed
+  # seeds plus a minute of mutation can reach, mirroring the dsl fuzz-smoke
+  # policy. Failing inputs land under config/testdata/fuzz and should be
+  # committed with the fix. The fuzz tests themselves are owned by stream A;
+  # this job only wires the execution. Local mirror: `make fuzz-smoke-config`
+  # (override: FUZZTIME=10s).
+  env-fuzz-smoke:
+    name: fuzz smoke (config)
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Fuzz config targets
+        run: make fuzz-smoke-config
+
+  # TODO(D2): `zever generate --check` over examples does not exist yet
+  # (generate has no --check flag on main). When D2 ships it, add a
+  # generate-drift job here mirroring `drift` (compile --check) and list it
+  # in ci-gate needs. Deliberately not blocking this stream's merge.
+  #   generate-drift:
+  #     name: generate --check drift
+  #     timeout-minutes: 10
+  #     runs-on: ubuntu-latest
+  #     permissions:
+  #       contents: read
+  #     steps:
+  #       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+  #         with:
+  #           go-version-file: go.work
+  #       - name: Check generated code matches the schema
+  #         run: zever generate --check ./examples/...
+
   ci-gate:
     name: ci-gate
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, scaffold]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold]
     steps:
       - name: Aggregate results
         run: |
