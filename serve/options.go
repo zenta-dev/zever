@@ -50,16 +50,22 @@ func WithPprofAddr(addr string) Option {
 	}
 }
 
-// WithEnvOverride replaces the environment serve resolves config from,
+// WithEnv replaces the environment serve resolves config from,
 // instead of config.FromEnv. Tests pass literal maps; production leaves
 // this unset. Provider overlays inside container still read the process
 // environment (see container.New), so provider tests use t.Setenv for
 // SERVICE_* variables.
-func WithEnvOverride(env config.Env) Option {
+func WithEnv(env config.Env) Option {
 	return func(o *options) {
 		o.env = env
 		o.hasEnv = true
 	}
+}
+
+// WithEnvOverride is an alias of WithEnv kept for call sites written
+// against the pre-release name.
+func WithEnvOverride(env config.Env) Option {
+	return WithEnv(env)
 }
 
 // withListenHook reports each bound listener address. It is a test seam:

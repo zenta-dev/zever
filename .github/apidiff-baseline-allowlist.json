@@ -1,3 +1,9 @@
 {
-  "allowlist": []
+  "allowlist": [
+    {
+      "expires": "2026-12-31",
+      "module": "serve",
+      "reason": "new in v0.8.0, no serve/v* baseline tag yet"
+    }
+  ]
 }

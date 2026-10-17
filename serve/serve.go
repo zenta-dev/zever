@@ -78,23 +78,36 @@ type GRPCModule interface {
 	GRPCPolicies() map[string]authz.Policy
 }
 
+// Run boots a generated server to completion: it blocks until SIGINT or
+// SIGTERM, then shuts down gracefully and returns. It never panics and
+// never calls log.Fatal or os.Exit: the caller prints the returned error
+// to stderr and exits non-zero.
+func Run(providers []container.Provider, modules func(*container.Container) []Module, opts ...Option) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	return runServe(ctx, providers, modules, opts...)
+}
+
 // Main runs a generated server to completion: it blocks until SIGINT or
 // SIGTERM, then shuts down gracefully and returns. It never panics and
 // never calls log.Fatal: the caller prints the returned error to stderr
 // and exits non-zero.
 //
-// When os.Args carries `doctor` or `--doctor`, Main prints the resolve-all
-// JSON report to stdout and returns nil (or ErrDoctorFailed) instead of
-// serving; the generated main exits non-zero on error.
+// Main is Run plus the `doctor` dispatch: when os.Args carries `doctor`
+// or `--doctor`, Main prints the resolve-all JSON report to stdout and
+// returns nil (or ErrDoctorFailed) instead of serving.
+//
+// Deviation from the v0.8.0 plan spec (loud, deliberate): the plan sketches
+// Main as void, printing to stderr and calling os.Exit(1) itself. Main
+// instead returns the error so the generated main owns the exit path and
+// the boot stays unit-testable; no os.Exit lives in this library.
 func Main(providers []container.Provider, modules func(*container.Container) []Module, opts ...Option) error {
 	if isDoctorArgs(os.Args[1:]) {
 		return runDoctorReport(os.Stdout, providers, opts...)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	return runServe(ctx, providers, modules, opts...)
+	return Run(providers, modules, opts...)
 }
 
 // Worker runs a queue/scheduler worker to completion: it blocks until

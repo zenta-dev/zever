@@ -17,8 +17,9 @@
 //	ZEVER_ENV       dev/test/development marks non-production (reflection,
 //	                deterministic dev crypto key)
 //
-// Generated main.go contract (stream D): call Main with the app's providers
-// and a modules func returning one Module per schema module. Each Module's
+// Generated main.go contract (stream D): call Run with the app's providers
+// and a modules func returning one Module per schema module (Main is Run
+// plus the `doctor` dispatch; Doctor prints the resolve-all report alone). Each Module's
 // Mount calls that module's generated RegisterModule, resolving the gRPC
 // server via c.GRPC, auth via c.Auth, and permission via c.Permission. On
 // Main error, print to stderr and os.Exit(1). The `doctor` (or `--doctor`)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 
 	"github.com/zenta-dev/zever/container"
@@ -14,6 +15,15 @@ type doctorBattery struct {
 	Name  string `json:"name"`
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
+}
+
+// Doctor resolves every boot battery through a real container and prints
+// one JSON document ({"ok": bool, "batteries": [...]}) to stdout. It
+// returns nil when every battery resolves, or ErrDoctorFailed otherwise.
+// It is the programmatic form of the `doctor`/`--doctor` Main dispatch:
+// the zever CLI execs the built server and parses this shape.
+func Doctor(providers []container.Provider, opts ...Option) error {
+	return runDoctorReport(os.Stdout, providers, opts...)
 }
 
 // runDoctorReport resolves every boot battery through a real container and
