@@ -68,7 +68,7 @@ func Timeout(d time.Duration) func(http.Handler) http.Handler {
 			case <-done:
 				select {
 				case p := <-panicked:
-					panic(p)
+					panic(p) // errscan:allow: re-panic on the request goroutine so Recover handles it
 				default:
 				}
 
