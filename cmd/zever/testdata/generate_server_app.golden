@@ -51,12 +51,26 @@ func Config() (*config.Config, error) {
 // New builds the container every binary in this project uses. Nothing is
 // opened until a battery is first requested.
 func New() (*container.Container, error) {
-	logslog.Register()
-	routerstdhttp.Register()
+	Providers()
+
 	cfg, err := Config()
 	if err != nil {
 		return nil, err
 	}
 
 	return container.New(cfg), nil
+}
+
+// Providers wires the selected adapters into their battery registries and
+// returns the explicit provider set for serve.Main. The registry wiring is
+// the whole of the "wiring" a zever app does: adapter packages expose
+// constructors but never self-register, so an app calls Register for
+// exactly the adapters it actually uses and nothing else. The returned
+// slice is nil today -- this project's batteries resolve through the
+// registries above -- and stays so a later `zever add` can append
+// container.Provide values without changing main.go.
+func Providers() []container.Provider {
+	logslog.Register()
+	routerstdhttp.Register()
+	return nil
 }

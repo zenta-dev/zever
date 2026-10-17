@@ -20,6 +20,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/backend/zenorm"
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // errNoInputFiles is returned when neither explicit args nor auto-discovery
@@ -158,23 +159,26 @@ func backendNames() string {
 	return strings.Join(backendNamesSlice(), ", ")
 }
 
+// GenerateDefaultBackends is the ONE constant backend set `zever generate`
+// (and, by extension, `zever compile` with no explicit selection) compiles:
+// the schema-derived outputs every project needs. proto/protogogen stay out
+// of the constant: they are auto-added only when the schema declares
+// services (see schemaDeclaresServices), since every resolved operation
+// carries a gRPC transport. Override the selection with --backend or the
+// ZEVER_BACKENDS environment variable.
+const GenerateDefaultBackends = "gogen,zenorm,atlas,openapi"
+
+// grpcBackends are auto-added to a default backend selection when the schema
+// declares services: every resolved operation carries a gRPC transport, so
+// the protobuf outputs are part of the default pipeline only then.
+const grpcBackends = "proto,protogogen"
+
 // defaultBackends returns the sorted backend names joined by "," for use as
-// the --backend flag default. It includes every key in backendRegistry except
-// "mcp", which stays opt-in via --backend=mcp so default compiles do not
-// gain a new output tree.
+// the --backend flag default. It is exactly GenerateDefaultBackends
+// (proto/protogogen join only via schema-driven auto-add, mcp stays opt-in
+// via --backend=mcp so default compiles gain no new output tree).
 func defaultBackends() string {
-	names := backendNamesSlice()
-
-	out := names[:0]
-	for _, name := range names {
-		if name == "mcp" {
-			continue
-		}
-
-		out = append(out, name)
-	}
-
-	return strings.Join(out, ",")
+	return GenerateDefaultBackends
 }
 
 func backendNamesSlice() []string {
@@ -186,6 +190,83 @@ func backendNamesSlice() []string {
 	sort.Strings(names)
 
 	return names
+}
+
+// resolveBackendSpec selects the effective --backend value: an explicitly
+// passed flag value wins, then the ZEVER_BACKENDS environment variable, then
+// GenerateDefaultBackends. An empty spec (no flag, no env) selects the
+// default and reports defaulted=true so runCompileWith can auto-add the
+// gRPC backends when the schema declares services.
+func resolveBackendSpec(spec string) (string, bool) {
+	if strings.TrimSpace(spec) != "" && spec != GenerateDefaultBackends {
+		return spec, false
+	}
+
+	if env := strings.TrimSpace(os.Getenv("ZEVER_BACKENDS")); env != "" {
+		return env, strings.TrimSpace(spec) == ""
+	}
+
+	return GenerateDefaultBackends, true
+}
+
+// schemaDeclaresServices reports whether the resolved schema holds any
+// service: every resolved operation carries a gRPC transport, so a schema
+// with services needs the proto/protogogen outputs in a default pipeline.
+func schemaDeclaresServices(schema *ir.Schema) bool {
+	if schema == nil {
+		return false
+	}
+
+	for _, m := range schema.Modules {
+		if len(m.Services) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// missingGRPCBackends lists the grpcBackends entries absent from a
+// comma-separated backend spec.
+func missingGRPCBackends(spec string) []string {
+	have := map[string]bool{}
+	for _, name := range strings.Split(spec, ",") {
+		have[strings.TrimSpace(name)] = true
+	}
+
+	var missing []string
+
+	for _, name := range strings.Split(grpcBackends, ",") {
+		if !have[name] {
+			missing = append(missing, name)
+		}
+	}
+
+	return missing
+}
+
+// withGRPCBackends adds proto/protogogen to a comma-separated backend spec
+// when missing, preserving order (existing entries keep their position,
+// additions append sorted).
+func withGRPCBackends(spec string) string {
+	have := map[string]bool{}
+	for _, name := range strings.Split(spec, ",") {
+		have[strings.TrimSpace(name)] = true
+	}
+
+	out := strings.TrimSpace(spec)
+
+	for _, name := range strings.Split(grpcBackends, ",") {
+		if !have[name] {
+			if out != "" {
+				out += ","
+			}
+
+			out += name
+		}
+	}
+
+	return out
 }
 
 // newCompileFlagSet builds the stdlib flag set for `zever compile`: the
@@ -279,10 +360,7 @@ func runCompile(args []string) error { //nolint:gocyclo
 // each backend's output under cfg.OutDir/<backend>/. It prints diagnostics
 // to stderr and a success summary to cfg.Out.
 func runCompileWith(cfg CompileConfig) error {
-	backendsSpec := cfg.Backends
-	if strings.TrimSpace(backendsSpec) == "" {
-		backendsSpec = defaultBackends()
-	}
+	backendsSpec, defaulted := resolveBackendSpec(cfg.Backends)
 
 	outDir := cfg.OutDir
 	if outDir == "" {
@@ -333,6 +411,28 @@ func runCompileWith(cfg CompileConfig) error {
 		}
 
 		return err
+	}
+
+	// A default selection grows proto/protogogen when the schema declares
+	// services: every resolved operation carries a gRPC transport, so the
+	// protobuf outputs belong to the default pipeline only then. Explicit
+	// --backend selections are honored exactly.
+	if defaulted && schemaDeclaresServices(result.Schema) {
+		if missing := missingGRPCBackends(backendsSpec); len(missing) > 0 {
+			if extra, err := resolveBackends(strings.Join(missing, ","), computeBackendRoots(outDir)); err == nil {
+				if second, secondDiags := compile.WithSchemaDir(files, schemaDir, extra...); !secondDiags.HasErrors() {
+					backendsSpec = withGRPCBackends(backendsSpec)
+
+					if result.Outputs == nil {
+						result.Outputs = map[string]map[string][]byte{}
+					}
+
+					for name, backendFiles := range second.Outputs {
+						result.Outputs[name] = backendFiles
+					}
+				}
+			}
+		}
 	}
 
 	// Stamp every output with the schema provenance (version+hash) before it

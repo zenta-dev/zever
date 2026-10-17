@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"go/format"
 	"go/parser"
 	"go/token"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,83 +111,52 @@ func TestRunGenerateServer(t *testing.T) {
 
 	for _, fragment := range []string{
 		`"example.com/shop/internal/app"`,
-		`"github.com/zenta-dev/zever/core/middleware"`,
+		`"github.com/zenta-dev/zever/serve"`,
 		"func main()",
-		"httpServer.Shutdown(shutdownCtx)",
-		"grpcServer.GracefulStop()",
-		"c.Router()",
-		"middleware.RecoverUnaryServerInterceptor(logger)",
-		"middleware.TracingUnaryServerInterceptor(obs)",
-		"authz.UnaryServerInterceptorStrict(authInst, permInst, policies)",
-		"policies[healthpb.Health_Check_FullMethodName] = authz.Policy{}",
-		"grpc.KeepaliveParams(keepalive.ServerParameters{",
-		"grpc.MaxRecvMsgSize(DefaultGRPCMaxMessageBytes)",
-		"grpc.MaxSendMsgSize(DefaultGRPCMaxMessageBytes)",
-		"r.Use(middleware.Recover(logger), middleware.RequestLogger(logger), middleware.Tracing(obs), middleware.SecurityHeaders(securityHeadersOpts))",
-		// Baseline response security headers ship in the generated
-		// server, with HSTS switched on only when TLS is configured.
-		"middleware.SecurityHeaders(securityHeadersOpts)",
-		"middleware.SecurityHeadersOptions{}",
-		"middleware.DefaultHSTSMaxAge",
-		`r.Handle("GET", "/healthz",`,
-		`r.Handle("GET", "/readyz",`,
-		// Readiness is one container decision, not a per-handler DB ping:
-		// the aggregate covers the db ping plus the opt-in outbox stall
-		// gate, so /readyz and the gRPC health status cannot drift apart.
-		"c.Ready(readyCtx)",
-		"healthServer := health.NewServer()",
-		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
-		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_SERVING)",
-		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
-		"ReadTimeout:       readTimeout,",
-		"WriteTimeout:      writeTimeout,",
-		"IdleTimeout:       idleTimeout,",
-		`grpcAddr := flag.String("grpc-addr", ":9090", "gRPC address to listen on")`,
-		// Opt-in pprof: off by default, loopback-only, own listener.
-		`flag.String("pprof-addr", os.Getenv("PPROF_ADDR")`,
-		"container.StartPprof(pprofAddr, logger)",
-		"pprofSrv.Shutdown(pprofCtx)",
-		// Outbound calls go through the resilience manager's per-dependency guard.
-		"c.Resilience()",
-		"guardedGRPCClient",
-		"grpcclient.WithGuard(g)",
-		// SIGHUP reloads the log level and the rate limiter via atomic
-		// swap; everything else in the config file is restart-only.
-		"container.NewReloadableLogger",
-		"container.NewReloadableLimiter",
-		"container.WatchSIGHUP",
-		"SIGHUP reload skipped",
-		"reloaded SIGHUP-reloadable config",
+		"serve.Main(app.Providers(), app.Modules)",
+		`os.Stderr.WriteString("server: "`,
+		"os.Exit(1)",
 	} {
 		if !strings.Contains(main, fragment) {
 			t.Fatalf("server main.go lacks %q:\n%s", fragment, main)
 		}
 	}
 
-	// Readiness must be the container aggregate, not a hand-rolled ping: an
-	// inline db ping in the handler is exactly the drift this replaced, since
-	// it can never learn about the outbox stall gate.
-	if strings.Contains(main, "database.Ping(") {
-		t.Fatalf("server main.go must not inline a readiness db ping:\n%s", main)
+	// The wrapper is thin by contract: boot behavior (listeners, TLS,
+	// health, readiness, rate limiting, reflection, pprof, SIGHUP, doctor)
+	// lives in the serve library, never in generated text. main.go stays
+	// short enough to review at a glance.
+	if lines := strings.Count(main, "\n"); lines > 40 {
+		t.Fatalf("server main.go = %d lines, want a ~15-line thin wrapper", lines)
 	}
 
-	// zever's zero-infra defaults ship a real rate limit (rate 10, burst 20),
-	// so rate-limit wiring is on even with no project config -- the inverse
-	// of the predecessor's opt-in. See rateLimitConfigured.
-	for _, wanted := range []string{"c.RateLimit()", "middleware.RateLimit", "RateLimitUnaryServerInterceptor"} {
-		if !strings.Contains(main, wanted) {
-			t.Fatalf("server main.go must wire rate limiting under zever defaults, lacks %q:\n%s", wanted, main)
+	for _, unwanted := range []string{
+		"grpc.NewServer",
+		"http.ListenAndServe",
+		"reflection.Register",
+		"RateLimit",
+		"middleware.",
+		"healthpb.",
+	} {
+		if strings.Contains(main, unwanted) {
+			t.Fatalf("server main.go must not contain %q (serve owns it):\n%s", unwanted, main)
 		}
 	}
 
-	// Reflection is off by default (secure-by-default): the generated server
-	// must neither register the reflection service nor import the package.
-	for _, unwanted := range []string{
-		"reflection.Register(grpcServer)",
-		`"google.golang.org/grpc/reflection"`,
+	// With no schema the wiring file still renders: an empty module list
+	// plus the schema-hash stamp (empty-schema hash).
+	modules := readGenerated(t, filepath.Join(dir, "internal", "app", "modules.go"))
+
+	for _, fragment := range []string{
+		"package app",
+		"func Modules(c *container.Container) []serve.Module",
+		`"github.com/zenta-dev/zever/serve"`,
+		"// Code generated by zever generate server v",
+		"; DO NOT EDIT.",
+		"// schema-hash: sha256:",
 	} {
-		if strings.Contains(main, unwanted) {
-			t.Fatalf("server main.go must not contain %q by default:\n%s", unwanted, main)
+		if !strings.Contains(modules, fragment) {
+			t.Fatalf("modules.go lacks %q:\n%s", fragment, modules)
 		}
 	}
 
@@ -204,6 +173,7 @@ func TestRunGenerateServer(t *testing.T) {
 		"logslog.Register()",
 		"routerstdhttp.Register()",
 		"func New() (*container.Container, error)",
+		"func Providers() []container.Provider",
 	} {
 		if !strings.Contains(app, fragment) {
 			t.Fatalf("app.go lacks %q:\n%s", fragment, app)
@@ -224,68 +194,23 @@ func TestRunGenerateServer(t *testing.T) {
 
 	assertGolden(t, "generate_server_main_default.golden", []byte(main))
 	assertGolden(t, "generate_server_app.golden", []byte(app))
+	assertGolden(t, "generate_server_modules_empty.golden", []byte(modules))
 }
 
-// TestRunGenerateServerReflectionEnabledByEnv proves the explicit opt-in:
-// GRPC_REFLECTION=true wires the reflection service into the generated
-// server, import included.
-func TestRunGenerateServerReflectionEnabledByEnv(t *testing.T) {
-	dir := t.TempDir()
-	withWorkingDir(t, dir)
-	writeGoMod(t, dir, "example.com/shop")
-	t.Setenv("GRPC_REFLECTION", "true")
-	t.Setenv("ZEVER_ENV", "production")
-
-	if err := runGenerateServer(nil); err != nil {
-		t.Fatalf("runGenerateServer: %v", err)
-	}
-
-	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
-
-	for _, fragment := range []string{
-		`"google.golang.org/grpc/reflection"`,
-		"reflection.Register(grpcServer)",
+// TestRunGenerateServerIgnoresServerEnv proves the generated entrypoint is
+// env-independent: reflection/TLS/rate-limit knobs now live in the serve
+// library (read at boot), never in generated text, so server env changes do
+// not alter a single generated byte.
+func TestRunGenerateServerIgnoresServerEnv(t *testing.T) {
+	for _, env := range []struct{ key, val string }{
+		{"GRPC_REFLECTION", "true"},
+		{"ZEVER_ENV", "dev"},
 	} {
-		if !strings.Contains(main, fragment) {
-			t.Fatalf("server main.go lacks %q with GRPC_REFLECTION=true:\n%s", fragment, main)
-		}
-	}
-}
-
-// TestRunGenerateServerReflectionDisabledByExplicitEnv proves an explicit
-// GRPC_REFLECTION=false wins over a dev ZEVER_ENV: the operator's explicit
-// choice is never overridden.
-func TestRunGenerateServerReflectionDisabledByExplicitEnv(t *testing.T) {
-	dir := t.TempDir()
-	withWorkingDir(t, dir)
-	writeGoMod(t, dir, "example.com/shop")
-	t.Setenv("GRPC_REFLECTION", "false")
-	t.Setenv("ZEVER_ENV", "dev")
-
-	if err := runGenerateServer(nil); err != nil {
-		t.Fatalf("runGenerateServer: %v", err)
-	}
-
-	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
-
-	if strings.Contains(main, "reflection.Register(grpcServer)") {
-		t.Fatalf("server main.go must not register reflection with GRPC_REFLECTION=false:\n%s", main)
-	}
-}
-
-// TestRunGenerateServerReflectionEnabledInDevMode proves the dev convenience:
-// a dev ZEVER_ENV (dev/test/development, case-insensitive) wires reflection
-// even with no GRPC_REFLECTION set, so grpcurl keeps working locally.
-func TestRunGenerateServerReflectionEnabledInDevMode(t *testing.T) {
-	tests := []string{"dev", "test", "development", "DEV", "Test"}
-
-	for _, env := range tests {
-		t.Run(env, func(t *testing.T) {
+		t.Run(env.key, func(t *testing.T) {
 			dir := t.TempDir()
 			withWorkingDir(t, dir)
 			writeGoMod(t, dir, "example.com/shop")
-			t.Setenv("GRPC_REFLECTION", "")
-			t.Setenv("ZEVER_ENV", env)
+			t.Setenv(env.key, env.val)
 
 			if err := runGenerateServer(nil); err != nil {
 				t.Fatalf("runGenerateServer: %v", err)
@@ -293,112 +218,12 @@ func TestRunGenerateServerReflectionEnabledInDevMode(t *testing.T) {
 
 			main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
 
-			if !strings.Contains(main, "reflection.Register(grpcServer)") {
-				t.Fatalf("server main.go must register reflection with ZEVER_ENV=%s:\n%s", env, main)
+			for _, unwanted := range []string{"reflection.Register", "RateLimit", "tls.LoadX509KeyPair"} {
+				if strings.Contains(main, unwanted) {
+					t.Fatalf("server main.go must not contain %q with %s=%s:\n%s", unwanted, env.key, env.val, main)
+				}
 			}
 		})
-	}
-}
-
-// TestRunGenerateServerReflectionOffInProdEnv proves a production ZEVER_ENV
-// with GRPC_REFLECTION unset stays off.
-func TestRunGenerateServerReflectionOffInProdEnv(t *testing.T) {
-	dir := t.TempDir()
-	withWorkingDir(t, dir)
-	writeGoMod(t, dir, "example.com/shop")
-	t.Setenv("GRPC_REFLECTION", "")
-	t.Setenv("ZEVER_ENV", "production")
-
-	if err := runGenerateServer(nil); err != nil {
-		t.Fatalf("runGenerateServer: %v", err)
-	}
-
-	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
-
-	if strings.Contains(main, "reflection.Register(grpcServer)") {
-		t.Fatalf("server main.go must not register reflection with ZEVER_ENV=production:\n%s", main)
-	}
-}
-
-// TestRunGenerateServerTLSWiring proves the generated server serves TLS
-// from the router battery's tls_cert/tls_key/tls_client_ca options: gRPC
-// credentials plus HTTPS on one shared tls.Config (TLS 1.2 floor, mTLS
-// client verification when a client CA is set), with a startup warning
-// when both listeners stay plaintext on a non-loopback address.
-func TestRunGenerateServerTLSWiring(t *testing.T) {
-	dir := t.TempDir()
-	withWorkingDir(t, dir)
-	writeGoMod(t, dir, "example.com/shop")
-
-	if err := runGenerateServer(nil); err != nil {
-		t.Fatalf("runGenerateServer: %v", err)
-	}
-
-	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
-
-	for _, fragment := range []string{
-		`"crypto/tls"`,
-		`"crypto/x509"`,
-		`"google.golang.org/grpc/credentials"`,
-		"Router.Options.TLSCertFile",
-		"Router.Options.TLSKeyFile",
-		"Router.Options.TLSClientCAFile",
-		"tls.LoadX509KeyPair",
-		"tls.VersionTLS12",
-		"tls.RequireAndVerifyClientCert",
-		"credentials.NewTLS",
-		"grpc.Creds(",
-		"ListenAndServeTLS",
-		"plaintext",
-		"isLoopbackAddr",
-	} {
-		if !strings.Contains(main, fragment) {
-			t.Fatalf("server main.go lacks TLS wiring %q:\n%s", fragment, main)
-		}
-	}
-}
-
-// TestIsLoopbackAddrCases pins the classification rule the generated
-// server's isLoopbackAddr embeds (replicated with net directly: the
-// template is text, not an import): loopback hosts and only those skip
-// the plaintext warning, while wildcard, empty, and unparsable hosts
-// always warn.
-func TestIsLoopbackAddrCases(t *testing.T) {
-	t.Parallel()
-
-	isLoopbackAddr := func(addr string) bool {
-		host, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			return false
-		}
-		switch strings.ToLower(strings.Trim(host, "[]")) {
-		case "", "0.0.0.0", "::":
-			return false
-		case "localhost":
-			return true
-		}
-		ip := net.ParseIP(strings.Trim(host, "[]"))
-		return ip != nil && ip.IsLoopback()
-	}
-
-	tests := []struct {
-		addr string
-		want bool
-	}{
-		{"127.0.0.1:8080", true},
-		{"[::1]:9090", true},
-		{"localhost:8080", true},
-		{":8080", false},
-		{"0.0.0.0:8080", false},
-		{"[::]:8080", false},
-		{"192.168.1.10:8080", false},
-		{"example.com:443", false},
-		{"not-an-addr", false},
-	}
-	for _, tc := range tests {
-		if got := isLoopbackAddr(tc.addr); got != tc.want {
-			t.Errorf("isLoopbackAddr(%q) = %v, want %v", tc.addr, got, tc.want)
-		}
 	}
 }
 
@@ -584,10 +409,10 @@ func writeServerSchema(t *testing.T, dir string) {
 }
 
 // TestRunGenerateServerWiresRegisterModule proves that, given a schema (auto-
-// discovered under schema/), the scaffolded main.go actually imports the
-// generated gogen package, merges its GRPCPolicies(), constructs a stub
-// service implementation, and calls RegisterModule -- no TODOs left for a
-// declared module.
+// discovered under schema/), the refreshed modules.go imports the generated
+// gogen package, exposes the module as a serve.GRPCModule delegating to its
+// GRPCPolicies(), constructs the stub service implementation in Mount, and
+// calls RegisterModule -- while main.go stays the thin serve.Main wrapper.
 func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
@@ -600,26 +425,32 @@ func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 
 	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
 
+	if !strings.Contains(main, "serve.Main(app.Providers(), app.Modules)") {
+		t.Fatalf("wired server main.go is not the thin wrapper:\n%s", main)
+	}
+
+	modules := readGenerated(t, filepath.Join(dir, "internal", "app", "modules.go"))
+
 	for _, fragment := range []string{
 		`genapp "example.com/shop/generated/gogen/app"`,
 		`appimpl "example.com/shop/internal/service/app"`,
-		"for k, v := range genapp.GRPCPolicies()",
+		"type AppModule struct",
+		"func NewAppModule(c *container.Container) *AppModule",
+		"var _ serve.GRPCModule = (*AppModule)(nil)",
+		`func (m *AppModule) Name() string`,
+		`"app"`,
+		"func (m *AppModule) GRPCPolicies() map[string]authz.Policy",
+		"return genapp.GRPCPolicies()",
+		"func (m *AppModule) Mount(r router.Router, _ *container.Container) error",
 		"taskServiceImpl := appimpl.NewTaskServiceImpl()",
 		"genapp.RegisterModule(r, grpcServer, authInst, permInst, genapp.ModuleImpls{",
 		"TaskService: taskServiceImpl,",
-		"healthpb.RegisterHealthServer(grpcServer, healthServer)",
-		"c.Resilience()",
-		"guardedGRPCClient",
-		"c.Ready(readyCtx)",
-		"healthServer.SetServingStatus(\"\", healthpb.HealthCheckResponse_NOT_SERVING)",
+		"func Modules(c *container.Container) []serve.Module",
+		"NewAppModule(c),",
 	} {
-		if !strings.Contains(main, fragment) {
-			t.Fatalf("wired server main.go lacks %q:\n%s", fragment, main)
+		if !strings.Contains(modules, fragment) {
+			t.Fatalf("wired modules.go lacks %q:\n%s", fragment, modules)
 		}
-	}
-
-	if strings.Contains(main, "TODO: pass .zen schema files") {
-		t.Fatalf("wired server main.go should not show the no-schema TODO hint:\n%s", main)
 	}
 
 	stub := readGenerated(t, filepath.Join(dir, "internal", "service", "app", "task_service.go"))
@@ -635,7 +466,7 @@ func TestRunGenerateServerWiresRegisterModule(t *testing.T) {
 		}
 	}
 
-	assertGolden(t, "generate_server_main_wired.golden", []byte(main))
+	assertGolden(t, "generate_server_modules_wired.golden", []byte(modules))
 }
 
 // TestRunGenerateServerNeverOverwritesAnExistingStub proves the skip-if-
@@ -668,39 +499,51 @@ func TestRunGenerateServerNeverOverwritesAnExistingStub(t *testing.T) {
 	}
 }
 
-// TestRunGenerateServerWiresRateLimitWhenConfigured proves rate-limit wiring
-// appears when zever.yaml configures a rate/burst for the "ratelimit"
-// battery. Under zever's defaults the wiring is already on (see
-// TestRunGenerateServer), so this test pins the explicit-config path too.
-func TestRunGenerateServerWiresRateLimitWhenConfigured(t *testing.T) {
+// TestGenerateServerWarnsOnRemovedService proves HARD RULE R1's second half:
+// a stub file that no longer matches any schema service is left byte-for-byte
+// and reported on stderr, never deleted.
+func TestGenerateServerWarnsOnRemovedService(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
-
-	const cfg = "ratelimit:\n  adapter: memory\n  options:\n    rate: 100\n    burst: 20\n"
-
-	if err := os.WriteFile(filepath.Join(dir, "zever.yaml"), []byte(cfg), 0o600); err != nil {
-		t.Fatalf("write zever.yaml: %v", err)
-	}
+	writeServerSchema(t, dir)
 
 	if err := runGenerateServer(nil); err != nil {
 		t.Fatalf("runGenerateServer: %v", err)
 	}
 
-	main := readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
+	// A stub for a service the schema no longer declares: R1 says it stays
+	// byte-for-byte, with a warning on stderr naming the fix (delete by hand).
+	orphanPath := filepath.Join(dir, "internal", "service", "app", "gone_service.go")
 
-	for _, fragment := range []string{
-		"limiter, err := c.RateLimit()",
-		"reloadableLimiter := container.NewReloadableLimiter(limiter)",
-		"middleware.RateLimitUnaryServerInterceptor(limiter, middleware.PeerAddrKey)",
-		"middleware.ParseTrustedProxies(serverCfg.RateLimit.Options.TrustedProxies)",
-		"rateLimitKey := middleware.RemoteAddrKey",
-		"rateLimitKey = middleware.ClientIPKey(trustedProxies)",
-		"r.Use(middleware.RateLimit(limiter, rateLimitKey))",
-	} {
-		if !strings.Contains(main, fragment) {
-			t.Fatalf("server main.go lacks %q with a configured rate limit:\n%s", fragment, main)
-		}
+	const orphan = "package appimpl\n\n// formerly generated\n"
+
+	if err := os.WriteFile(orphanPath, []byte(orphan), 0o600); err != nil {
+		t.Fatalf("write orphan stub: %v", err)
+	}
+
+	var stderr bytes.Buffer
+
+	res, err := GenerateServer(GenerateServerConfig{
+		ModulePath: "example.com/shop", OutDir: "./generated",
+		SchemaDir: "schema", ServerEntry: "cmd/server",
+		Force:  true,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		t.Fatalf("GenerateServer: %v", err)
+	}
+
+	if res.Modules != 1 {
+		t.Fatalf("res.Modules = %d, want 1", res.Modules)
+	}
+
+	if got := readFile(t, orphanPath); got != orphan {
+		t.Fatalf("orphan stub was modified: %q", got)
+	}
+
+	if !strings.Contains(stderr.String(), "gone_service.go") {
+		t.Fatalf("stderr lacks orphan warning:\n%s", stderr.String())
 	}
 }
 
