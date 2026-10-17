@@ -1381,6 +1381,13 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
+	// The sqlite default DSN (data/app.db, see the quickstart) needs its
+	// directory to exist: keeping it in the tree means the scaffolded
+	// binaries and `zever db migrate` run without a mkdir first.
+	if writeErr := write(filepath.Join("data", ".gitkeep"), nil); writeErr != nil {
+		return nil, writeErr
+	}
+
 	return written, nil
 }
 

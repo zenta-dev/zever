@@ -234,7 +234,8 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 	out := filepath.Join(workDir, "acme")
 
 	// The minimal tree: go.mod, schema, server main, typed wiring, the
-	// sample module, env files, gitignore and README. Nothing heavier.
+	// sample module, env files, gitignore, README and the sqlite data dir.
+	// Nothing heavier.
 	for _, rel := range []string{
 		"go.mod",
 		filepath.Join(defaultSchemaDir, "app.zen"),
@@ -245,6 +246,7 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 		".env.example",
 		".gitignore",
 		"README.md",
+		filepath.Join("data", ".gitkeep"),
 	} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Fatalf("expected %s to exist: %v", rel, err)

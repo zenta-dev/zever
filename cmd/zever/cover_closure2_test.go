@@ -1037,6 +1037,7 @@ func TestClosure2WriteNewProjectTable(t *testing.T) {
 		{".env.example", true},
 		{".gitignore", true},
 		{"README.md", true},
+		{filepath.Join("data", ".gitkeep"), true},
 	}
 
 	for _, tc := range targets {
