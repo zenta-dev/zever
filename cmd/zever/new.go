@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -2308,29 +2308,18 @@ func renderEnvExample(selections []batterySelection) []byte {
 	return []byte(b.String())
 }
 
-// devSecretFields marks Options field names that carry secret material and
-// are safe to pre-fill with random dev values: they never change adapter
-// selection or routing (DSN/PATH/URL are excluded), so a random value can
-// never break boot. Compare case-insensitively against the upper-cased
-// field name.
-var devSecretFields = []string{"SECRET", "PASSWORD", "TOKEN"}
-
-// isDevSecretField reports whether an upper-cased field name carries secret
-// material per devSecretFields.
-func isDevSecretField(upper string) bool {
-	for _, marker := range devSecretFields {
-		if strings.Contains(upper, marker) {
-			return true
-		}
-	}
-
-	return false
+// isSecretField reports whether a struct field carries secret material,
+// via the framework's own `zever:"secret"` marker tag. Name heuristics
+// would drift; the tag is the contract redact.go and friends already honor.
+func isSecretField(sf reflect.StructField) bool {
+	return sf.Tag.Get("zever") == "secret"
 }
 
 // collectDevSecrets walks one Options struct value, returning KEY=random
-// lines for empty secret-like fields under prefix (one nesting level,
-// mirroring appendEnvKeys). Non-empty secret fields already carry a default
-// and need no generated value.
+// lines for empty string fields tagged `zever:"secret"` under prefix (one
+// nesting level, mirroring appendEnvKeys). Non-empty secret fields already
+// carry a default and need no generated value; non-string secrets have no
+// text form and are skipped.
 func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 	v := addressableCopy(opts)
 	if !v.IsValid() {
@@ -2361,16 +2350,16 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 					continue
 				}
 
+				if !isSecretField(nsf) {
+					continue
+				}
+
 				nf := nested.Field(j)
 				if nf.Kind() != reflect.String || nf.String() != "" {
 					continue
 				}
 
-				if !isDevSecretField(envKeyName(nsf.Name)) {
-					continue
-				}
-
-				secret, err := randomHex(32)
+				secret, err := randomSecret()
 				if err != nil {
 					continue
 				}
@@ -2381,15 +2370,15 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 			continue
 		}
 
+		if !isSecretField(sf) {
+			continue
+		}
+
 		if f.Kind() != reflect.String || f.String() != "" {
 			continue
 		}
 
-		if !isDevSecretField(envKeyName(sf.Name)) {
-			continue
-		}
-
-		secret, err := randomHex(32)
+		secret, err := randomSecret()
 		if err != nil {
 			continue
 		}
@@ -2398,27 +2387,39 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 	}
 }
 
-// randomHex returns n random bytes as hex, for per-project dev secrets.
-// Failure (no OS entropy) is a hard error: secrets must never silently
-// fall back to deterministic values.
-func randomHex(n int) (string, error) {
-	buf := make([]byte, n)
+// randomSecret returns 32 random bytes as base64: the per-project dev
+// secret shape for every `zever:"secret"` field and for the pre-generated
+// AUTH_JWT_SECRET/CRYPTO_KEY. Failure (no OS entropy) is a hard error:
+// secrets must never silently fall back to deterministic values.
+func randomSecret() (string, error) {
+	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("zever new: rand: %w", err)
 	}
 
-	return hex.EncodeToString(buf), nil
+	return base64.StdEncoding.EncodeToString(buf), nil
 }
 
-// renderDevEnv generates .env: random per-project dev secrets for every
-// empty secret-like field of the wired batteries, plus a pre-generated
-// AUTH_JWT_SECRET so `zever add auth` works with zero extra steps. Dev
-// only: rotate real values for production. Never commit this file.
+// renderDevEnv generates .env: a random per-project CRYPTO_KEY (so serve's
+// dev-key guard passes without ZEVER_ENV games), random dev secrets for
+// every empty `zever:"secret"` field of the wired batteries, plus a
+// pre-generated AUTH_JWT_SECRET so `zever add auth` works with zero extra
+// steps. Dev only: rotate real values for production. Never commit this
+// file.
 func renderDevEnv(selections []batterySelection) ([]byte, error) {
 	var b strings.Builder
 
 	b.WriteString("# Local dev secrets. Generated per project by `zever new`; never commit.\n")
 	b.WriteString("# Dev only: set real values via the environment in production.\n")
+
+	cryptoKey, err := randomSecret()
+	if err != nil {
+		return nil, err
+	}
+
+	b.WriteString("\n# Random per project: serve boots without ZEVER_ENV games and no\n")
+	b.WriteString("# two checkouts share key material. Production sets a real CRYPTO_KEY.\n")
+	fmt.Fprintf(&b, "CRYPTO_KEY=%s\n", cryptoKey)
 
 	sorted := append([]batterySelection(nil), selections...)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -2454,7 +2455,7 @@ func renderDevEnv(selections []batterySelection) ([]byte, error) {
 	}
 
 	if !hasAuth {
-		secret, err := randomHex(32)
+		secret, err := randomSecret()
 		if err != nil {
 			return nil, err
 		}

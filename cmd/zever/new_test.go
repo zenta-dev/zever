@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -487,16 +488,28 @@ func TestRunNewWritesEnvFiles(t *testing.T) {
 		}
 	}
 
-	if len(secret) != 64 {
-		t.Fatalf("AUTH_JWT_SECRET must be 32 random bytes as hex (64 chars), got %q", secret)
+	if len(secret) < 32 {
+		t.Fatalf("AUTH_JWT_SECRET must carry at least 32 random bytes, got %q", secret)
 	}
 
-	for _, c := range secret {
-		if c >= '0' && c <= '9' || c >= 'a' && c <= 'f' {
-			continue
-		}
+	if _, err := base64.StdEncoding.DecodeString(secret); err != nil {
+		t.Fatalf("AUTH_JWT_SECRET must be base64, got %q: %v", secret, err)
+	}
 
-		t.Fatalf("AUTH_JWT_SECRET must be lowercase hex, got %q", secret)
+	cryptoKey := ""
+	for _, line := range strings.Split(env, "\n") {
+		if v, ok := strings.CutPrefix(line, "CRYPTO_KEY="); ok {
+			cryptoKey = v
+		}
+	}
+
+	key, err := base64.StdEncoding.DecodeString(cryptoKey)
+	if err != nil || len(key) != 32 {
+		t.Fatalf("CRYPTO_KEY must be 32 random bytes as base64, got %q: %v", cryptoKey, err)
+	}
+
+	if strings.Contains(env, "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=") {
+		t.Fatal(".env must not contain the deterministic dev crypto key")
 	}
 
 	example := readFile(t, filepath.Join(out, ".env.example"))
