@@ -38,6 +38,11 @@ jobs:
             **/go.sum
       - name: Build zever CLI
         run: go build -o "$RUNNER_TEMP/zever-bin/zever" ./cmd/zever
+      # Stream G friction gate: the scaffolded project must lint clean under
+      # its own .golangci.yml (mirrors TestRunNewScaffoldsAndBuilds at E2E
+      # level), so the dev-journey step below can run the lint leg.
+      - name: Install golangci-lint
+        run: make setup-golangci-lint && echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Quickstart (mirrors docs/start/quickstart)
         run: |
           set -euo pipefail
@@ -87,3 +92,15 @@ jobs:
           zever routes schema/app.zen
           kill $SRV
           trap - EXIT
+      # Stream G friction regression test (extends the job above, replaces
+      # nothing): the headless 3-command journey `zever new hello && cd hello
+      # && zever dev` (+ curl) in a fresh dir with the default scaffold.
+      # Budget: 600s wall-clock with a warm module cache (warning only —
+      # timing is signal, never red). `zever dev --once` does not exist yet,
+      # so the script gates on dev boot + readiness probe with DEV_TIMEOUT
+      # and notes the gap for stream D2; /hello/world 200 likewise waits on
+      # D2's demo handler (fresh scaffolds 404 by design until handlers are
+      # written) and is recorded, not asserted. Same script runs locally via
+      # `make quickstart-check`.
+      - name: Dev-boot journey (3 commands, timed)
+        run: bash tools/ci-quickstart-dev.sh "$RUNNER_TEMP/zever-bin/zever"

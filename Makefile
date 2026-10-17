@@ -123,6 +123,20 @@ compile-check: ## Verify committed generated code matches the schema (zever comp
 	$(GO) run ./cmd/zever compile --check --backend=zenorm --out examples/json_query/generated examples/json_query/schema/json_query.zen
 	$(GO) run ./cmd/zever compile --check --backend=zenorm --out examples/bulk_upsert/generated examples/bulk_upsert/schema/bulk_upsert.zen
 
+.PHONY: compilefail-check
+compilefail-check: ## Assert typed-Ref misuse fixtures fail to build (stream G gate)
+	bash tools/ci-compilefail.sh
+
+.PHONY: fuzz-smoke-config
+fuzz-smoke-config: ## 60s fuzz smoke for config .env parser targets (override: FUZZTIME=10s, stream G gate)
+	bash tools/ci-env-fuzz-smoke.sh
+
+.PHONY: quickstart-check
+quickstart-check: ## Headless 3-command journey: new -> dev boot -> readiness probe (stream G gate)
+	TMPD="$$(mktemp -d)" && trap 'rm -rf "$$TMPD"' EXIT INT TERM && \
+	go build -o "$$TMPD/zever" ./cmd/zever && \
+	ZEVER_FRAMEWORK_PATH="$(CURDIR)" bash tools/ci-quickstart-dev.sh "$$TMPD/zever"
+
 .PHONY: test-race
 test-race: ## Run tests with the race detector
 	$(GO) test -race ./...
