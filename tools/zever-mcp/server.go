@@ -62,6 +62,8 @@ func newServer() *Server {
 	s.register(compileTool())
 	s.register(schemaTool())
 	s.register(explainTool())
+	s.register(checkTool())
+	s.register(routesTool())
 	s.register(doctorTool())
 	s.register(s.generateTool())
 	return s

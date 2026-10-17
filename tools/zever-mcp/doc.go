@@ -3,6 +3,7 @@
 //
 // It speaks newline-delimited JSON-RPC 2.0 (the MCP stdio transport) and
 // implements the initialize, ping, tools/list and tools/call methods. Tools
-// compile .zen schemas and summarize or explain the resolved IR, so an agent
-// can introspect and validate a zever project without reading compiler source.
+// compile .zen schemas, validate them (zever_check), list their HTTP routes
+// (zever_routes), and summarize or explain the resolved IR, so an agent can
+// introspect and validate a zever project without reading compiler source.
 package main

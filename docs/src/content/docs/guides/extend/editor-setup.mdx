@@ -19,6 +19,20 @@ go install ./tools/zever-lsp
 
 The server takes no config or flags, speaks stdio LSP only, and reports its version in `initialize`'s `serverInfo`.
 
+## Let coding agents use the compiler (MCP)
+
+`tools/zever-mcp` is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server, so Claude Code, Cursor, and other MCP clients can validate and inspect your schemas without shelling out. It is separate from the editor language server and needs no config.
+
+```sh
+go build -o zever-mcp ./tools/zever-mcp
+```
+
+```json title=".mcp.json"
+{ "mcpServers": { "zever": { "command": "/path/to/zever-mcp" } } }
+```
+
+Each read-only tool takes `dir` (a directory of `.zen` files) or `files` (inline sources): `zever_check` validates and returns `ok` or `file:line:col` diagnostics, `zever_routes` lists the HTTP routes as JSON, `zever_schema` and `zever_explain` summarize the resolved schema, and `zever_compile` returns the merged OpenAPI document. `zever_doctor` and `zever_generate` shell out to the `zever` CLI, which must be on `PATH`, and `zever_generate` only applies after a dry-run plan and human approval. The full tool table is in [AI](../../integrations/ai/#give-coding-agents-the-compiler-over-mcp).
+
 ## Connect your editor
 
 <Tabs>
