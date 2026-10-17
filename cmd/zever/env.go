@@ -10,10 +10,9 @@ import (
 
 // resolveServiceEnv builds the service Env for CLI commands: .env/.env.local
 // discovery plus the process environment (see config.FromEnv), with an
-// optional explicit dotenv file --config PATH layered between them: the
-// explicit file wins over discovered dotfiles, the process wins over
-// everything. A missing explicit file is an error; missing discovered files
-// are skipped silently.
+// optional explicit dotenv file layered between them: the explicit file wins
+// over discovered dotfiles, the process wins over everything. A missing
+// explicit file is an error; missing discovered files are skipped silently.
 //
 // The explicit file's ${VAR} references expand against that file only;
 // process-referencing expansion belongs in the discovered .env files.

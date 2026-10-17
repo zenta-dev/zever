@@ -73,7 +73,7 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 - `zever dev`: Watch schemas & source; recompile and restart
 - `zever docs`: Generate man pages and markdown reference docs
 - `zever doctor`: Verify enabled project batteries resolve
-- `zever explain`: Print an operation's declaration location and summary
+- `zever explain`: Print the wiring graph or an operation summary
 - `zever extract`: Extract one module into a standalone service
 - `zever fmt`: Format .zen schemas
 - `zever generate`: Scaffold modules, entities, jobs, schedules, entrypoints
@@ -84,10 +84,11 @@ zever compile schema/app.zen --backend=mcp --out ./gen
 - `zever outbox purge`: Delete processed history
 - `zever outbox status`: Show relay counters
 - `zever outbox`: Inspect and repair the outbox dead-letter queue
-- `zever queue:work`: Run worker entrypoint (default cmd/worker)
 - `zever routes`: List HTTP routes declared by RPCs
-- `zever schedule:run`: Alias for queue:work (worker runs scheduler)
+- `zever schedule run`: Alias for worker (worker runs scheduler)
+- `zever schedule`: Run scheduled jobs via the worker
 - `zever serve`: Run server entrypoint (default cmd/server)
 - `zever tinker`: Live container REPL via tinker shim
 - `zever uninstall`: Remove the zever and zever-lsp binaries
 - `zever upgrade`: Upgrade the zever binary to the latest release
+- `zever worker`: Run worker entrypoint (default cmd/worker)

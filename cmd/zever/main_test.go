@@ -74,7 +74,7 @@ func TestSubcommandHandlers_coversEverySubcommand(t *testing.T) {
 	want := []string{
 		"new", "add", "compile", "doctor", "config", "routes", "check", "breaking", "fmt",
 		"explain", "check-boundaries", "check:boundaries", "graph", "generate", "extract",
-		"serve", "dev", "queue:work", "schedule:run", "tinker", "db", "outbox", "build",
+		"serve", "dev", "worker", "queue:work", "schedule", "schedule:run", "tinker", "db", "outbox", "build",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {
@@ -471,7 +471,9 @@ func TestUseCobra_routing(t *testing.T) {
 		{"extract", []string{"extract", "shop"}, true},
 		{"serve", []string{"serve"}, true},
 		{"dev", []string{"dev"}, true},
+		{"worker", []string{"worker"}, true},
 		{"queue work", []string{"queue:work"}, true},
+		{"schedule", []string{"schedule", "run"}, true},
 		{"schedule run", []string{"schedule:run"}, true},
 		{"tinker", []string{"tinker"}, true},
 		{"bare db", []string{"db"}, true},

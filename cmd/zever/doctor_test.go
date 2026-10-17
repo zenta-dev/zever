@@ -57,13 +57,15 @@ func TestRunDoctorFlagParseError(t *testing.T) {
 }
 
 func TestRunDoctorMissingConfigFile(t *testing.T) {
+	// There is no --config file flag: service config is env-only (.env
+	// discovery + process env), so naming it is flag misuse (exit 2).
 	err := runDoctor([]string{"--config", "nope.yaml"})
 	if err == nil {
-		t.Fatalf("expected error for missing config file, got nil")
+		t.Fatalf("expected error for removed --config flag, got nil")
 	}
 
-	if !strings.Contains(err.Error(), "load config") {
-		t.Fatalf("error = %q, want it attributed to config loading", err.Error())
+	if !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("error = %q, want it to report an unknown flag", err.Error())
 	}
 }
 
@@ -81,10 +83,11 @@ func TestRunDoctorWithCoreListsBatteries(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\nDB_ADAPTER=sqlite\nPASSWORD_ADAPTER=argon2id\nQUEUE_ADAPTER=memory\nWORKFLOW_ADAPTER=memory\n")
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\nDB_ADAPTER=sqlite\nPASSWORD_ADAPTER=argon2id\nQUEUE_ADAPTER=memory\nWORKFLOW_ADAPTER=memory\n")
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
 		t.Fatalf("runDoctorWith: %v", err)
 	}
 
@@ -114,11 +117,12 @@ func TestRunDoctorWithCoreConfigFile(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith with config file: %v", err)
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err != nil {
+		t.Fatalf("runDoctorWith with env file: %v", err)
 	}
 
 	if !strings.Contains(out.String(), "config") {
@@ -127,12 +131,15 @@ func TestRunDoctorWithCoreConfigFile(t *testing.T) {
 }
 
 func TestRunDoctorWithCoreBadConfigFile(t *testing.T) {
+	// A malformed .env in the working directory fails resolution closed:
+	// config is env-only, so there is no file flag to point at.
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", "not: [valid\n")
+	writeInspectFixture(t, dir, ".env", "this line has no equals sign\n")
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
-		t.Fatalf("expected error for unparsable config file, got nil")
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
+		t.Fatalf("expected error for unparsable .env, got nil")
 	}
 }
 

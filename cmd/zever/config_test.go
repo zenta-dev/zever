@@ -56,12 +56,14 @@ func TestRunConfigShowFlagParseError(t *testing.T) {
 }
 
 func TestRunConfigShowMissingConfigFile(t *testing.T) {
+	// There is no --config file flag: service config is env-only, so
+	// naming it is an unknown-flag rejection, never a load error.
 	err := runConfig([]string{"show", "--config", "nope.yaml"})
 	if err == nil {
-		t.Fatal("expected error for missing config file, got nil")
+		t.Fatal("expected error for removed --config flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "load config") {
-		t.Fatalf("error = %q, want it attributed to config loading", err.Error())
+	if !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("error = %q, want it to report an unknown flag", err.Error())
 	}
 }
 
@@ -96,11 +98,12 @@ func TestRunConfigShowWithCoreRedactsSecrets(t *testing.T) {
 
 func TestRunConfigShowWithCoreConfigFile(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runConfigShowWith(ConfigConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
-		t.Fatalf("runConfigShowWith with config file: %v", err)
+	if err := runConfigShowWith(ConfigConfig{Out: &out}); err != nil {
+		t.Fatalf("runConfigShowWith with env file: %v", err)
 	}
 	if !strings.Contains(out.String(), "db") {
 		t.Fatalf("output = %q, want the db service row", out.String())
@@ -108,12 +111,14 @@ func TestRunConfigShowWithCoreConfigFile(t *testing.T) {
 }
 
 func TestRunConfigShowWithCoreBadConfigFile(t *testing.T) {
+	// A malformed .env in the working directory fails resolution closed.
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", "not: [valid\n")
+	writeInspectFixture(t, dir, ".env", "this line has no equals sign\n")
+	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runConfigShowWith(ConfigConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
-		t.Fatal("expected error for unparsable config file, got nil")
+	if err := runConfigShowWith(ConfigConfig{Out: &out}); err == nil {
+		t.Fatal("expected error for unparsable .env, got nil")
 	}
 }
 
@@ -141,4 +146,53 @@ func TestPrintConfigUsageColoredBox(t *testing.T) {
 
 	fs := flag.NewFlagSet("config show", flag.ContinueOnError)
 	printConfigUsage(fs)
+}
+
+// TestRunConfigShowPrintsNamedInstances proves per-instance output:
+// SERVICE__NAME__* env renders a redacted "service/NAME" section beside the
+// default row, and secret values never appear raw.
+func TestRunConfigShowPrintsNamedInstances(t *testing.T) {
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", "DB_ADAPTER=sqlite\nDB__ANALYTICS__ADAPTER=postgres\nDB__ANALYTICS__DSN=postgres://user:s3cret@localhost/db?sslmode=disable\n")
+	t.Chdir(dir)
+
+	var out bytes.Buffer
+	if err := runConfigShowWith(ConfigConfig{Out: &out}); err != nil {
+		t.Fatalf("runConfigShowWith: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "db/ANALYTICS") {
+		t.Fatalf("output missing db/ANALYTICS instance section:\n%s", got)
+	}
+
+	if strings.Contains(got, "s3cret") {
+		t.Fatalf("output leaks instance secret:\n%s", got)
+	}
+}
+
+// TestRunConfigShowTypoEnvHints pins the typo'd-env-var surface: an unknown
+// key under a wired service prefix fails with a did-you-mean hint naming
+// the exact key, so the operator knows what to fix and where.
+func TestRunConfigShowTypoEnvHints(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("DB_MAXCONN", "5")
+
+	var out bytes.Buffer
+	err := runConfigShowWith(ConfigConfig{Out: &out})
+	if err == nil {
+		t.Fatal("runConfigShowWith typo env: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(err.Error(), "DB_MAXCONN") {
+		t.Fatalf("error = %q, want it to name the exact env key", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "did you mean") {
+		t.Fatalf("error = %q, want a did-you-mean hint", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "DB_MAX_CONNS") {
+		t.Fatalf("error = %q, want the corrected env key", err.Error())
+	}
 }

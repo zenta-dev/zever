@@ -96,7 +96,9 @@ var subcommandHandlers = map[string]func([]string) error{
 	"extract":          runExtract,
 	"serve":            runServe,
 	"dev":              runDev,
+	"worker":           runQueueWork,
 	"queue:work":       runQueueWork,
+	"schedule":         runScheduleLegacy,
 	"schedule:run":     runScheduleRun,
 	"tinker":           runTinker,
 	"db":               runDB,
@@ -228,7 +230,7 @@ func run(args []string) error {
 				printFmtUsage(flag.NewFlagSet("fmt", flag.ContinueOnError))
 				return nil
 			case "doctor":
-				fs, _, _ := newDoctorFlagSet()
+				fs, _ := newDoctorFlagSet()
 				printDoctorUsage(fs)
 				return nil
 			case "config":
@@ -269,16 +271,16 @@ func run(args []string) error {
 			case "graph":
 				printGraphUsage(flag.NewFlagSet("graph", flag.ContinueOnError))
 				return nil
-			case "queue:work":
+			case "worker", "queue:work":
 				printUsage()
 
-				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever queue:work -h' for full flags")) //nolint:wsl_v5
+				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever worker -h' for full flags")) //nolint:wsl_v5
 
 				return nil
-			case "schedule:run":
+			case "schedule", "schedule:run":
 				printUsage()
 
-				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever schedule:run -h' for full flags")) //nolint:wsl_v5
+				_, _ = fmt.Fprintln(os.Stderr, formatHint("try 'zever schedule run -h' for full flags")) //nolint:wsl_v5
 
 				return nil
 			}
@@ -333,12 +335,17 @@ func printRoutesUsage(fs *flag.FlagSet) {
 
 // printExplainUsage prints styled help for `zever explain`.
 func printExplainUsage(fs *flag.FlagSet) {
-	header := title("zever explain") + dim(" — print an operation's declaration location and summary")
-	usage := bold("Usage:") + "  " + cmd("zever explain") + dim("  ") + cyan("<Service.Operation|Module.Service.Operation> <files...>")
+	header := title("zever explain") + dim(" — wiring graph or operation summary")
+	usage := bold("Usage:") + "  " + cmd("zever explain") + dim(" [Service|Service/Name|Service.Operation|Module.Service.Operation] [files...]")
 	body := joinLines(
 		header,
 		"",
 		usage,
+		"",
+		"Bare "+cmd("zever explain")+dim(" prints the wiring graph: every ref's"),
+		dim("driver, registered drivers, typed dependencies, and env keys."),
+		dim("A single-segment service (or service/name) scopes it to one ref;"),
+		dim("a dotted path prints one operation's location and summary."),
 		"",
 		bold("Flags:"),
 	)
@@ -346,8 +353,9 @@ func printExplainUsage(fs *flag.FlagSet) {
 	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain")+dim("  # wiring graph for every ref"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain db")+dim("  # one service's wiring"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain UserService.GetUser schema/app.zen"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever explain billing.OrderService.GetOrder schema/*.zen"))
 
 	if shouldShowHint() {
 		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever routes' to list every HTTP route first"))
@@ -402,10 +410,11 @@ func printUsage() {
 	header := title("zever") + dim(" — zever toolkit")
 	usage := bold("Usage:") + "  " + cmd("zever") + dim(" <command> [flags]") + dim("  •  ") + dim("add -i/--interactive for guided prompts")
 
-	sectionScaffold := bold("Scaffolding")
+	sectionStart := bold("Start")
+	sectionBuild := bold("Build")
+	sectionData := bold("Data")
+	sectionRun := bold("Run & ops")
 	sectionInspect := bold("Inspection")
-	sectionRuntime := bold("Runtime")
-	sectionDB := bold("Database")
 	sectionOps := bold("Operations")
 
 	// Columns: command (cyan, padded) + dim description.
@@ -418,41 +427,45 @@ func printUsage() {
 		"",
 		usage,
 		"",
-		sectionScaffold,
+		sectionStart,
 		line("new", "Scaffold a brand new zever application"),
+		line("dev", "Watch schemas & source; recompile and restart"),
+		"",
+		sectionBuild,
 		line("add", "Add one battery to the calling project"),
 		line("generate", "Scaffold modules, entities, jobs, schedules, entrypoints"),
-		line("extract", "Extract one module into a standalone service"),
+		line("fmt", "Format .zen schemas (gofmt-style: -l list, --write rewrite)"),
+		line("check", "Validate .zen schemas only — no output written"),
+		"",
+		sectionData,
+		line("db", "Database commands (db migrate, db rollback, db seed)"),
+		"",
+		sectionRun,
+		line("serve", "Run server entrypoint (default cmd/server)"),
+		line("worker", "Run worker entrypoint (default cmd/worker)"),
+		line("schedule run", "Alias for worker (worker runs scheduler)"),
+		line("doctor", "Resolve enabled project batteries and report "+successMark()+"/"+failMark()),
+		line("upgrade", "Upgrade the zever binary to the latest release"),
 		"",
 		sectionInspect,
 		line("compile", "Compile .zen schemas through backends (atlas, gogen, mcp, openapi, proto, protogogen, zenorm; default: all except mcp)"),
-		line("check", "Validate .zen schemas only — no output written"),
 		line("breaking", "Report API-breaking changes between two schema versions"),
-		line("fmt", "Format .zen schemas (gofmt-style: -l list, --write rewrite)"),
-		line("doctor", "Resolve enabled project batteries and report "+successMark()+"/"+failMark()),
 		line("config show", "Print the resolved config, redacted"),
 		line("routes", "List HTTP routes declared by RPCs"),
-		line("explain", "Print an operation's declaration location and summary"),
+		line("explain", "Print the wiring graph or an operation summary"),
 		line("check-boundaries", "Report cross-module reference violations"),
 		line("graph", "Print Mermaid entity-relation and module diagrams"),
 		"",
-		sectionRuntime,
-		line("serve", "Run server entrypoint (default cmd/server)"),
-		line("dev", "Watch schemas & source; recompile and restart"),
-		line("queue:work", "Run worker entrypoint (default cmd/worker)"),
-		line("schedule:run", "Alias for queue:work (worker runs scheduler)"),
-		line("tinker", "Live container REPL via tinker shim"),
-		"",
-		sectionDB,
-		line("db", "Database commands (db migrate, db rollback, db seed)"),
-		"",
 		sectionOps,
+		line("extract", "Extract one module into a standalone service"),
+		line("tinker", "Live container REPL via tinker shim"),
 		line("completion", "Generate shell completion scripts"),
 		line("docs", "Generate man pages and markdown reference docs"),
 		line("build", "Build a slim CLI with only the adapters you need"),
 		line("outbox", "Inspect and repair the outbox DLQ"),
 		line("uninstall", "Remove the zever and zever-lsp binaries"),
-		line("upgrade", "Upgrade the zever binary to the latest release"),
+		"",
+		dim("Legacy spellings still work but are hidden: queue:work → worker, schedule:run → schedule run, check:boundaries → check-boundaries"),
 		"",
 		bold("Examples:"),
 		dim("  ")+cmd("zever new myapp")+dim("                  # scaffold new app"),

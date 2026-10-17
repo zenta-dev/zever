@@ -332,7 +332,13 @@ func runDBMigrate(args []string) error {
 		return fmt.Errorf("zever db migrate: %w", err)
 	}
 
-	cfg := resolveMigrateConfig(*adapter, *dsn, nil, *dryRun, *dropColumns,
+	// Env-first connection: flags win, unset flags fall back to the
+	// effective env-derived DB config (DB_ADAPTER plus the adapter's DSN or
+	// Path), best-effort. Values are never echoed: failures name the field,
+	// never the DSN.
+	adapterVal, dsnVal := migrateConnFromEnv(*adapter, *dsn, flagWasSet(fs, "adapter"))
+
+	cfg := resolveMigrateConfig(adapterVal, dsnVal, nil, *dryRun, *dropColumns,
 		resolveMigrateSafetyOptions(*lint, *lockTimeout, *statementTimeout, *concurrentIndexes))
 
 	// Config-file fallback for timeouts the flags left unset: db.options
@@ -399,6 +405,46 @@ func runDBMigrate(args []string) error {
 	}
 
 	return applyDiff(cfg.Adapter, cfg.DSN, result.Schema, planOpts, cfg.Lint)
+}
+
+// migrateConnFromEnv applies the env-first connection rule for db migrate:
+// an explicitly-set --adapter/--dsn always wins; otherwise the effective
+// env-derived DB config supplies the adapter (DB_ADAPTER) and the DSN or
+// file path for that adapter. Resolution is best-effort: an unresolvable
+// environment keeps the flag values.
+func migrateConnFromEnv(adapter, dsn string, adapterSet bool) (string, string) {
+	if adapterSet && strings.TrimSpace(dsn) != "" {
+		return adapter, dsn
+	}
+
+	env, err := config.FromEnv()
+	if err != nil {
+		return adapter, dsn
+	}
+
+	resolved, err := config.Resolve(env)
+	if err != nil || resolved == nil {
+		return adapter, dsn
+	}
+
+	if !adapterSet && strings.TrimSpace(resolved.DB.Adapter) != "" {
+		adapter = resolved.DB.Adapter
+	}
+
+	if strings.TrimSpace(dsn) == "" {
+		switch adapter {
+		case "postgres":
+			if strings.TrimSpace(resolved.DB.Options.DSN) != "" {
+				dsn = resolved.DB.Options.DSN
+			}
+		default:
+			if strings.TrimSpace(resolved.DB.Options.Path) != "" {
+				dsn = resolved.DB.Options.Path
+			}
+		}
+	}
+
+	return adapter, dsn
 }
 
 // flagWasSet reports whether a flag was explicitly set on the FlagSet.

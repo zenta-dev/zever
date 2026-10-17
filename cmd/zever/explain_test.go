@@ -24,8 +24,20 @@ service UserService {
 `
 
 func TestRunExplainUsage(t *testing.T) {
-	if err := runExplain(nil); err == nil {
-		t.Fatalf("expected error when no args given, got nil")
+	// Bare `zever explain` prints the wiring graph, not an error.
+	var runErr error
+
+	output := inspectCaptureOutput(t, func() {
+		runErr = runExplain(nil)
+	})
+	if runErr != nil {
+		t.Fatalf("runExplain(nil): %v", runErr)
+	}
+
+	for _, want := range []string{"driver=", "depends:", "env:"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("wiring output = %q, want it to contain %q", output, want)
+		}
 	}
 
 	if err := runExplain([]string{"UserService.GetUser"}); err == nil {
@@ -321,5 +333,94 @@ service OrderService {
 	}
 	if !strings.Contains(err.Error(), "did you mean") {
 		t.Fatalf("error = %q, want qualified suggestion", err.Error())
+	}
+}
+
+func TestRunExplainWiringServiceRef(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	var out bytes.Buffer
+	if err := runExplainWiringWith(ExplainWiringConfig{Ref: "db", Out: &out}); err != nil {
+		t.Fatalf("runExplainWiringWith db: %v", err)
+	}
+
+	for _, want := range []string{"db", "driver=", "depends:", "env:"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("output = %q, want it to contain %q", out.String(), want)
+		}
+	}
+
+	if strings.Contains(out.String(), "queue  driver=") {
+		t.Fatalf("service-scoped output leaks other services:\n%s", out.String())
+	}
+}
+
+func TestRunExplainWiringUnknownService(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	var out bytes.Buffer
+	err := runExplainWiringWith(ExplainWiringConfig{Ref: "dbb", Out: &out})
+	if err == nil {
+		t.Fatalf("expected error for unknown service, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "did you mean") {
+		t.Fatalf("error = %q, want a did-you-mean hint", err.Error())
+	}
+}
+
+func TestRunExplainWiringNamedInstance(t *testing.T) {
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", "DB_ADAPTER=sqlite\nDB__ANALYTICS__ADAPTER=postgres\n")
+	t.Chdir(dir)
+
+	var out bytes.Buffer
+	if err := runExplainWiringWith(ExplainWiringConfig{Out: &out}); err != nil {
+		t.Fatalf("runExplainWiringWith: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "db/ANALYTICS") {
+		t.Fatalf("output missing db/ANALYTICS row:\n%s", out.String())
+	}
+}
+
+func TestRunExplainWiringJSONEnvelope(t *testing.T) {
+	jbuf := mustJSONMode(t)
+	t.Chdir(t.TempDir())
+
+	var human bytes.Buffer
+	if err := runExplainWiringWith(ExplainWiringConfig{Out: &human, JSON: true}); err != nil {
+		t.Fatalf("runExplainWiringWith JSON: %v", err)
+	}
+
+	if human.String() != "" {
+		t.Fatalf("human output = %q in JSON mode, want only the envelope", human.String())
+	}
+
+	env := mustDecodeEnvelope(t, jbuf)
+	if !env.OK || env.Command != "explain" {
+		t.Fatalf("envelope = %+v, want ok explain envelope", env)
+	}
+
+	data := envelopeData(t, env)
+	rows, ok := data["wiring"].([]any)
+	if !ok || len(rows) == 0 {
+		t.Fatalf("data.wiring = %v, want the wiring rows", data["wiring"])
+	}
+}
+
+func TestWiringDependsOnDocumentsScheduler(t *testing.T) {
+	t.Parallel()
+
+	if got := wiringDependsOn("scheduler"); len(got) != 2 || got[0] != "cache" || got[1] != "queue" {
+		t.Fatalf("wiringDependsOn(scheduler) = %v, want [cache queue]", got)
+	}
+
+	if got := wiringDependsOn("job"); len(got) != 1 || got[0] != "queue" {
+		t.Fatalf("wiringDependsOn(job) = %v, want [queue]", got)
+	}
+
+	if got := wiringDependsOn("db"); len(got) != 0 {
+		t.Fatalf("wiringDependsOn(db) = %v, want empty", got)
 	}
 }

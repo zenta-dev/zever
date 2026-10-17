@@ -65,7 +65,7 @@ func TestEveryCommandAppearsInHelp(t *testing.T) {
 	root := newRootCmd()
 	var names []string
 	for _, c := range root.Commands() {
-		if c.Name() == "help" {
+		if c.Name() == "help" || c.Hidden {
 			continue
 		}
 		names = append(names, c.Name())

@@ -1,19 +1,15 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
-)
-
-// errExplainUsage is returned when runExplain is invoked without the
-// dotted path argument and at least one input file.
-var errExplainUsage = errors.New(
-	"zever explain: usage: zever explain <Service.Operation|Module.Service.Operation> <file.zen>",
 )
 
 // ExplainConfig carries every input runExplainWith needs. Screen agents
@@ -37,12 +33,19 @@ type ExplainConfig struct {
 // "Module.Service.Operation" (module-qualified, for disambiguating an
 // operation name that exists in more than one module's service). Matching
 // is exact and case-sensitive on Module.Name/Service.Name/Operation.Name.
+// runExplain prints the wiring graph when invoked bare (`zever explain`),
+// one service's wiring for a single-segment service or service/name ref,
+// and an operation summary for dotted operation paths (see runExplainWith).
 func runExplain(args []string) error {
-	if len(args) < 1 {
-		return errExplainUsage
+	if len(args) == 0 {
+		return runExplainWiringWith(ExplainWiringConfig{JSON: jsonMode})
 	}
 
 	path := args[0]
+
+	if !strings.Contains(path, ".") {
+		return runExplainWiringWith(ExplainWiringConfig{Ref: path, JSON: jsonMode})
+	}
 
 	if err := rejectUnknownFlags("explain", args[1:], nil); err != nil {
 		return err
@@ -268,4 +271,212 @@ func explainErrors(errs []*ir.ErrorCase) string {
 	}
 
 	return strings.Join(names, ", ")
+}
+
+// ExplainWiringConfig carries every input runExplainWiringWith needs. Ref is
+// "" for the full graph, a service name for one service's section, or
+// "service/name" for one named instance. A nil Out defaults to os.Stdout.
+// JSON emits a machine-readable envelope instead of the human graph.
+type ExplainWiringConfig struct {
+	Ref  string
+	Out  io.Writer
+	JSON bool
+}
+
+// wiringDependsOn names the documented container-level typed dependencies:
+// Job builds a dispatcher over the resolved Queue, and the Scheduler shares
+// the process-wide Cache and Queue (resolving Scheduler resolves Queue as a
+// side effect). Every other service resolves standalone.
+func wiringDependsOn(service string) []string {
+	switch service {
+	case "job":
+		return []string{"queue"}
+	case "scheduler":
+		return []string{"cache", "queue"}
+	default:
+		return nil
+	}
+}
+
+// wiringRow is one ref's wiring section, human and JSON alike.
+type wiringRow struct {
+	// Ref is the "service" or "service/NAME" label (see Container.Wired).
+	Ref string `json:"ref"`
+	// Driver is the selected adapter for the ref.
+	Driver string `json:"driver"`
+	// Drivers lists every registered adapter for the service.
+	Drivers []string `json:"drivers"`
+	// Depends lists the ref's typed container dependencies, if any.
+	Depends []string `json:"depends,omitempty"`
+	// Env lists the env keys wiring the ref, in sorted order: the ADAPTER
+	// selector plus every set key under the ref's namespace.
+	Env []string `json:"env"`
+}
+
+// runExplainWiringWith prints the wiring graph: every wired ref's driver,
+// registered drivers, typed dependencies, and env keys. Service config is
+// env-only (see config.FromEnv); refs cover the default instance of every
+// service plus each SERVICE__NAME__* named instance in the environment.
+func runExplainWiringWith(cfg ExplainWiringConfig) error {
+	out := outOrStdout(cfg.Out)
+
+	env, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("zever explain: resolve env: %w", err)
+	}
+
+	resolved, err := config.Resolve(env)
+	if err != nil {
+		return fmt.Errorf("zever explain: resolve config from env: %w", err)
+	}
+
+	services := resolved.RedactedServices()
+	instances := redactedInstances(env, resolved, services)
+
+	rows := buildWiringRows(env, services, instances)
+
+	if cfg.Ref != "" {
+		rows = filterWiringRows(rows, cfg.Ref)
+		if len(rows) == 0 {
+			return wiringNotFoundError(cfg.Ref, services)
+		}
+	}
+
+	if cfg.JSON {
+		emitSuccess("explain", map[string]any{"ref": cfg.Ref, "wiring": rows})
+
+		return nil
+	}
+
+	printWiring(out, rows)
+
+	return nil
+}
+
+// buildWiringRows assembles one row per default instance plus one per named
+// instance, in deterministic (service, name) order.
+func buildWiringRows(env config.Env, services map[string]config.ServiceConfig, instances map[string]config.ServiceConfig) []wiringRow {
+	names := make([]string, 0, len(services))
+	for name := range services {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	var rows []wiringRow
+
+	for _, svc := range names {
+		rows = append(rows, wiringRow{
+			Ref:     svc,
+			Driver:  services[svc].Adapter,
+			Drivers: container.RegisteredAdapters(svc),
+			Depends: wiringDependsOn(svc),
+			Env:     wiringEnvKeys(env, svc, ""),
+		})
+
+		for _, iname := range sortedInstanceNames(instances, svc) {
+			rows = append(rows, wiringRow{
+				Ref:     svc + "/" + iname,
+				Driver:  instances[svc+"/"+iname].Adapter,
+				Drivers: container.RegisteredAdapters(svc),
+				Depends: wiringDependsOn(svc),
+				Env:     wiringEnvKeys(env, svc, iname),
+			})
+		}
+	}
+
+	return rows
+}
+
+// wiringEnvKeys lists the env keys wiring one ref in sorted order: the
+// ADAPTER selector when set, plus every set key under the ref's namespace
+// (SERVICE_ for the default instance, SERVICE__NAME__ for a named one).
+func wiringEnvKeys(env config.Env, svc, name string) []string {
+	var prefix, adapterKey string
+
+	if name == "" {
+		prefix = strings.ToUpper(svc) + "_"
+		adapterKey = strings.ToUpper(svc) + "_ADAPTER"
+	} else {
+		prefix = strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "__"
+		adapterKey = prefix + "ADAPTER"
+	}
+
+	var out []string
+
+	for k := range env {
+		upper := strings.ToUpper(k)
+		if upper == adapterKey || (strings.HasPrefix(upper, prefix) && upper != strings.ToUpper(svc)) {
+			out = append(out, k)
+		}
+	}
+
+	sort.Strings(out)
+
+	return out
+}
+
+// filterWiringRows keeps the row for ref (service or service/name,
+// case-insensitive on both segments) plus, for a bare service, its named
+// instances.
+func filterWiringRows(rows []wiringRow, ref string) []wiringRow {
+	svc, name, _ := strings.Cut(ref, "/")
+
+	var out []wiringRow
+
+	for _, r := range rows {
+		rsvc, rname, _ := strings.Cut(r.Ref, "/")
+		if !strings.EqualFold(rsvc, svc) {
+			continue
+		}
+
+		if name == "" || strings.EqualFold(rname, name) {
+			out = append(out, r)
+		}
+	}
+
+	return out
+}
+
+// wiringNotFoundError builds the unknown-ref error with a did-you-mean hint
+// against every known service label.
+func wiringNotFoundError(ref string, services map[string]config.ServiceConfig) error {
+	known := make([]string, 0, len(services))
+
+	for svc := range services {
+		known = append(known, svc)
+	}
+
+	sort.Strings(known)
+
+	if s := closest(ref, known); s != "" {
+		return fmt.Errorf("zever explain: no service matches %q (did you mean %q?)", ref, s)
+	}
+
+	return fmt.Errorf("zever explain: no service matches %q", ref)
+}
+
+// printWiring prints rows in ref order: driver, registered drivers, typed
+// dependencies, and env keys per ref.
+func printWiring(out io.Writer, rows []wiringRow) {
+	for _, r := range rows {
+		_, _ = fmt.Fprintf(out, "%s  driver=%s\n", cyan(r.Ref), r.Driver)
+
+		if len(r.Drivers) > 0 {
+			_, _ = fmt.Fprintf(out, "  drivers: %s\n", strings.Join(r.Drivers, ", "))
+		}
+
+		deps := "—"
+		if len(r.Depends) > 0 {
+			deps = strings.Join(r.Depends, ", ")
+		}
+
+		_, _ = fmt.Fprintf(out, "  depends: %s\n", deps)
+
+		if len(r.Env) > 0 {
+			_, _ = fmt.Fprintf(out, "  env: %s\n", strings.Join(r.Env, ", "))
+		} else {
+			_, _ = fmt.Fprintf(out, "  env: (defaults; set %s_* to override)\n", strings.ToUpper(strings.SplitN(r.Ref, "/", 2)[0]))
+		}
+	}
 }

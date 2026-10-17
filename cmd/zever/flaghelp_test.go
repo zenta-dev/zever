@@ -61,17 +61,21 @@ func TestLegacyHelpListsJSONAndRealFlags(t *testing.T) {
 		}
 	})
 
-	for _, want := range []string{"--config string", "--strict"} {
+	for _, want := range []string{"--strict"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("help doctor missing %q:\n%s", want, out)
 		}
+	}
+
+	if strings.Contains(out, "--config") {
+		t.Errorf("help doctor still lists removed --config:\n%s", out)
 	}
 }
 
 func TestCobraHelpListsDocumentedFlags(t *testing.T) {
 	// Not parallel: Cobra's PersistentPreRun writes package-level mode vars.
 	for sub, wants := range map[string][]string{
-		"doctor": {"--config", "--strict", "--json"},
+		"doctor": {"--strict", "--json"},
 		"fmt":    {"--write", "--list", "--json"},
 		"new":    {"--adapters", "--profile", "--json"},
 	} {

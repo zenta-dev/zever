@@ -105,11 +105,6 @@ func completeBuildAdapters(_ *cobra.Command, _ []string, toComplete string) ([]s
 	return out, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 }
 
-// completeConfigFiles completes --config with YAML/JSON files.
-func completeConfigFiles(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-	return []string{"yaml", "yml", "json"}, cobra.ShellCompDirectiveFilterFileExt
-}
-
 func filterPrefix(all []string, prefix string) []string {
 	out := make([]string, 0, len(all))
 
@@ -212,10 +207,4 @@ func registerCompletions(root *cobra.Command) {
 	set(withFlagValues(completeNothing, map[string]cobra.CompletionFunc{
 		"adapters": completeBuildAdapters,
 	}), "build")
-	set(withFlagValues(completeNothing, map[string]cobra.CompletionFunc{
-		"config": completeConfigFiles,
-	}), "doctor")
-	set(withFlagValues(completeNothing, map[string]cobra.CompletionFunc{
-		"config": completeConfigFiles,
-	}), "config", "show")
 }

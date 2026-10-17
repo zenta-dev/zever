@@ -382,8 +382,8 @@ func TestUnknownFlagsRejectedWithSuggestion(t *testing.T) {
 		{"graph", func() error { return runGraph([]string{"--bogus"}) }, "unknown flag"},
 		{"check", func() error { return runCheck([]string{"--bogus"}) }, "unknown flag"},
 		{"boundaries", func() error { return runCheckBoundaries([]string{"--bogus"}) }, "unknown flag"},
-		{"config show", func() error { return runConfigShow([]string{"--confg"}) }, "--config"},
-		{"doctor", func() error { return runDoctor([]string{"--confg"}) }, "--config"},
+		{"config show", func() error { return runConfigShow([]string{"--confg"}) }, "unknown flag"},
+		{"doctor", func() error { return runDoctor([]string{"--confg"}) }, "unknown flag"},
 		{"breaking", func() error { return runBreaking([]string{"--bogus", "--", "a.zen"}) }, "unknown flag"},
 	}
 

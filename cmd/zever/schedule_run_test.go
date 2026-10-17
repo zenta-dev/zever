@@ -32,8 +32,8 @@ func TestRunScheduleRunHelpStatesTheAlias(t *testing.T) {
 		t.Fatalf("-h launched a child: %+v", *calls)
 	}
 
-	if got := scheduleRunHelp; !strings.Contains(got, "alias for queue:work") {
-		t.Fatalf("schedule:run help must state the alias plainly:\n%s", got)
+	if got := scheduleRunHelp; !strings.Contains(got, "alias for worker") {
+		t.Fatalf("schedule run help must state the alias plainly:\n%s", got)
 	}
 }
 

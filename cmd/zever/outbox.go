@@ -98,18 +98,16 @@ func runOutboxDLQ(args []string) error {
 // outboxFlags holds the shared connection flags every outbox subcommand
 // accepts.
 type outboxFlags struct {
-	dsn    *string
-	table  *string
-	config *string
+	dsn   *string
+	table *string
 }
 
 // newOutboxFlagSet builds the shared outbox connection flags for name.
 func newOutboxFlagSet(name string) (*flag.FlagSet, outboxFlags) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	f := outboxFlags{
-		dsn:    fs.String("dsn", "", "postgres DSN or sqlite path; default: OUTBOX_DSN env"),
-		table:  fs.String("table", "", `outbox table name; default: OUTBOX_TABLE env or "outbox"`),
-		config: fs.String("config", "", "dotenv file path (default: .env/.env.local discovery + process env)"),
+		dsn:   fs.String("dsn", "", "postgres DSN or sqlite path; default: OUTBOX_DSN env"),
+		table: fs.String("table", "", `outbox table name; default: OUTBOX_TABLE env or "outbox"`),
 	}
 
 	return fs, f
@@ -121,13 +119,13 @@ type outboxTarget struct {
 	Table string
 }
 
-// resolveOutboxTarget loads the outbox section from configPath (empty means
-// .env/.env.local discovery plus the process environment; non-empty layers
-// that dotenv file in between) and applies the --dsn/--table flag overrides.
-func resolveOutboxTarget(configPath, dsn, table string) (outboxTarget, error) {
-	cfg, err := resolveServiceConfig(configPath)
+// resolveOutboxTarget loads the outbox section from .env/.env.local
+// discovery plus the process environment (see config.FromEnv) and applies
+// the --dsn/--table flag overrides.
+func resolveOutboxTarget(dsn, table string) (outboxTarget, error) {
+	cfg, err := resolveServiceConfig("")
 	if err != nil {
-		return outboxTarget{}, fmt.Errorf("zever outbox: load config %q: %w", configPath, err)
+		return outboxTarget{}, fmt.Errorf("zever outbox: resolve config from env: %w", err)
 	}
 
 	opts := cfg.Outbox.Options
@@ -203,7 +201,7 @@ func runOutboxStatus(args []string) error {
 		return err
 	}
 
-	target, err := resolveOutboxTarget(*flags.config, *flags.dsn, *flags.table)
+	target, err := resolveOutboxTarget(*flags.dsn, *flags.table)
 	if err != nil {
 		return err
 	}
@@ -250,7 +248,7 @@ func runOutboxDLQList(args []string) error {
 		return err
 	}
 
-	target, err := resolveOutboxTarget(*flags.config, *flags.dsn, *flags.table)
+	target, err := resolveOutboxTarget(*flags.dsn, *flags.table)
 	if err != nil {
 		return err
 	}
@@ -304,7 +302,7 @@ func runOutboxDLQRequeue(args []string) error {
 		return errors.New("zever outbox dlq requeue: specify exactly one of --id or --all")
 	}
 
-	target, err := resolveOutboxTarget(*flags.config, *flags.dsn, *flags.table)
+	target, err := resolveOutboxTarget(*flags.dsn, *flags.table)
 	if err != nil {
 		return err
 	}
@@ -360,7 +358,7 @@ func runOutboxDLQPurge(args []string) error {
 		return errors.New("zever outbox dlq purge: --id is required")
 	}
 
-	target, err := resolveOutboxTarget(*flags.config, *flags.dsn, *flags.table)
+	target, err := resolveOutboxTarget(*flags.dsn, *flags.table)
 	if err != nil {
 		return err
 	}
@@ -421,7 +419,7 @@ func runOutboxPurge(args []string) error {
 		return errors.New("zever outbox purge: --before must not be negative")
 	}
 
-	target, err := resolveOutboxTarget(*flags.config, *flags.dsn, *flags.table)
+	target, err := resolveOutboxTarget(*flags.dsn, *flags.table)
 	if err != nil {
 		return err
 	}
@@ -510,7 +508,6 @@ func printOutboxUsage() {
 		bold("Connection flags:"),
 		line("--dsn", "postgres DSN or sqlite path (default: OUTBOX_DSN env)"),
 		line("--table", `outbox table name (default: OUTBOX_TABLE env or "outbox")`),
-		line("--config", "dotenv file path (default: .env/.env.local discovery + process env)"),
 		"",
 		dim("Run '")+cmd("zever outbox <subcommand> -h")+dim("' for flags  •  ")+hint("tip: ")+dim("use --json for machine-readable output"),
 	)

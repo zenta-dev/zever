@@ -130,9 +130,15 @@ func TestCompleteAdaptersFlags(t *testing.T) {
 func TestCompleteFlagNames(t *testing.T) {
 	// Not parallel: Cobra's PersistentPreRun writes package-level mode vars.
 	cands, _ := completeLines(t, "doctor", "--")
-	for _, want := range []string{"--config", "--strict", "--json"} {
+	for _, want := range []string{"--strict", "--json"} {
 		if !hasCand(cands, want) {
 			t.Errorf("doctor flag names %v missing %q", cands, want)
+		}
+	}
+
+	for _, gone := range []string{"--config"} {
+		if hasCand(cands, gone) {
+			t.Errorf("doctor flag names %v still offer removed %q", cands, gone)
 		}
 	}
 }
