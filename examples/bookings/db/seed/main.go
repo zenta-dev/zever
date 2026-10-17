@@ -2,7 +2,7 @@
 //
 // Hand-written to match the `zever generate seed` shape. Run it against a
 // database that `zever db migrate` has already created the tables in. The
-// container is wired here directly (config.Load + explicit adapter
+// container is wired here directly (config.Resolve + explicit adapter
 // registration) so this track stays disjoint from the sibling server track
 // that owns internal/app.
 package main
@@ -65,7 +65,11 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("seed: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return fmt.Errorf("seed: load config: %w", err)
 	}

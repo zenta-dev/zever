@@ -202,7 +202,7 @@ func TestRunGenerateWorkerRefusesToClobberWithoutForce(t *testing.T) {
 	}
 }
 
-func TestRunGenerateWorkerHonoursProjectConfig(t *testing.T) {
+func TestRunGenerateWorkerIgnoresLegacyProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
@@ -213,7 +213,7 @@ func TestRunGenerateWorkerHonoursProjectConfig(t *testing.T) {
 		t.Fatalf("write zever.yaml: %v", err)
 	}
 
-	path := filepath.Join(dir, "zen", "nested", "shop.zen")
+	path := filepath.Join(dir, "schema", "shop.zen")
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -227,11 +227,12 @@ func TestRunGenerateWorkerHonoursProjectConfig(t *testing.T) {
 		t.Fatalf("runGenerateWorker: %v", err)
 	}
 
-	// The schema directory is walked recursively.
-	main := readGenerated(t, filepath.Join(dir, "cmd", "jobs", "main.go"))
+	// Legacy layout tables are ignored: the worker lands at the default
+	// entry, compiled from the default schema dir.
+	main := readGenerated(t, filepath.Join(dir, "cmd", "worker", "main.go"))
 
 	if !strings.Contains(main, `job.Register("Ship"`) {
-		t.Fatalf("nested schema file was not compiled:\n%s", main)
+		t.Fatalf("schema file was not compiled:\n%s", main)
 	}
 }
 

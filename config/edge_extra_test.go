@@ -48,16 +48,15 @@ func TestRedactedServicesPluginCorruptOptions(t *testing.T) {
 	}
 }
 
-// TestLoadVeryLongValue is the string-length boundary: a 1 MiB env value for
+// TestResolveVeryLongValue is the string-length boundary: a 1 MiB env value for
 // a string field must be accepted without truncation.
-func TestLoadVeryLongValue(t *testing.T) {
-	seedHostileEnv(t)
+func TestResolveVeryLongValue(t *testing.T) {
+	t.Parallel()
 	long := strings.Repeat("x", 1<<20)
-	t.Setenv("STORAGE_ROOT", long)
 
-	cfg, err := Load("")
+	cfg, err := Resolve(Env{"STORAGE_ROOT": long})
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if cfg.Storage.Options.Root != long {
 		t.Fatalf("value truncated: got %d bytes, want %d", len(cfg.Storage.Options.Root), len(long))

@@ -14,7 +14,7 @@ func TestRunDBSeedUsesDefaultSeedEntry(t *testing.T) {
 	assertOneLaunch(t, calls, defaultSeedEntry, []string{"--truncate"})
 }
 
-func TestRunDBSeedUsesConfiguredSeedEntry(t *testing.T) {
+func TestRunDBSeedIgnoresLegacySeedEntry(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.json", `{"project":{"seed_entry":"db/fixtures"}}`)
 	t.Chdir(dir)
@@ -25,7 +25,7 @@ func TestRunDBSeedUsesConfiguredSeedEntry(t *testing.T) {
 		t.Fatalf("runDBSeed: %v", err)
 	}
 
-	assertOneLaunch(t, calls, "db/fixtures", nil)
+	assertOneLaunch(t, calls, defaultSeedEntry, nil)
 }
 
 // TestRunDBSeedThroughDispatcher proves `zever db seed` reaches runDBSeed via
@@ -67,19 +67,19 @@ func TestResolveSeedConfig(t *testing.T) {
 	}
 }
 
-// TestRunDBSeedBadConfig proves a broken project file surfaces as an error.
-func TestRunDBSeedBadConfig(t *testing.T) {
+// TestRunDBSeedIgnoresBadLegacyConfig proves a broken legacy project file
+// no longer surfaces: layout is defaults-only, so the default seed entry
+// launches.
+func TestRunDBSeedIgnoresBadLegacyConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.json", "{bad json")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
 
-	if err := runDBSeed(nil); err == nil {
-		t.Fatal("expected a config error, got nil")
+	if err := runDBSeed(nil); err != nil {
+		t.Fatalf("runDBSeed: %v", err)
 	}
 
-	if len(*calls) != 0 {
-		t.Fatalf("bad config launched a child: %+v", *calls)
-	}
+	assertOneLaunch(t, calls, defaultSeedEntry, nil)
 }

@@ -5,8 +5,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"go.yaml.in/yaml/v3"
 )
 
 // TestProfileBatteriesKnown proves every --profile name resolves to a battery
@@ -128,8 +126,8 @@ func equalStringSlices(a, b []string) bool {
 }
 
 // TestProfileAPIScaffoldWiresBatteries proves the api preset flows end to
-// end: profile extras merged through batteriesFor land in zever.yaml with
-// default adapters.
+// end: profile extras merged through batteriesFor land in internal/app/app.go
+// with default adapters.
 func TestProfileAPIScaffoldWiresBatteries(t *testing.T) {
 	t.Parallel()
 
@@ -145,20 +143,10 @@ func TestProfileAPIScaffoldWiresBatteries(t *testing.T) {
 		t.Fatalf("writeNewProject: %v", err)
 	}
 
-	var doc map[string]batteryYAML
-	if err := yaml.Unmarshal([]byte(readFile(t, filepath.Join(cfg.OutDir, "zever.yaml"))), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
-
+	appGo := readFile(t, filepath.Join(cfg.OutDir, "internal", "app", "app.go"))
 	for _, want := range append([]string(nil), apiProfileBatteries...) {
-		entry, ok := doc[want]
-		if !ok {
-			t.Errorf("zever.yaml lacks api battery %q", want)
-			continue
-		}
-
-		if entry.Adapter != defaultServiceAdapter(want) {
-			t.Errorf("zever.yaml %s adapter = %q, want default %q", want, entry.Adapter, defaultServiceAdapter(want))
+		if !strings.Contains(appGo, "/"+want+"/") {
+			t.Errorf("app.go lacks api battery %q", want)
 		}
 	}
 }

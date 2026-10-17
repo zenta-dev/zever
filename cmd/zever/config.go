@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-
-	"github.com/zenta-dev/zever/config"
 )
 
 // errConfigUnknownSubcommand is returned when `zever config` is given no
@@ -16,10 +14,10 @@ var errConfigUnknownSubcommand = errors.New("zever config: missing subcommand (w
 
 // ConfigConfig carries every input runConfigShowWith needs. Screen agents
 // build it from huh forms; the flag shell (runConfigShow) builds it from
-// argv. An empty ConfigPath runs config.Load(""), which discovers
-// zever.yaml/.yml/.json in the working directory and applies env overrides.
-// A nil Out defaults to os.Stdout. JSON emits a machine-readable envelope
-// instead of the human adapter list.
+// argv. An empty ConfigPath resolves service config from .env/.env.local
+// discovery plus the process environment; a non-empty one layers that
+// dotenv file in between. A nil Out defaults to os.Stdout. JSON emits a
+// machine-readable envelope instead of the human adapter list.
 type ConfigConfig struct {
 	ConfigPath string
 	Out        io.Writer
@@ -70,8 +68,8 @@ func printConfigUsage(fs *flag.FlagSet) {
 	printFlagDefaults(fs)
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show")+dim("  # print discovered config + env, redacted"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show --config zever.yaml"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show")+dim("  # print resolved service config + env, redacted"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever config show --config .env"))
 }
 
 // runConfigShow builds a ConfigConfig from argv and runs runConfigShowWith.
@@ -85,7 +83,7 @@ func runConfigShow(args []string) error {
 	}
 
 	fs := flag.NewFlagSet("config show", flag.ContinueOnError)
-	configPath := fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
+	configPath := fs.String("config", "", "optional dotenv file path (default: .env/.env.local discovery + process env)")
 	fs.Usage = func() { printConfigUsage(fs) }
 
 	if err := rejectUnknownFlags("config show", args, []string{"config"}); err != nil {
@@ -99,11 +97,10 @@ func runConfigShow(args []string) error {
 	return runConfigShowWith(ConfigConfig{ConfigPath: *configPath, JSON: jsonMode})
 }
 
-// runConfigShowWith resolves cfg through config.Load(cfg.ConfigPath) --
-// config.Load("") discovers zever.yaml/.yml/.json in the working directory
-// and applies env overrides, matching how the container resolves config --
-// and prints one "<service>: adapter=<x>" header per battery, followed by its
-// redacted option fields, to cfg.Out.
+// runConfigShowWith resolves cfg through resolveServiceConfig --
+// .env/.env.local discovery plus the process environment (matching how the
+// container resolves config) -- and prints one "<service>: adapter=<x>"
+// header per battery, followed by its redacted option fields, to cfg.Out.
 //
 // No secrets ever reach cfg.Out: config.Config.RedactedServices is the sole
 // display path, and it replaces every sensitive field with
@@ -111,7 +108,7 @@ func runConfigShow(args []string) error {
 func runConfigShowWith(cfg ConfigConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	resolved, err := config.Load(cfg.ConfigPath)
+	resolved, err := resolveServiceConfig(cfg.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("zever config show: load config %q: %w", cfg.ConfigPath, err)
 	}

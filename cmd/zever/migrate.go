@@ -415,14 +415,18 @@ func flagWasSet(fs *flag.FlagSet, name string) bool {
 }
 
 // applyConfigTimeoutFallback fills timeouts the flags left unset from the
-// config file's db.options (file or DB_* env), best-effort: no config file,
-// or an unloadable one, keeps the flag values (zero disables).
+// resolved service config's db options (OUTBOX_* / DB_* env), best-effort:
+// an unresolvable config keeps the flag values (zero disables).
 func applyConfigTimeoutFallback(cfg *MigrateConfig) {
 	if cfg.LockTimeout != 0 && cfg.StatementTimeout != 0 {
 		return
 	}
 
-	fileCfg, loadErr := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return
+	}
+	fileCfg, loadErr := config.Resolve(env)
 	if loadErr != nil || fileCfg == nil {
 		return
 	}

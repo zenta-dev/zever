@@ -11,23 +11,24 @@ func TestClosure3SeedStubRender(t *testing.T) {
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/app")
 
-	// Newline generated_dir breaks the stub's gofmt; --force gets past the
-	// entrypoint collision so the stub render is what fails.
+	// Legacy project tables are ignored: a newline generated_dir no longer
+	// reaches generation, so the seed scaffolds at the default location.
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  generated_dir: \"a\\nb\"\n")
 
-	if err := runGenerateSeed([]string{"--force"}); err == nil {
-		t.Fatal("want stub render error")
+	if err := runGenerateSeed([]string{"--force"}); err != nil {
+		t.Fatalf("legacy project table must not fail generation: %v", err)
 	}
 
 	if err := os.Remove(filepath.Join(dir, "zever.yaml")); err != nil {
 		t.Fatal(err)
 	}
 
-	// loadProjectConfig error inside runGenerateSeed.
+	// Legacy config files are ignored: loadProjectConfig returns defaults
+	// even with a malformed zever.yaml present.
 	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
 
-	if err := runGenerateSeed(nil); err == nil {
-		t.Fatal("want project error")
+	if _, err := loadProjectConfig(); err != nil {
+		t.Fatalf("legacy file must not fail project load: %v", err)
 	}
 }
 

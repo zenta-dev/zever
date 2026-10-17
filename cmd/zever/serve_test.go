@@ -82,10 +82,10 @@ func TestRunServeUsesDefaultServerEntry(t *testing.T) {
 	assertOneLaunch(t, calls, defaultServerEntry, []string{"-addr", ":9090"})
 }
 
-func TestRunServeUsesConfiguredServerEntry(t *testing.T) {
+func TestRunServeIgnoresLegacyServerEntry(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  server_entry: cmd/api\n")
-	writeServePreflight(t, dir, "cmd/api")
+	writeServePreflight(t, dir, defaultServerEntry)
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
@@ -94,7 +94,7 @@ func TestRunServeUsesConfiguredServerEntry(t *testing.T) {
 		t.Fatalf("runServe: %v", err)
 	}
 
-	assertOneLaunch(t, calls, "cmd/api", nil)
+	assertOneLaunch(t, calls, defaultServerEntry, nil)
 }
 
 func TestRunServePropagatesLaunchError(t *testing.T) {
@@ -169,20 +169,20 @@ func TestResolveServeConfig(t *testing.T) {
 	}
 }
 
-// TestRunServeBadConfig proves a broken project file surfaces as an error
-// instead of launching with half-decoded layout.
-func TestRunServeBadConfig(t *testing.T) {
+// TestRunServeIgnoresBadLegacyConfig proves a broken legacy project file
+// no longer surfaces: layout is defaults-only, so the default entry
+// launches.
+func TestRunServeIgnoresBadLegacyConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  server_entry: [unclosed\n")
+	writeServePreflight(t, dir, defaultServerEntry)
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
 
-	if err := runServe(nil); err == nil {
-		t.Fatal("expected a config error, got nil")
+	if err := runServe(nil); err != nil {
+		t.Fatalf("runServe: %v", err)
 	}
 
-	if len(*calls) != 0 {
-		t.Fatalf("bad config launched a child: %+v", *calls)
-	}
+	assertOneLaunch(t, calls, defaultServerEntry, nil)
 }

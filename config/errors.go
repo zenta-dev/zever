@@ -14,14 +14,8 @@ var ErrUnknownField = errors.New("config: unknown field")
 // ErrUnknownAdapter reports an adapter name with no registered factory.
 var ErrUnknownAdapter = errors.New("config: unknown adapter")
 
-// ErrUnsupportedFormat reports a config file extension this package cannot decode.
-var ErrUnsupportedFormat = errors.New("config: unsupported format")
-
 // ErrInvalidOptions reports service options that fail validation.
 var ErrInvalidOptions = errors.New("config: invalid options")
-
-// ErrDecode reports a failure to decode a service's options.
-var ErrDecode = errors.New("config: decode")
 
 // ErrInvalidPlugin indicates a plugin validator is invalid.
 var ErrInvalidPlugin = errors.New("config: invalid plugin")
@@ -105,24 +99,6 @@ func (e *UnknownAdapterError) Error() string {
 // Unwrap exposes ErrUnknownAdapter for errors.Is.
 func (e *UnknownAdapterError) Unwrap() error {
 	return ErrUnknownAdapter
-}
-
-// DecodeError carries the underlying failure from decoding a service's options.
-type DecodeError struct {
-	// Service is the service whose options failed to decode.
-	Service string
-	// Err is the underlying decode failure.
-	Err error
-}
-
-// Error describes which service failed to decode and why.
-func (e *DecodeError) Error() string {
-	return fmt.Sprintf("config: decode %s: %v", e.Service, e.Err)
-}
-
-// Unwrap exposes the underlying decode failure for errors.Is and errors.As.
-func (e *DecodeError) Unwrap() error {
-	return e.Err
 }
 
 // InvalidOptionsError carries the validation reason for a service's options.

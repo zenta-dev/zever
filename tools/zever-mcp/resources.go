@@ -53,9 +53,9 @@ var staticResources = []resourceDef{
 		MimeType:    "text/markdown",
 		Text: "# zever doctor guide\n" +
 			"\n" +
-			"Each FAIL row names a battery that failed to resolve. Fix it in " +
-			"`zever.yaml` under that battery's key, or via the matching " +
-			"`ZEVER_*` environment variable. A battery needing a secret " +
+			"Each FAIL row names a battery that failed to resolve. Fix it " +
+			"via the matching `<SERVICE>_*` environment variable " +
+			"(for example DB_ADAPTER, AUTH_JWT_SECRET). A battery needing a secret " +
 			"(for example auth/jwt with no configured secret) fails " +
 			"expectedly: supply the secret, never invent one.\n" +
 			"Pass `--strict` to gate CI on zero FAIL rows.\n",

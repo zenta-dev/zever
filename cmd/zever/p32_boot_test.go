@@ -17,14 +17,12 @@ func TestP32ScaffoldBoots(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	yamlContent := readFile(t, "bootapp/zever.yaml")
+	appGo := readFile(t, "bootapp/internal/app/app.go")
 	for _, b := range []string{"log", "router", "auth", "permission", "observability", "db", "ratelimit"} {
-		if !strings.Contains(yamlContent, b+":") {
-			t.Errorf("zever.yaml missing boot-required battery %q:\n%s", b, yamlContent)
+		if !strings.Contains(appGo, "/"+b+"/") {
+			t.Errorf("app.go missing boot-required battery %q", b)
 		}
 	}
-
-	appGo := readFile(t, "bootapp/internal/app/app.go")
 	for _, frag := range []string{"authjwt.Register()", "permissionnoop.Register()", "observabilitystdout.Register()", "dbsqlite.Register()", "ratelimitmemory.Register()"} {
 		if !strings.Contains(appGo, frag) {
 			t.Errorf("app.go missing %q", frag)

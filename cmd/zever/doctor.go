@@ -16,9 +16,9 @@ import (
 
 // DoctorConfig carries every input runDoctorWith needs. Screen agents build
 // it from huh forms; the flag shell (runDoctor) builds it from argv. An
-// empty ConfigPath runs config.Load(""), which discovers
-// zever.yaml/.yml/.json in the working directory and applies env overrides.
-// A nil Out defaults to os.Stdout.
+// empty ConfigPath resolves service config from .env/.env.local discovery
+// plus the process environment; a non-empty one layers that dotenv file in
+// between. A nil Out defaults to os.Stdout.
 type DoctorConfig struct {
 	ConfigPath string
 	Out        io.Writer
@@ -40,13 +40,12 @@ func printDoctorUsage(fs *flag.FlagSet) {
 		"",
 		usage,
 		"",
-		"Only the services enabled in the project config are checked: the",
-		"top-level batteries in zever.yaml/.yml/.json (same discovery as",
-		"config.Load and serve). In a project with a server entrypoint the",
+		"Every known battery is checked, resolved from service",
+		"env (<SERVICE>_<FIELD>, e.g. DB_ADAPTER, AUTH_JWT_SECRET).",
+		"In a project with a server entrypoint the",
 		"checks run inside the built server ("+cmd("go run <entry> --doctor")+")",
 		"against its real container and registrations; otherwise they run in",
-		"the CLI with a note. Without a project config every battery is",
-		"checked, also with a note.",
+		"the CLI with a note.",
 		"",
 		"Shared-pool MaxConns mismatches (a borrower capped differently",
 		"from the first opener) print as pool warnings with the",
@@ -66,11 +65,11 @@ func printDoctorUsage(fs *flag.FlagSet) {
 	_, _ = fmt.Fprintln(fs.Output(), "")
 	_, _ = fmt.Fprintln(fs.Output(), dim("Examples:"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor")+dim("  # verify enabled project batteries"))
-	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor --config zever.yaml"))
+	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor --config .env"))
 	_, _ = fmt.Fprintln(fs.Output(), dim("  ")+cmd("zever doctor -i")+dim("  # guided mode"))
 
 	if shouldShowHint() {
-		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever doctor' after editing ZEVER_* env"))
+		_, _ = fmt.Fprintln(fs.Output(), formatHint("run 'zever doctor' after editing service env"))
 	}
 }
 
@@ -78,16 +77,15 @@ func printDoctorUsage(fs *flag.FlagSet) {
 // every help path so `zever help doctor` lists the real flags.
 func newDoctorFlagSet() (fs *flag.FlagSet, configPath *string, strict *bool) {
 	fs = flag.NewFlagSet("doctor", flag.ContinueOnError)
-	configPath = fs.String("config", "", "optional config file path (default: discover zever.yaml/.yml/.json + env)")
+	configPath = fs.String("config", "", "optional dotenv file path (default: .env/.env.local discovery + process env)")
 	strict = fs.Bool("strict", false, "accepted for compatibility; failures now always exit non-zero")
 	fs.Usage = func() { printDoctorUsage(fs) }
 
 	return fs, configPath, strict
 }
 
-// runDoctor builds a Container from config.Load(path) (which discovers
-// zever.yaml/.yml/.json and applies env when --config is absent) and checks
-// only the project's enabled batteries (see doctorScope), printing
+// runDoctor builds a Container from the resolved service config (see
+// resolveServiceConfig) and checks the project's batteries, printing
 // "<battery>: OK" or "<battery>: FAIL: <err>" for each. Every Container
 // accessor here follows the same (T, error) shape, so a FAIL for a battery
 // that needs security material it can't safely invent (e.g. auth/jwt with no
@@ -208,34 +206,13 @@ type doctorScope struct {
 	note string
 }
 
-// resolveDoctorScope locates the project the same way serve does:
-// discoverServeConfig probes zever.yaml/.yml/.json in the working directory
-// (first match wins), and serveYamlBatteries reads its top-level service
-// keys — exactly the batteries `zever new` wrote, since the scaffold emits
-// one stanza per enabled battery and nothing else. An explicit --config path
-// pins the file instead of discovery. With no file at all every battery is
-// checked and the note says so.
+// resolveDoctorScope plans which batteries to check. Service configuration
+// is env-only, so no file lists the enabled set: every known battery is
+// checked (nil enabled). The server entrypoint still comes from the project
+// layout: when a built server exists the checks run inside it.
 func resolveDoctorScope(configPath string) doctorScope {
-	path := configPath
-	if path == "" {
-		path = discoverServeConfig()
-	}
-
-	if path == "" {
-		return doctorScope{source: "cli", note: "no project config found (zever.yaml/.yml/.json) — checking all batteries"}
-	}
-
-	keys, err := serveYamlBatteries(path)
-	if err != nil {
-		return doctorScope{source: "cli", note: fmt.Sprintf("could not read batteries from %s — checking all batteries", path)}
-	}
-
-	enabled := make(map[string]bool, len(keys))
-	for _, k := range keys {
-		enabled[k] = true
-	}
-
-	scope := doctorScope{enabled: enabled, source: "cli"}
+	_ = configPath
+	scope := doctorScope{source: "cli"}
 
 	entry := defaultServerEntry
 	if pc, err := loadProjectConfig(); err == nil && strings.TrimSpace(pc.ServerEntry) != "" {
@@ -352,7 +329,7 @@ func runDoctorWith(cfg DoctorConfig) error {
 func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	resolved, err := config.Load(cfg.ConfigPath)
+	resolved, err := resolveServiceConfig(cfg.ConfigPath)
 	if err != nil {
 		return fmt.Errorf("zever doctor: load config %q: %w", cfg.ConfigPath, err)
 	}
@@ -468,7 +445,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	if failed {
 		summary := fmt.Sprintf("%d OK, %d %s", okCount, failCount, failure("FAIL"))
 		_, _ = fmt.Fprintln(out, dim("Summary: ")+summary)
-		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — check config or ZEVER_* env"))
+		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — check service env (e.g. DB_ADAPTER, AUTH_JWT_SECRET)"))
 		_, _ = fmt.Fprintln(os.Stderr, dim("zever doctor: one or more batteries failed to resolve (see above)"))
 
 		return fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(rows))

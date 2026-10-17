@@ -770,13 +770,10 @@ func TestClosure2WorkerFaults(t *testing.T) {
 		t.Fatal("want stubs error")
 	}
 
-	// runGenerateWorker loadProjectConfig error.
+	// Legacy config files are ignored: a malformed zever.yaml must not
+	// fail worker generation at project load.
 	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
 	_ = os.Chmod(svc, 0o750)
-
-	if err := runGenerateWorker(nil); err == nil {
-		t.Fatal("want project error")
-	}
 
 	if err := os.Remove(filepath.Join(dir, "zever.yaml")); err != nil {
 		t.Fatal(err)
@@ -910,11 +907,12 @@ func TestClosure2SeedRender(t *testing.T) {
 
 	_ = os.Chmod(svc, 0o750)
 
-	// Stub render error via crafted project config: newline generated_dir.
+	// Legacy project config is ignored: a crafted generated_dir no longer
+	// reaches generation, so the seed scaffolds at the default location.
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  generated_dir: \"a\\nb\"\n")
 
-	if err := runGenerateSeed(nil); err == nil {
-		t.Fatal("want stub render error")
+	if err := runGenerateSeed([]string{"--force"}); err != nil {
+		t.Fatalf("legacy project table must not fail generation: %v", err)
 	}
 
 	if err := os.Remove(filepath.Join(dir, "zever.yaml")); err != nil {
@@ -1040,7 +1038,6 @@ func TestClosure2WriteNewProjectTable(t *testing.T) {
 		{".gitignore", true},
 		{"README.md", true},
 		{filepath.Join("data", ".gitkeep"), true},
-		{"zever.yaml", true},
 	}
 
 	for _, tc := range targets {
@@ -1068,11 +1065,12 @@ func TestClosure2ExtractFaults(t *testing.T) {
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/app")
 
-	// loadProjectConfig error inside runExtract.
+	// Legacy config files are ignored inside runExtract: a malformed
+	// zever.yaml must not fail extraction at project load.
 	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
 
-	if err := runExtract([]string{"shop"}); err == nil {
-		t.Fatal("want project error")
+	if _, err := loadProjectConfig(); err != nil {
+		t.Fatalf("legacy file must not fail project load: %v", err)
 	}
 
 	if err := os.Remove(filepath.Join(dir, "zever.yaml")); err != nil {
@@ -1178,13 +1176,14 @@ func TestClosure2ProjectDiscover(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 
-	// Self-symlink: Stat follows into ELOOP, covering the stat-error return.
+	// Legacy files are never read: even a self-symlink ELOOP yields
+	// defaults, not a discovery error.
 	if err := os.Symlink("zever.yaml", filepath.Join(dir, "zever.yaml")); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := loadProjectConfig(); err == nil {
-		t.Fatal("want discover error")
+	if pc, err := loadProjectConfig(); err != nil || pc != defaultProjectConfig() {
+		t.Fatalf("legacy symlink = %+v, %v; want defaults", pc, err)
 	}
 
 	if err := os.Remove(filepath.Join(dir, "zever.yaml")); err != nil {

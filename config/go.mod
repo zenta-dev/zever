@@ -42,8 +42,6 @@ require (
 	github.com/zenta-dev/zever/core/webhook v0.7.2
 	github.com/zenta-dev/zever/core/workflow v0.7.2
 	github.com/zenta-dev/zever/shared/codec v0.7.2
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2
-	go.yaml.in/yaml/v3 v3.0.5
 )
 
 replace (
@@ -161,6 +159,7 @@ require (
 	github.com/zenta-dev/zever/shared/httpclient v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect

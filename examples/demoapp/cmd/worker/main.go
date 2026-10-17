@@ -3,7 +3,7 @@
 //
 // The scheduler dispatches onto the queue and the worker consumes from it,
 // so both share one queue: with the in-process memory adapter that means
-// one process. Swapping the queue adapter in zever.yaml makes this
+// one process. Swapping the queue adapter via QUEUE_* env makes this
 // distributable with no code change here.
 package main
 

@@ -3,12 +3,13 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
-// TestP32ServePreflightUnregisteredAdapter proves yaml battery without app.go Register fails fast.
-func TestP32ServePreflightUnregisteredAdapter(t *testing.T) {
+// TestP32ServePreflightIgnoresLegacyYaml proves a legacy zever.yaml battery
+// without an app.go Register no longer gates serving: config is env-only,
+// so the entrypoint launches.
+func TestP32ServePreflightIgnoresLegacyYaml(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 
@@ -36,14 +37,8 @@ func TestP32ServePreflightUnregisteredAdapter(t *testing.T) {
 	}
 
 	calls := stubLaunch(t, nil)
-	err := runServe(nil)
-	if err == nil {
-		t.Fatal("expected unregistered-adapter error")
+	if err := runServe(nil); err != nil {
+		t.Fatalf("runServe: %v", err)
 	}
-	if !strings.Contains(err.Error(), "zever add auth") {
-		t.Fatalf("error %q lacks `zever add auth` fix", err)
-	}
-	if len(*calls) != 0 {
-		t.Fatalf("launched despite pre-flight failure: %+v", *calls)
-	}
+	assertOneLaunch(t, calls, defaultServerEntry, nil)
 }

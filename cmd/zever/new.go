@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -12,10 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.yaml.in/yaml/v3"
-
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/core/crypto"
 	"github.com/zenta-dev/zever/dsl/ir"
 )
 
@@ -120,7 +116,7 @@ type NewConfig struct {
 	ExistingProject  bool // cwd already has a go.mod; skip go.mod generation
 
 	// DBAdapter, CacheAdapter and QueueAdapter override the corresponding
-	// entries in the service map written to zever.yaml. Empty means "use
+	// entries in the scaffolded service map. Empty means "use
 	// config.Default()'s pick" (sqlite / memory / memory). Only ever
 	// populated by the TUI wizard — the flag-driven path has no equivalent
 	// flags and always leaves these empty.
@@ -128,8 +124,8 @@ type NewConfig struct {
 	CacheAdapter string
 	QueueAdapter string
 
-	// Batteries is the full set of service names to write into zever.yaml
-	// and import into internal/app/app.go: always coreBatteries
+	// Batteries is the full set of service names to import into
+	// internal/app/app.go: always coreBatteries
 	// (generate_server.go's floor: log, router) plus whatever extra
 	// services were opted into.
 	// Set by runNew before writeNewProject runs -- never left as the zero
@@ -942,13 +938,6 @@ func goVersionOf(path string) string {
 	return ""
 }
 
-// batteryYAML is the on-disk shape for a service entry; Options is
-// omitted when empty to match the hand-written examples.
-type batteryYAML struct {
-	Adapter string         `yaml:"adapter"`
-	Options map[string]any `yaml:"options,omitempty"`
-}
-
 // allServiceAdapters is every service config.Default() knows, with its
 // default adapter. It is the single source for nonCoreBatteryNames and
 // defaultServiceAdapter, so the scaffold's service universe cannot drift
@@ -1038,8 +1027,8 @@ var apiProfileBatteries = []string{
 }
 
 // fullProfileSkipped are the services the "full" profile leaves out: none has
-// an adapter that resolves from zever.yaml alone (ai needs an API key, geo a
-// dataset file, i18n an embedded FS), so wiring them would scaffold a config
+// an adapter that resolves from env defaults alone (ai needs an API key, geo a
+// dataset file, i18n an embedded FS), so wiring them would scaffold a project
 // that fails `zever doctor`. Add them with `zever add <battery>`.
 var fullProfileSkipped = map[string]bool{"ai": true, "geo": true, "i18n": true}
 
@@ -1140,8 +1129,7 @@ func nonCoreBatteryNames() []string {
 // batterySelections resolves cfg.Batteries into batterySelection pairs,
 // applying cfg.DBAdapter/CacheAdapter/QueueAdapter overrides and the
 // general cfg.Adapters map (--adapters flag / picker picks) -- the single
-// source both renderZeverYaml and writeNewProject's app.go render use, so
-// the two files can never pick different adapters for the same service.
+// source writeNewProject's app.go render uses for adapter wiring.
 // The three legacy fields win over the map when both name a battery.
 func (c NewConfig) batterySelections() []batterySelection {
 	overrideFor := map[string]string{}
@@ -1167,84 +1155,6 @@ func (c NewConfig) batterySelections() []batterySelection {
 	}
 
 	return sel
-}
-
-// zeverYamlSchemaModeline is prepended to the scaffolded zever.yaml so
-// editors with the YAML Language Server extension get autocomplete and
-// inline validation against the sibling zever.schema.json this scaffold
-// also writes. It is a YAML comment: config.Load ignores it like any other
-// comment line.
-const zeverYamlSchemaModeline = "# yaml-language-server: $schema=./zever.schema.json\n"
-
-// renderZeverYaml builds the always-emitted zever.yaml: exactly
-// cfg.Batteries' adapter picks (never the full config.Default() service
-// map -- see NewConfig.Batteries' own doc comment for why the set is
-// minimal by default and developer-composed beyond that).
-//
-// Adaptation note: the "project" table the predecessor scaffold wrote alongside the batteries
-// is deliberately omitted. zever's config.Load is strict and rejects a
-// "project" key, so a generated file containing one would fail to load in
-// the scaffolded project itself. loadProjectConfig assumes the defaults
-// below for a missing table, which is exactly the layout writeNewProject
-// scaffolds, so nothing is lost.
-// devAuthSecret is the deterministic dev-only JWT secret scaffolded into
-// zever.yaml so `zever serve` boots without extra env. Public, never prod.
-const devAuthSecret = "zever-dev-only-not-a-secret-0123456789ab" //nolint:gosec // deterministic dev-only secret, never production
-
-// devAuthIssuer is the scaffolded JWT issuer for local development.
-const devAuthIssuer = "dev"
-
-func renderZeverYaml(cfg NewConfig) ([]byte, error) {
-	batteries := make(map[string]batteryYAML, len(cfg.Batteries))
-	for _, sel := range cfg.batterySelections() {
-		entry := batteryYAML{Adapter: sel.Adapter}
-		if sel.Battery == "crypto" {
-			// config merge replaces the whole options map, so the dev key
-			// must be written explicitly alongside the allow flag.
-			entry.Options = map[string]any{
-				"key":           crypto.DevCryptoKey,
-				"allow_dev_key": true,
-			}
-		}
-		if sel.Battery == "auth" && sel.Adapter == "jwt" {
-			// jwt Open requires a 32+ byte secret; scaffold a public
-			// dev-only one so the server boots with no extra env.
-			entry.Options = map[string]any{
-				"jwt": map[string]any{
-					"secret": devAuthSecret,
-					"issuer": devAuthIssuer,
-				},
-			}
-		}
-		batteries[sel.Battery] = entry
-	}
-
-	data, err := yaml.Marshal(batteries)
-	if err != nil {
-		return nil, fmt.Errorf("zever new: marshal zever.yaml: %w", err)
-	}
-
-	if _, ok := batteries["crypto"]; ok {
-		data = injectCryptoDevKeyComment(data)
-	}
-
-	return data, nil
-}
-
-// cryptoDevKeyComment explains the scaffolded crypto key + allow_dev_key
-// option: the dev key is public, so the comment must tell the developer to
-// replace both with a real key in production.
-const cryptoDevKeyComment = "# crypto: key is the public deterministic dev key and allow_dev_key=true permits it,\n# both for local development only. In production remove allow_dev_key and set a real key.\n"
-
-// injectCryptoDevKeyComment prepends cryptoDevKeyComment to the top-level
-// crypto: block yaml.Marshal emits (map keys sort, so the block starts at
-// column 0 with "crypto:\n").
-func injectCryptoDevKeyComment(data []byte) []byte {
-	const marker = "crypto:\n"
-	if !bytes.Contains(data, []byte(marker)) {
-		return data
-	}
-	return bytes.Replace(data, []byte(marker), append([]byte(cryptoDevKeyComment), marker...), 1)
 }
 
 // ensureTargetDir refuses to scaffold into a non-empty existing directory
@@ -1411,19 +1321,6 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 	// tree means the scaffolded binaries run without a mkdir first (as
 	// zever extract already does for extracted services).
 	if writeErr := write(filepath.Join("data", ".gitkeep"), nil); writeErr != nil {
-		return nil, writeErr
-	}
-
-	if writeErr := write("zever.schema.json", config.SchemaJSON); writeErr != nil {
-		return nil, writeErr
-	}
-
-	yamlData, err := renderZeverYaml(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	if writeErr := write("zever.yaml", append([]byte(zeverYamlSchemaModeline), yamlData...)); writeErr != nil {
 		return nil, writeErr
 	}
 
@@ -1752,8 +1649,7 @@ node_modules/
 
 // renderNewDockerfile returns the reference Dockerfile for a scaffolded
 // project: multi-stage golang builder -> distroless nonroot runtime,
-// HEALTHCHECK against the scaffolded /healthz endpoint, zever.yaml copied
-// alongside the binary. goVersion selects the builder tag
+// HEALTHCHECK against the scaffolded /healthz endpoint. goVersion selects the builder tag
 // (golang:<ver>-trixie); empty falls back to defaultGoVersion. The output
 // carries no secrets and no absolute local paths.
 func renderNewDockerfile(goVersion string) string {
@@ -1791,7 +1687,6 @@ LABEL org.opencontainers.image.title="${TITLE}" \
 WORKDIR /app
 COPY --from=busybox /bin/wget /usr/bin/wget
 COPY --from=builder /out/server /app/server
-COPY zever.yaml ./zever.yaml
 EXPOSE 8080 9090
 USER nonroot:nonroot
 ENTRYPOINT ["/app/server"]

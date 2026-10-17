@@ -2,8 +2,8 @@
 // binaries.
 //
 // Explicit Register calls register exactly the adapters selected in
-// zever.yaml. JWT secret comes from the environment only: set
-// AUTH_JWT_SECRET to at least 32 bytes. It is never stored in zever.yaml.
+// Config is env-only. JWT secret comes from the environment only: set
+// AUTH_JWT_SECRET to at least 32 bytes. It is never stored in a file.
 package app
 
 import (
@@ -53,14 +53,18 @@ import (
 const DefaultDBPath = "data/bookings.db"
 
 // Config returns the resolved configuration: zever's zero-infra defaults,
-// overlaid by any zever.yaml in the working directory and by environment
+// overlaid by .env/.env.local discovery and by environment
 // variables, with a sqlite path filled in when nothing supplied one.
 //
 // The JWT secret (AUTH_JWT_SECRET) comes from the environment only and is
 // never defaulted here. Config fails closed when the secret is missing or
 // shorter than 32 bytes.
 func Config() (*config.Config, error) {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("app: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
 	}
@@ -91,7 +95,7 @@ func New() (*container.Container, error) {
 	return container.New(cfg), nil
 }
 
-// Register wires every adapter selected in zever.yaml into its battery
+// Register wires every adapter selected via env into its battery
 // registry. Registration is idempotent and performs no I/O. New calls it;
 // entrypoints that build the container themselves (cmd/server applies runtime
 // defaults to the config before container.New) call it directly.

@@ -131,14 +131,14 @@ func writeScaffold(tag, path string, content []byte, force bool) error {
 // Both are adapter modules with a Register() wiring their battery registry
 // (see adapterBinding): the container wires nothing itself. Anything beyond
 // the floor is added via `zever new`'s battery picker (or `zever add`, or
-// by hand in zever.yaml + app.go).
+// with service env + app.go).
 var coreBatteries = []string{
 	"log", "router",
 }
 
 // batterySelection is one battery+adapter pair, the single shape both
-// renderZeverYaml (new.go) and appTemplate render from, so zever.yaml and
-// app.go's blank imports can never drift apart.
+// `zever new`'s battery picker (new.go) and appTemplate render from, so the
+// scaffolded service set and app.go's blank imports can never drift apart.
 type batterySelection struct {
 	Battery string
 	Adapter string
@@ -337,8 +337,7 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 }
 
 const serverUsageBody = `Scaffolds the HTTP+gRPC server entrypoint at <server_entry>/main.go (default
-cmd/server, override with project.server_entry in zever.yaml/.toml/.json),
-plus internal/app/app.go if the project does not have one yet. The
+cmd/server), plus internal/app/app.go if the project does not have one yet. The
 scaffolded entrypoint serves HTTP on -addr (default :8080) and gRPC on
 -grpc-addr (default :9090), both with graceful shutdown.
 
@@ -586,8 +585,8 @@ type serverModuleData struct {
 type serverData struct {
 	ModulePath string
 	Modules    []serverModuleData
-	// RateLimitEnabled is true only when the project's own zever.yaml (or
-	// equivalent) configures a real rate/burst for the "ratelimit" battery
+	// RateLimitEnabled is true only when the resolved service env
+	// configures a real rate/burst for the "ratelimit" battery
 	// -- see rateLimitConfigured's doc comment for why this can't simply be
 	// "always resolve c.RateLimit()".
 	RateLimitEnabled bool
@@ -626,21 +625,23 @@ func reflectionEnabled() bool {
 // rate/burst and errors without one, so unconditionally resolving
 // c.RateLimit() in the generated main.go would break every project that
 // hasn't configured a limit. Rate-limit wiring is instead emitted only when
-// the config says a limit is actually set -- add
-// `ratelimit: {options: {rate: ..., burst: ...}}` to zever.yaml and
-// re-run `zever generate server --force` to turn it on, no other wiring
-// needed.
+// the config says a limit is actually set -- add RATELIMIT_RATE/RATELIMIT_BURST
+// to the env and re-run `zever generate server --force` to turn it on,
+// no other wiring needed.
 //
 // Adaptation note: zever's config is typed, so this reads
 // cfg.RateLimit.Options.Rate directly instead of zen-go's
 // cfg.Get("ratelimit").Options["rate"] JSON-round-tripped map lookup.
-// A second zever difference: zever.yaml may carry a "project" table that
-// config.Load's strict merge rejects (see project.go), so an unreadable
-// config falls back to config.Default() instead of failing generation --
-// the real error still surfaces at serve time. zever's defaults ship a real
-// limit (rate 10, burst 20), so the fallback wires the limiter on.
+// An unreadable config falls back to config.Default() instead of failing
+// generation -- the real error still surfaces at serve time. zever's
+// defaults ship a real limit (rate 10, burst 20), so the fallback wires
+// the limiter on.
 func rateLimitConfigured() bool {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return config.Default().RateLimit.Options.Rate > 0
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		cfg = config.Default()
 	}
@@ -805,8 +806,8 @@ func writeStubIfMissing(tag, path string, content []byte) (written bool, err err
 // uses, and each has a matching Register call in New wiring its battery
 // registry. This list was picked at scaffold time (`zever new`'s battery
 // picker, or the floor (log, router) when there was no prior `zever new`)
-// -- add a battery later with `zever add <battery>` (or by hand in
-// zever.yaml plus one import and Register call here); this file is
+// -- add a battery later with `zever add <battery>` (or with service env plus
+// one import and Register call here); this file is
 // scaffolded once and never regenerated.
 const appTemplate = `// Package app builds the config and container shared by this project's
 // binaries.
@@ -816,7 +817,7 @@ const appTemplate = `// Package app builds the config and container shared by th
 // uses, and each has a matching Register call in New wiring its battery
 // registry. This list was picked at scaffold time (` + "`zever new`" + `'s battery picker, or the floor
 // (log, router) when there was no prior ` + "`zever new`" + `) -- add a battery
-// later with ` + "`zever add <battery>`" + ` (or by hand in zever.yaml plus one
+// later with ` + "`zever add <battery>`" + ` (or with service env plus one
 // import and Register call here); this file is scaffolded once and never
 // regenerated.
 package app
@@ -834,11 +835,15 @@ import (
 const DefaultDBPath = "data/app.db"
 
 // Config returns the resolved configuration: zever's zero-infra defaults,
-// overlaid by any zever.yaml in the working directory and by ZEVER_*
-// environment variables, with a sqlite path filled in when nothing supplied
+// overlaid by .env/.env.local discovery and <SERVICE>_* environment
+// variables, with a sqlite path filled in when nothing supplied
 // one.
 func Config() (*config.Config, error) {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("app: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
 	}

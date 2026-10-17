@@ -471,7 +471,7 @@ func TestRunGenerateServerKeepsAnExistingAppPackage(t *testing.T) {
 	}
 }
 
-func TestRunGenerateServerHonoursProjectConfig(t *testing.T) {
+func TestRunGenerateServerIgnoresLegacyProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
@@ -484,10 +484,10 @@ func TestRunGenerateServerHonoursProjectConfig(t *testing.T) {
 		t.Fatalf("runGenerateServer: %v", err)
 	}
 
-	readGenerated(t, filepath.Join(dir, "cmd", "api", "main.go"))
+	readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
 
-	if _, err := os.Stat(filepath.Join(dir, "cmd", "server", "main.go")); !os.IsNotExist(err) {
-		t.Fatalf("scaffold ignored project.server_entry")
+	if _, err := os.Stat(filepath.Join(dir, "cmd", "api", "main.go")); !os.IsNotExist(err) {
+		t.Fatalf("scaffold honoured the legacy project.server_entry")
 	}
 }
 

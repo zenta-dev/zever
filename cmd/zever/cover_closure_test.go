@@ -577,7 +577,8 @@ func TestClosureRunGenerateServerBranches(t *testing.T) {
 		t.Fatal("want project/go.mod error")
 	}
 
-	// Bad project file.
+	// Legacy project file (still no go.mod): the error comes from the
+	// missing module, not the file.
 	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
 
 	if err := runGenerateServer(nil); err == nil {
@@ -680,11 +681,11 @@ func TestClosureRunGenerateTinkerBranches(t *testing.T) {
 
 	stubPromptTTY(t, false)
 
-	// Bad project file.
+	// Legacy project file: ignored, so generation proceeds at defaults.
 	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
 
-	if err := runGenerateTinker([]string{"--app", "example.com/app/internal/app"}); err == nil {
-		t.Fatal("want project error")
+	if err := runGenerateTinker([]string{"--app", "example.com/app/internal/app"}); err != nil {
+		t.Fatalf("legacy file must not fail generation: %v", err)
 	}
 
 	if rmErr := os.Remove(filepath.Join(dir, "zever.yaml")); rmErr != nil {
@@ -1090,12 +1091,6 @@ func TestClosureNewHelpers(t *testing.T) {
 		t.Fatalf("unknown = %q", got)
 	}
 
-	// renderZeverYaml error branch is unreachable via valid input; cover success.
-	y, err := renderZeverYaml(NewConfig{Name: "app", Batteries: []string{"db"}})
-	if err != nil || !strings.Contains(string(y), "sqlite") {
-		t.Fatalf("yaml = %q, %v", y, err)
-	}
-
 	// ensureTargetDir variants.
 	target := filepath.Join(dir, "newdir")
 
@@ -1119,7 +1114,7 @@ func TestClosureNewHelpers(t *testing.T) {
 	_ = fp
 
 	if targetErr := ensureTargetDir("tag", fp, false); targetErr != nil {
-		t.Logf("file target: %v", err)
+		t.Logf("file target: %v", targetErr)
 	}
 
 	// renderNewGoMod with/without framework + Abs error.
@@ -1273,84 +1268,13 @@ func TestClosureProjectBranches(t *testing.T) {
 		t.Fatalf("defaults = %+v, %v", pc, err)
 	}
 
-	// yaml project file.
+	// Legacy files are ignored: still defaults.
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  schema_dir: custom\n")
+	writeZeverFixture(t, dir, ".env", "SCHEMA_DIR=custom\n")
 
 	pc, err = loadProjectConfig()
-	if err != nil || pc.SchemaDir != "custom" || pc.ServerEntry != defaultServerEntry {
-		t.Fatalf("yaml = %+v, %v", pc, err)
-	}
-
-	// yml precedence: remove yaml, add yml + json; yml wins.
-	if rmErr := os.Remove(filepath.Join(dir, "zever.yaml")); rmErr != nil {
-		t.Fatal(err)
-	}
-
-	writeZeverFixture(t, dir, "zever.yml", "project:\n  schema_dir: fromyml\n")
-	writeZeverFixture(t, dir, "zever.json", `{"project": {"schema_dir": "fromjson"}}`)
-
-	pc, err = loadProjectConfig()
-	if err != nil || pc.SchemaDir != "fromyml" {
-		t.Fatalf("yml precedence = %+v, %v", pc, err)
-	}
-
-	if rmErr := os.Remove(filepath.Join(dir, "zever.yml")); rmErr != nil {
-		t.Fatal(err)
-	}
-
-	pc, err = loadProjectConfig()
-	if err != nil || pc.SchemaDir != "fromjson" {
-		t.Fatalf("json = %+v, %v", pc, err)
-	}
-
-	// Decode errors.
-	if rmErr := os.Remove(filepath.Join(dir, "zever.json")); rmErr != nil {
-		t.Fatal(rmErr)
-	}
-
-	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
-
-	if _, cfgErr := loadProjectConfig(); cfgErr == nil {
-		t.Fatal("want yaml error")
-	}
-
-	writeZeverFixture(t, dir, "zever.json", `{"project":`)
-
-	// remove yaml so json is discovered.
-	if rmErr := os.Remove(filepath.Join(dir, "zever.yaml")); rmErr != nil {
-		t.Fatal(err)
-	}
-
-	if _, cfgErr := loadProjectConfig(); cfgErr == nil {
-		t.Fatal("want json error")
-	}
-
-	if jsonRmErr := os.Remove(filepath.Join(dir, "zever.json")); jsonRmErr != nil {
-		t.Fatal(jsonRmErr)
-	}
-
-	// decodeProjectFile direct: unsupported ext + missing file.
-	writeZeverFixture(t, dir, "zever.toml", "x")
-
-	if _, decodeErr := decodeProjectFile(filepath.Join(dir, "zever.toml")); decodeErr == nil {
-		t.Fatal("want unsupported ext error")
-	}
-
-	if _, missingErr := decodeProjectFile(filepath.Join(dir, "nope.yaml")); missingErr == nil {
-		t.Fatal("want read error")
-	}
-
-	// Directory named zever.yaml is skipped (IsDir) → defaults.
-	if mkdirErr := os.Mkdir(filepath.Join(dir, "zever.yaml"), 0o750); mkdirErr != nil {
-		t.Fatal(mkdirErr)
-	}
-
-	if _, dirCfgErr := loadProjectConfig(); dirCfgErr != nil {
-		t.Fatalf("dir config = %v", dirCfgErr)
-	}
-
-	if rmErr := os.Remove(filepath.Join(dir, "zever.yaml")); rmErr != nil {
-		t.Fatal(err)
+	if err != nil || pc != defaultProjectConfig() {
+		t.Fatalf("ignored files = %+v, %v", pc, err)
 	}
 }
 

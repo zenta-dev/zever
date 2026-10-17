@@ -1,0 +1,5 @@
+- **Breaking:** `config`: removed file-based configuration (`Load`, `discover`, `decodeFile`, `merge`, `SchemaJSON`, `config/schema/*`, `toml:`/`yaml:` tags). Service config is env-only: `FromEnv()` + `Resolve(env)`. Legacy `zever.yaml`/`.yml`/`.json` files are ignored; see `config/README.md` migration.
+- **Breaking:** `config`: unknown keys under a wired service prefix (`DB_BOGUS=1`, `AUTH_TOKEN`) now fail `Resolve`/`ApplyEnv` with a did-you-mean hint instead of being silently ignored. Unknown service heads (`PATH`, `FOO_BAR`) are still ignored.
+- **Breaking:** `config`: `zever new` no longer scaffolds `zever.yaml`/`zever.schema.json`, and the reference `Dockerfile` no longer copies `zever.yaml`. `zever doctor`/`config show` `--config` now takes a dotenv file.
+- feat(config): stdlib-only `.env` parser (`LoadEnv`, `FromEnv`): quotes, `#` comments, `export` prefix, `${VAR}` expansion, fail-closed errors naming file+line, 10 MiB file / 1 MiB line bounds.
+- feat(config): instance-aware env (`SERVICE__NAME__FIELD`) via `ApplyEnv(env, service, name, dst)`, `InstanceNames(env, service)`, `DefaultOptions(service, name)`, and `Resolve(env)`.

@@ -19,7 +19,7 @@ const (
 
 // Environment names for the two demo webhook targets and their per-target
 // secrets. Secrets come from the environment only and are never stored in
-// zever.yaml; empty target URLs are skipped so the worker runs without them.
+// a file; empty target URLs are skipped so the worker runs without them.
 const (
 	EnvCreatedTarget   = "BOOKINGS_WEBHOOK_CREATED_TARGET"
 	EnvCreatedSecret   = "BOOKINGS_WEBHOOK_CREATED_SECRET" //nolint:gosec // environment variable name, not a credential.

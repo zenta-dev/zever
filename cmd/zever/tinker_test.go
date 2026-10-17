@@ -850,13 +850,14 @@ func TestTinkerREPLEOF(t *testing.T) {
 	}
 }
 
-// TestRunTinkerBadProject pins the config error branch of runTinker.
-func TestRunTinkerBadProject(t *testing.T) {
+// TestRunTinkerIgnoresBadLegacyConfig pins that a broken legacy project
+// file no longer surfaces: layout is defaults-only.
+func TestRunTinkerIgnoresBadLegacyConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  tinker_entry: [unclosed\n")
 	t.Chdir(dir)
 
-	if err := runTinker(nil); err == nil {
-		t.Fatal("expected a config error, got nil")
+	if pc, err := loadProjectConfig(); err != nil || pc != defaultProjectConfig() {
+		t.Fatalf("legacy file = %+v, %v; want defaults", pc, err)
 	}
 }
