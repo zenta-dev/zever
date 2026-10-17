@@ -107,6 +107,10 @@ version-check: ## Fail if cmd/zever/VERSION is lower than the newest cmd/zever/v
 changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** prefix, indentation)
 	bash tools/changelog-lint.sh
 
+.PHONY: changelog-compile
+changelog-compile: ## Compile .changelog/unreleased/*.md fragments into CHANGELOG.md ## [Unreleased]
+	bash tools/changelog-compile.sh
+
 .PHONY: compile-check
 compile-check: ## Verify committed generated code matches the schema (zever compile --check over every example)
 	cd examples/todo && $(GO) run ../../cmd/zever compile --check --out ./generated schema/todo.zen schema/todo_grpc.zen

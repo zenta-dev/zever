@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -155,6 +157,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "apidiff: read %s: %v\n", changelog, err)
 		return 1
 	}
+	raw = appendChangelogFragments(raw, filepath.Join(filepath.Dir(changelog), ".changelog", "unreleased"))
 	entries := breakingEntries(string(raw))
 	uncovered := 0
 	for _, f := range failures {
@@ -364,6 +367,53 @@ func isInternalPackage(pkgPath, modulePath string) bool {
 		return true
 	}
 	return false
+}
+
+// appendChangelogFragments appends every .md fragment in fragDir (except
+// README.md) under a synthetic ## [Unreleased] header, so the Unreleased
+// scan in breakingEntries also covers entries carried by parallel PRs that
+// have not been compiled into the changelog yet. Missing dir or no
+// fragments leaves body unchanged. Fragment entries must already satisfy
+// the changelog-lint rules; this function does not re-lint them.
+func appendChangelogFragments(body []byte, fragDir string) []byte {
+	matches, err := filepath.Glob(filepath.Join(fragDir, "*.md"))
+	if err != nil || len(matches) == 0 {
+		return body
+	}
+	var frags []string
+	for _, m := range matches {
+		if filepath.Base(m) == "README.md" {
+			continue
+		}
+		frag, err := os.ReadFile(m)
+		if err != nil {
+			continue
+		}
+		if len(strings.TrimSpace(string(frag))) == 0 {
+			continue
+		}
+		frags = append(frags, m)
+	}
+	if len(frags) == 0 {
+		return body
+	}
+	sort.Strings(frags)
+	var sb strings.Builder
+	sb.Write(body)
+	if len(sb.String()) > 0 && !strings.HasSuffix(sb.String(), "\n") {
+		sb.WriteByte('\n')
+	}
+	sb.WriteString("\n## [Unreleased]\n")
+	for _, m := range frags {
+		frag, err := os.ReadFile(m)
+		if err != nil {
+			continue
+		}
+		sb.WriteString("\n")
+		sb.Write(bytes.TrimSpace(frag))
+		sb.WriteString("\n")
+	}
+	return []byte(sb.String())
 }
 
 // unreleasedHasBreaking reports whether body carries a **Breaking:** entry

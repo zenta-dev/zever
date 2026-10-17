@@ -132,6 +132,39 @@ func TestUnreleasedHasBreaking(t *testing.T) {
 	}
 }
 
+func TestAppendChangelogFragments(t *testing.T) {
+	t.Parallel()
+	base := "# Changelog\n\n## [Unreleased]\n\n- existing\n"
+	t.Run("no dir unchanged", func(t *testing.T) {
+		t.Parallel()
+		got := appendChangelogFragments([]byte(base), filepath.Join(t.TempDir(), "missing"))
+		if string(got) != base {
+			t.Errorf("missing dir: body changed:\n%s", got)
+		}
+	})
+	t.Run("fragments scanned as unreleased", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		mustWrite(t, filepath.Join(dir, "v080-a.md"), "- **Breaking:** `mod`: drop X\n")
+		mustWrite(t, filepath.Join(dir, "README.md"), "# fragments\n")
+		mustWrite(t, filepath.Join(dir, "empty.md"), "\n")
+		got := appendChangelogFragments([]byte(base), dir)
+		if !unreleasedHasBreaking(string(got)) {
+			t.Errorf("fragment breaking entry not detected:\n%s", got)
+		}
+		if !strings.Contains(string(got), "- existing") {
+			t.Errorf("original body lost:\n%s", got)
+		}
+	})
+	t.Run("empty dir unchanged", func(t *testing.T) {
+		t.Parallel()
+		got := appendChangelogFragments([]byte(base), t.TempDir())
+		if string(got) != base {
+			t.Errorf("empty dir: body changed:\n%s", got)
+		}
+	})
+}
+
 func TestGatePassesOnCompatibleTree(t *testing.T) {
 	root := initRepo(t)
 	mustGit(t, root, "tag", "mod/v0.1.0")
