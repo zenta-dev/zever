@@ -55,6 +55,24 @@ Env names follow the usual scheme: `OBSERVABILITY_ADAPTER`, `OBSERVABILITY_SERVI
 
 `Validate` requires `service_name` of 1 to 128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. Adapters are `noop` for tests, `stdout` (default) for local visibility, and `otlp` for production. See the [observability config reference](../../../reference/config/#observability).
 
+## Metrics
+
+Zever does not serve a Prometheus `/metrics` endpoint. Metrics (for example the `outbox.*` relay counters) leave the process over OTLP together with the traces, so run a collector and let it expose or forward them: the OpenTelemetry Collector's `prometheus` exporter gives Prometheus a scrape target, and `prometheusremotewrite` pushes instead. See the [outbox operations guide](../../digging-deeper/outbox-ops/) for the metric names and alert rules.
+
+## Profiling with pprof
+
+The generated server can serve Go runtime profiles, off by default. Set `--pprof-addr` (or `PPROF_ADDR`) to turn it on:
+
+```sh
+PPROF_ADDR=127.0.0.1:6060 ./server        # or: ./server --pprof-addr 127.0.0.1:6060
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
+curl -o cpu.pb.gz 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
+```
+
+Profiles are served on their own listener, never on the public router, and the address must be loopback (`127.0.0.1:PORT` or `localhost:PORT`); a wildcard or public host fails startup. Reach it from outside the host through an SSH tunnel or `kubectl port-forward pod/<name> 6060`. The server logs a warning when it is on. Endpoints: the index, any named runtime profile (`heap`, `goroutine`, `allocs`, `block`, `mutex`, `threadcreate`, with `?debug=1` for text), `profile` (CPU) and `trace` (both take `?seconds=N`, 1 to 300). `cmdline` is not served because argv can hold secrets.
+
+Code that builds its own server can use `container.StartPprof(addr, logger)` directly; the handler uses a private mux and never registers on `http.DefaultServeMux`.
+
 ## Bound and redact attributes
 
 Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValueLen`), and spans at 32 attributes (`MaxAttrs`). `attr_value_limit` tunes the value cap (0 means default, otherwise 256 to 16384). Sensitive keys (password, secret, token, api_key, auth, cookie, session, private_key) export as `[redacted]`, but never attach a secret to a span at all. Name spans after the operation (`queue.dispatch`), not the adapter, and keep high-cardinality values such as user IDs out of metric labels.
