@@ -43,7 +43,7 @@ func TestP32ScaffoldBoots(t *testing.T) {
 	}
 
 	mainSrc := readFile(t, "bootapp/cmd/server/main.go")
-	if !strings.Contains(mainSrc, "serve.Main(app.Providers(), app.Modules())") {
+	if !strings.Contains(mainSrc, "serve.Main(app.Providers(), app.Modules(), opts...)") {
 		t.Errorf("server main.go does not boot via serve.Main:\n%s", mainSrc)
 	}
 }

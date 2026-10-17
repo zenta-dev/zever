@@ -334,7 +334,7 @@ func TestRunNewScaffoldsAndBuilds(t *testing.T) {
 	}
 
 	mainSrc := readFile(t, filepath.Join(out, defaultServerEntry, "main.go"))
-	if !strings.Contains(mainSrc, "serve.Main(app.Providers(), app.Modules())") {
+	if !strings.Contains(mainSrc, "serve.Main(app.Providers(), app.Modules(), opts...)") {
 		t.Fatalf("server main.go does not call serve.Main with Providers and Modules:\n%s", mainSrc)
 	}
 

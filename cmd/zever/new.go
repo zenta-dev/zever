@@ -2082,9 +2082,17 @@ func renderWiringContent(tag, modulePath string, selections []batterySelection) 
 	})
 }
 
-// newServerMainTemplate is the whole server entrypoint: parse nothing,
-// wire nothing, just hand the typed Providers and Modules to serve.Main.
-// serve returns the error; main owns the exit path (stderr + non-zero).
+// newServerMainTemplate is the whole server entrypoint: parse the listen
+// flags the launcher passes through, then hand the typed Providers and
+// Modules to serve.Main. serve returns the error; main owns the exit path
+// (stderr + non-zero).
+//
+// -addr overrides the HTTP port (":8080", "host:port" or bare "8080"; only
+// the port is used, serve binds all interfaces and warns on plaintext
+// non-loopback). Empty falls back to serve's own PORT/default. -grpc-addr
+// enables gRPC only when auth+permission are wired (see grpcWired):
+// otherwise a one-line notice explains the skip, so `zever dev -grpc-addr
+// ...` stays green on scaffolds that never wired them.
 const newServerMainTemplate = `// Command server runs this project's HTTP API.
 //
 // Scaffolded by ` + "`zever new`" + `. It is deliberately thin: serve.Main owns
@@ -2093,19 +2101,88 @@ const newServerMainTemplate = `// Command server runs this project's HTTP API.
 package main
 
 import (
+	"flag"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 
+	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/serve"
 
 	"{{.ModulePath}}/internal/app"
 )
 
 func main() {
-	if err := serve.Main(app.Providers(), app.Modules()); err != nil {
+	addr := flag.String("addr", "", "HTTP listen address (:port or host:port; empty uses PORT, default :8080)")
+	grpcAddr := flag.String("grpc-addr", "", "gRPC listen address (needs auth+permission wired; empty disables)")
+	flag.Parse()
+
+	opts := []serve.Option{}
+
+	if port, err := serverPort(*addr); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
+		os.Exit(1)
+	} else if port != "" {
+		opts = append(opts, serve.WithPort(port))
+	}
+
+	if *grpcAddr != "" {
+		if !grpcWired() {
+			fmt.Fprintln(os.Stderr, "server: -grpc-addr skipped (wire auth+permission via 'zever add auth permission' to enable gRPC)")
+		} else {
+			opts = append(opts, serve.WithGRPCAddr(*grpcAddr))
+		}
+	}
+
+	if err := serve.Main(app.Providers(), app.Modules(), opts...); err != nil {
 		fmt.Fprintln(os.Stderr, "server:", err)
 		os.Exit(1)
 	}
+}
+
+// grpcWired reports whether the project's Providers wire the auth and
+// permission instances gRPC serving requires. It builds a throwaway
+// container (nothing resolves until first use) and inspects the provider
+// labels, mirroring what serve itself demands in setupGRPC.
+func grpcWired() bool {
+	c := container.New(nil, app.Providers()...)
+
+	auth, permission := false, false
+
+	for _, label := range c.Wired() {
+		switch label {
+		case "auth", "auth/default":
+			auth = true
+		case "permission", "permission/default":
+			permission = true
+		}
+	}
+
+	return auth && permission
+}
+
+// serverPort extracts the port from an -addr value (":8080",
+// "127.0.0.1:8080" or bare "8080"), failing closed on garbage. The empty
+// address means "no override".
+func serverPort(addr string) (string, error) {
+	if addr == "" {
+		return "", nil
+	}
+
+	if _, port, err := net.SplitHostPort(addr); err == nil {
+		if port == "" {
+			return "", fmt.Errorf("-addr %q names no port", addr)
+		}
+
+		return port, nil
+	}
+
+	if _, err := strconv.Atoi(addr); err == nil {
+		return addr, nil
+	}
+
+	return "", fmt.Errorf("-addr %q wants :port or host:port", addr)
 }
 `
 
