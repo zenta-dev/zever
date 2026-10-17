@@ -112,3 +112,22 @@ func TestRunCheckPinsMissingVersionFile(t *testing.T) {
 		t.Fatalf("check-pins without VERSION = %d, stderr %q; want 1 mentioning VERSION", code, stderr)
 	}
 }
+
+func TestWorkReplacesRoundTrip(t *testing.T) {
+	mods := map[string]string{
+		zeverPrefix + "core/a": "core/a",
+		zeverPrefix + "core/b": "core/b",
+	}
+	base := "go 1.27\n\nuse (\n\t./core/a\n)\n"
+	one := withWorkReplaces(base, workReplaces(mods, "v0.7.2"))
+	if !strings.Contains(one, "replace "+zeverPrefix+"core/b v0.7.2 => ./core/b\n") {
+		t.Fatalf("missing replace:\n%s", one)
+	}
+	two := withWorkReplaces(one, workReplaces(mods, "v0.7.3"))
+	if strings.Contains(two, "v0.7.2") || strings.Count(two, workBegin) != 1 {
+		t.Fatalf("block not replaced in place:\n%s", two)
+	}
+	if again := withWorkReplaces(two, workReplaces(mods, "v0.7.3")); again != two {
+		t.Fatalf("not idempotent:\n%s", again)
+	}
+}

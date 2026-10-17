@@ -4,18 +4,18 @@ go 1.27.2
 
 require (
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/zenta-dev/zever/adapters/db/postgres v0.7.1
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.1
-	github.com/zenta-dev/zever/adapters/log/noop v0.7.1
-	github.com/zenta-dev/zever/adapters/queue/memory v0.7.1
-	github.com/zenta-dev/zever/core/db v0.7.1
-	github.com/zenta-dev/zever/core/job v0.7.1
-	github.com/zenta-dev/zever/core/log v0.7.1
-	github.com/zenta-dev/zever/core/queue v0.7.1
-	github.com/zenta-dev/zever/core/scheduler v0.7.1
-	github.com/zenta-dev/zever/orm v0.7.1
-	github.com/zenta-dev/zever/shared/codec v0.7.1
-	github.com/zenta-dev/zever/shared/dbconn v0.7.1
+	github.com/zenta-dev/zever/adapters/db/postgres v0.7.2
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.2
+	github.com/zenta-dev/zever/adapters/log/noop v0.7.2
+	github.com/zenta-dev/zever/adapters/queue/memory v0.7.2
+	github.com/zenta-dev/zever/core/db v0.7.2
+	github.com/zenta-dev/zever/core/job v0.7.2
+	github.com/zenta-dev/zever/core/log v0.7.2
+	github.com/zenta-dev/zever/core/queue v0.7.2
+	github.com/zenta-dev/zever/core/scheduler v0.7.2
+	github.com/zenta-dev/zever/orm v0.7.2
+	github.com/zenta-dev/zever/shared/codec v0.7.2
+	github.com/zenta-dev/zever/shared/dbconn v0.7.2
 )
 
 require (
@@ -31,14 +31,14 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/core/cache v0.7.1 // indirect
-	github.com/zenta-dev/zever/core/observability v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/msgspan v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.1 // indirect
+	github.com/zenta-dev/zever/core/cache v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/observability v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect

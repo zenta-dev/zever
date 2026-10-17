@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/shared/httpclient
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/shared/traceprop v0.7.1
+	github.com/zenta-dev/zever/shared/traceprop v0.7.2
 	go.opentelemetry.io/otel/trace v1.47.0
 )
 

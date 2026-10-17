@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/redis/go-redis/v9 v9.23.0
-	github.com/zenta-dev/zever/shared/redisopt v0.7.1
+	github.com/zenta-dev/zever/shared/redisopt v0.7.2
 )
 
 require (

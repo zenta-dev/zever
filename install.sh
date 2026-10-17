@@ -7,7 +7,7 @@
 #
 # One-liner:
 #   curl --proto '=https' --tlsv1.2 -sSf -L \
-#     https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh -s -- --version v0.7.1
+#     https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh -s -- --version v0.7.2
 #
 # Notes (repo ethos, verified facts - do not "simplify" these away):
 # - Binaries come from GitHub releases (or a source build). `go install
@@ -23,7 +23,7 @@
 #   or TERM=dumb (FORCE_COLOR overrides the TTY check, --no-color wins).
 set -eu
 
-ZEVER_VERSION_DEFAULT="v0.7.1"
+ZEVER_VERSION_DEFAULT="v0.7.2"
 ZEVER_REPO="zenta-dev/zever"
 GO_MIN_MAJOR=1
 GO_MIN_MINOR=27
@@ -156,8 +156,8 @@ Environment:
 
 Examples:
   sh install.sh
-  sh install.sh --version v0.7.1 --prefix ~/.local --yes
-  ZEVER_VERSION=v0.7.1 ZEVER_PREFIX=/opt/zever sh install.sh --yes
+  sh install.sh --version v0.7.2 --prefix ~/.local --yes
+  ZEVER_VERSION=v0.7.2 ZEVER_PREFIX=/opt/zever sh install.sh --yes
 EOF
 }
 

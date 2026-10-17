@@ -159,6 +159,7 @@ compile_checks() {
     printf 'use (\n\t%s\n' "$CHECK_DIR"
     sed -n '/^use (/,/^)/p' "$ROOT/go.work" | grep -E '^[[:space:]]+\./' | sed "s#\./#$ROOT/#"
     printf ')\n'
+    grep -E '^replace .* => \./' "$ROOT/go.work" | sed "s# => \./# => $ROOT/#" || true
   } >"$CHECK_DIR/go.work"
   cp "$ROOT/go.work.sum" "$CHECK_DIR/go.work.sum" 2>/dev/null || true
   # One vet over all staged blocks (a single build is far faster than one

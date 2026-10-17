@@ -4,12 +4,12 @@ go 1.27.2
 
 require (
 	github.com/oklog/ulid/v2 v2.1.2
-	github.com/zenta-dev/zever/core/billing v0.7.1
+	github.com/zenta-dev/zever/core/billing v0.7.2
 )
 
 require (
-	github.com/zenta-dev/zever/shared/providersopt v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/billing => ../../../core/billing

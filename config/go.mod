@@ -3,46 +3,46 @@ module github.com/zenta-dev/zever/config
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/ai v0.7.1
-	github.com/zenta-dev/zever/core/analytics v0.7.1
-	github.com/zenta-dev/zever/core/auth v0.7.1
-	github.com/zenta-dev/zever/core/billing v0.7.1
-	github.com/zenta-dev/zever/core/cache v0.7.1
-	github.com/zenta-dev/zever/core/cdn v0.7.1
-	github.com/zenta-dev/zever/core/crypto v0.7.1
-	github.com/zenta-dev/zever/core/db v0.7.1
-	github.com/zenta-dev/zever/core/document v0.7.1
-	github.com/zenta-dev/zever/core/eventbus v0.7.1
-	github.com/zenta-dev/zever/core/flag v0.7.1
-	github.com/zenta-dev/zever/core/geo v0.7.1
-	github.com/zenta-dev/zever/core/i18n v0.7.1
-	github.com/zenta-dev/zever/core/idempotency v0.7.1
-	github.com/zenta-dev/zever/core/job v0.7.1
-	github.com/zenta-dev/zever/core/lock v0.7.1
-	github.com/zenta-dev/zever/core/log v0.7.1
-	github.com/zenta-dev/zever/core/mailer v0.7.1
-	github.com/zenta-dev/zever/core/media v0.7.1
-	github.com/zenta-dev/zever/core/notification v0.7.1
-	github.com/zenta-dev/zever/core/observability v0.7.1
-	github.com/zenta-dev/zever/core/outbox v0.7.1
-	github.com/zenta-dev/zever/core/password v0.7.1
-	github.com/zenta-dev/zever/core/payment v0.7.1
-	github.com/zenta-dev/zever/core/permission v0.7.1
-	github.com/zenta-dev/zever/core/queue v0.7.1
-	github.com/zenta-dev/zever/core/ratelimit v0.7.1
-	github.com/zenta-dev/zever/core/resilience v0.7.1
-	github.com/zenta-dev/zever/core/router v0.7.1
-	github.com/zenta-dev/zever/core/scheduler v0.7.1
-	github.com/zenta-dev/zever/core/search v0.7.1
-	github.com/zenta-dev/zever/core/secrets v0.7.1
-	github.com/zenta-dev/zever/core/session v0.7.1
-	github.com/zenta-dev/zever/core/storage v0.7.1
-	github.com/zenta-dev/zever/core/tenant v0.7.1
-	github.com/zenta-dev/zever/core/vectorstore v0.7.1
-	github.com/zenta-dev/zever/core/webhook v0.7.1
-	github.com/zenta-dev/zever/core/workflow v0.7.1
-	github.com/zenta-dev/zever/shared/codec v0.7.1
-	github.com/zenta-dev/zever/shared/redisopt v0.7.1
+	github.com/zenta-dev/zever/core/ai v0.7.2
+	github.com/zenta-dev/zever/core/analytics v0.7.2
+	github.com/zenta-dev/zever/core/auth v0.7.2
+	github.com/zenta-dev/zever/core/billing v0.7.2
+	github.com/zenta-dev/zever/core/cache v0.7.2
+	github.com/zenta-dev/zever/core/cdn v0.7.2
+	github.com/zenta-dev/zever/core/crypto v0.7.2
+	github.com/zenta-dev/zever/core/db v0.7.2
+	github.com/zenta-dev/zever/core/document v0.7.2
+	github.com/zenta-dev/zever/core/eventbus v0.7.2
+	github.com/zenta-dev/zever/core/flag v0.7.2
+	github.com/zenta-dev/zever/core/geo v0.7.2
+	github.com/zenta-dev/zever/core/i18n v0.7.2
+	github.com/zenta-dev/zever/core/idempotency v0.7.2
+	github.com/zenta-dev/zever/core/job v0.7.2
+	github.com/zenta-dev/zever/core/lock v0.7.2
+	github.com/zenta-dev/zever/core/log v0.7.2
+	github.com/zenta-dev/zever/core/mailer v0.7.2
+	github.com/zenta-dev/zever/core/media v0.7.2
+	github.com/zenta-dev/zever/core/notification v0.7.2
+	github.com/zenta-dev/zever/core/observability v0.7.2
+	github.com/zenta-dev/zever/core/outbox v0.7.2
+	github.com/zenta-dev/zever/core/password v0.7.2
+	github.com/zenta-dev/zever/core/payment v0.7.2
+	github.com/zenta-dev/zever/core/permission v0.7.2
+	github.com/zenta-dev/zever/core/queue v0.7.2
+	github.com/zenta-dev/zever/core/ratelimit v0.7.2
+	github.com/zenta-dev/zever/core/resilience v0.7.2
+	github.com/zenta-dev/zever/core/router v0.7.2
+	github.com/zenta-dev/zever/core/scheduler v0.7.2
+	github.com/zenta-dev/zever/core/search v0.7.2
+	github.com/zenta-dev/zever/core/secrets v0.7.2
+	github.com/zenta-dev/zever/core/session v0.7.2
+	github.com/zenta-dev/zever/core/storage v0.7.2
+	github.com/zenta-dev/zever/core/tenant v0.7.2
+	github.com/zenta-dev/zever/core/vectorstore v0.7.2
+	github.com/zenta-dev/zever/core/webhook v0.7.2
+	github.com/zenta-dev/zever/core/workflow v0.7.2
+	github.com/zenta-dev/zever/shared/codec v0.7.2
+	github.com/zenta-dev/zever/shared/redisopt v0.7.2
 	go.yaml.in/yaml/v3 v3.0.5
 )
 
@@ -156,14 +156,14 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/httpclient v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/msgspan v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/providersopt v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.1 // indirect
+	github.com/zenta-dev/zever/adapters/log/noop v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect

@@ -3,13 +3,13 @@ module github.com/zenta-dev/zever/adapters/vectorstore/db
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/adapters/db/postgres v0.7.1
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.1
-	github.com/zenta-dev/zever/core/db v0.7.1
-	github.com/zenta-dev/zever/core/vectorstore v0.7.1
-	github.com/zenta-dev/zever/orm v0.7.1
-	github.com/zenta-dev/zever/shared/codec v0.7.1
-	github.com/zenta-dev/zever/shared/dbconn v0.7.1
+	github.com/zenta-dev/zever/adapters/db/postgres v0.7.2
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.2
+	github.com/zenta-dev/zever/core/db v0.7.2
+	github.com/zenta-dev/zever/core/vectorstore v0.7.2
+	github.com/zenta-dev/zever/orm v0.7.2
+	github.com/zenta-dev/zever/shared/codec v0.7.2
+	github.com/zenta-dev/zever/shared/dbconn v0.7.2
 )
 
 require (
@@ -22,10 +22,10 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.1 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

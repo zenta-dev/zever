@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/adapters/vectorstore/qdrant
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/db v0.7.1 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.1 // indirect
+	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
@@ -15,8 +15,8 @@ require (
 
 require (
 	github.com/qdrant/go-client v1.19.4
-	github.com/zenta-dev/zever/core/vectorstore v0.7.1
-	github.com/zenta-dev/zever/shared/endpoint v0.7.1
+	github.com/zenta-dev/zever/core/vectorstore v0.7.2
+	github.com/zenta-dev/zever/shared/endpoint v0.7.2
 )
 
 replace github.com/zenta-dev/zever/core/vectorstore => ../../../core/vectorstore
