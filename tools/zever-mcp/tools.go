@@ -52,6 +52,27 @@ func compileSchema(ctx context.Context, in compileInput) (*compile.Result, diag.
 	return res, diags, nil
 }
 
+// resolveSchema loads the schema source and resolves it with zero backends
+// (resolution and validation only). A non-nil result is returned even when
+// diagnostics carry errors.
+func resolveSchema(ctx context.Context, in compileInput) (*compile.Result, diag.List, error) {
+	files := in.Files
+	if len(files) == 0 {
+		if in.Dir == "" {
+			return nil, nil, errors.New("zever-mcp: either dir or files is required")
+		}
+
+		read, err := readZenFiles(in.Dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		files = read
+	}
+
+	res, diags := compile.CompileContext(ctx, files)
+	return res, diags, nil
+}
+
 // maxSchemaFileBytes caps the size of a single .zen file read from disk.
 const maxSchemaFileBytes = 1 << 20
 
