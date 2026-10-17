@@ -122,7 +122,7 @@ Every `zever new` project ships a reference `Dockerfile` + `.dockerignore`:
   serves; `/readyz` gates on the container readiness aggregate —
   a DB ping plus, when `outbox.stall_readiness` is set, the
   relay's stall flag).
-- Copies the binary + `zever.yaml` only. Secrets are never baked
+- Copies the binary only. Secrets are never baked
   into the image — pass config at runtime via environment, e.g.
   `docker run -e DB_DSN=... app`.
 

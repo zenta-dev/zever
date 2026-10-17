@@ -374,6 +374,12 @@ func updateAppGoForAdd(src string, sel batterySelection) (string, error) {
 	return string(formatted), nil
 }
 
+// zeverYamlSchemaModeline heads a brand-new zever.yaml so editors with the
+// YAML Language Server extension get autocomplete and inline validation.
+// (New projects no longer scaffold config files; only `zever add` still
+// touches zever.yaml, pending the CLI UX rework.)
+const zeverYamlSchemaModeline = "# yaml-language-server: $schema=./zever.schema.json\n"
+
 // updateZeverYamlForAdd sets batteries' adapter pick in zever.yaml source,
 // preserving every other entry (including the entry's own options). A
 // missing or empty file starts a fresh document.

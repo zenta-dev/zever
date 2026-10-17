@@ -63,7 +63,11 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("seed: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return fmt.Errorf("seed: load config: %w", err)
 	}

@@ -11,7 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/outbox"
 )
 
@@ -108,9 +107,9 @@ type outboxFlags struct {
 func newOutboxFlagSet(name string) (*flag.FlagSet, outboxFlags) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	f := outboxFlags{
-		dsn:    fs.String("dsn", "", "postgres DSN or sqlite path; default: zever.yaml outbox.dsn"),
-		table:  fs.String("table", "", `outbox table name; default: zever.yaml outbox.table or "outbox"`),
-		config: fs.String("config", "", "config file path (default: discover zever.yaml/.yml/.json + env)"),
+		dsn:    fs.String("dsn", "", "postgres DSN or sqlite path; default: OUTBOX_DSN env"),
+		table:  fs.String("table", "", `outbox table name; default: OUTBOX_TABLE env or "outbox"`),
+		config: fs.String("config", "", "dotenv file path (default: .env/.env.local discovery + process env)"),
 	}
 
 	return fs, f
@@ -123,10 +122,10 @@ type outboxTarget struct {
 }
 
 // resolveOutboxTarget loads the outbox section from configPath (empty means
-// discover zever.yaml/.yml/.json in the working directory plus env overrides)
-// and applies the --dsn/--table flag overrides.
+// .env/.env.local discovery plus the process environment; non-empty layers
+// that dotenv file in between) and applies the --dsn/--table flag overrides.
 func resolveOutboxTarget(configPath, dsn, table string) (outboxTarget, error) {
-	cfg, err := config.Load(configPath)
+	cfg, err := resolveServiceConfig(configPath)
 	if err != nil {
 		return outboxTarget{}, fmt.Errorf("zever outbox: load config %q: %w", configPath, err)
 	}
@@ -509,9 +508,9 @@ func printOutboxUsage() {
 		line("purge", "Delete processed messages older than --before"),
 		"",
 		bold("Connection flags:"),
-		line("--dsn", "postgres DSN or sqlite path (default: zever.yaml)"),
-		line("--table", `outbox table name (default: "outbox")`),
-		line("--config", "config file path (default: discover zever.yaml)"),
+		line("--dsn", "postgres DSN or sqlite path (default: OUTBOX_DSN env)"),
+		line("--table", `outbox table name (default: OUTBOX_TABLE env or "outbox")`),
+		line("--config", "dotenv file path (default: .env/.env.local discovery + process env)"),
 		"",
 		dim("Run '")+cmd("zever outbox <subcommand> -h")+dim("' for flags  •  ")+hint("tip: ")+dim("use --json for machine-readable output"),
 	)

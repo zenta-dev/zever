@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -16,21 +14,17 @@ func BenchmarkDefault(b *testing.B) {
 	}
 }
 
-// BenchmarkLoadFile measures the full layered load (decode, strict merge,
-// best-effort env overlay, fail-closed validate) from a small valid file.
-func BenchmarkLoadFile(b *testing.B) {
-	dir := b.TempDir()
-	path := filepath.Join(dir, "zever.yaml")
-	if err := os.WriteFile(path, []byte("db:\n  adapter: sqlite\n  options:\n    max_conns: 10\nlog:\n  adapter: slog\n"), 0o600); err != nil {
-		b.Fatal(err)
-	}
+// BenchmarkResolveEnv measures the full env-only resolution (defaults,
+// env overlay, fail-closed validate) from a small valid Env.
+func BenchmarkResolveEnv(b *testing.B) {
+	env := Env{"DB_ADAPTER": "sqlite", "DB_MAXCONNS": "10", "LOG_ADAPTER": "slog"}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		cfg, err := Load(path)
+		cfg, err := Resolve(env)
 		if err != nil {
-			b.Fatalf("Load: %v", err)
+			b.Fatalf("Resolve: %v", err)
 		}
 		if cfg.DB.Options.MaxConns != 10 {
 			b.Fatalf("max_conns = %d, want 10", cfg.DB.Options.MaxConns)
@@ -88,17 +82,17 @@ func BenchmarkRedact(b *testing.B) {
 	}
 }
 
-// BenchmarkApplyEnv measures the best-effort environment overlay, the only
+// BenchmarkApplyEnv measures the environment overlay, the only
 // reflection-bearing path in config.
 func BenchmarkApplyEnv(b *testing.B) {
-	b.Setenv("DB_MAXCONNS", "20")
+	env := Env{"DB_MAXCONNS": "20"}
 	cfg := Default()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if err := applyEnv(cfg); err != nil {
-			b.Fatalf("applyEnv: %v", err)
+		if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+			b.Fatalf("ApplyEnv: %v", err)
 		}
 	}
 }

@@ -45,8 +45,8 @@ Hand-owned, never overwritten: `internal/app/app.go` (adapter selection, JWT
 gate, i18n/permission runtime defaults), `internal/service/shop/shop_service.go`
 (9 RPC bodies), `internal/service/jobs/*` bodies (Deps-closure = filled-in stub
 form), `internal/service/seed/seed.go` bodies, `internal/api/*` rich shapes,
-schema, `zever.yaml`, locales/fixtures, tests.
-`db/seed/main.go` intentionally bypasses `app.New()` (`config.Load` directly)
+schema, service env, locales/fixtures, tests.
+`db/seed/main.go` intentionally bypasses `app.New()` (`config.Resolve` directly)
 so seeding needs no JWT secret.
 
 ## Layout

@@ -3,12 +3,18 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// Env is an injectable process environment: variable name to value. Library
+// code takes Env as an argument and never touches the real process
+// environment itself, so tests pass literal maps; only FromEnv reads
+// os.Environ and .env files.
+type Env map[string]string
 
 // ErrInvalidValue is returned when an env-provided value cannot be coerced
 // into its field. Only the field name is reported: values may be secrets.
@@ -19,79 +25,327 @@ var ErrInvalidValue = errors.New("config: invalid value")
 // coercion.
 var durationType = reflect.TypeOf(time.Duration(0))
 
-// applyEnv overlays environment variables onto cfg with no prefix:
-// DB_ADAPTER selects the db adapter, DB_MAXCONNS sets a db field.
+// Resolve builds a Config from env: service defaults, overlaid by the
+// default instance of every service (`SERVICE_FIELD`, `SERVICE_ADAPTER`),
+// then validated fail-closed. Unknown service heads and bare names are
+// ignored so ambient process environment never breaks startup; unknown keys
+// under a wired service prefix fail with a did-you-mean hint. Named
+// instances (`SERVICE__NAME__*`) are left for the caller: enumerate them
+// with InstanceNames and apply each with ApplyEnv.
 //
-// Matching is best-effort by design: a variable is ignored unless its head
-// (up to the first "_") names a known service and the remainder is non-empty
-// and resolves to a settable field. Unknown variables never error, so
-// unrelated process environment (PATH, HOME, AUTH_TOKEN, DB, USER, ...) can
-// never break startup. Strict mode would fail here: bare names like PATH
-// and HOME have no "_" at all, and plausible heads like AUTH in AUTH_TOKEN
-// collide with real service names.
-//
-// Field lookup is case-insensitive with "_" ignored, so MAX_RETRIES matches
-// MaxRetries. One nesting level is supported (AUTH_JWT_SECRET sets
-// Options.JWT.Secret). Durations stay strings and parse via
-// time.ParseDuration ("5s" style). Adapter assignment is unchecked here;
-// Validate rejects bad names fail-closed later. Reflection runs only for
-// env-provided fields; the file path stays marshal-based (decodeOptions).
-//
-// Reflection errors name the FIELD only — values are never echoed, so env
-// file secrets cannot leak into error text.
-func applyEnv(cfg *Config) error {
-	for _, kv := range os.Environ() {
-		key, value, _ := strings.Cut(kv, "=")
-		head, rest, ok := strings.Cut(key, "_")
-		if !ok {
-			continue
-		}
-		svc, ok := matchService(head)
-		if !ok {
-			continue
-		}
-		field := strings.ToLower(rest)
-		if field == "" {
-			continue
-		}
+// On ANY failure Resolve returns nil plus the error.
+func Resolve(env Env) (*Config, error) {
+	cfg := Default()
+	overlay := stripAdapterKeys(env)
+	for _, svc := range knownServiceNames() {
 		adapter, opts, ok := serviceRefs(cfg, svc)
 		if !ok {
 			continue
 		}
-		if field == "adapter" {
-			*adapter = value
-			continue
+		if v, ok := lookupEnvKey(env, strings.ToUpper(svc)+"_ADAPTER"); ok {
+			*adapter = v
 		}
-		if err := setOptionField(svc, opts, []string{field}, value, key); err != nil {
-			var unknown *UnknownFieldError
-			if !errors.As(err, &unknown) {
-				return &InvalidOptionsError{Service: svc, Reason: err.Error()}
-			}
-			if !strings.Contains(field, "_") {
-				continue
-			}
-			outer, inner, _ := strings.Cut(field, "_")
-			if err := setOptionField(svc, opts, []string{outer, inner}, value, key); err != nil {
-				var nested *UnknownFieldError
-				if errors.As(err, &nested) {
-					continue
-				}
-				return &InvalidOptionsError{Service: svc, Reason: err.Error()}
-			}
+		if err := ApplyEnv(overlay, svc, "", opts); err != nil {
+			return nil, err
 		}
 	}
-	applyPluginEnv(cfg)
+	applyPluginEnv(env, cfg)
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// stripAdapterKeys copies env minus every `SERVICE_ADAPTER` key: adapter
+// selection is applied directly by Resolve, so bare-Options ApplyEnv never
+// sees it (an Options struct with its own adapter-shaped field keeps its
+// default, matching the old file+env layering).
+func stripAdapterKeys(env Env) Env {
+	out := make(Env, len(env))
+outer:
+	for key, value := range env {
+		upper := strings.ToUpper(key)
+		for _, svc := range knownServiceNames() {
+			if upper == strings.ToUpper(svc)+"_ADAPTER" {
+				continue outer
+			}
+		}
+		out[key] = value
+	}
+	return out
+}
+
+// lookupEnvKey finds key (already uppercased) in env case-insensitively,
+// reporting the value. When several cases of the same key exist, the last
+// in sorted order wins, keeping multi-case environments deterministic.
+func lookupEnvKey(env Env, key string) (string, bool) {
+	var found bool
+	var value string
+	for _, k := range sortedEnvKeys(env) {
+		if strings.ToUpper(k) == key {
+			value, found = env[k], true
+		}
+	}
+	return value, found
+}
+
+// sortedEnvKeys returns env's keys in sorted order so multi-key application
+// and error reporting stay deterministic across map iteration order.
+func sortedEnvKeys(env Env) []string {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// ApplyEnv overlays env onto dst, the SINGLE reflection point for
+// environment configuration. service names the battery (matched
+// case-insensitively, so "DB" and "db" agree); name selects the instance,
+// "" for the default. The wired prefix is SERVICE for the default instance
+// and SERVICE__NAME for a named one, uppercased; keys outside the prefix
+// are ignored, as are bare names and other services' keys, so ambient
+// process environment never breaks startup.
+//
+// dst must be a non-nil pointer to a struct, in one of two shapes: a
+// Service envelope (an Adapter string field plus an Options struct field,
+// as in Config) or bare Options. In envelope form a trailing ADAPTER key
+// selects the adapter and every other key descends into Options; in bare
+// form ADAPTER keys resolve like any other field and unresolvable ones are
+// ignored, since adapter selection is the caller's job there.
+//
+// Field matching reuses the zero-alloc ASCII-fold: case-insensitive with
+// "_" ignored, so MAX_RETRIES matches MaxRetries. One nesting level is
+// supported (AUTH_JWT_SECRET sets JWT.Secret). A key matching both a flat
+// field and a nested path is a collision and fails. Unknown keys under the
+// wired prefix fail with an UnknownFieldError carrying a did-you-mean
+// suggestion. Durations parse via time.ParseDuration ("5s" style). Errors
+// name fields only — values are never echoed.
+func ApplyEnv(env Env, service, name string, dst any) error {
+	svc, ok := matchService(service)
+	if !ok {
+		return &UnknownServiceError{Service: service, Suggestion: closest(service, knownServiceNames())}
+	}
+	if strings.Contains(name, "__") {
+		return &InvalidOptionsError{Service: svc, Reason: fmt.Sprintf("invalid instance name %q: must not contain %q", name, "__")}
+	}
+	prefix := strings.ToUpper(svc)
+	named := name != ""
+	if named {
+		prefix += "__" + strings.ToUpper(name)
+	}
+	root := reflect.Indirect(reflect.ValueOf(dst))
+	if !root.IsValid() || root.Kind() != reflect.Struct || !root.CanSet() {
+		return &InvalidOptionsError{Service: svc, Reason: "dst must be a non-nil pointer to a struct"}
+	}
+	target := root
+	setDst := dst
+	var adapter reflect.Value
+	var candidates []string
+	envelope := false
+	if opts, ok := findField(root, "options"); ok && opts.Kind() == reflect.Struct {
+		if a, ok := findField(root, "adapter"); ok && a.Kind() == reflect.String && a.CanSet() {
+			target = opts
+			setDst = target.Addr().Interface()
+			adapter = a
+			envelope = true
+			candidates = append([]string{"adapter"}, fieldCandidates(target)...)
+		}
+	}
+	if candidates == nil {
+		candidates = fieldCandidates(root)
+	}
+	for _, key := range sortedEnvKeys(env) {
+		rest, ok := applyPrefixKey(key, prefix, named)
+		if !ok {
+			continue
+		}
+		if envelope && normEqualFold(rest, "adapter") {
+			adapter.SetString(env[key])
+			continue
+		}
+		if !envelope && normEqualFold(rest, "adapter") {
+			// Bare Options with no envelope: adapter selection is the
+			// caller's job, so a bare ADAPTER key sets the field when
+			// the struct has one and is otherwise ignored.
+			if field, ok := findField(target, rest); ok && isScalarField(field) {
+				if err := setOptionField(svc, setDst, []string{rest}, env[key], key); err != nil {
+					return wrapApplyError(svc, err)
+				}
+			}
+			continue
+		}
+		flat, flatOK := findField(target, rest)
+		outerName, innerName, hasNesting := cutEnvNesting(rest)
+		var outerStruct reflect.Value
+		var inner reflect.Value
+		nestedOK := false
+		if hasNesting {
+			if outer, ok := findField(target, outerName); ok {
+				if indir := reflect.Indirect(outer); indir.IsValid() && indir.Kind() == reflect.Struct {
+					outerStruct = indir
+					if in, ok := findField(indir, innerName); ok {
+						inner = in
+						nestedOK = true
+					}
+				}
+			}
+		}
+		if flatOK && isScalarField(flat) && nestedOK && isScalarField(inner) {
+			return &InvalidOptionsError{Service: svc, Reason: fmt.Sprintf("ambiguous env %s: matches fields %q and %q", key, strings.ToLower(rest), strings.ToLower(outerName)+"."+strings.ToLower(innerName))}
+		}
+		if flatOK && isScalarField(flat) {
+			if err := setOptionField(svc, setDst, []string{rest}, env[key], key); err != nil {
+				return wrapApplyError(svc, err)
+			}
+			continue
+		}
+		if nestedOK {
+			if err := setOptionField(svc, setDst, []string{outerName, innerName}, env[key], key); err != nil {
+				return wrapApplyError(svc, err)
+			}
+			continue
+		}
+		return unknownEnvFieldError(svc, rest, innerName, hasNesting, outerStruct, candidates)
+	}
 	return nil
 }
 
+// applyPrefixKey reports the field remainder of an env key under the wired
+// prefix. Default instances match PREFIX_FIELD (single underscore; double
+// underscores belong to the instance namespace and are skipped). Named
+// instances match PREFIX__FIELD. Everything else is not ours.
+func applyPrefixKey(key, prefix string, named bool) (string, bool) {
+	upper := strings.ToUpper(key)
+	if named {
+		sep := prefix + "__"
+		if upper == prefix || !strings.HasPrefix(upper, sep) {
+			return "", false
+		}
+		rest := upper[len(sep):]
+		if rest == "" {
+			return "", false
+		}
+		return rest, true
+	}
+	if upper == prefix || !strings.HasPrefix(upper, prefix+"_") {
+		return "", false
+	}
+	rest := upper[len(prefix)+1:]
+	if rest == "" || rest[0] == '_' {
+		return "", false
+	}
+	return rest, true
+}
+
+// cutEnvNesting splits a remainder at its first underscore into outer and
+// inner path segments. ok is false when there is no usable nesting.
+func cutEnvNesting(rest string) (outer, inner string, ok bool) {
+	idx := strings.IndexByte(rest, '_')
+	if idx <= 0 || idx+1 >= len(rest) {
+		return "", "", false
+	}
+	return rest[:idx], rest[idx+1:], true
+}
+
+// isScalarField reports whether f accepts a string coercion via setScalar:
+// durations, strings, bools, integers, unsigned integers, and floats.
+func isScalarField(f reflect.Value) bool {
+	if !f.IsValid() || !f.CanSet() {
+		return false
+	}
+	if f.Type() == durationType {
+		return true
+	}
+	switch f.Kind() { //nolint:exhaustive // default rejects every kind the env overlay doesn't support
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	default:
+		return false
+	}
+}
+
+// wrapApplyError converts a setOptionField failure to the ApplyEnv contract:
+// unknown fields surface as-is (they already carry a suggestion);
+// unparseable values become InvalidOptionsError without echoing the value.
+func wrapApplyError(svc string, err error) error {
+	var unknown *UnknownFieldError
+	if errors.As(err, &unknown) {
+		return err
+	}
+	return &InvalidOptionsError{Service: svc, Reason: err.Error()}
+}
+
+// unknownEnvFieldError builds the UnknownFieldError for a remainder that
+// resolved to no settable field, preferring the inner struct's candidates
+// for the suggestion when the outer segment resolved.
+func unknownEnvFieldError(svc, rest, innerName string, hasNesting bool, outerStruct reflect.Value, candidates []string) error {
+	if hasNesting && outerStruct.IsValid() {
+		if innerCands := fieldCandidates(outerStruct); len(innerCands) > 0 {
+			return &UnknownFieldError{Service: svc, Field: rest, Suggestion: closest(innerName, innerCands)}
+		}
+	}
+	return &UnknownFieldError{Service: svc, Field: rest, Suggestion: closest(rest, candidates)}
+}
+
+// InstanceNames lists the named instances configured for service in env by
+// parsing SERVICE__NAME__* keys. Names normalize to uppercase and return
+// sorted and deduplicated; malformed keys (empty name or field) are
+// skipped. Unknown services and empty input yield nil.
+func InstanceNames(env Env, service string) []string {
+	svc, ok := matchService(service)
+	if !ok {
+		return nil
+	}
+	head := strings.ToUpper(svc) + "__"
+	seen := make(map[string]bool)
+	var out []string
+	for _, key := range sortedEnvKeys(env) {
+		upper := strings.ToUpper(key)
+		if !strings.HasPrefix(upper, head) {
+			continue
+		}
+		name, field, ok := strings.Cut(upper[len(head):], "__")
+		if !ok || name == "" || field == "" {
+			continue
+		}
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// DefaultOptions returns fresh default Options for service, applying the
+// same zero-infrastructure defaults Default uses. name seeds named
+// instances from their service default: every instance starts identical and
+// diverges through ApplyEnv. Unknown services yield nil.
+func DefaultOptions(service, name string) any {
+	_ = name
+	svc, ok := matchService(service)
+	if !ok {
+		return nil
+	}
+	_, opts, ok := serviceRefs(Default(), svc)
+	if !ok {
+		return nil
+	}
+	return reflect.Indirect(reflect.ValueOf(opts)).Interface()
+}
+
 // applyPluginEnv overlays `<PLUGIN>_ADAPTER` variables onto cfg.Plugins,
-// one per registered plugin name (uppercased). Best-effort like the core
-// path: missing or empty variables are ignored, and with no plugins this
-// is a no-op. Only the adapter is overridable; plugin options stay raw
+// one per existing plugin entry (uppercased). Missing or empty variables
+// are ignored. Only the adapter is overridable; plugin options stay raw
 // because they have no typed fields to coerce into.
-func applyPluginEnv(cfg *Config) {
+func applyPluginEnv(env Env, cfg *Config) {
 	for name, svc := range cfg.Plugins {
-		v, ok := os.LookupEnv(strings.ToUpper(name) + "_ADAPTER")
+		v, ok := lookupEnvKey(env, strings.ToUpper(name)+"_ADAPTER")
 		if !ok || v == "" {
 			continue
 		}
@@ -404,8 +658,7 @@ func setOptionField(service string, dst any, path []string, value string, envNam
 // setScalar coerces the env string into f by kind. Durations parse via
 // time.ParseDuration ("5s" style). Failures name the field, source env var,
 // and expected kind via scrubbedValue — the raw value is never echoed, so
-// secrets in env/file values cannot leak into error text (decodeOptions
-// already scrubs the file path the same way).
+// secrets in env/file values cannot leak into error text.
 func setScalar(service, field, envName string, f reflect.Value, value string) error {
 	miss := func() error { return &UnknownFieldError{Service: service, Field: field} }
 	if f.Type() == durationType {

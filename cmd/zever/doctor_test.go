@@ -25,8 +25,14 @@ func TestRunDoctorInteractiveFlag(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
 
+	prevChecks := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prevChecks })
+	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
+		return map[string]func() error{"config": func() error { return nil }}
+	}
+
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
 	t.Chdir(dir)
 
 	if err := runDoctor([]string{"-i"}); err != nil {
@@ -62,8 +68,20 @@ func TestRunDoctorMissingConfigFile(t *testing.T) {
 }
 
 func TestRunDoctorWithCoreListsBatteries(t *testing.T) {
+	prev := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prev })
+	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
+		return map[string]func() error{
+			"config":   func() error { return nil },
+			"db":       func() error { return nil },
+			"password": func() error { return nil },
+			"queue":    func() error { return nil },
+			"workflow": func() error { return nil },
+		}
+	}
+
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", "log:\n  adapter: slog\nrouter:\n  adapter: stdhttp\ndb:\n  adapter: sqlite\npassword:\n  adapter: argon2id\nqueue:\n  adapter: memory\nworkflow:\n  adapter: memory\n")
+	cfgPath := writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\nDB_ADAPTER=sqlite\nPASSWORD_ADAPTER=argon2id\nQUEUE_ADAPTER=memory\nWORKFLOW_ADAPTER=memory\n")
 
 	var out bytes.Buffer
 	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
@@ -89,8 +107,14 @@ func TestRunDoctorWithCoreListsBatteries(t *testing.T) {
 }
 
 func TestRunDoctorWithCoreConfigFile(t *testing.T) {
+	prev := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prev })
+	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
+		return map[string]func() error{"config": func() error { return nil }}
+	}
+
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", "{}\n")
+	cfgPath := writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
 
 	var out bytes.Buffer
 	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
@@ -113,8 +137,9 @@ func TestRunDoctorWithCoreBadConfigFile(t *testing.T) {
 }
 
 // TestRunDoctorWithAppliesEnvOverrides proves `zever doctor` with no
-// --config resolves through config.Load(""), so env overrides apply before
-// batteries are resolved -- the same config the container would build.
+// --config resolves through dotenv discovery plus the process environment,
+// so env overrides apply before batteries are resolved -- the same config
+// the container would build.
 func TestRunDoctorWithAppliesEnvOverrides(t *testing.T) {
 	t.Setenv("DB_ADAPTER", "postgres")
 
@@ -152,8 +177,14 @@ func TestRunDoctorInteractiveLongForm(t *testing.T) {
 	prev := interactiveMode
 	t.Cleanup(func() { interactiveMode = prev })
 
+	prevChecks := doctorChecksFor
+	t.Cleanup(func() { doctorChecksFor = prevChecks })
+	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
+		return map[string]func() error{"config": func() error { return nil }}
+	}
+
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
 	t.Chdir(dir)
 
 	if err := runDoctor([]string{"--interactive"}); err != nil {

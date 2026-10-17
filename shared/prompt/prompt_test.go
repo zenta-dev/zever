@@ -109,7 +109,7 @@ func TestDoctorTriage(t *testing.T) {
 
 	got := DoctorTriage("auth: FAIL bad secret")
 
-	for _, want := range []string{"doctor --json", "FAIL", "ZEVER_*"} {
+	for _, want := range []string{"doctor --json", "FAIL", "AUTH_JWT_SECRET"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q:\n%s", want, got)
 		}

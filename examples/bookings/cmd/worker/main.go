@@ -6,10 +6,10 @@
 // per declared schedule). The scheduler dispatches onto the queue and the
 // worker consumes from it, so both must share one queue: with the in-process
 // memory adapter that means one process. Swapping the queue adapter for
-// redis/nats in zever.yaml is what makes this distributable, with no code
+// redis/nats via QUEUE_* env is what makes this distributable, with no code
 // change here.
 //
-// The container is wired here directly (config.Load + explicit adapter
+// The container is wired here directly (config.Resolve + explicit adapter
 // registration) so this track stays disjoint from the sibling server track
 // that owns internal/app.
 package main
@@ -76,7 +76,11 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("worker: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return fmt.Errorf("worker: load config: %w", err)
 	}

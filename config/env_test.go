@@ -8,11 +8,13 @@ import (
 )
 
 func TestEnvAdapterAll(t *testing.T) {
-	cfg := Default()
+	t.Parallel()
+	env := make(Env, len(knownServiceNames()))
 	for _, svc := range knownServiceNames() {
-		t.Setenv(svcKey(svc, "ADAPTER"), "custom-"+svc)
+		env[strings.ToUpper(svc)+"_ADAPTER"] = "custom-" + svc
 	}
-	if err := applyEnv(cfg); err != nil {
+	cfg, err := Resolve(env)
+	if err != nil {
 		t.Fatal(err)
 	}
 	for _, svc := range knownServiceNames() {
@@ -23,20 +25,19 @@ func TestEnvAdapterAll(t *testing.T) {
 	}
 }
 
-func svcKey(svc, field string) string {
-	return strings.ToUpper(svc) + "_" + field
-}
-
 func TestEnvFieldTypes(t *testing.T) {
-	t.Setenv("DB_MAXCONNS", "7")
-	t.Setenv("BILLING_SANDBOX", "true")
-	t.Setenv("RATELIMIT_RATE", "2.5")
-	t.Setenv("DB_MAXCONNLIFETIME", "5m")
-	t.Setenv("ROUTER_APPNAME", "myapp")
-	t.Setenv("PASSWORD_TIME", "5")
-	t.Setenv("AUTH_JWT_SECRET", "dummy-secret-value")
-	cfg := Default()
-	if err := applyEnv(cfg); err != nil {
+	t.Parallel()
+	env := Env{
+		"DB_MAXCONNS":        "7",
+		"BILLING_SANDBOX":    "true",
+		"RATELIMIT_RATE":     "2.5",
+		"DB_MAXCONNLIFETIME": "5m",
+		"ROUTER_APPNAME":     "myapp",
+		"PASSWORD_TIME":      "5",
+		"AUTH_JWT_SECRET":    "dummy-secret-value",
+	}
+	cfg, err := Resolve(env)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DB.Options.MaxConns != 7 {
@@ -63,16 +64,18 @@ func TestEnvFieldTypes(t *testing.T) {
 }
 
 func TestEnvNested(t *testing.T) {
-	t.Setenv("SESSION_REDIS_ADDR", "localhost:6379")
-	t.Setenv("FLAG_STATIC_PATH", "/tmp/x")
-	t.Setenv("WEBHOOK_MAX_RETRIES", "3")
-	t.Setenv("PASSWORD_SALT_LENGTH", "24")
-	t.Setenv("CACHE_MAXENTRIES", "100")
-	t.Setenv("STORAGE_ROOT", "/data")
-	t.Setenv("CRYPTO_SIGN_KEY", "e30=")
-	t.Setenv("SESSION_TTL", "30s")
-	cfg := Default()
-	if err := applyEnv(cfg); err != nil {
+	t.Parallel()
+	env := Env{
+		"SESSION_REDIS_ADDR":   "localhost:6379",
+		"FLAG_STATIC_PATH":     "/tmp/x",
+		"WEBHOOK_MAX_RETRIES":  "3",
+		"PASSWORD_SALT_LENGTH": "24",
+		"CACHE_MAXENTRIES":     "100",
+		"STORAGE_ROOT":         "/data",
+		"SESSION_TTL":          "30s",
+	}
+	cfg, err := Resolve(env)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.Session.Options.Redis.Addr != "localhost:6379" {
@@ -93,20 +96,32 @@ func TestEnvNested(t *testing.T) {
 	if cfg.Storage.Options.Root != "/data" {
 		t.Fatalf("got %q", cfg.Storage.Options.Root)
 	}
-	if cfg.Crypto.Options.SignKey != "e30=" {
-		t.Fatalf("got %q", cfg.Crypto.Options.SignKey)
-	}
 	if cfg.Session.Options.TTL != 30*time.Second {
 		t.Fatalf("got %v", cfg.Session.Options.TTL)
 	}
 }
 
-func TestEnvDedicatedPool(t *testing.T) {
-	t.Setenv("SEARCH_DEDICATEDPOOL", "true")
-	t.Setenv("QUEUE_DEDICATEDPOOL", "true")
-	t.Setenv("SESSION_DSN", "data/sess.db")
+func TestEnvCryptoSignKey(t *testing.T) {
+	t.Parallel()
 	cfg := Default()
-	if err := applyEnv(cfg); err != nil {
+	env := Env{"CRYPTO_SIGN_KEY": "e30="}
+	if err := ApplyEnv(env, "crypto", "", &cfg.Crypto); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Crypto.Options.SignKey != "e30=" {
+		t.Fatalf("got %q", cfg.Crypto.Options.SignKey)
+	}
+}
+
+func TestEnvDedicatedPool(t *testing.T) {
+	t.Parallel()
+	env := Env{
+		"SEARCH_DEDICATEDPOOL": "true",
+		"QUEUE_DEDICATEDPOOL":  "true",
+		"SESSION_DSN":          "data/sess.db",
+	}
+	cfg, err := Resolve(env)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if !cfg.Search.Options.DedicatedPool {
@@ -120,35 +135,56 @@ func TestEnvDedicatedPool(t *testing.T) {
 	}
 }
 
-func TestEnvIgnoreUnknown(t *testing.T) {
-	t.Setenv("FOO_BAR", "x")
-	t.Setenv("AUTH_TOKEN", "hostile")
-	t.Setenv("DB", "hostile")
-	t.Setenv("CONFIGTESTBARE", "hostile")
-	t.Setenv("DB_", "x")
-	t.Setenv("DB_NOPE_X", "x")
-	t.Setenv("PERMISSION_RULES", "x")
-	t.Setenv("OBSERVABILITY_HEADERS", "x")
-	t.Setenv("SCHEDULER_DISPATCHER_Q", "x")
-	t.Setenv("STORAGE_POLICY_X", "y")
-	t.Setenv("DB_DSN_X", "z")
-	t.Setenv("EVENTBUS_ONPANIC", "x")
-	t.Setenv("SCHEDULER_DISPATCHER", "x")
-	cfg := Default()
-	before := *cfg
-	if err := applyEnv(cfg); err != nil {
+// TestEnvIgnoreUnknownHeads pins the ambient-environment rule: keys whose
+// head names no known service (or which name no field at all) never break
+// resolution.
+func TestEnvIgnoreUnknownHeads(t *testing.T) {
+	t.Parallel()
+	env := Env{
+		"FOO_BAR":        "x",
+		"PATH":           "/bin",
+		"DB":             "hostile",
+		"CONFIGTESTBARE": "hostile",
+		"DB_":            "x",
+	}
+	cfg, err := Resolve(env)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DB.Options.DSN != "" || cfg.DB.Adapter != "sqlite" {
 		t.Fatal("hostile env leaked into db")
 	}
-	if cfg.Auth.Options.JWT.Secret != "" {
-		t.Fatal("AUTH_TOKEN leaked into auth")
+}
+
+// TestEnvUnknownFieldFails pins the fail-fast rule: a key under a WIRED
+// service prefix that resolves to no field is an error, not a silent skip,
+// so typos surface instead of booting with defaults.
+func TestEnvUnknownFieldFails(t *testing.T) {
+	t.Parallel()
+	for _, key := range []string{
+		"DB_NOPE_X", "AUTH_TOKEN", "PERMISSION_RULES",
+		"OBSERVABILITY_HEADERS", "SCHEDULER_DISPATCHER_Q",
+		"STORAGE_POLICY_X", "DB_DSN_X", "EVENTBUS_ONPANIC", "SCHEDULER_DISPATCHER",
+	} {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+			_, err := Resolve(Env{key: "x"})
+			if err == nil {
+				t.Fatalf("%s: want error", key)
+			}
+			var unknown *UnknownFieldError
+			if !errors.As(err, &unknown) {
+				t.Fatalf("%s: want UnknownFieldError, got %T: %v", key, err, err)
+			}
+			if !errors.Is(err, ErrUnknownField) {
+				t.Fatalf("%s: want ErrUnknownField match: %v", key, err)
+			}
+		})
 	}
-	_ = before
 }
 
 func TestEnvTypeErrors(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"DB_MAXCONNS":               "abc",
 		"BILLING_SANDBOX":           "maybe",
@@ -163,8 +199,8 @@ func TestEnvTypeErrors(t *testing.T) {
 	}
 	for key, val := range cases {
 		t.Run(key, func(t *testing.T) {
-			t.Setenv(key, val)
-			err := applyEnv(Default())
+			t.Parallel()
+			_, err := Resolve(Env{key: val})
 			if err == nil {
 				t.Fatal("want error")
 			}

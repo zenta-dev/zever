@@ -7,19 +7,20 @@ import (
 	"testing"
 )
 
-func writeFile(t *testing.T, dir, name, content string) string {
+func writeFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	p := filepath.Join(dir, name)
 	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return p
 }
 
-// seedHostileEnv sets variables that must never affect Load.
+// seedHostileEnv sets process variables that must never affect Resolve:
+// unknown heads and bare names are ignored. AUTH_TOKEN is deliberately
+// absent: AUTH is a wired service head, so it fails fast under the unknown-
+// key rule (pinned by TestEnvUnknownFieldFails).
 func seedHostileEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("AUTH_TOKEN", "hostile")
 	t.Setenv("DB", "hostile")
 	t.Setenv("USER", "hostile")
 	t.Setenv("CONFIGTESTBARE", "hostile")
@@ -49,55 +50,9 @@ func TestKnownServiceNames(t *testing.T) {
 	}
 }
 
-func TestLoadExplicitMissing(t *testing.T) {
+func TestResolveDefaults(t *testing.T) {
 	seedHostileEnv(t)
-	cfg, err := Load(filepath.Join(t.TempDir(), "nope.yaml"))
-	if err == nil {
-		t.Fatal("want error")
-	}
-	if cfg != nil {
-		t.Fatal("want nil config")
-	}
-}
-
-func TestLoadExplicitUnsupported(t *testing.T) {
-	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.toml", "x = 1\n")
-	_, err := Load(p)
-	if err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadExplicitBadYAML(t *testing.T) {
-	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.yaml", ":\tbad:\n")
-	if _, err := Load(p); err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadExplicitUnknownService(t *testing.T) {
-	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.yaml", "nope:\n  adapter: x\n")
-	_, err := Load(p)
-	if err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadExplicitUnknownField(t *testing.T) {
-	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.yaml", "db:\n  adapter: sqlite\n  options:\n    bogus: 1\n")
-	if _, err := Load(p); err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadDiscoverAbsent(t *testing.T) {
-	seedHostileEnv(t)
-	t.Chdir(t.TempDir())
-	cfg, err := Load("")
+	cfg, err := Resolve(Env{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,115 +61,9 @@ func TestLoadDiscoverAbsent(t *testing.T) {
 	}
 }
 
-func TestLoadDiscoverYAML(t *testing.T) {
+func TestResolveEnvOverrides(t *testing.T) {
 	seedHostileEnv(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "zever.yaml", "db:\n  adapter: postgres\nlog:\n  adapter: noop\n")
-	t.Chdir(dir)
-	cfg, err := Load("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
-	}
-	if cfg.Log.Adapter != "noop" {
-		t.Fatalf("got %q", cfg.Log.Adapter)
-	}
-}
-
-func TestLoadDiscoverJSON(t *testing.T) {
-	seedHostileEnv(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "zever.json", `{"db": {"adapter": "postgres"}}`)
-	t.Chdir(dir)
-	cfg, err := Load("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
-	}
-}
-
-func TestLoadDiscoverSkipsDir(t *testing.T) {
-	seedHostileEnv(t)
-	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "zever.yaml"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, dir, "zever.yml", "db:\n  adapter: postgres\n")
-	t.Chdir(dir)
-	cfg, err := Load("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
-	}
-}
-
-func TestLoadDiscoverBadFile(t *testing.T) {
-	seedHostileEnv(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "zever.yaml", ":\tbad:\n")
-	t.Chdir(dir)
-	if _, err := Load(""); err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadDiscoverMergeError(t *testing.T) {
-	seedHostileEnv(t)
-	dir := t.TempDir()
-	writeFile(t, dir, "zever.yaml", "nope:\n  adapter: x\n")
-	t.Chdir(dir)
-	if _, err := Load(""); err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadInvalidFailsNil(t *testing.T) {
-	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.yaml", "crypto:\n  adapter: local\n  options:\n    key: x\n")
-	cfg, err := Load(p)
-	if err == nil {
-		t.Fatal("want error")
-	}
-	if cfg != nil {
-		t.Fatal("want nil config")
-	}
-}
-
-func TestLoadEnvTypeError(t *testing.T) {
-	seedHostileEnv(t)
-	t.Setenv("DB_MAXCONNS", "abc")
-	dir := t.TempDir()
-	t.Chdir(dir)
-	if _, err := Load(""); err == nil {
-		t.Fatal("want error")
-	}
-}
-
-func TestLoadEnvBadAdapterFails(t *testing.T) {
-	seedHostileEnv(t)
-	t.Setenv("DB_ADAPTER", "")
-	dir := t.TempDir()
-	t.Chdir(dir)
-	cfg, err := Load("")
-	if err == nil {
-		t.Fatal("want error")
-	}
-	if cfg != nil {
-		t.Fatal("want nil config")
-	}
-}
-
-func TestLoadPrecedence(t *testing.T) {
-	seedHostileEnv(t)
-	p := writeFile(t, t.TempDir(), "zever.yaml", "db:\n  adapter: postgres\n  options:\n    max_conns: 10\n")
-	t.Setenv("DB_MAXCONNS", "20")
-	cfg, err := Load(p)
+	cfg, err := Resolve(Env{"DB_ADAPTER": "postgres", "DB_MAXCONNS": "20"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,6 +72,66 @@ func TestLoadPrecedence(t *testing.T) {
 	}
 	if cfg.DB.Options.MaxConns != 20 {
 		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
+	}
+}
+
+func TestResolveInvalidFailsNil(t *testing.T) {
+	seedHostileEnv(t)
+	cfg, err := Resolve(Env{"CRYPTO_ADAPTER": "local", "CRYPTO_KEY": "x"})
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if cfg != nil {
+		t.Fatal("want nil config")
+	}
+}
+
+func TestResolveEnvTypeError(t *testing.T) {
+	seedHostileEnv(t)
+	if _, err := Resolve(Env{"DB_MAXCONNS": "abc"}); err == nil {
+		t.Fatal("want error")
+	}
+}
+
+func TestResolveEnvBadAdapterFails(t *testing.T) {
+	seedHostileEnv(t)
+	cfg, err := Resolve(Env{"DB_ADAPTER": ""})
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if cfg != nil {
+		t.Fatal("want nil config")
+	}
+}
+
+func TestFromEnvReadsDotEnv(t *testing.T) {
+	seedHostileEnv(t)
+	dir := t.TempDir()
+	writeFile(t, dir, ".env", "DB_ADAPTER=postgres\n")
+	t.Chdir(dir)
+	env, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if env["DB_ADAPTER"] != "postgres" {
+		t.Fatalf("got %q", env["DB_ADAPTER"])
+	}
+	cfg, err := Resolve(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DB.Adapter != "postgres" {
+		t.Fatalf("got %q", cfg.DB.Adapter)
+	}
+}
+
+func TestFromEnvMalformedDotEnvFails(t *testing.T) {
+	seedHostileEnv(t)
+	dir := t.TempDir()
+	writeFile(t, dir, ".env", ":\tbad:\n")
+	t.Chdir(dir)
+	if _, err := FromEnv(); err == nil {
+		t.Fatal("want error")
 	}
 }
 
@@ -255,10 +164,7 @@ func TestRedactedServices(t *testing.T) {
 func TestErrorSecretsNeverInText(t *testing.T) {
 	seedHostileEnv(t)
 	secret := "super-secret-value-xyz-123"
-	t.Setenv("DB_MAXCONNS", secret)
-	dir := t.TempDir()
-	t.Chdir(dir)
-	_, err := Load("")
+	_, err := Resolve(Env{"DB_MAXCONNS": secret})
 	if err == nil {
 		t.Fatal("want error")
 	}

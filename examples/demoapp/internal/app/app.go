@@ -1,7 +1,7 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// It layers zever's zero-infra defaults, overlaid by zever.yaml in the
+// It layers zever's zero-infra defaults, overlaid by .env files in the
 // working directory and by environment variables, then injects demo-friendly
 // defaults for the batteries that need explicit material (file paths, the
 // RBAC rules, the embedded i18n catalogs). The container resolves every
@@ -86,12 +86,16 @@ const (
 const DevJWTSecret = "dev-only-insecure-secret-32bytes!!" //nolint:gosec
 
 // Config returns the resolved configuration: zever's zero-infra defaults,
-// overlaid by any zever.yaml in the working directory and by environment
+// overlaid by .env/.env.local discovery and by environment
 // variables, with demo file paths and rules filled in when nothing supplied
 // them. Runtime defaults live here because internal/app is hand-owned and
 // never regenerated, so entrypoints stay pure CLI shape.
 func Config() (*config.Config, error) {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("app: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
 	}

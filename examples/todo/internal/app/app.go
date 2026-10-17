@@ -6,7 +6,7 @@
 // Register for exactly the adapters it actually uses and nothing else.
 //
 // JWT secret comes from the environment only: set AUTH_JWT_SECRET to at
-// least 32 bytes. It is never stored in zever.yaml. `zever doctor` reports
+// least 32 bytes. It is never stored in a file. `zever doctor` reports
 // auth FAIL until the secret is set, which is expected by default.
 package app
 
@@ -31,13 +31,17 @@ import (
 const DefaultDBPath = "data/app.db"
 
 // Config returns the resolved configuration: zever's zero-infra defaults,
-// overlaid by any zever.yaml in the working directory and by environment
+// overlaid by .env/.env.local discovery and by environment
 // variables, with a sqlite path filled in when nothing supplied one.
 //
 // The JWT secret (AUTH_JWT_SECRET) comes from the environment only and is
 // never defaulted here; auth/jwt requires at least 32 bytes.
 func Config() (*config.Config, error) {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("app: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
 	}

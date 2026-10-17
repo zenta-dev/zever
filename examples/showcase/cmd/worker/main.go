@@ -5,7 +5,7 @@
 // generator output): the scheduler dispatches onto the queue and the worker
 // consumes from it, so both must share one queue: with the in-process memory
 // adapter that means one process. Swapping the queue adapter for redis/nats
-// in zever.yaml is what makes this distributable, with no code change here.
+// via QUEUE_* env is what makes this distributable, with no code change here.
 //
 // Unlike the canonical stubs (which take no deps), the handlers here close
 // over jobs.Deps, which is the filled-in stub form.

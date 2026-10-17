@@ -14,7 +14,7 @@ func TestRunQueueWorkUsesDefaultWorkerEntry(t *testing.T) {
 	assertOneLaunch(t, calls, defaultWorkerEntry, []string{"--concurrency=8"})
 }
 
-func TestRunQueueWorkUsesConfiguredWorkerEntry(t *testing.T) {
+func TestRunQueueWorkIgnoresLegacyWorkerEntry(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  worker_entry: cmd/jobs\n")
 	t.Chdir(dir)
@@ -25,7 +25,7 @@ func TestRunQueueWorkUsesConfiguredWorkerEntry(t *testing.T) {
 		t.Fatalf("runQueueWork: %v", err)
 	}
 
-	assertOneLaunch(t, calls, "cmd/jobs", nil)
+	assertOneLaunch(t, calls, defaultWorkerEntry, nil)
 }
 
 func TestRunQueueWorkHelpDoesNotLaunch(t *testing.T) {
@@ -53,19 +53,19 @@ func TestResolveWorkerConfig(t *testing.T) {
 	}
 }
 
-// TestRunQueueWorkBadConfig proves a broken project file surfaces as an error.
-func TestRunQueueWorkBadConfig(t *testing.T) {
+// TestRunQueueWorkIgnoresBadLegacyConfig proves a broken legacy project
+// file no longer surfaces: layout is defaults-only, so the default worker
+// launches.
+func TestRunQueueWorkIgnoresBadLegacyConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  worker_entry: [unclosed\n")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
 
-	if err := runQueueWork(nil); err == nil {
-		t.Fatal("expected a config error, got nil")
+	if err := runQueueWork(nil); err != nil {
+		t.Fatalf("runQueueWork: %v", err)
 	}
 
-	if len(*calls) != 0 {
-		t.Fatalf("bad config launched a child: %+v", *calls)
-	}
+	assertOneLaunch(t, calls, defaultWorkerEntry, nil)
 }

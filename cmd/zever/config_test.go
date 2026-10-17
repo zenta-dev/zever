@@ -96,7 +96,7 @@ func TestRunConfigShowWithCoreRedactsSecrets(t *testing.T) {
 
 func TestRunConfigShowWithCoreConfigFile(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", "{}\n")
+	cfgPath := writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
 
 	var out bytes.Buffer
 	if err := runConfigShowWith(ConfigConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
@@ -118,8 +118,9 @@ func TestRunConfigShowWithCoreBadConfigFile(t *testing.T) {
 }
 
 // TestRunConfigShowWithAppliesEnvOverrides proves `zever config show` with no
-// --config resolves through config.Load(""), so env overrides apply exactly
-// as they do when the container builds its config.
+// --config resolves through dotenv discovery plus the process environment,
+// so env overrides apply exactly as they do when the container builds its
+// config.
 func TestRunConfigShowWithAppliesEnvOverrides(t *testing.T) {
 	t.Setenv("DB_ADAPTER", "postgres")
 

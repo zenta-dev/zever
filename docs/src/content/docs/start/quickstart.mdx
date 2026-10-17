@@ -50,7 +50,6 @@ Expected output (abridged):
 ✔ scaffolded "hello" into ./hello
   wrote hello/schema/app.zen
   wrote hello/cmd/server/main.go
-  wrote hello/zever.yaml
 ```
 
 Start small with `--profile minimal` (bootable floor only), `--profile api` (adds cache, queue, session, password, scheduler, and reliability batteries), or `--profile full` (every battery). See [Customizing and leaving zever](../extend/customizing-and-leaving/) for the "batteries you actually need" table with measured dependency footprints.
@@ -129,8 +128,12 @@ service TaskService {
    ```
 
 5. Serve the API. The server listens on `:8080` (HTTP) and `:9090` (gRPC).
+   Service configuration is env-only: export the secrets the boot
+   batteries need first (32+ byte JWT secret).
 
    ```sh
+   export AUTH_JWT_SECRET=0123456789abcdef0123456789abcdef
+   export AUTH_JWT_ISSUER=dev
    zever serve
    ```
 

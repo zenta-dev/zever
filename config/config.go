@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/core/analytics"
@@ -48,55 +47,65 @@ import (
 // The adapter names the backend implementation (for example "sqlite");
 // Options carries that backend's typed settings.
 type Service[T any] struct {
-	Adapter string `json:"adapter" yaml:"adapter"`
-	Options T      `json:"options" yaml:"options"`
+	Adapter string `json:"adapter"`
+	Options T      `json:"options"`
+}
+
+// ServiceConfig is the display envelope for a single service: the adapter
+// name plus its redacted option map. It backs RedactedServices, the sole
+// display path for option maps.
+type ServiceConfig struct {
+	// Adapter names the backend implementation (for example "sqlite").
+	Adapter string `json:"adapter"`
+	// Options carries the backend's redacted settings.
+	Options map[string]any `json:"options"`
 }
 
 // Config holds the resolved typed configuration for every service.
 type Config struct {
-	AI            Service[ai.Options]            `json:"ai" yaml:"ai"`
-	Analytics     Service[analytics.Options]     `json:"analytics" yaml:"analytics"`
-	Auth          Service[auth.Options]          `json:"auth" yaml:"auth"`
-	Billing       Service[billing.Options]       `json:"billing" yaml:"billing"`
-	Cache         Service[cache.Options]         `json:"cache" yaml:"cache"`
-	CDN           Service[cdn.Options]           `json:"cdn" yaml:"cdn"`
-	Crypto        Service[crypto.Options]        `json:"crypto" yaml:"crypto"`
-	DB            Service[db.Options]            `json:"db" yaml:"db"`
-	Document      Service[document.Options]      `json:"document" yaml:"document"`
-	EventBus      Service[eventbus.Options]      `json:"eventbus" yaml:"eventbus"`
-	Flag          Service[flag.Options]          `json:"flag" yaml:"flag"`
-	Geo           Service[geo.Options]           `json:"geo" yaml:"geo"`
-	I18n          Service[i18n.Options]          `json:"i18n" yaml:"i18n"`
-	Idempotency   Service[idempotency.Options]   `json:"idempotency" yaml:"idempotency"`
-	Lock          Service[lock.Options]          `json:"lock" yaml:"lock"`
-	Log           Service[log.Options]           `json:"log" yaml:"log"`
-	Mailer        Service[mailer.Options]        `json:"mailer" yaml:"mailer"`
-	Media         Service[media.Options]         `json:"media" yaml:"media"`
-	Notification  Service[notification.Options]  `json:"notification" yaml:"notification"`
-	Observability Service[observability.Options] `json:"observability" yaml:"observability"`
-	Outbox        Service[outbox.Options]        `json:"outbox" yaml:"outbox"`
-	Password      Service[password.Options]      `json:"password" yaml:"password"`
-	Payment       Service[payment.Options]       `json:"payment" yaml:"payment"`
-	Permission    Service[permission.Options]    `json:"permission" yaml:"permission"`
-	Queue         Service[queue.Options]         `json:"queue" yaml:"queue"`
-	RateLimit     Service[ratelimit.Options]     `json:"ratelimit" yaml:"ratelimit"`
-	Resilience    Service[resilience.Options]    `json:"resilience" yaml:"resilience"`
-	Router        Service[router.Options]        `json:"router" yaml:"router"`
-	Scheduler     Service[scheduler.Options]     `json:"scheduler" yaml:"scheduler"`
-	Search        Service[search.Options]        `json:"search" yaml:"search"`
-	Secrets       Service[secrets.Options]       `json:"secrets" yaml:"secrets"`
-	Session       Service[session.Options]       `json:"session" yaml:"session"`
-	Storage       Service[storage.Options]       `json:"storage" yaml:"storage"`
-	Tenant        Service[tenant.Options]        `json:"tenant" yaml:"tenant"`
-	VectorStore   Service[vectorstore.Options]   `json:"vectorstore" yaml:"vectorstore"`
-	Webhook       Service[webhook.Options]       `json:"webhook" yaml:"webhook"`
-	Workflow      Service[workflow.Options]      `json:"workflow" yaml:"workflow"`
+	AI            Service[ai.Options]            `json:"ai"`
+	Analytics     Service[analytics.Options]     `json:"analytics"`
+	Auth          Service[auth.Options]          `json:"auth"`
+	Billing       Service[billing.Options]       `json:"billing"`
+	Cache         Service[cache.Options]         `json:"cache"`
+	CDN           Service[cdn.Options]           `json:"cdn"`
+	Crypto        Service[crypto.Options]        `json:"crypto"`
+	DB            Service[db.Options]            `json:"db"`
+	Document      Service[document.Options]      `json:"document"`
+	EventBus      Service[eventbus.Options]      `json:"eventbus"`
+	Flag          Service[flag.Options]          `json:"flag"`
+	Geo           Service[geo.Options]           `json:"geo"`
+	I18n          Service[i18n.Options]          `json:"i18n"`
+	Idempotency   Service[idempotency.Options]   `json:"idempotency"`
+	Lock          Service[lock.Options]          `json:"lock"`
+	Log           Service[log.Options]           `json:"log"`
+	Mailer        Service[mailer.Options]        `json:"mailer"`
+	Media         Service[media.Options]         `json:"media"`
+	Notification  Service[notification.Options]  `json:"notification"`
+	Observability Service[observability.Options] `json:"observability"`
+	Outbox        Service[outbox.Options]        `json:"outbox"`
+	Password      Service[password.Options]      `json:"password"`
+	Payment       Service[payment.Options]       `json:"payment"`
+	Permission    Service[permission.Options]    `json:"permission"`
+	Queue         Service[queue.Options]         `json:"queue"`
+	RateLimit     Service[ratelimit.Options]     `json:"ratelimit"`
+	Resilience    Service[resilience.Options]    `json:"resilience"`
+	Router        Service[router.Options]        `json:"router"`
+	Scheduler     Service[scheduler.Options]     `json:"scheduler"`
+	Search        Service[search.Options]        `json:"search"`
+	Secrets       Service[secrets.Options]       `json:"secrets"`
+	Session       Service[session.Options]       `json:"session"`
+	Storage       Service[storage.Options]       `json:"storage"`
+	Tenant        Service[tenant.Options]        `json:"tenant"`
+	VectorStore   Service[vectorstore.Options]   `json:"vectorstore"`
+	Webhook       Service[webhook.Options]       `json:"webhook"`
+	Workflow      Service[workflow.Options]      `json:"workflow"`
 	// Plugins holds third-party plugin services keyed by plugin name. Each
 	// entry carries the plugin's adapter selection plus its raw, untyped
 	// options: unknown option fields pass through untouched because the
 	// plugin validates them itself (see RegisterPluginValidator). Nil by
 	// default; Default leaves it nil and merge initializes it on first use.
-	Plugins map[string]Service[json.RawMessage] `json:"plugins" yaml:"plugins" toml:"plugins"`
+	Plugins map[string]Service[json.RawMessage] `json:"plugins"`
 }
 
 // knownServiceNames returns the 37 lowercase service names in sorted order.
@@ -118,8 +127,8 @@ var mapCodec = codec.JSONCodec[map[string]any]{}
 
 // serviceToMap converts one service's typed options to a plain map via a
 // JSON round-trip, preserving each package's json-tag semantics. It is the
-// shared bridge for redaction and env field discovery. The file path stays
-// marshal-based too (decodeOptions), so reflection is confined to env.go.
+// shared bridge for redaction and env field discovery; reflection for env
+// application stays confined to env.go.
 func serviceToMap[T any](o T) map[string]any {
 	b, err := codec.JSONCodec[T]{}.Encode(o)
 	if err != nil {
@@ -207,58 +216,4 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 		out[name] = ServiceConfig{Adapter: svc.Adapter, Options: m}
 	}
 	return out
-}
-
-// discoveryOrder lists the filenames probed (in CWD) when Load is called
-// with an empty path. First hit wins; absent files are silently skipped.
-var discoveryOrder = []string{"zever.yaml", "zever.yml", "zever.json"}
-
-// Load builds a Config in layers, later layers winning:
-//
-//  1. Default: zero-infrastructure adapters plus deterministic dev secrets.
-//  2. File: path != "" must exist and decode (any failure returns nil, err);
-//     path == "" discovers zever.yaml/yml/json in CWD, absent files skip silently.
-//  3. merge: strict — unknown services and unknown fields fail.
-//  4. applyEnv: best-effort — unknown variables are ignored, never errors.
-//  5. Validate: fail-closed — any service failure returns nil, err.
-//
-// On ANY failure Load returns nil plus the error.
-func Load(path string) (*Config, error) {
-	cfg := Default()
-	if path != "" {
-		raw, err := decodeFile(path)
-		if err != nil {
-			return nil, err
-		}
-		if err := merge(cfg, raw); err != nil {
-			return nil, err
-		}
-	} else if found := discover(); found != "" {
-		raw, err := decodeFile(found)
-		if err != nil {
-			return nil, err
-		}
-		if err := merge(cfg, raw); err != nil {
-			return nil, err
-		}
-	}
-	if err := applyEnv(cfg); err != nil {
-		return nil, err
-	}
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-	return cfg, nil
-}
-
-// discover returns the first existing discoveryOrder file in CWD, or ""
-// when none exists. Stat failures (missing files, permissions) simply
-// skip: discovery is best-effort, and an explicit path stays strict.
-func discover() string {
-	for _, name := range discoveryOrder {
-		if info, err := os.Stat(name); err == nil && !info.IsDir() {
-			return name
-		}
-	}
-	return ""
 }

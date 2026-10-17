@@ -85,6 +85,13 @@ func TestP32ScaffoldBootsE2E(t *testing.T) {
 	t.Setenv("GOFLAGS", "-mod=mod")
 	t.Setenv("GOWORK", "off")
 
+	// Service config is env-only: the scaffold ships no secrets, so the
+	// boot batteries that need security material get it from env (the same
+	// values an operator would supply). The child server inherits them via
+	// os.Environ below.
+	t.Setenv("AUTH_JWT_SECRET", "0123456789abcdef0123456789abcdef")
+	t.Setenv("AUTH_JWT_ISSUER", "dev")
+
 	// Restore real tidy runner (TestMain stubs it for unit speed).
 	runGoModTidyFunc = runGoModTidy
 	t.Cleanup(func() { runGoModTidyFunc = func(string, string) error { return nil } })

@@ -38,10 +38,7 @@ func writeAddFixture(t *testing.T, dir, frameworkDir string) {
 		t.Fatalf("write app.go: %v", werr)
 	}
 
-	yamlData, err := renderZeverYaml(NewConfig{Batteries: []string{"log", "router"}})
-	if err != nil {
-		t.Fatalf("renderZeverYaml: %v", err)
-	}
+	yamlData := "log:\n  adapter: slog\nrouter:\n  adapter: stdhttp\n"
 
 	if err := os.WriteFile(filepath.Join(dir, "zever.yaml"), append([]byte(zeverYamlSchemaModeline), yamlData...), 0o600); err != nil {
 		t.Fatalf("write zever.yaml: %v", err)

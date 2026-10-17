@@ -6,7 +6,7 @@
 // uses, and each has a matching Register call in New wiring its battery
 // registry. This list was picked at scaffold time (`zever new`'s battery picker, or the floor
 // (log, router) when there was no prior `zever new`) -- add a battery
-// later with `zever add <battery>` (or by hand in zever.yaml plus one
+// later with `zever add <battery>` (or with service env plus one
 // import and Register call here); this file is scaffolded once and never
 // regenerated.
 package app
@@ -25,11 +25,15 @@ import (
 const DefaultDBPath = "data/app.db"
 
 // Config returns the resolved configuration: zever's zero-infra defaults,
-// overlaid by any zever.yaml in the working directory and by ZEVER_*
-// environment variables, with a sqlite path filled in when nothing supplied
+// overlaid by .env/.env.local discovery and <SERVICE>_* environment
+// variables, with a sqlite path filled in when nothing supplied
 // one.
 func Config() (*config.Config, error) {
-	cfg, err := config.Load("")
+	env, err := config.FromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("app: load env: %w", err)
+	}
+	cfg, err := config.Resolve(env)
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
 	}

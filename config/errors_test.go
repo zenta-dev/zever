@@ -21,14 +21,6 @@ func TestErrUnknownField_message(t *testing.T) {
 	}
 }
 
-func TestErrUnsupportedFormat_message(t *testing.T) {
-	t.Parallel()
-
-	if got, want := ErrUnsupportedFormat.Error(), "config: unsupported format"; got != want {
-		t.Errorf("Error() = %q, want %q", got, want)
-	}
-}
-
 func TestErrInvalidOptions_message(t *testing.T) {
 	t.Parallel()
 
@@ -37,10 +29,10 @@ func TestErrInvalidOptions_message(t *testing.T) {
 	}
 }
 
-func TestErrDecode_message(t *testing.T) {
+func TestErrInvalidValue_message(t *testing.T) {
 	t.Parallel()
 
-	if got, want := ErrDecode.Error(), "config: decode"; got != want {
+	if got, want := ErrInvalidValue.Error(), "config: invalid value"; got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 }
@@ -88,40 +80,6 @@ func TestUnknownFieldError_errorAndUnwrap(t *testing.T) {
 
 	if target.Service != "db" || target.Field != "bogus" {
 		t.Errorf("got {%q %q}, want {db bogus}", target.Service, target.Field)
-	}
-}
-
-func TestDecodeError_errorAndUnwrap(t *testing.T) {
-	t.Parallel()
-
-	inner := errors.New("boom")
-	err := &DecodeError{Service: "db", Err: inner}
-
-	if got, want := err.Error(), "config: decode db: boom"; got != want {
-		t.Errorf("Error() = %q, want %q", got, want)
-	}
-
-	if !errors.Is(err, inner) {
-		t.Errorf("errors.Is did not match inner error %v", inner)
-	}
-
-	var target *DecodeError
-	if !errors.As(err, &target) {
-		t.Fatalf("errors.As failed for %v", err)
-	}
-
-	if target.Service != "db" {
-		t.Errorf("Service = %q, want %q", target.Service, "db")
-	}
-}
-
-func TestDecodeError_unwrapChainPreservesSentinel(t *testing.T) {
-	t.Parallel()
-
-	wrapped := &DecodeError{Service: "db", Err: ErrDecode}
-
-	if !errors.Is(wrapped, ErrDecode) {
-		t.Errorf("errors.Is(%v, ErrDecode) = false, want true", wrapped)
 	}
 }
 

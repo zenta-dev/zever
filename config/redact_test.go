@@ -547,7 +547,7 @@ func TestRedactSecretFields_secretType(t *testing.T) {
 	t.Parallel()
 
 	type typed struct {
-		APIKey Secret `json:"api_key" toml:"api_key" yaml:"api_key"`
+		APIKey Secret `json:"api_key"`
 		Plain  string `json:"plain"`
 	}
 
@@ -629,79 +629,24 @@ func TestRedact_denylistStillFullyRedactsDSN(t *testing.T) {
 }
 
 type secretRoundTripOptions struct {
-	Name   string `json:"name" toml:"name" yaml:"name"`
-	Secret Secret `json:"secret" toml:"secret" yaml:"secret"`
+	Name   string `json:"name"`
+	Secret Secret `json:"secret"`
 }
 
-func TestSecret_roundTripDecode(t *testing.T) {
+func TestSecret_roundTripEnv(t *testing.T) {
 	t.Parallel()
 
-	t.Run("json", func(t *testing.T) {
-		t.Parallel()
-		path := writeTempConfig(t, "zever.json", `{"ai":{"adapter":"ollama","options":{"name":"n","secret":"s3cr3t"}}}`)
-		got, err := decodeFile(path)
-		if err != nil {
-			t.Fatalf("decodeFile: %v", err)
-		}
-		opts, err := decodeOptions[secretRoundTripOptions]("ai", got["ai"].Options)
-		if err != nil {
-			t.Fatalf("json strict decode: %v", err)
-		}
-		if opts.Secret != "s3cr3t" {
-			t.Errorf("json decode of Secret = %q, want s3cr3t", opts.Secret)
-		}
-	})
-
-	t.Run("yaml", func(t *testing.T) {
-		t.Parallel()
-		path := writeTempConfig(t, "zever.yaml", "ai:\n  adapter: ollama\n  options:\n    name: n\n    secret: s3cr3t\n")
-		got, err := decodeFile(path)
-		if err != nil {
-			t.Fatalf("decodeFile: %v", err)
-		}
-		opts, err := decodeOptions[secretRoundTripOptions]("ai", got["ai"].Options)
-		if err != nil {
-			t.Fatalf("yaml strict decode: %v", err)
-		}
-		if opts.Secret != "s3cr3t" {
-			t.Errorf("yaml decode of Secret = %q, want s3cr3t", opts.Secret)
-		}
-	})
-
-	t.Run("env", func(t *testing.T) {
-		t.Parallel()
-		var opts secretRoundTripOptions
-		if err := setOptionField("x", &opts, []string{"secret"}, "s3cr3t", "X_SECRET"); err != nil {
-			t.Fatalf("setOptionField: %v", err)
-		}
-		if opts.Secret != "s3cr3t" {
-			t.Errorf("env decode of Secret = %q, want s3cr3t", opts.Secret)
-		}
-	})
-}
-
-func TestSecret_strictDecodeStaysStrict(t *testing.T) {
-	t.Parallel()
-
-	_, err := decodeOptions[secretRoundTripOptions]("x", map[string]any{
-		"name":          "n",
-		"secret":        "s3cr3t",
-		"unknown_field": "v",
-	})
-	if err == nil {
-		t.Error("unknown field should fail strict decode")
+	var opts secretRoundTripOptions
+	if err := setOptionField("x", &opts, []string{"name"}, "n", "X_NAME"); err != nil {
+		t.Fatalf("setOptionField: %v", err)
 	}
-
-	_, err = decodeOptions[secretRoundTripOptions]("x", map[string]any{"secret": 42})
-	if err == nil {
-		t.Error("non-string secret should fail strict decode")
+	if err := setOptionField("x", &opts, []string{"secret"}, "s3cr3t", "X_SECRET"); err != nil {
+		t.Fatalf("setOptionField: %v", err)
 	}
-
-	got, err := decodeOptions[secretRoundTripOptions]("x", map[string]any{"name": "n", "secret": "s3cr3t"})
-	if err != nil {
-		t.Fatalf("strict decode of valid options: %v", err)
+	if opts.Secret != "s3cr3t" {
+		t.Errorf("env decode of Secret = %q, want s3cr3t", opts.Secret)
 	}
-	if got.Secret != "s3cr3t" {
-		t.Errorf("Secret = %q, want s3cr3t", got.Secret)
+	if opts.Name != "n" {
+		t.Errorf("env decode of Name = %q, want n", opts.Name)
 	}
 }

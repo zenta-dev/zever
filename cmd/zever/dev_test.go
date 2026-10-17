@@ -762,14 +762,15 @@ func TestDevRebuildReportsRelaunchFailure(t *testing.T) {
 	}
 }
 
-// TestRunDevBadProject pins the config error branch of runDev.
-func TestRunDevBadProject(t *testing.T) {
+// TestRunDevIgnoresBadLegacyConfig pins that a broken legacy project file
+// no longer surfaces: layout is defaults-only.
+func TestRunDevIgnoresBadLegacyConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeZeverFixture(t, dir, "zever.yaml", "project:\n  schema_dir: [unclosed\n")
 	t.Chdir(dir)
 
-	if err := runDev(nil); err == nil {
-		t.Fatal("expected a config error, got nil")
+	if pc, err := loadProjectConfig(); err != nil || pc != defaultProjectConfig() {
+		t.Fatalf("legacy file = %+v, %v; want defaults", pc, err)
 	}
 }
 

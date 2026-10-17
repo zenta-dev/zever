@@ -10,19 +10,20 @@ import (
 	"testing"
 )
 
-// doctorTwoBatteryFixture enables exactly two zero-infra batteries. Both
-// resolve without secrets or network, so the run is green and deterministic.
-const doctorTwoBatteryFixture = "log:\n  adapter: slog\nrouter:\n  adapter: stdhttp\n"
+// doctorTwoBatteryFixture sets two zero-infra batteries via env. Doctor
+// checks every known battery (service config is env-only, so no file lists
+// an enabled set); the fixture only steers values, never scope.
+const doctorTwoBatteryFixture = "LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\n"
 
-// doctorFailingBatteryFixture enables one battery that cannot resolve without
+// doctorFailingBatteryFixture selects a battery that cannot resolve without
 // a configured secret (jwt requires a 32+ byte secret, adapter-validated at
-// Open, never at Validate, so config.Load succeeds and the row FAILs).
-const doctorFailingBatteryFixture = "auth:\n  adapter: jwt\n"
+// Open, never at Validate, so resolution succeeds and the row FAILs).
+const doctorFailingBatteryFixture = "AUTH_ADAPTER=jwt\n"
 
-// doctorTypoBatteryFixture enables one battery with a misspelled adapter:
+// doctorTypoBatteryFixture selects a battery with a misspelled adapter:
 // ParseAdapter stays permissive so config validation passes, but the
 // adapters row fails fast with a did-you-mean hint (P4-1).
-const doctorTypoBatteryFixture = "cache:\n  adapter: memmory\n"
+const doctorTypoBatteryFixture = "CACHE_ADAPTER=memmory\n"
 
 // doctorEnabledRows returns the battery names in doctor's human output by
 // first-field match, so "ai" never collides with prose like "batteries".
@@ -45,38 +46,39 @@ func doctorEnabledRows(t *testing.T, out string) []string {
 	return names
 }
 
-// TestDoctorOnlyChecksEnabledBatteries is the P3-3 core contract: a fixture
-// project enabling two services gets exactly those rows (plus the config
-// validation and adapters rows), never the other 30+ batteries.
-func TestDoctorOnlyChecksEnabledBatteries(t *testing.T) {
+// TestDoctorChecksAllBatteries pins the env-only scope: config values steer
+// adapters, but every known battery is checked, never a file-listed subset.
+func TestDoctorChecksAllBatteries(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	cfgPath := writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith two-battery fixture: %v", err)
+	err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out})
+	if err == nil {
+		t.Fatal("runDoctorWith two-battery fixture: got nil error, want non-nil (auth/jwt has no secret)")
 	}
 
 	names := doctorEnabledRows(t, out.String())
 
-	want := map[string]bool{"config": true, "adapters": true, "log": true, "router": true}
-	if len(names) != len(want) {
-		t.Fatalf("checked batteries = %v, want exactly %v\noutput:\n%s", names, want, out.String())
-	}
-
-	for _, n := range names {
-		if !want[n] {
-			t.Fatalf("checked batteries = %v, want exactly %v\noutput:\n%s", names, want, out.String())
+	for _, want := range []string{"config", "adapters", "log", "router", "db", "ai", "auth"} {
+		found := false
+		for _, n := range names {
+			if n == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("checked batteries = %v, want row %q\noutput:\n%s", names, want, out.String())
 		}
 	}
 }
 
 // TestDoctorHumanFailsOnBatteryFailure pins the P3-3 exit-code fix: the human
-// path returns a non-nil error (exit 1) when any enabled battery fails, with
+// path returns a non-nil error (exit 1) when any battery fails, with
 // no --strict flag needed.
 func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorFailingBatteryFixture)
+	cfgPath := writeInspectFixture(t, dir, ".env", doctorFailingBatteryFixture)
 
 	var out bytes.Buffer
 	err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out})
@@ -96,10 +98,6 @@ func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 	if !strings.Contains(line, "FAIL") {
 		t.Fatalf("auth row %q does not FAIL", line)
 	}
-
-	if _, ok := doctorLine(out.String(), "db"); ok {
-		t.Fatalf("output checks db, which the fixture does not enable:\n%s", out.String())
-	}
 }
 
 // TestDoctorAdaptersRowSuggestsOnTypo pins the P4-1 fail-fast: a misspelled
@@ -107,7 +105,7 @@ func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 // registered adapter, instead of surfacing only as a resolve error.
 func TestDoctorAdaptersRowSuggestsOnTypo(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorTypoBatteryFixture)
+	cfgPath := writeInspectFixture(t, dir, ".env", doctorTypoBatteryFixture)
 
 	var out bytes.Buffer
 	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
@@ -126,8 +124,9 @@ func TestDoctorAdaptersRowSuggestsOnTypo(t *testing.T) {
 	}
 }
 
-// TestDoctorNoProjectChecksAllWithNote pins the fallback: with no project
-// config in the working directory every battery is checked and a note says so.
+// TestDoctorNoProjectChecksAllWithNote pins the fallback: with no server
+// entrypoint in the working directory every battery is checked via the CLI
+// registry and a note says so.
 func TestDoctorNoProjectChecksAllWithNote(t *testing.T) {
 	t.Chdir(t.TempDir())
 
@@ -137,8 +136,8 @@ func TestDoctorNoProjectChecksAllWithNote(t *testing.T) {
 		t.Fatal("runDoctorWith defaults: got nil error, want non-nil (auth/jwt has no secret)")
 	}
 
-	if got := out.String(); !strings.Contains(got, "no project config") {
-		t.Fatalf("output lacks the all-batteries fallback note:\n%s", got)
+	if got := out.String(); !strings.Contains(got, "CLI registry") {
+		t.Fatalf("output lacks the CLI-registry note:\n%s", got)
 	}
 
 	for _, want := range []string{"config", "ai", "auth", "db"} {
@@ -162,7 +161,7 @@ func TestDoctorUnknownFlagIsUsage(t *testing.T) {
 
 // TestDoctorServerReportUsedWhenAvailable proves the CLI execs the built
 // server's --doctor mode when the project has an entrypoint: rows come from
-// the server report, filtered to the enabled set.
+// the server report.
 func TestDoctorServerReportUsedWhenAvailable(t *testing.T) {
 	ctx := t.Context()
 
@@ -188,7 +187,6 @@ func TestDoctorServerReportUsedWhenAvailable(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, "zever.yaml", "db:\n  adapter: sqlite\n")
 	if err := os.MkdirAll(filepath.Join(dir, "cmd", "server"), 0o750); err != nil {
 		t.Fatalf("mkdir entrypoint: %v", err)
 	}
@@ -209,8 +207,8 @@ func TestDoctorServerReportUsedWhenAvailable(t *testing.T) {
 		t.Fatalf("output missing server-reported db row:\n%s", out.String())
 	}
 
-	if _, ok := doctorLine(out.String(), "ai"); ok {
-		t.Fatalf("output checks ai, which the fixture does not enable:\n%s", out.String())
+	if _, ok := doctorLine(out.String(), "ai"); !ok {
+		t.Fatalf("output missing server-reported ai row:\n%s", out.String())
 	}
 
 	if got := out.String(); !strings.Contains(got, "cmd/server") {
@@ -219,7 +217,7 @@ func TestDoctorServerReportUsedWhenAvailable(t *testing.T) {
 }
 
 // TestDoctorServerFallbackWithNote proves the CLI registry fallback: when the
-// server exec fails, enabled batteries are still checked locally with a note.
+// server exec fails, batteries are still checked locally with a note.
 func TestDoctorServerFallbackWithNote(t *testing.T) {
 	ctx := t.Context()
 
@@ -231,7 +229,7 @@ func TestDoctorServerFallbackWithNote(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
 	if err := os.MkdirAll(filepath.Join(dir, "cmd", "server"), 0o750); err != nil {
 		t.Fatalf("mkdir entrypoint: %v", err)
 	}
@@ -239,31 +237,29 @@ func TestDoctorServerFallbackWithNote(t *testing.T) {
 	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWithContext(ctx, DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith fallback all-OK fixture: %v", err)
-	}
+	_ = runDoctorWithContext(ctx, DoctorConfig{Out: &out})
 
 	if got := out.String(); !strings.Contains(got, "CLI registry") {
 		t.Fatalf("output lacks the CLI-registry fallback note:\n%s", got)
 	}
 
 	names := doctorEnabledRows(t, out.String())
-	if len(names) != 4 {
-		t.Fatalf("checked batteries = %v, want exactly adapters/config/log/router:\n%s", names, out.String())
+	if len(names) == 0 {
+		t.Fatalf("checked batteries = %v, want every known battery:\n%s", names, out.String())
 	}
 }
 
 // TestDoctorJSONProjectEnvelope keeps the P3-4 envelope over the new scope:
-// two enabled batteries yield four data rows (config + adapters + 2) and ok:true.
+// every known battery yields a data row and ok reflects the failing auth row.
 func TestDoctorJSONProjectEnvelope(t *testing.T) {
 	jbuf := mustJSONMode(t)
 
 	dir := t.TempDir()
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", doctorTwoBatteryFixture)
+	cfgPath := writeInspectFixture(t, dir, ".env", doctorTwoBatteryFixture)
 
 	var human bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err != nil {
-		t.Fatalf("runDoctorWith JSON two-battery fixture: %v", err)
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err == nil {
+		t.Fatal("runDoctorWith JSON two-battery fixture: got nil error, want non-nil (auth/jwt has no secret)")
 	}
 
 	if human.String() != "" {
@@ -271,17 +267,18 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 	}
 
 	env := mustDecodeEnvelope(t, jbuf)
-	if !env.OK || env.Command != "doctor" || env.ExitCode != ExitOK {
-		t.Fatalf("envelope = %+v, want ok doctor envelope", env)
+	if env.OK || env.Command != "doctor" {
+		t.Fatalf("envelope = %+v, want failing doctor envelope", env)
 	}
 
 	data := envelopeData(t, env)
 
 	rows, ok := data["batteries"].([]any)
-	if !ok || len(rows) != 4 {
-		t.Fatalf("data.batteries has %d rows, want 4 (adapters/config/log/router): %v", len(rows), data["batteries"])
+	if !ok || len(rows) == 0 {
+		t.Fatalf("data.batteries has %d rows, want every known battery: %v", len(rows), data["batteries"])
 	}
 
+	seen := map[string]bool{}
 	for _, r := range rows {
 		row, ok := r.(map[string]any)
 		if !ok {
@@ -289,8 +286,11 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 		}
 
 		name, _ := row["name"].(string)
-		if name != "config" && name != "adapters" && name != "log" && name != "router" {
-			t.Fatalf("battery row %q not in the enabled set", name)
+		seen[name] = true
+	}
+	for _, want := range []string{"config", "adapters", "log", "router", "db"} {
+		if !seen[want] {
+			t.Fatalf("battery row %q missing from the envelope", want)
 		}
 	}
 }
@@ -299,16 +299,18 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 // (db-backed, same sqlite file) resolves before db alphabetically and opens
 // the shared pool with the default cap; db's explicit max_conns then
 // mismatches, and doctor prints the pool warning with the dedicated_pool
-// hint without failing the command.
+// hint. Unrelated batteries (ai/auth/crypto/geo/i18n need credentials the
+// fixture does not supply) still fail, so the command exits non-zero; the
+// warning assertions are what this test pins.
 func TestDoctorSurfacesPoolMismatch(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "shared.db")
-	fixture := "cache:\n  adapter: db\n  options:\n    dsn: " + file + "\ndb:\n  adapter: sqlite\n  options:\n    path: " + file + "\n    max_conns: 5\n"
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", fixture)
+	fixture := "CACHE_ADAPTER=db\nCACHE_DSN=" + file + "\nDB_ADAPTER=sqlite\nDB_PATH=" + file + "\nDB_MAXCONNS=5\n"
+	cfgPath := writeInspectFixture(t, dir, ".env", fixture)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err != nil {
-		t.Fatalf("runDoctorWith shared-pool fixture: %v", err)
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &out}); err == nil {
+		t.Fatal("runDoctorWith shared-pool fixture: got nil error, want non-nil (unconfigured batteries fail)")
 	}
 
 	got := out.String()
@@ -326,23 +328,23 @@ func TestDoctorSurfacesPoolMismatch(t *testing.T) {
 }
 
 // TestDoctorJSONCarriesPoolWarnings proves the same mismatch reaches the
-// JSON envelope as data.pool_warnings while the command still exits 0.
+// JSON envelope as data.pool_warnings.
 func TestDoctorJSONCarriesPoolWarnings(t *testing.T) {
 	jbuf := mustJSONMode(t)
 
 	dir := t.TempDir()
 	file := filepath.Join(dir, "shared.db")
-	fixture := "cache:\n  adapter: db\n  options:\n    dsn: " + file + "\ndb:\n  adapter: sqlite\n  options:\n    path: " + file + "\n    max_conns: 5\n"
-	cfgPath := writeInspectFixture(t, dir, "zever.yaml", fixture)
+	fixture := "CACHE_ADAPTER=db\nCACHE_DSN=" + file + "\nDB_ADAPTER=sqlite\nDB_PATH=" + file + "\nDB_MAXCONNS=5\n"
+	cfgPath := writeInspectFixture(t, dir, ".env", fixture)
 
 	var human bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err != nil {
-		t.Fatalf("runDoctorWith JSON shared-pool fixture: %v", err)
+	if err := runDoctorWith(DoctorConfig{ConfigPath: cfgPath, Out: &human, JSON: true}); err == nil {
+		t.Fatal("runDoctorWith JSON shared-pool fixture: got nil error, want non-nil (unconfigured batteries fail)")
 	}
 
 	env := mustDecodeEnvelope(t, jbuf)
-	if !env.OK || env.Command != "doctor" || env.ExitCode != ExitOK {
-		t.Fatalf("envelope = %+v, want ok doctor envelope (warnings never fail)", env)
+	if env.OK || env.Command != "doctor" {
+		t.Fatalf("envelope = %+v, want failing doctor envelope", env)
 	}
 
 	data := envelopeData(t, env)

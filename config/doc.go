@@ -1,24 +1,21 @@
-// Package config loads layered service configuration with safe defaults,
-// strict file decoding, best-effort environment matching, and redaction
-// as the sole display path for option maps.
+// Package config resolves layered service configuration from safe defaults
+// and environment variables, with redaction as the sole display path for
+// option maps.
 //
 // Layering (later layers win):
 //
 //	Default: zero-infrastructure adapters plus deterministic dev secrets
 //	so tests run without manual setup. Dev secrets are not for production;
-//	production must supply real secrets via file or environment.
+//	production must supply real secrets via environment.
 //
-//	File: YAML or JSON decoded strictly. Unknown services and
-//	unknown fields are errors, so typos fail fast instead of being
-//	silently ignored.
-//
-//	Environment: variables carry no prefix. Matching is best-effort:
-//	unknown variables are ignored, never errors, so unrelated process
-//	environment cannot break startup.
+//	Env: variables carry no prefix: DB_ADAPTER selects the db adapter,
+//	DB_MAXCONNS sets a db field. Files (.env, .env.local) feed the same
+//	layer beneath the real process environment; see LoadEnv and FromEnv.
 //
 // A service is one zever package's Adapter plus Options: the adapter
 // names the backend implementation (for example "sqlite" or "memory")
-// and Options carries that backend's typed settings.
+// and Options carries that backend's typed settings. Named instances add
+// a middle segment (DB__REPORTING__DSN); see ApplyEnv and InstanceNames.
 //
 // Display rule: raw option maps may hold secrets in plain strings.
 // Never log them directly. Redact (and the redacted service views built

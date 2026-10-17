@@ -86,7 +86,7 @@ func TestRunGenerateSeedNeverOverwritesAnExistingStub(t *testing.T) {
 	}
 }
 
-func TestRunGenerateSeedHonoursProjectConfig(t *testing.T) {
+func TestRunGenerateSeedIgnoresLegacyProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
@@ -101,12 +101,12 @@ func TestRunGenerateSeedHonoursProjectConfig(t *testing.T) {
 		t.Fatalf("runGenerateSeed: %v", err)
 	}
 
-	readGenerated(t, filepath.Join(dir, "cmd", "seeder", "main.go"))
+	readGenerated(t, filepath.Join(dir, "db", "seed", "main.go"))
 
 	stub := readGenerated(t, filepath.Join(dir, "internal", "service", "seed", "seed.go"))
 
-	if !strings.Contains(stub, "internal/orm/") {
-		t.Fatalf("seed stub ignored project.generated_dir:\n%s", stub)
+	if strings.Contains(stub, "internal/orm/") {
+		t.Fatalf("seed stub honoured the legacy project.generated_dir:\n%s", stub)
 	}
 }
 

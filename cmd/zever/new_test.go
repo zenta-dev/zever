@@ -9,10 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.yaml.in/yaml/v3"
-
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/core/crypto"
 )
 
 // Shared fixture helpers (withWorkingDir, readFile, readGenerated,
@@ -387,17 +384,12 @@ func TestRunNewExistingProjectSkipsGoMod(t *testing.T) {
 	if !strings.Contains(server, `"example.com/existing/internal/app"`) {
 		t.Fatalf("server main.go does not import the existing module's app package:\n%s", server)
 	}
-
-	if _, err := os.Stat(filepath.Join(out, "zever.yaml")); err != nil {
-		t.Fatalf("expected zever.yaml to be written: %v", err)
-	}
 }
 
-// TestRunNewScaffoldsMinimalZeverYaml proves the default (flag-driven)
-// `zever new` writes exactly coreBatteries into zever.yaml -- not the full
-// ~32-service config.Default() map -- and that the emitted file loads
-// through the ported config.Load (the strict-merge coexistence proof).
-func TestRunNewScaffoldsMinimalZeverYaml(t *testing.T) {
+// TestRunNewScaffoldsMinimalAppWiring proves the default (flag-driven)
+// `zever new` wires exactly coreBatteries into internal/app/app.go -- not the
+// full ~32-service config.Default() map.
+func TestRunNewScaffoldsMinimalAppWiring(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
@@ -407,53 +399,36 @@ func TestRunNewScaffoldsMinimalZeverYaml(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "zeta", "zever.yaml"))
-
-	var doc map[string]any
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
+	// Config is env-only: no config files are scaffolded.
+	for _, name := range []string{"zever.yaml", "zever.schema.json"} {
+		if _, err := os.Stat(filepath.Join(workDir, "zeta", name)); !os.IsNotExist(err) {
+			t.Fatalf("%s must not be scaffolded (err = %v)", name, err)
+		}
 	}
+
+	appGo := readFile(t, filepath.Join(workDir, "zeta", "internal", "app", "app.go"))
 
 	// Default scaffold is floor plus boot-required batteries so the
 	// generated server resolves out of the box (P3-2).
 	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
-	if len(doc) != len(want) {
-		t.Fatalf("zever.yaml lists %d services, want %d boot ones: %v", len(doc), len(want), doc)
-	}
-
 	for _, b := range want {
-		if _, ok := doc[b]; !ok {
-			t.Errorf("zever.yaml missing boot service %q", b)
+		if !strings.Contains(appGo, "/"+b+"/") {
+			t.Errorf("app.go missing boot service %q", b)
 		}
 	}
 
 	// A service outside the core set (e.g. "search") must not appear by
 	// default -- proves the scaffold is minimal, not "all of them".
-	if _, ok := doc["search"]; ok {
-		t.Fatalf("zever.yaml unexpectedly includes non-core service \"search\": %v", doc)
-	}
-
-	// The emitted file must load through the strict ported config: this is
-	// the mapping proof (batteries-only YAML, no "project" table).
-	t.Chdir(filepath.Join(workDir, "zeta"))
-
-	cfg, err := config.Load("")
-	if err != nil {
-		t.Fatalf("config.Load of generated zever.yaml: %v", err)
-	}
-
-	if cfg.DB.Adapter != "sqlite" {
-		t.Fatalf("loaded db adapter = %q, want sqlite", cfg.DB.Adapter)
+	if strings.Contains(appGo, "/search/") {
+		t.Fatalf("app.go unexpectedly wires non-core service \"search\"")
 	}
 }
 
 // TestRunNewWritesConfigSchema proves `zever new` scaffolds a
-// zever.schema.json alongside zever.yaml (byte-identical to config.SchemaJSON,
-// the framework's own embedded schema) and points zever.yaml at it via a
-// yaml-language-server modeline comment, so editors get autocomplete/
-// validation for the generated project's config out of the box.
-func TestRunNewWritesConfigSchema(t *testing.T) {
+// TestRunNewWritesNoConfigFiles proves `zever new` scaffolds no config
+// files at all: service configuration is env-only, so neither zever.yaml
+// nor zever.schema.json is emitted.
+func TestRunNewWritesNoConfigFiles(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
@@ -465,21 +440,17 @@ func TestRunNewWritesConfigSchema(t *testing.T) {
 
 	out := filepath.Join(workDir, "zeta")
 
-	schemaContent := readFile(t, filepath.Join(out, "zever.schema.json"))
-	if schemaContent != string(config.SchemaJSON) {
-		t.Fatalf("zever.schema.json content does not match config.SchemaJSON")
-	}
-
-	yamlContent := readFile(t, filepath.Join(out, "zever.yaml"))
-	if !strings.HasPrefix(yamlContent, zeverYamlSchemaModeline) {
-		t.Fatalf("zever.yaml does not start with the yaml-language-server modeline:\n%s", yamlContent)
+	for _, name := range []string{"zever.yaml", "zever.schema.json"} {
+		if _, err := os.Stat(filepath.Join(out, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s must not be scaffolded (err = %v)", name, err)
+		}
 	}
 }
 
-// TestRunNewAppGoImportsMatchZeverYamlBatteries proves app.go's adapter
-// imports are exactly the services zever.yaml lists -- the two files can
-// never drift, because both are rendered from the same NewConfig.Batteries.
-func TestRunNewAppGoImportsMatchZeverYamlBatteries(t *testing.T) {
+// TestRunNewAppGoImportsMatchBatteries proves app.go's adapter imports are
+// exactly the selected batteries, because both are rendered from the same
+// NewConfig.Batteries.
+func TestRunNewAppGoImportsMatchBatteries(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
@@ -772,68 +743,6 @@ func TestQuickstartBackends(t *testing.T) {
 	}
 }
 
-// TestRenderZeverYamlGolden pins the exact bytes of the emitted zever.yaml.
-func TestRenderZeverYamlGolden(t *testing.T) {
-	cfg := NewConfig{
-		Batteries: []string{"auth", "db", "cache"},
-		DBAdapter: "postgres",
-	}
-
-	data, err := renderZeverYaml(cfg)
-	if err != nil {
-		t.Fatalf("renderZeverYaml: %v", err)
-	}
-
-	assertGolden(t, "zever_yaml", data)
-}
-
-// TestRenderZeverYamlCryptoAllowDevKey proves a scaffolded crypto battery
-// ships allow_dev_key: true plus an explanatory comment, so a generated
-// project resolves the dev key out of the box while the comment tells the
-// developer to remove it for production.
-func TestRenderZeverYamlCryptoAllowDevKey(t *testing.T) {
-	cfg := NewConfig{Batteries: []string{"crypto", "log"}}
-
-	data, err := renderZeverYaml(cfg)
-	if err != nil {
-		t.Fatalf("renderZeverYaml: %v", err)
-	}
-
-	var doc map[string]any
-	if unmarshalErr := yaml.Unmarshal(data, &doc); unmarshalErr != nil {
-		t.Fatalf("parse yaml: %v", unmarshalErr)
-	}
-	cryptoSvc, ok := doc["crypto"].(map[string]any)
-	if !ok {
-		t.Fatalf("crypto entry missing or wrong shape: %v", doc["crypto"])
-	}
-	options, ok := cryptoSvc["options"].(map[string]any)
-	if !ok {
-		t.Fatalf("crypto options missing: %v", cryptoSvc)
-	}
-	if options["allow_dev_key"] != true {
-		t.Errorf("crypto options = %v, want allow_dev_key: true", options)
-	}
-
-	if !strings.Contains(string(data), "#") || !strings.Contains(string(data), "production") {
-		t.Errorf("zever.yaml lacks the dev-key comment:\n%s", data)
-	}
-
-	// The emitted file must load through the strict config loader with the
-	// dev key explicitly allowed.
-	cfgPath := writeInspectFixture(t, t.TempDir(), "zever.yaml", string(data))
-	loaded, err := config.Load(cfgPath)
-	if err != nil {
-		t.Fatalf("config.Load of rendered yaml: %v", err)
-	}
-	if !loaded.Crypto.Options.AllowDevKey {
-		t.Error("loaded crypto options: AllowDevKey = false, want true")
-	}
-	if !crypto.IsDevCryptoKey(loaded.Crypto.Options.Key) {
-		t.Errorf("loaded crypto key = %q, want the dev key", loaded.Crypto.Options.Key)
-	}
-}
-
 // TestRenderNewGoModGolden pins the exact bytes of a version-pinned go.mod
 // (no checkout paths, so the output is deterministic).
 func TestRenderNewGoModGolden(t *testing.T) {
@@ -1068,7 +977,7 @@ func TestBatteryAdapters(t *testing.T) {
 }
 
 // TestRunNewBatteriesFlagScaffoldsExtras proves --batteries extends the
-// floor set in both zever.yaml and go.mod without any prompting.
+// floor set in both app.go and go.mod without any prompting.
 func TestRunNewBatteriesFlagScaffoldsExtras(t *testing.T) {
 	resetInteractiveMode(t)
 
@@ -1081,17 +990,11 @@ func TestRunNewBatteriesFlagScaffoldsExtras(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "flagapp", "zever.yaml"))
-
-	var doc map[string]any
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
+	appGo := readFile(t, filepath.Join(workDir, "flagapp", "internal", "app", "app.go"))
 
 	for _, want := range []string{"log", "router", "db", "cache"} {
-		if _, ok := doc[want]; !ok {
-			t.Errorf("zever.yaml missing %q: %v", want, doc)
+		if !strings.Contains(appGo, "/"+want+"/") {
+			t.Errorf("app.go missing service %q", want)
 		}
 	}
 
@@ -1122,16 +1025,10 @@ func TestRunNewAdaptersFlagOverrides(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "adaptapp", "zever.yaml"))
+	appGo := readFile(t, filepath.Join(workDir, "adaptapp", "internal", "app", "app.go"))
 
-	var doc map[string]batteryYAML
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
-
-	if doc["db"].Adapter != "postgres" {
-		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	if !strings.Contains(appGo, "adapters/db/postgres") {
+		t.Fatalf("app.go lacks the postgres adapter wiring:\n%s", appGo)
 	}
 
 	gomod := readFile(t, filepath.Join(workDir, "adaptapp", "go.mod"))
@@ -1160,17 +1057,16 @@ func TestRunNewFlagOnlyMatchesFloorGolden(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "floorapp", "zever.yaml"))
-
-	var doc map[string]any
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
+	appGo := readFile(t, filepath.Join(workDir, "floorapp", "internal", "app", "app.go"))
 
 	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
-	if len(doc) != len(want) {
-		t.Fatalf("zever.yaml lists %d services, want %d boot ones: %v", len(doc), len(want), doc)
+	for _, b := range want {
+		if !strings.Contains(appGo, "/"+b+"/") {
+			t.Errorf("app.go missing boot service %q", b)
+		}
+	}
+	if strings.Contains(appGo, "/search/") {
+		t.Fatalf("app.go unexpectedly wires non-core service \"search\"")
 	}
 }
 
@@ -1215,17 +1111,13 @@ func TestRunNewYesSkipsPicker(t *testing.T) {
 		t.Fatalf("runNew -y: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "yesapp", "zever.yaml"))
-
-	var doc map[string]any
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
+	appGo := readFile(t, filepath.Join(workDir, "yesapp", "internal", "app", "app.go"))
 
 	want := mergeBatteries(coreBatteries, scaffoldBootBatteries)
-	if len(doc) != len(want) {
-		t.Fatalf("-y scaffolded %d services, want %d boot ones: %v", len(doc), len(want), doc)
+	for _, b := range want {
+		if !strings.Contains(appGo, "/"+b+"/") {
+			t.Errorf("-y app.go missing boot service %q", b)
+		}
 	}
 }
 
@@ -1312,16 +1204,10 @@ func TestRunNewPickerStubbed(t *testing.T) {
 		t.Fatalf("runNew --interactive: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "pickapp", "zever.yaml"))
+	appGo := readFile(t, filepath.Join(workDir, "pickapp", "internal", "app", "app.go"))
 
-	var doc map[string]batteryYAML
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
-
-	if doc["db"].Adapter != "postgres" {
-		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	if !strings.Contains(appGo, "adapters/db/postgres") {
+		t.Fatalf("app.go lacks the picked postgres adapter wiring:\n%s", appGo)
 	}
 
 	gomod := readFile(t, filepath.Join(workDir, "pickapp", "go.mod"))
@@ -1349,23 +1235,17 @@ func TestRunNewFlagsSkipPickerPrompts(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	yamlContent := readFile(t, filepath.Join(workDir, "parityapp", "zever.yaml"))
+	appGo := readFile(t, filepath.Join(workDir, "parityapp", "internal", "app", "app.go"))
 
-	var doc map[string]batteryYAML
-
-	if err := yaml.Unmarshal([]byte(yamlContent), &doc); err != nil {
-		t.Fatalf("parse zever.yaml: %v", err)
-	}
-
-	if doc["db"].Adapter != "postgres" {
-		t.Fatalf("zever.yaml db adapter = %q, want postgres: %v", doc["db"].Adapter, doc)
+	if !strings.Contains(appGo, "adapters/db/postgres") {
+		t.Fatalf("app.go lacks the postgres adapter wiring:\n%s", appGo)
 	}
 }
 
 // TestRenderNewDockerfileReference pins the reference Dockerfile contract:
 // multi-stage golang builder to distroless nonroot, non-root USER, EXPOSE,
-// ENTRYPOINT, HEALTHCHECK on /healthz, zever.yaml + binary copied, no
-// secrets baked, no absolute local paths.
+// ENTRYPOINT, HEALTHCHECK on /healthz, binary copied, no secrets baked, no
+// absolute local paths, no config file copied (config is env-only).
 func TestRenderNewDockerfileReference(t *testing.T) {
 	t.Parallel()
 
@@ -1383,7 +1263,6 @@ func TestRenderNewDockerfileReference(t *testing.T) {
 		`ENTRYPOINT ["/app/server"]`,
 		"HEALTHCHECK",
 		"/healthz",
-		"COPY zever.yaml",
 		"./cmd/server",
 	} {
 		if !strings.Contains(dockerfile, fragment) {
@@ -1396,6 +1275,7 @@ func TestRenderNewDockerfileReference(t *testing.T) {
 		"ENV DB_", "ENV ZEVER_",
 		"COPY /home/", "COPY /Users/", "COPY C:\\",
 		"--password", "--token",
+		"COPY zever.yaml", "COPY .env",
 	} {
 		if strings.Contains(dockerfile, banned) {
 			t.Errorf("Dockerfile must not contain %q:\n%s", banned, dockerfile)
