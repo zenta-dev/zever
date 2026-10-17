@@ -112,6 +112,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documents wiring the MCP server into coding agents, the AI guide lists all seven
   tools, and the backends concept page notes that REST and gRPC client SDKs come
   from feeding the `openapi` and `proto` outputs to your language's generator.
+- `feat(cli)`: `zever new` also scaffolds a `Makefile` (generate, build, test, vet,
+  fmt, lint, run, docker), a golangci-lint v2 `.golangci.yml`, an
+  `.editorconfig` and `.github/dependabot.yml`. The scaffolded Dockerfile moves
+  to `golang:<ver>-trixie` + `distroless/static-debian13` (matching the showcase
+  image) and carries OCI labels fed by `--build-arg`. A new `scaffold` CI job
+  scaffolds a project and builds, vets, tests and lints it.
 
 ### Security
 

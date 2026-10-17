@@ -19,7 +19,7 @@ GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp   # cross-compile
 |---|---|---|
 | Systemd | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VMs and bare metal. |
 | Kubernetes | Image plus `env:` secrets and a mounted `zever.yaml`. | Orchestrated rollouts. |
-| Container image | `docker build -f examples/showcase/Dockerfile .` | Multi-stage: `golang:1.27.1-bookworm` builder (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), final `gcr.io/distroless/static-debian13:nonroot` with an absolute `ENTRYPOINT ["/server"]`. |
+| Container image | `docker build -f examples/showcase/Dockerfile .` | Multi-stage: `golang:1.27.1-trixie` builder (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), final `gcr.io/distroless/static-debian13:nonroot` with an absolute `ENTRYPOINT ["/server"]`. |
 | Compose | `DB_PASSWORD=... docker compose up --build` | Scaffolded `compose.yaml` when `zever new` picks `db=postgres` or `*=redis`. Health-gated startup. |
 
 Static builds work because sqlite is pure Go (no cgo) and the distroless static base carries CA certificates for Stripe and cloud TLS. Build from the repo root; the builder runs with `GOWORK=off`. The worker follows the same pattern with `./cmd/worker`. Build from a clean tree at a tag and keep the SBOM. Tagged releases build static binaries and SBOMs with SLSA provenance; verify before deploy:

@@ -98,14 +98,24 @@ Inspection / Runtime / Database / Operations).
 - `zever new --force`: scaffold into a non-empty directory anyway.
 - For the full command list, see `zever --help`.
 
+## `zever new` contributor tooling
+
+Every `zever new` project also ships a `Makefile` (`generate`, `build`,
+`test`, `vet`, `fmt`, `lint`, `run`, `docker`, `help`), a golangci-lint v2
+`.golangci.yml`, an `.editorconfig` and `.github/dependabot.yml` (weekly,
+grouped Go modules, GitHub Actions and Docker updates). They are plain files
+the project owns; zever never rewrites them.
+
 ## `zever new` Docker scaffold
 
 Every `zever new` project ships a reference `Dockerfile` + `.dockerignore`:
 
-- Multi-stage build: `golang:<ver>-bookworm` builder compiles
-  `./cmd/server`, then `gcr.io/distroless/static-debian12:nonroot`
+- Multi-stage build: `golang:<ver>-trixie` builder compiles
+  `./cmd/server`, then `gcr.io/distroless/static-debian13:nonroot`
   runs it (a `busybox` stage supplies `/usr/bin/wget` for the
   healthcheck only).
+- Carries OCI image labels (`org.opencontainers.image.title`, `version`,
+  `revision`, `source`) fed by `--build-arg TITLE|VERSION|REVISION|SOURCE`.
 - Runs as non-root (`USER nonroot:nonroot`), exposes `8080` (HTTP)
   + `9090` (gRPC), `ENTRYPOINT ["/app/server"]`, and healthchecks
   `GET /healthz` (the same endpoint the generated server template
