@@ -5,10 +5,11 @@ import (
 	"strings"
 )
 
-// Contributor-tooling files written into every scaffolded project next to the
-// Dockerfile and CI workflow: a Makefile of the common dev tasks, a
-// golangci-lint config, an .editorconfig and a dependabot config. They are
-// plain files the project owns from day one; zever never rewrites them.
+// Contributor-tooling files written into scaffolded projects by opt-in
+// `zever add` recipes (docker, ci, lint, compose) or shipped by default in
+// earlier scaffold generations (Makefile, golangci, editorconfig,
+// dependabot). They are plain files the project owns from day one; zever
+// never rewrites them.
 
 // renderNewMakefile returns the scaffolded Makefile. backends is the
 // --backend value the project's `zever compile` runs use (same as CI).
@@ -144,3 +145,376 @@ updates:
     schedule:
       interval: weekly
 `
+
+// newDockerignore keeps build context small and secrets out of the image:
+// local sqlite files, dev env files (never bake secrets), build output,
+// VCS metadata and JS deps never ship.
+const newDockerignore = `# Local sqlite databases.
+*.db
+
+# Local dev secrets: config arrives via environment, never baked in.
+.env
+.env.local
+
+# Build output.
+dist/
+
+# VCS metadata.
+.git/
+
+# JS deps (docs tooling only, never part of the Go image).
+node_modules/
+`
+
+// renderNewDockerfile returns the reference Dockerfile for a scaffolded
+// project: multi-stage golang builder -> distroless nonroot runtime,
+// HEALTHCHECK against the scaffolded /healthz endpoint. goVersion selects the builder tag
+// (golang:<ver>-trixie); empty falls back to defaultGoVersion. The output
+// carries no secrets and no absolute local paths.
+func renderNewDockerfile(goVersion string) string {
+	if goVersion == "" {
+		goVersion = defaultGoVersion
+	}
+
+	return fmt.Sprintf(`# Scaffolded by `+"`zever new`"+` (`+"`zever add docker`"+` recipe). Reference production image.
+#
+# Build with: docker build -t app .
+# Run with: docker run --rm -p 8080:8080 -p 9090:9090 app
+# Config via environment (never baked in): docker run -e DB_DSN=... app
+
+FROM golang:%s-trixie AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+
+FROM busybox:1.36.1-musl AS busybox
+
+FROM gcr.io/distroless/static-debian13:nonroot
+# OCI image labels; pass at build time, e.g.
+#   docker build --build-arg VERSION=1.2.3 --build-arg REVISION=$(git rev-parse HEAD) \
+#     --build-arg SOURCE=https://github.com/acme/app -t app .
+ARG TITLE=app
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG SOURCE=
+LABEL org.opencontainers.image.title="${TITLE}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.source="${SOURCE}"
+WORKDIR /app
+COPY --from=busybox /bin/wget /usr/bin/wget
+COPY --from=builder /out/server /app/server
+EXPOSE 8080 9090
+USER nonroot:nonroot
+ENTRYPOINT ["/app/server"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+`, goVersion)
+}
+
+// renderCIGitHubWorkflow returns the project's CI workflow (`zever add ci`
+// recipe): it installs the pinned zever CLI release binary, regenerates
+// derived code from the schema, gates drift with `zever compile --check`
+// (proving compile is deterministic on regenerating projects, and gating
+// committed-output drift for teams that check in generated/), then builds
+// and tests. cliPin is the release pin ("latest" omits --version, the
+// release tag otherwise); backends is the --backend value for both compile
+// invocations. The CLI is installed from the release binary via install.sh:
+// `go install` of cmd/zever only works from the release that ships a
+// replace-free cmd/zever/go.mod (v0.7.2), so scaffolds pinned to older
+// versions could not build.
+func renderCIGitHubWorkflow(goVersion, cliPin, backends string) string {
+	if goVersion == "" {
+		goVersion = defaultGoVersion
+	}
+
+	// Local checkouts carry the pseudo-version, which no registry can
+	// install from: the installer then picks its default release instead.
+	if cliPin == "" || cliPin == pseudoVersionZero {
+		cliPin = "latest"
+	}
+
+	installVersion := ""
+	if cliPin != "" && cliPin != "latest" {
+		installVersion = " --version " + cliPin
+	}
+
+	return fmt.Sprintf(`# Scaffolded by `+"`zever add ci`"+`. Regenerate derived code, gate drift, build and test.
+#
+# The regenerate step keeps fresh clones green when generated/ is gitignored
+# (the default). Teams that commit generated/ instead (see
+# "Customizing and leaving zever" in the docs) can drop the regenerate step:
+# `+"`zever compile --check`"+` alone then fails the build on drift.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '%s'
+      - name: Install zever CLI
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh -s -- --yes%s
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Regenerate from schema
+        run: zever compile --backend=%s --out ./generated schema/*.zen
+      - name: Drift gate (committed generated/ must match the schema)
+        run: zever compile --check --backend=%s --out ./generated schema/*.zen
+      - name: Build
+        run: go build ./...
+      - name: Test
+        run: go test ./...
+`, goVersion, installVersion, backends, backends)
+}
+
+// renderNewCompose returns compose.yaml for the wired selections, or ""
+// when no picked battery needs external infra. Postgres picks (db,
+// search, vectorstore, workflow) add a db service; redis picks (cache, queue,
+// session, ratelimit, lock, eventbus, idempotency) share one redis
+// service. Env carries secrets at run time (never baked in); per-battery
+// URL vars point at the compose services.
+//
+// The canonical "db" adapter name always provisions postgres: it selects
+// the backend by DSN at runtime (empty means embedded sqlite), and the
+// compose db service is what a postgres DSN points at. Legacy alias names
+// ("postgres", "pgvector") provision it too; legacy "sqlite" never does.
+func renderNewCompose(sel []batterySelection) string {
+	needsPG := false
+	redisBatteries := []string{}
+
+	for _, s := range sel {
+		switch {
+		case s.Battery == "db" && s.Adapter == "postgres":
+			needsPG = true
+		case (s.Battery == "search" && (s.Adapter == "db" || s.Adapter == "postgres")) ||
+			(s.Battery == "vectorstore" && (s.Adapter == "db" || s.Adapter == "pgvector")) ||
+			(s.Battery == "workflow" && (s.Adapter == "db" || s.Adapter == "postgres")):
+			needsPG = true
+		case (s.Battery == "cache" || s.Battery == "queue" || s.Battery == "session" ||
+			s.Battery == "ratelimit" || s.Battery == "lock" || s.Battery == "eventbus" ||
+			s.Battery == "idempotency") && s.Adapter == "redis":
+			redisBatteries = append(redisBatteries, s.Battery)
+		}
+	}
+
+	if !needsPG && len(redisBatteries) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("# Written by `zever add compose`. External services for local prod-like runs.\n")
+	b.WriteString("#\n")
+	b.WriteString("# Up with: docker compose up --build\n")
+	b.WriteString("# Secrets via environment (never baked in): DB_PASSWORD=... docker compose up --build\n")
+	b.WriteString("#\n")
+	b.WriteString("# Worker uses the same image:\n")
+	b.WriteString("#   docker compose run --rm app ./worker\n")
+	b.WriteString("services:\n")
+	b.WriteString("  app:\n")
+	b.WriteString("    build: .\n")
+	b.WriteString("    ports:\n")
+	b.WriteString("      - \"8080:8080\"\n")
+	b.WriteString("      - \"9090:9090\"\n")
+	if needsPG || len(redisBatteries) > 0 {
+		b.WriteString("    depends_on:\n")
+		if needsPG {
+			b.WriteString("      db:\n        condition: service_healthy\n")
+		}
+		if len(redisBatteries) > 0 {
+			b.WriteString("      redis:\n        condition: service_healthy\n")
+		}
+	}
+	b.WriteString("    environment:\n")
+	if needsPG {
+		b.WriteString("      DB_DSN: postgres://app:${DB_PASSWORD:-devsecret}@db:5432/app?sslmode=disable\n")
+	}
+	for _, battery := range redisBatteries {
+		b.WriteString("      " + strings.ToUpper(battery) + "_URL: redis://redis:6379\n")
+	}
+	if needsPG {
+		b.WriteString("  db:\n")
+		b.WriteString("    image: postgres:16-bookworm\n")
+		b.WriteString("    environment:\n")
+		b.WriteString("      POSTGRES_USER: app\n")
+		b.WriteString("      POSTGRES_PASSWORD: ${DB_PASSWORD:-devsecret}\n")
+		b.WriteString("      POSTGRES_DB: app\n")
+		b.WriteString("    volumes:\n")
+		b.WriteString("      - pgdata:/var/lib/postgresql/data\n")
+		b.WriteString("    healthcheck:\n")
+		b.WriteString("      test: [\"CMD-SHELL\", \"pg_isready -U app\"]\n")
+		b.WriteString("      interval: 5s\n")
+		b.WriteString("      timeout: 3s\n")
+		b.WriteString("      retries: 10\n")
+	}
+	if len(redisBatteries) > 0 {
+		b.WriteString("  redis:\n")
+		b.WriteString("    image: redis:7-alpine\n")
+		b.WriteString("    volumes:\n")
+		b.WriteString("      - redisdata:/data\n")
+		b.WriteString("    healthcheck:\n")
+		b.WriteString("      test: [\"CMD\", \"redis-cli\", \"ping\"]\n")
+		b.WriteString("      interval: 5s\n")
+		b.WriteString("      timeout: 3s\n")
+		b.WriteString("      retries: 10\n")
+	}
+	b.WriteString("volumes:\n")
+	if needsPG {
+		b.WriteString("  pgdata:\n")
+	}
+	if len(redisBatteries) > 0 {
+		b.WriteString("  redisdata:\n")
+	}
+	return b.String()
+}
+
+// recipeWorkerMainTemplate is the `zever add worker` entrypoint: it hands
+// the typed Providers to serve.Worker, which owns scheduler start, signal
+// handling and graceful shutdown. Job registration lives in the project's
+// own packages, resolved from the container inside the handlers.
+const recipeWorkerMainTemplate = `// Command worker runs this project's background job worker and its embedded
+// scheduler.
+//
+// Written by ` + "`zever add worker`" + `. It is deliberately thin: serve.Worker owns
+// boot, scheduler start, signal handling and graceful shutdown.
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/zenta-dev/zever/serve"
+
+	"{{.ModulePath}}/internal/app"
+)
+
+func main() {
+	if err := serve.Worker(app.Providers()); err != nil {
+		fmt.Fprintln(os.Stderr, "worker:", err)
+		os.Exit(1)
+	}
+}
+`
+
+// recipeSeedMainTemplate is the `zever add seed` entrypoint: it resolves
+// the database from the typed Providers and reports readiness. Real rows
+// belong in a db/seed package of the project's own; this file only proves
+// the container resolves end to end.
+const recipeSeedMainTemplate = `// Command seed populates this project's database with development data.
+//
+// Written by ` + "`zever add seed`" + `. It resolves the database from the typed
+// Providers and pings it; add real rows here (or in a db/seed package)
+// once the schema has tables worth seeding.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/zenta-dev/zever/container"
+
+	"{{.ModulePath}}/internal/app"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	c := container.New(nil, app.Providers()...)
+
+	db, err := c.DB()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "seed:", err)
+		os.Exit(1)
+	}
+
+	if err := db.Ping(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "seed:", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("seed: database is reachable; nothing to seed yet")
+
+	if err := c.Close(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "seed:", err)
+		os.Exit(1)
+	}
+}
+`
+
+// renderK8sManifest returns the `zever add k8s` manifest: a Deployment plus
+// a Service in one multi-document file. Config arrives via environment
+// (never baked in); the image is a placeholder the project overrides at
+// deploy time.
+func renderK8sManifest(appName string) string {
+	return fmt.Sprintf(`# Written by `+"`zever add k8s`"+`. Deploy with: kubectl apply -f k8s/app.yaml
+# Config via environment (never baked in); set image: to the built image.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: %[1]s
+  labels:
+    app: %[1]s
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: %[1]s
+  template:
+    metadata:
+      labels:
+        app: %[1]s
+    spec:
+      containers:
+        - name: %[1]s
+          image: %[1]s:latest
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 9090
+              name: grpc
+          env:
+            - name: DB_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: %[1]s-secrets
+                  key: dsn
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: %[1]s
+  labels:
+    app: %[1]s
+spec:
+  selector:
+    app: %[1]s
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+  type: ClusterIP
+`, appName)
+}

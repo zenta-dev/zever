@@ -34,8 +34,8 @@ func TestProfileBatteriesKnown(t *testing.T) {
 }
 
 // TestProfileBatteriesOrdered proves the profile sets nest: minimal is the
-// boot set alone, api adds the service batteries a JSON API needs, and full
-// covers every known service.
+// minimal stack alone, api adds the service batteries a JSON API needs, and
+// full covers every known service.
 func TestProfileBatteriesOrdered(t *testing.T) {
 	t.Parallel()
 
@@ -47,7 +47,7 @@ func TestProfileBatteriesOrdered(t *testing.T) {
 	}
 
 	if got := batteriesFor(minimal, ""); !equalStringSlices(got, boot) {
-		t.Fatalf("minimal resolves to %v, want boot set %v", got, boot)
+		t.Fatalf("minimal resolves to %v, want minimal stack %v", got, boot)
 	}
 
 	api, err := profileBatteries("api")
@@ -73,8 +73,8 @@ func TestProfileBatteriesOrdered(t *testing.T) {
 	fullSet := batteriesFor(full, "")
 
 	// Services with no zero-infra adapter (they need an API key, a dataset
-	// or an embedded FS supplied from code) would scaffold a config that
-	// fails `zever doctor`, so the full profile leaves them for `zever add`.
+	// or an embedded FS) would scaffold a config that fails `zever doctor`,
+	// so the full profile leaves them for `zever add`.
 	needInputs := map[string]bool{"ai": true, "geo": true, "i18n": true}
 
 	if want := len(allServiceAdapters) - len(needInputs); len(fullSet) != want {
@@ -84,7 +84,7 @@ func TestProfileBatteriesOrdered(t *testing.T) {
 	for battery := range allServiceAdapters {
 		picked := batteryPicked(fullSet, battery)
 		if needInputs[battery] && picked {
-			t.Errorf("full profile wires %q, which cannot resolve from zever.yaml alone", battery)
+			t.Errorf("full profile wires %q, which cannot resolve from env alone", battery)
 		}
 
 		if !needInputs[battery] && !picked {
@@ -94,7 +94,7 @@ func TestProfileBatteriesOrdered(t *testing.T) {
 }
 
 // TestProfileBatteriesSorted proves profile extras are sorted, so go.mod
-// requires and zever.yaml stay deterministic across runs.
+// requires and .env.example stay deterministic across runs.
 func TestProfileBatteriesSorted(t *testing.T) {
 	t.Parallel()
 
@@ -126,8 +126,8 @@ func equalStringSlices(a, b []string) bool {
 }
 
 // TestProfileAPIScaffoldWiresBatteries proves the api preset flows end to
-// end: profile extras merged through batteriesFor land in internal/app/app.go
-// with default adapters.
+// end: profile extras merged through batteriesFor land in
+// internal/app/wiring.go with default adapters.
 func TestProfileAPIScaffoldWiresBatteries(t *testing.T) {
 	t.Parallel()
 
@@ -143,16 +143,17 @@ func TestProfileAPIScaffoldWiresBatteries(t *testing.T) {
 		t.Fatalf("writeNewProject: %v", err)
 	}
 
-	appGo := readFile(t, filepath.Join(cfg.OutDir, "internal", "app", "app.go"))
+	wiring := readFile(t, filepath.Join(cfg.OutDir, "internal", "app", "wiring.go"))
 	for _, want := range append([]string(nil), apiProfileBatteries...) {
-		if !strings.Contains(appGo, "/"+want+"/") {
-			t.Errorf("app.go lacks api battery %q", want)
+		if !strings.Contains(wiring, "/"+want+"/") {
+			t.Errorf("wiring.go lacks api battery %q", want)
 		}
 	}
 }
 
 // TestRunNewUnknownProfileFailsClosed proves a typo'd --profile never
-// scaffolds the floor set silently. Not parallel: withWorkingDir chdirs.
+// scaffolds silently: the deprecation prints first, then the unknown
+// profile fails.
 func TestRunNewUnknownProfileFailsClosed(t *testing.T) {
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)

@@ -66,7 +66,8 @@ func getHealth(ctx context.Context, client *http.Client, url string) bool {
 // TestP32ScaffoldBootsE2E proves `zever new` yields a bootable app:
 // new → compile → build → run → GET /healthz 200 → graceful shutdown.
 // Offline via GOPROXY=off with local workspace replaces; skips when the
-// toolchain is unavailable.
+// toolchain is unavailable. Skips while the serve stream is unmerged: the
+// boot cannot be proven against the compile-only API stub.
 func TestP32ScaffoldBootsE2E(t *testing.T) {
 	if testing.Short() {
 		t.Skip("scaffold boot e2e is slow")
@@ -77,6 +78,11 @@ func TestP32ScaffoldBootsE2E(t *testing.T) {
 	}
 
 	repoRoot := repoRootAbs(t)
+
+	if _, err := os.Stat(filepath.Join(repoRoot, "serve", "go.mod")); err != nil {
+		t.Skip("serve module not merged yet: boot needs the real serve library")
+	}
+
 	workDir := t.TempDir()
 	withWorkingDir(t, workDir)
 	t.Setenv(zeverFrameworkPathEnv, repoRoot)
@@ -123,13 +129,20 @@ func TestP32ScaffoldBootsE2E(t *testing.T) {
 		t.Fatalf("go build ./cmd/server: %v\n%s", buildErr, out)
 	}
 
-	httpAddr := "127.0.0.1:" + freeLoopbackPort(ctx, t)
-	grpcAddr := "127.0.0.1:" + freeLoopbackPort(ctx, t)
+	httpPort := freeLoopbackPort(ctx, t)
+
+	// The generated server reads its listeners from the environment
+	// (PORT, GRPC_ADDR) and refuses the deterministic dev crypto key
+	// outside dev, so the boot runs with an explicit dev marker. The
+	// minimal scaffold boots HTTP-only: enabling gRPC (GRPC_ADDR) needs
+	// auth+permission wired via `zever add auth permission`.
+	t.Setenv("PORT", httpPort)
+	t.Setenv("ZEVER_ENV", "dev")
 
 	// Run server.
 	srvCtx, srvStop := context.WithCancel(context.Background())
 	defer srvStop()
-	srvCmd := exec.CommandContext(srvCtx, serverBin, "-addr", httpAddr, "-grpc-addr", grpcAddr)
+	srvCmd := exec.CommandContext(srvCtx, serverBin)
 	srvCmd.Dir = projDir
 	srvCmd.Env = os.Environ()
 	startErr := srvCmd.Start()
@@ -150,7 +163,7 @@ func TestP32ScaffoldBootsE2E(t *testing.T) {
 	}()
 
 	// Wait for /healthz 200.
-	healthURL := fmt.Sprintf("http://%s/healthz", httpAddr)
+	healthURL := fmt.Sprintf("http://127.0.0.1:%s/healthz", httpPort)
 	client := &http.Client{Timeout: 2 * time.Second}
 	ready := waitFor(ctx, func() bool { return getHealth(ctx, client, healthURL) })
 	if !ready {
