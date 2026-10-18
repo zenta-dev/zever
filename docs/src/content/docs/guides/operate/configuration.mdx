@@ -1,15 +1,20 @@
 ---
 title: Configuration
-description: Layer typed defaults, a strict file, and best-effort env overrides without leaking secrets.
+description: Service configuration via environment variables (no config files)
 ---
 
 import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever config layers typed defaults, a strict YAML or JSON file, and best-effort environment overrides. Per-service keys live in the [config reference](../../../reference/config/).
+Zever reads all service configuration from **environment variables only**. There are **no config files** (`zever.yaml`, `.yml`, `.json` are ignored).
 
 ## Quick start
 
-Later layers win: `defaults < file < env`. `config.Default()` returns zero-infra adapters (memory, local, sqlite, log, noop). `config.Load(path)` overlays a file and the process env, then validates, so an unknown adapter or unparsable value fails at load, not mid-request.
+Layers (later wins): `defaults < .env < .env.local < process environment`.
+
+- **defaults**: `config.Default()` — zero-infra adapters (sqlite, slog, stdhttp, memory caches, etc.)
+- **`.env`**: project-committed example + local overrides (gitignored)
+- **`.env.local`**: machine-local overrides (gitignored, higher priority)
+- **process environment**: highest priority, no file I/O
 
 ```sh
 DB_ADAPTER=postgres
@@ -21,47 +26,73 @@ AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 ```
 
-Load it with `config.Load("zever.yaml")`, then `container.New(cfg)`. `container.New(nil)` is valid for tests that never load a file. Accessors (`c.DB()`, `c.Cache()`) resolve lazily and retry after an error. See [Container](../../../concepts/container/).
+## Resolve from env
+
+```go
+env, err := config.FromEnv()        // reads .env, .env.local, process env
+resolved, err := config.Resolve(env) // typed Config
+```
+
+Or in one step: `config.LoadEnv()` (same as `FromEnv`).
+
+```go
+cfg, err := config.LoadEnv()
+container.New(cfg, app.Providers()...)
+```
 
 ## Map environment variables to keys
 
-Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased. `_ADAPTER` switches the adapter (`DB_ADAPTER=postgres`). Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries`, and one nesting level splits at the first `_`, so `AUTH_JWT_SECRET` sets `Options.JWT.Secret`. Durations accept `"5s"` strings in env only; files store `time.Duration` as integer nanoseconds.
+Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased.
 
-## Load a file strictly
+- Default instance: `SERVICE_FIELD` (e.g., `DB_ADAPTER=postgres`)
+- Named instance: `SERVICE__NAME__FIELD` (e.g., `DB__ANALYTICS__DSN=...`)
 
-| Source | Unknown input | Why |
-|---|---|---|
-| File | Error | Typos fail at deploy time. |
-| Env | Silently ignored | Stray env (`PATH`, `HOME`, `AUTH_TOKEN`) must not break startup. |
+Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries`. One nesting level splits at the first `_`: `AUTH_JWT_SECRET` sets `Options.JWT.Secret`.
 
-Only a value that fails to parse for a resolved field returns `InvalidOptionsError`, for example `DB_MAXCONNS=abc`.
+Durations accept `"5s"` strings in env only; files store `time.Duration` as integer nanoseconds.
 
-| Call | Behavior |
-|---|---|
-| `Load("")` | Probes `zever.yaml`, `zever.yml`, then `zever.json` in the cwd. First hit wins; missing files skip silently. |
-| `Load(path)` | The path must exist and decode, else `nil` plus the error. |
-| Other extension | `ErrUnsupportedFormat` (only `.yaml`, `.yml`, `.json`). |
-| Null or empty block | Decodes to zero values. |
+## Default adapters (zero-infra)
 
-File keys are snake_case; old flat spellings are rejected as unknown fields. Env names are unaffected because matching ignores `_` and case.
+| Service | Default Adapter |
+|---------|-----------------|
+| db | sqlite |
+| cache | memory |
+| queue | memory |
+| log | slog |
+| router | stdhttp |
+| ... | (see `config.Default()`) |
 
-| Old key | New key |
-|---|---|
-| `apikey` | `api_key` |
-| `baseurl` | `base_url` |
-| `maxconns` / `minconns` | `max_conns` / `min_conns` |
-| `maxconnlifetime` / `maxconnidletime` | `max_conn_lifetime` / `max_conn_idle_time` |
-| `secretkey` / `webhooksecret` | `secret_key` / `webhook_secret` |
-| `poolsize` / `pooltimeout` | `pool_size` / `pool_timeout` |
+## Migration from v0.7
 
-`config/schema/zever.schema.json` gives editor autocomplete but can lag the Go option structs; the [config reference](../../../reference/config/) and `zever config show` are authoritative.
+| v0.7 | v0.8 |
+|------|------|
+| `zever.yaml` | `.env` + `wiring.go` |
+| `config.Load("")` | `config.FromEnv()` / `config.LoadEnv()` |
+| `ServiceConfig.Adapter` | wired in `wiring.go` via `container.Provide` |
+| `DB_MAXCONNS` | `DB_MAXCONNS` (same) |
+| `DB__ANALYTICS__DSN` | `DB__ANALYTICS__DSN` (same format) |
+| `zever doctor --config` | `zever doctor` (no flag) |
+
+## Legacy file warning
+
+If `zever.yaml`/`.yml`/`.json` exists in the working directory, `config.FromEnv()` prints a one-line warning:
+
+```
+config: zever.yaml found in working directory: ignored; see migration guide in config/README.md
+```
+
+The file is **ignored entirely** — no values are read from it.
+
+## Generated env template
+
+`zever new` and `zever add` generate `.env.example` with every env key, default value, and comment. This is the authoritative source for what env vars each service accepts.
 
 ## Redact config before printing
 
-Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show [--config PATH]` prints one `<service>  adapter=<x>` header per service plus its masked options.
+Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  adapter=<x>` header per service plus its masked options.
 
 ```go title="main.go"
-for name, sc := range cfg.RedactedServices() { // map[string]config.ServiceConfig
+for name, sc := range cfg.RedactedServices() {
     fmt.Println(name, sc.Adapter, sc.Options)
 }
 ```
@@ -77,15 +108,15 @@ Defaults pick the zero-infra adapter per service (`db` sqlite, `cache`/`queue`/`
 ## Troubleshooting
 
 <details>
-<summary>`Load` fails with unknown field `maxconns`</summary>
+<summary>Unknown field error</summary>
 
-A pre-rename flat spelling. Rename it to `max_conns`.
+A pre-rename flat spelling. Rename it to snake_case (e.g., `maxconns` → `max_conns`).
 </details>
 
 <details>
-<summary>`Load("")` ignores your file</summary>
+<summary>Unknown field under a wired service prefix</summary>
 
-The name is outside the probe list or the file is elsewhere. Rename to `zever.yaml`, `zever.yml`, or `zever.json` in the working directory, or pass an explicit path.
+`config.Resolve` fails with a did-you-mean hint. Check the service's options struct.
 </details>
 
 <details>
@@ -100,22 +131,6 @@ A resolved field failed to parse. Set an integer. Unset variables are ignored, b
 Env is best-effort: `AUTH` is known but the remainder matches no field. Set `AUTH_JWT_SECRET`.
 </details>
 
-<details>
-<summary>A secret appears in logs</summary>
-
-A raw option map was printed. Print `cfg.RedactedServices()` instead.
-</details>
-
-<details>
-<summary>`ErrUnsupportedFormat` on load</summary>
-
-The extension is not `.yaml`, `.yml`, or `.json`. Rename the file; the TOML copy in `config/schema/` is editor tooling only.
-</details>
-
-## Related
-
-<CardGrid>
-  <LinkCard title="Deployment" href="../deployment/" description="Production checklist." />
-  <LinkCard title="Config reference" href="../../../reference/config/" description="Every service and key." />
-  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Adapter swap rules." />
-</CardGrid>
+<Aside type="danger" title="Dev-only keys">
+`Default()` belongs in local dev and tests: its crypto key is deterministic and public. Supply `AUTH_JWT_SECRET`, the crypto key, and provider keys from env or a mounted file in production.
+</Aside>

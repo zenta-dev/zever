@@ -48,7 +48,7 @@ Pick by where state lives and who must see it:
 
 ## Wiring a choice
 
-Set it in `zever.yaml` (or an env var such as `CACHE_ADAPTER=redis`), and make sure the adapter is registered. `zever add cache/redis` adds the `go.mod` require, the `Register()` call, and the config stanza in one step:
+Set it via env var (e.g., `CACHE_ADAPTER=redis`), and make sure the adapter is registered. `zever add cache/redis` adds the `go.mod` require, the `Register()` call, the wiring.go entry, and the `.env.example` stanza in one step:
 
 ```sh
 zever add cache/redis

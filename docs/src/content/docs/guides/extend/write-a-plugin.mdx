@@ -149,7 +149,7 @@ Mirror the core shape: an interface, a string `Adapter`, typed `Options` with `V
 
 Successful builds cache per `Container`; failures retry on the next `Resolve`. A wrong-typed value fails `Resolve` with a type-mismatch error, and resolved plugins close with `Container.Close`. `examples/sms/app/main.go` shows the full flow.
 
-`zever add <battery>[/<adapter>]` scaffolds the `go.mod`, `internal/app/app.go`, and `zever.yaml` wiring. For a plugin, pass an explicit adapter and `--module <path[@version]>` (default `v0.1.0`):
+`zever add <battery>[/<adapter>]` scaffolds the `go.mod`, `internal/app/wiring.go` with typed `container.Provide` wiring. For a plugin, pass an explicit adapter and `--module <path[@version]>` (default `v0.1.0`):
 
 ```sh
 zever add sms/stub --module example.com/zever-battery-sms

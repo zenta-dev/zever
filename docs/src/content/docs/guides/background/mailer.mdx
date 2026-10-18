@@ -117,7 +117,7 @@ m, err := c.Mailer()
 <details>
 <summary>host must be non-empty on boot with the log adapter</summary>
 
-`host` and `port` were left zero; validation requires both even though log never dials. Set `host: localhost` and `port: 25`, matching `examples/bookings/zever.yaml`.
+`host` and `port` were left zero; validation requires both even though log never dials. Set `MAILER_HOST=localhost` and `MAILER_PORT=25` in your `.env`.
 </details>
 
 <details>

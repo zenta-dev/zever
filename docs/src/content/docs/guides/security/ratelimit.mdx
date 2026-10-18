@@ -35,7 +35,7 @@ true 17 <nil>
 
 ## Limit a request path
 
-The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!dec.Allowed`, and `500` on error. Charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when `zever.yaml` enables it; both fail open, and `WithFailMode(FailClosed)` opts in.
+The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!dec.Allowed`, and `500` on error. Charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when `RATELIMIT_ADAPTER` is set; both fail open, and `WithFailMode(FailClosed)` opts in.
 
 ## Share limits across replicas
 
@@ -74,7 +74,7 @@ Replicas run `memory` buckets; move to `redis`, or divide the per-instance rate 
 <details>
 <summary>`rate must be > 0 and finite`</summary>
 
-`rate` and `burst` are required; an empty options block fails `Validate` (the bookings `zever.yaml` uses `rate: 10`, `burst: 20`).
+`rate` and `burst` are required; an empty options block fails `Validate` (the bookings example uses `RATELIMIT_RATE=10`, `RATELIMIT_BURST=20` in `.env`).
 </details>
 
 <details>

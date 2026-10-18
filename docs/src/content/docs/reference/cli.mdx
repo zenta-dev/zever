@@ -186,7 +186,7 @@ zever add <battery>[/<adapter>] [--adapter NAME] [--force] [--module PATH[@VERSI
 ```
 
 `--adapter` overrides the slash form, `--force` overwrites an existing
-`zever.yaml` stanza, `--module` names a plugin battery's Go module
+`wiring.go` registration, `--module` names a plugin battery's Go module
 (required for plugin batteries), and `--dry-run` prints the edits
 without writing them.
 
@@ -196,7 +196,7 @@ The adapter may be omitted (`zever add cache` selects
 batteries are errors. Run it from the project root (the directory
 holding `go.mod`); without one it fails.
 
-Effects (three append-only edits, never overwriting hand-written code):
+Effects (two append-only edits, never overwriting hand-written code):
 
 - `go.mod`: adds `require` entries for the battery's core and adapter
   modules at the version pinned by the framework require (falling back
@@ -209,10 +209,6 @@ Effects (three append-only edits, never overwriting hand-written code):
   skipped, so re-adding the same battery is a no-op. Fails if the file
   has no import block or no `func New`, scaffold it with
   `zever generate server` first.
-- `zever.yaml`: sets `<battery>.adapter`, preserving every other entry
-  (including the entry's own options). A missing or empty file starts a
-  fresh document (with the schema modeline, like `zever new`); an
-  existing file keeps its header.
 
 `zever add` does not run `go mod tidy`, run it afterwards so `go.sum`
 catches up, then serve:
@@ -226,9 +222,9 @@ zever serve
 ### `zever outbox`
 
 Inspects and repairs the outbox dead-letter queue without starting the
-relay. Every subcommand takes `--dsn`, `--table`, and `--config`;
-without `--dsn`/`--table` the values come from `zever.yaml` (discovered
-in the working directory) plus environment overrides. `--json` gives
+relay. Every subcommand takes `--dsn` and `--table`;
+without `--dsn`/`--table` the values come from environment variables
+(`OUTBOX_DSN`, `OUTBOX_TABLE`) plus environment overrides. `--json` gives
 machine-readable output on every one.
 
 | Command | Effect |
@@ -315,8 +311,7 @@ the same TTY rules as `uninstall`; `--json` emits the envelope.
   `zever completion bash > /etc/bash_completion.d/zever`. The scripts
   complete dynamically: `.zen` files for the schema commands, the
   `generate` kinds, `--backend` (comma lists), `--profile`, `--adapters`
-  (`battery=adapter` for `new`, `battery` or `battery/adapter` for `build`)
-  and `--config` files.
+  (`battery=adapter` for `new`, `battery` or `battery/adapter` for `build`).
 - `zever docs --dir <dir>` writes one man page plus one markdown file per
   command into `<dir>`; build stripped release binaries with
   `make build-release` (`-trimpath -ldflags="-s -w"`).
@@ -347,7 +342,7 @@ the same TTY rules as `uninstall`; `--json` emits the envelope.
   `NO_COLOR=1`; `TERM=dumb` is honored the same way.
 - **`zever outbox` reports empty counters**: the resolved `--table` does
   not match the table the relay writes. Compare against
-  `outbox.options.table` in `zever.yaml`.
+  `OUTBOX_TABLE` environment variable.
 - **`zever outbox dlq purge` says the adapter does not support deletion**:
   only the `db` adapter implements `outbox.Deleter`. Switch the
   connection, not the command.

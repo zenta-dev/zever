@@ -7,7 +7,7 @@ import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components'
 
 You will run `examples/bookings`, a space marketplace where hosts list spaces and guests book them. It takes about 15 minutes. You need Go 1.27+, the `zever` CLI, and a repo clone.
 
-All commands run from `examples/bookings/` so `zever.yaml` and the relative `data/` path resolve.
+All commands run from `examples/bookings/` so `.env` and the relative `data/` path resolve.
 
 ```sh
 cd examples/bookings
@@ -35,7 +35,7 @@ Checkpoint:
 OK applied 8 statement(s) via sqlite
 ```
 
-If you run `zever doctor --config zever.yaml` from another directory, the db check reports a path miss, so run it from here.
+If you run `zever doctor` from another directory, the db check reports a path miss, so run it from here.
 
 ## Seed demo data
 
@@ -153,7 +153,7 @@ A successful booking request passes, in order, through:
 ## Understand the doctor failures
 
 ```sh
-zever doctor --config zever.yaml
+zever doctor
 ```
 
 Expect 30 OK and 4 FAIL: `ai` (no API key), `auth` (no JWT secret), `geo` (missing fixture data), and `i18n` (missing embed FS). These are deliberate zero-infra gaps, not framework bugs; the app `README.md` lists them.

@@ -18,7 +18,7 @@ No. It compiles `.zen` schemas into infrastructure only: database access, cachin
 <details>
 <summary>How do I swap an adapter, say sqlite for postgres?</summary>
 
-Change `adapter:` (and its options) in `zever.yaml`, or set `DB_ADAPTER=postgres` and `DB_DSN=...` in the environment, and make sure the adapter is registered. `zever add db/postgres` does the `go.mod` require, the `Register()` call, and the config stanza. No code that uses the `db.DB` interface changes. See [Choosing batteries](../../extend/choosing-batteries/).
+Change adapter via `DB_ADAPTER=postgres` env or `zever add db/postgres`. The adapter must be registered; `zever add db/postgres` does the `go.mod` require, the `Register()` call, and the config stanza. No code that uses the `db.DB` interface changes. See [Choosing batteries](../../extend/choosing-batteries/).
 </details>
 
 <details>
@@ -76,7 +76,7 @@ Env matching is best-effort by design: a variable that does not match a resolved
 <details>
 <summary>It connects to sqlite even though I configured postgres</summary>
 
-The file was not found. `Load("")` only probes `zever.yaml`, `zever.yml`, and `zever.json` in the working directory, and falling back to defaults means sqlite. In production, load an explicit path.
+The file was not found. In production, load an explicit path.
 </details>
 
 <details>

@@ -26,7 +26,7 @@ Build one container per process; no globals or `init()` wiring; `container.New(n
 
 ## Load config once at boot
 
-Config layers as `defaults < file < env`: files are strict, env is best-effort (stray variables ignored). Validation runs at load, so an empty adapter name or invalid option value fails in phase 1, not mid-request. An adapter name nobody registered passes load and fails on first resolution with `UnknownAdapterError`. `Load("")` probes `zever.yaml/.yml/.json`; see the [Config reference](../../reference/config/) for keys. `Default()` dev secrets belong in tests only.
+Config layers as `defaults < env`. Validation runs at env resolution, so an empty adapter name or invalid option value fails at startup, not mid-request. The env parser probes `.env`, `.env.local`, then process env; see the [Config reference](../../reference/config/) for keys. `Default()` dev secrets belong in tests only.
 
 ## Resolve lazily and reuse
 
