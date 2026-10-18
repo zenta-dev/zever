@@ -212,73 +212,107 @@ func coreBatterySelections() []batterySelection {
 	return sel
 }
 
-// appTemplateData is appTemplate's render input: ModuleImports are the
+// appTemplateData is appTemplate's render input: AdapterImports are the
 // adapter modules' named imports (alias + path, e.g. logslog +
-// adapters/log/slog) the selection needs Register() calls for, and
-// Registers are the qualified Register calls (e.g. logslog.Register()),
-// all sorted for deterministic output.
+// adapters/log/slog) the selection needs, CoreImports the core packages
+// the mapped adapter factories' signatures name, RefVars the per-instance
+// Ref declarations, and Providers the qualified container.Provide entries
+// -- all sorted for deterministic output.
 type appTemplateData struct {
-	ModuleImports []moduleImport
-	Registers     []string
+	AdapterImports []moduleImport
+	CoreImports    []string
+	RefVars        []string
+	Providers      []string
 }
 
 // moduleImport is one adapter module import in the generated app.go:
-// Alias is the local name New's qualified Register call uses (battery +
-// adapter, e.g. logslog), Path the adapter package import path. Adapter
-// packages expose constructors but never self-register, so every adapter
-// module ships a Register() wiring its battery registry.
+// Alias is the local name the Provide factories are qualified with
+// (battery + adapter, e.g. logslog), Path the adapter package import path.
 type moduleImport struct {
 	Alias string
 	Path  string
 }
 
 // adapterBinding maps one battery selection to its adapter module: the
-// alias app.go imports it under, the adapter package import path, and the
-// qualified Register call New must make. Every battery/adapter pair binds:
-// every adapter (stdlib-only included) is a module with a Register()
-// wiring its battery registry, and the container wires nothing itself.
-// Aliases are battery + adapter with no separator; every pair is unique
-// and collides with neither stdlib names nor facade package names.
-func adapterBinding(b batterySelection) (alias, path, call string) {
+// alias app.go imports it under and the adapter package import path. Every
+// battery/adapter pair binds: every adapter (stdlib-only included) is
+// a module with a Register() wiring their battery registry, and the
+// container wires nothing itself. Aliases are battery + adapter with no
+// separator; every pair is unique and collides with neither stdlib
+// names nor facade package names.
+func adapterBinding(b batterySelection) (alias, path string) {
 	alias = b.Battery + b.Adapter
 
-	return alias, batteryImportPath(b), alias + ".Register()"
+	return alias, batteryImportPath(b)
 }
 
 // renderAppContent renders appTemplate for exactly the given battery
 // selection -- the one place that turns a []batterySelection into app.go's
-// content, shared by ensureAppPackage and `zever new`'s writeNewProject so
-// the two callers can never format the import block differently. The
-// output imports and registers exactly the selection (floor + user picks,
-// nothing more): one named import plus Register() call per selection,
-// sorted deterministically. There are no blank imports and no bundle
-// imports: every adapter registers itself explicitly.
+// content, so `zever generate server` (floor selection) and any future
+// caller can never format the import block differently. The output wires
+// exactly the selection (floor + user picks, nothing more): one Ref var
+// plus one container.Provide entry per selection, the named adapter
+// imports, and the core packages the mapped factories' signatures name,
+// all sorted deterministically. The Provide entries are the whole of the
+// wiring: the container validates the graph and resolves each instance
+// lazily on first use.
 func renderAppContent(tag string, selections []batterySelection) ([]byte, error) {
-	var moduleImports = make([]moduleImport, 0, len(selections))
+	sorted := append([]batterySelection(nil), selections...)
 
-	var registers = make([]string, 0, len(selections))
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Battery != sorted[j].Battery {
+			return sorted[i].Battery < sorted[j].Battery
+		}
 
-	for _, s := range selections {
-		alias, path, call := adapterBinding(s)
-		moduleImports = append(moduleImports, moduleImport{Alias: alias, Path: path})
-		registers = append(registers, call)
+		return sorted[i].Adapter < sorted[j].Adapter
+	})
+
+	adapterImports := make([]moduleImport, 0, len(sorted))
+	coreSeen := map[string]bool{}
+	coreImports := []string{}
+	refVars := make([]string, 0, len(sorted))
+	providers := make([]string, 0, len(sorted))
+
+	for _, s := range sorted {
+		alias, path := adapterBinding(s)
+		adapterImports = append(adapterImports, moduleImport{Alias: alias, Path: path})
+
+		if core := coreModulePath(s.Battery); !coreSeen[core] {
+			coreSeen[core] = true
+			coreImports = append(coreImports, core)
+		}
+
+		varName := refVarName(s.Battery, "default")
+		refVars = append(refVars, fmt.Sprintf("// %s names the default %s instance (%s adapter).\nvar %s = %s.DefaultRef()", varName, s.Battery, s.Adapter, varName, s.Battery))
+
+		factory, err := factoryExpr(s, alias, "\t\t")
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", tag, err)
+		}
+
+		providers = append(providers, "container.Provide("+varName+", "+factory+")")
 	}
 
-	sort.Slice(moduleImports, func(i, j int) bool { return moduleImports[i].Path < moduleImports[j].Path })
-	sort.Strings(registers)
+	sort.Slice(adapterImports, func(i, j int) bool { return adapterImports[i].Path < adapterImports[j].Path })
+	sort.Strings(coreImports)
 
-	return renderGoFile(tag, "app.go", appTemplate, appTemplateData{ModuleImports: moduleImports, Registers: registers})
+	return renderGoFile(tag, "app.go", appTemplate, appTemplateData{
+		AdapterImports: adapterImports,
+		CoreImports:    coreImports,
+		RefVars:        refVars,
+		Providers:      providers,
+	})
 }
 
 // ensureAppPackage scaffolds internal/app/app.go when the target project has
-// none. Every generated entrypoint calls app.New(), mirroring
-// examples/todo/internal/app: adapter packages never self-register, so one
-// place per project owns the adapter selection (imports) and the Register
-// calls. Called with no
-// battery-selection context (e.g. `zever generate server` run without a
-// prior `zever new`), so it renders with just coreBatterySelections -- the
-// floor (log, router), both adapter modules with Register calls, not a
-// developer's fuller pick.
+// no wiring of its own. `zever new` scaffolds the same wiring under
+// internal/app/wiring.go (its Ref vars and Providers share this file's
+// names), so either file existing means the project owns its adapter
+// selection and this create-if-missing step must stay out of the way.
+// Called with no battery-selection context (e.g. `zever generate server`
+// run without a prior `zever new`), so it renders with just
+// coreBatterySelections -- the floor (log, router), both adapter modules
+// with Provide entries, not a developer's fuller pick.
 func ensureAppPackage(tag string) (created bool, err error) {
 	path := filepath.Join("internal", "app", "app.go")
 
@@ -286,6 +320,12 @@ func ensureAppPackage(tag string) (created bool, err error) {
 		return false, nil
 	} else if !os.IsNotExist(statErr) {
 		return false, fmt.Errorf("%s: stat %q: %w", tag, path, statErr)
+	}
+
+	if _, statErr := os.Stat(filepath.Join("internal", "app", "wiring.go")); statErr == nil {
+		return false, nil
+	} else if !os.IsNotExist(statErr) {
+		return false, fmt.Errorf("%s: stat %q: %w", tag, filepath.Join("internal", "app", "wiring.go"), statErr)
 	}
 
 	content, err := renderAppContent(tag, coreBatterySelections())
@@ -331,7 +371,9 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 		printGenerateDryRun(stdout, res.ModulesFile)
 
 		if _, statErr := os.Stat(filepath.Join("internal", "app", "app.go")); os.IsNotExist(statErr) {
-			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(filepath.Join("internal", "app", "app.go")))
+			if _, statErr := os.Stat(filepath.Join("internal", "app", "wiring.go")); os.IsNotExist(statErr) {
+				_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(filepath.Join("internal", "app", "app.go")))
+			}
 		}
 
 		if len(data.Modules) > 0 {
@@ -343,10 +385,11 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 }
 
 const serverUsageBody = `Scaffolds a thin HTTP+gRPC server entrypoint at <server_entry>/main.go
-(default cmd/server): a ~15-line wrapper over the serve library
-(serve.Main with the project's Providers and Modules). All boot behavior --
-listeners, TLS, health, readiness, rate limiting, reflection, pprof, doctor
--- lives in serve; project wiring lives in internal/app.
+(default cmd/server): a flag-parsing wrapper over the serve library (the
+same shape "zever new" writes) that passes the project's Providers and
+the schema modules to serve.Main. All boot behavior -- listeners, TLS,
+health, readiness, rate limiting, reflection, pprof, doctor -- lives in
+serve; project wiring lives in internal/app.
 
 Also scaffolds internal/app/app.go when the project does not have one yet
 (adapter selection, stub-once) and refreshes internal/app/modules.go on every
@@ -903,14 +946,13 @@ func writeStubIfMissing(tag, path string, content []byte) (written bool, err err
 const appTemplate = `// Package app builds the config and container shared by this project's
 // binaries.
 //
-// Adapter packages expose constructors but never self-register, so wiring
-// is explicit: the named imports below pin exactly the adapters this app
-// uses, and each has a matching Register call in New wiring its battery
-// registry. This list was picked at scaffold time (` + "`zever new`" + `'s battery picker, or the floor
-// (log, router) when there was no prior ` + "`zever new`" + `) -- add a battery
-// later with ` + "`zever add <battery>`" + ` (or with service env plus one
-// import and Register call here); this file is scaffolded once and never
-// regenerated.
+// The Ref vars below name each wired instance; Providers builds them from
+// the named adapter constructors. This list was picked at scaffold time
+// (` + "`zever generate server`" + `'s floor (log, router) when there was no prior ` + "`zever new`" + `,
+// or the project's own picks once it has one) -- add a battery later with
+// ` + "`zever add <battery>`" + `: it only inserts Ref vars and Provider entries
+// here and never rewrites user code. Tune an instance with
+// container.WithOptions entries in Providers.
 package app
 
 import (
@@ -918,7 +960,8 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-{{range .ModuleImports}}	{{.Alias}} {{printf "%q" .Path}}
+{{range .CoreImports}}	"{{.}}"
+{{end}}{{range .AdapterImports}}	{{.Alias}} {{printf "%q" .Path}}
 {{end}})
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -934,6 +977,7 @@ func Config() (*config.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("app: load env: %w", err)
 	}
+
 	cfg, err := config.Resolve(env)
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
@@ -952,60 +996,142 @@ func Config() (*config.Config, error) {
 // New builds the container every binary in this project uses. Nothing is
 // opened until a battery is first requested.
 func New() (*container.Container, error) {
-	Providers()
-
 	cfg, err := Config()
 	if err != nil {
 		return nil, err
 	}
 
-	return container.New(cfg), nil
+	return container.New(cfg, Providers()...), nil
 }
 
-// Providers wires the selected adapters into their battery registries and
-// returns the explicit provider set for serve.Main. The registry wiring is
-// the whole of the "wiring" a zever app does: adapter packages expose
-// constructors but never self-register, so an app calls Register for
-// exactly the adapters it actually uses and nothing else. The returned
-// slice is nil today -- this project's batteries resolve through the
-// registries above -- and stays so a later ` + "`zever add`" + ` can append
-// container.Provide values without changing main.go.
+{{range .RefVars}}
+{{.}}{{end}}
+// Providers returns every wired service instance, in declaration order.
+// The container validates the graph (duplicate refs, missing deps,
+// cycles) and resolves each instance lazily on first use.
 func Providers() []container.Provider {
-{{range .Registers}}	{{.}}
-{{end}}	return nil
+	return []container.Provider{
+{{range .Providers}}		{{.}},
+{{end}}	}
 }
 `
 
-// serverTemplate renders cmd/server/main.go: a thin wrapper over the serve
-// library. All boot behavior (listeners, TLS, health, readiness, rate
-// limiting, reflection, pprof, SIGHUP reload, doctor) lives in serve; all
-// project wiring lives in internal/app (Providers, Modules).
+// serverTemplate renders cmd/server/main.go: the same flag-parsing wrapper
+// `zever new` scaffolds (see newServerMainTemplate), so the two commands can
+// never fight over the file's shape. It parses the listen flags the launcher
+// passes through, then hands the typed Providers and the schema modules to
+// serve.Main. serve returns the error; main owns the exit path (stderr +
+// non-zero).
+//
+// -addr overrides the HTTP port (":8080", "host:port" or bare "8080"; only
+// the port is used, serve binds all interfaces and warns on plaintext
+// non-loopback). Empty falls back to serve's own PORT/default. -grpc-addr
+// enables gRPC only when auth+permission are wired (see grpcWired):
+// otherwise a one-line notice explains the skip, so `zever dev -grpc-addr
+// ...` stays green on scaffolds that never wired them.
 const serverTemplate = `// Command server runs this project's HTTP+gRPC API.
 //
-// Scaffolded by ` + "`zever generate server`" + `. Thin wrapper over the serve
-// library: all boot behavior lives there, all project wiring in internal/app.
+// Scaffolded by ` + "`zever generate server`" + `. Deliberately thin:
+// serve.Main owns boot, signal handling and graceful shutdown; everything
+// with behaviour worth testing belongs in a package of its own.
 package main
 
 import (
+	"flag"
+	"fmt"
+	"net"
 	"os"
+	"strconv"
+
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/serve"
 
 	"{{.ModulePath}}/internal/app"
-	"github.com/zenta-dev/zever/serve"
 )
 
 func main() {
-	if err := serve.Main(app.Providers(), app.Modules); err != nil {
-		_, _ = os.Stderr.WriteString("server: " + err.Error() + "\n")
+	addr := flag.String("addr", "", "HTTP listen address (:port or host:port; empty uses PORT, default :8080)")
+	grpcAddr := flag.String("grpc-addr", "", "gRPC listen address (needs auth+permission wired; empty disables)")
+	flag.Parse()
 
+	opts := []serve.Option{}
+
+	if port, err := serverPort(*addr); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
+		os.Exit(1)
+	} else if port != "" {
+		opts = append(opts, serve.WithPort(port))
+	}
+
+	if *grpcAddr != "" {
+		if !grpcWired() {
+			fmt.Fprintln(os.Stderr, "server: -grpc-addr skipped (wire auth+permission via 'zever add auth permission' to enable gRPC)")
+		} else {
+			opts = append(opts, serve.WithGRPCAddr(*grpcAddr))
+		}
+	}
+
+	modules := func({{if .Modules}}c{{else}}_{{end}} *container.Container) []serve.Module {
+		return []serve.Module{
+{{range .Modules}}			app.New{{.TypeName}}(c),
+{{end}}		}
+	}
+
+	if err := serve.Main(app.Providers(), modules, opts...); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
 		os.Exit(1)
 	}
+}
+
+// grpcWired reports whether the project's Providers wire the auth and
+// permission instances gRPC serving requires. It builds a throwaway
+// container (nothing resolves until first use) and inspects the provider
+// labels, mirroring what serve itself demands in setupGRPC.
+func grpcWired() bool {
+	c := container.New(nil, app.Providers()...)
+
+	auth, permission := false, false
+
+	for _, label := range c.Wired() {
+		switch label {
+		case "auth", "auth/default":
+			auth = true
+		case "permission", "permission/default":
+			permission = true
+		}
+	}
+
+	return auth && permission
+}
+
+// serverPort extracts the port from an -addr value (":8080",
+// "127.0.0.1:8080" or bare "8080"), failing closed on garbage. The empty
+// address means "no override".
+func serverPort(addr string) (string, error) {
+	if addr == "" {
+		return "", nil
+	}
+
+	if _, port, err := net.SplitHostPort(addr); err == nil {
+		if port == "" {
+			return "", fmt.Errorf("-addr %q names no port", addr)
+		}
+
+		return port, nil
+	}
+
+	if _, err := strconv.Atoi(addr); err == nil {
+		return addr, nil
+	}
+
+	return "", fmt.Errorf("-addr %q wants :port or host:port", addr)
 }
 `
 
 // modulesFileName is the refreshed wiring file under internal/app: the
-// serve.Module wrappers plus Modules(), regenerated on every generate from
-// the current schema. Service implementations are the opposite contract
-// (see writeServiceStubs): stub-once, never overwritten.
+// serve.Module wrappers the generated main mounts, regenerated on every
+// generate from the current schema. Service implementations are the opposite
+// contract (see writeServiceStubs): stub-once, never overwritten.
 const modulesFileName = "modules.go"
 
 // scaffoldStampLine is the provenance header for refreshed scaffold files:
@@ -1017,19 +1143,20 @@ func scaffoldStampLine(hash string) string {
 }
 
 // modulesTemplate renders internal/app/modules.go: one serve.Module wrapper
-// per schema module plus the Modules constructor. It is refreshed on every
-// generate (force-written): hand edits belong in internal/service, never
-// here. Every module implements serve.GRPCModule by delegating to its
-// generated gogen package's GRPCPolicies, so serve's fail-closed interceptor
-// covers every service with no per-module merge code in main.
+// per schema module, from which main builds the module list it hands to
+// serve.Main. It is refreshed on every generate (force-written): hand edits
+// belong in internal/service, never here. Every module implements
+// serve.GRPCModule by delegating to its generated gogen package's
+// GRPCPolicies, so serve's fail-closed interceptor covers every service with
+// no per-module merge code in main.
 const modulesTemplate = `{{.Stamp}}
 // Package app wires the project's schema-declared modules into the serve
-// library: one serve.Module per module plus the Modules constructor the
-// generated main passes to serve.Main. This file is refreshed on every
-// generate from the current schema; put hand-written logic in
-// internal/service, never here.
+// library: one serve.Module wrapper per module that the generated main
+// mounts through serve.Main. This file is refreshed on every generate from
+// the current schema; put hand-written logic in internal/service, never
+// here.
 package app
-
+{{if .Modules}}
 import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
@@ -1040,14 +1167,7 @@ import (
 {{end}}{{range .Modules}}	{{.Alias}} "{{.ImportPath}}"
 	{{.ImplAlias}} "{{.ImplImportPath}}"
 {{end}})
-
-// Modules returns every schema-declared module for serve.Main to mount.
-// The container is shared: wrappers resolve what they need at Mount time.
-func Modules(c *container.Container) []serve.Module {
-	return []serve.Module{
-{{range .Modules}}		New{{.TypeName}}(c),
-{{end}}	}
-}
+{{end}}
 {{range .Modules}}{{$mod := .}}
 // {{$mod.TypeName}} mounts the {{$mod.ModuleName}} module's HTTP routes and
 // gRPC services.

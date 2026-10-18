@@ -121,6 +121,9 @@ func stubDevSeams(t *testing.T, watcher *fsnotify.Watcher) *devStartRecord {
 	origStart := devStartChild
 	origWatch := devNewWatcher
 	origCompile := devCompileFunc
+	origGenerate := devGenerateFunc
+	origMigrate := devMigrateFunc
+	origRoutes := devRoutesFunc
 
 	devStartChild = func(entryDir string, _ []string, _ io.Writer) (*devChild, error) {
 		starts.add(entryDir)
@@ -132,11 +135,19 @@ func stubDevSeams(t *testing.T, watcher *fsnotify.Watcher) *devStartRecord {
 	devCompileFunc = func(string, io.Writer) error {
 		return nil
 	}
+	devGenerateFunc = func(ProjectConfig, io.Writer) error {
+		return nil
+	}
+	devMigrateFunc = func(ProjectConfig, io.Writer) {}
+	devRoutesFunc = func(string, io.Writer) {}
 
 	t.Cleanup(func() {
 		devStartChild = origStart
 		devNewWatcher = origWatch
 		devCompileFunc = origCompile
+		devGenerateFunc = origGenerate
+		devMigrateFunc = origMigrate
+		devRoutesFunc = origRoutes
 	})
 
 	return starts
@@ -246,6 +257,17 @@ func TestDevLoopEndToEnd(t *testing.T) {
 	origDebounce, origGrace := devDebounce, devStopGrace
 	devDebounce, devStopGrace = 100*time.Millisecond, 3*time.Second
 	t.Cleanup(func() { devDebounce, devStopGrace = origDebounce, origGrace })
+
+	// The boot sequence (generate, auto-migrate, route table) is stubbed: this
+	// test proves the watch loop against a genuine `go run` child, not the
+	// writer's effect on a fixture module (covered by generate's own tests).
+	origGenerate, origMigrate, origRoutes := devGenerateFunc, devMigrateFunc, devRoutesFunc
+	devGenerateFunc = func(ProjectConfig, io.Writer) error { return nil }
+	devMigrateFunc = func(ProjectConfig, io.Writer) {}
+	devRoutesFunc = func(string, io.Writer) {}
+	t.Cleanup(func() {
+		devGenerateFunc, devMigrateFunc, devRoutesFunc = origGenerate, origMigrate, origRoutes
+	})
 
 	dir := t.TempDir()
 	schemaDir := filepath.Join(dir, "schema")
@@ -516,6 +538,9 @@ func stubClosedDevSeams(t *testing.T, watcher *fsnotify.Watcher) *devStartRecord
 	origStart := devStartChild
 	origWatch := devNewWatcher
 	origCompile := devCompileFunc
+	origGenerate := devGenerateFunc
+	origMigrate := devMigrateFunc
+	origRoutes := devRoutesFunc
 
 	devStartChild = func(string, []string, io.Writer) (*devChild, error) {
 		starts.add("cmd/server")
@@ -525,11 +550,17 @@ func stubClosedDevSeams(t *testing.T, watcher *fsnotify.Watcher) *devStartRecord
 		return watcher, nil
 	}
 	devCompileFunc = func(string, io.Writer) error { return nil }
+	devGenerateFunc = func(ProjectConfig, io.Writer) error { return nil }
+	devMigrateFunc = func(ProjectConfig, io.Writer) {}
+	devRoutesFunc = func(string, io.Writer) {}
 
 	t.Cleanup(func() {
 		devStartChild = origStart
 		devNewWatcher = origWatch
 		devCompileFunc = origCompile
+		devGenerateFunc = origGenerate
+		devMigrateFunc = origMigrate
+		devRoutesFunc = origRoutes
 	})
 
 	return starts
@@ -987,4 +1018,294 @@ func TestDevLoopDrainsFiredTimer(t *testing.T) {
 	if err := devLoop(ctx, project, nil, &syncBuffer{}); err != nil {
 		t.Fatalf("devLoop: %v", err)
 	}
+}
+
+// TestDevChildEnvTable pins the child environment derivation: the dev boot
+// marker is unconditional, PORT mirrors a well-formed -addr, and GRPC_ADDR
+// is never set (the child gates -grpc-addr on its own grpcWired check).
+func TestDevChildEnvTable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"no args", nil, []string{"ZEVER_ENV=dev"}},
+		{"addr space form", []string{"-addr", "127.0.0.1:8081"}, []string{"ZEVER_ENV=dev", "PORT=8081"}},
+		{"addr equals form", []string{"--addr=:9090"}, []string{"ZEVER_ENV=dev", "PORT=9090"}},
+		{"bare port addr", []string{"-addr", "8082"}, []string{"ZEVER_ENV=dev", "PORT=8082"}},
+		{"addr without port sets no PORT", []string{"-addr", "localhost"}, []string{"ZEVER_ENV=dev"}},
+		{"grpc-addr never sets GRPC_ADDR", []string{"-grpc-addr", "127.0.0.1:9091"}, []string{"ZEVER_ENV=dev"}},
+		{"other flags ignored", []string{"-verbose", "-addr", "127.0.0.1:8081", "--x=1"}, []string{"ZEVER_ENV=dev", "PORT=8081"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := devChildEnv(tc.args)
+			if len(got) != len(tc.want) {
+				t.Fatalf("devChildEnv(%v) = %v, want %v", tc.args, got, tc.want)
+			}
+
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("devChildEnv(%v) = %v, want %v", tc.args, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestDevServerURL pins the printed URL hint: -addr port wins, then PORT,
+// then serve's default.
+func TestDevServerURL(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		port string
+		want string
+	}{
+		{"addr given", []string{"-addr", "127.0.0.1:8081"}, "", "http://localhost:8081"},
+		{"addr default form", []string{"-addr", ":9090"}, "", "http://localhost:9090"},
+		{"no addr uses PORT env", nil, "8083", "http://localhost:8083"},
+		{"no addr no PORT uses default", nil, "", "http://localhost:8080"},
+	}
+
+	for _, tc := range tests {
+		// Not parallel: the cases mutate the process environment.
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.port == "" {
+				os.Unsetenv("PORT")
+			} else {
+				t.Setenv("PORT", tc.port)
+			}
+
+			if got := devServerURL(tc.args); got != tc.want {
+				t.Fatalf("devServerURL(%v) = %q, want %q", tc.args, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDevLoopPassesListenFlagsThrough proves dev's own flags reach the
+// child entrypoint untouched: the generated main parses -addr/-grpc-addr
+// itself, so dev must not strip or rewrite them.
+func TestDevLoopPassesListenFlagsThrough(t *testing.T) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatalf("new watcher: %v", err)
+	}
+	defer func() { _ = watcher.Close() }()
+
+	starts := &devStartRecord{}
+	fake := &devChild{cmd: nil, done: make(chan struct{})}
+	close(fake.done)
+
+	origStart := devStartChild
+	origWatch := devNewWatcher
+	origCompile := devCompileFunc
+	origGenerate := devGenerateFunc
+	origMigrate := devMigrateFunc
+	origRoutes := devRoutesFunc
+
+	var gotArgs []string
+	devStartChild = func(_ string, args []string, _ io.Writer) (*devChild, error) {
+		gotArgs = append([]string(nil), args...)
+		starts.add("cmd/server")
+		return fake, nil
+	}
+	devNewWatcher = func(ProjectConfig) (*fsnotify.Watcher, error) {
+		return watcher, nil
+	}
+	devCompileFunc = func(string, io.Writer) error { return nil }
+	devGenerateFunc = func(ProjectConfig, io.Writer) error { return nil }
+	devMigrateFunc = func(ProjectConfig, io.Writer) {}
+	devRoutesFunc = func(string, io.Writer) {}
+
+	t.Cleanup(func() {
+		devStartChild = origStart
+		devNewWatcher = origWatch
+		devCompileFunc = origCompile
+		devGenerateFunc = origGenerate
+		devMigrateFunc = origMigrate
+		devRoutesFunc = origRoutes
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	args := []string{"-addr", "127.0.0.1:8081", "-grpc-addr", "127.0.0.1:9091"}
+	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
+
+	if err := devLoop(ctx, project, args, &syncBuffer{}); err != nil {
+		t.Fatalf("devLoop: %v", err)
+	}
+
+	if len(gotArgs) != len(args) {
+		t.Fatalf("child args = %v, want %v", gotArgs, args)
+	}
+
+	for i := range gotArgs {
+		if gotArgs[i] != args[i] {
+			t.Fatalf("child args = %v, want %v", gotArgs, args)
+		}
+	}
+}
+
+// TestDevPrepareRunsBootSequence proves the one-time boot order: check,
+// generate, auto-migrate, route table — each step observed exactly once.
+func TestDevPrepareRunsBootSequence(t *testing.T) {
+	var compiled, generated, migrated, routed bool
+
+	origCompile := devCompileFunc
+	origGenerate := devGenerateFunc
+	origMigrate := devMigrateFunc
+	origRoutes := devRoutesFunc
+
+	devCompileFunc = func(string, io.Writer) error { compiled = true; return nil }
+	devGenerateFunc = func(ProjectConfig, io.Writer) error { generated = true; return nil }
+	devMigrateFunc = func(ProjectConfig, io.Writer) { migrated = true }
+	devRoutesFunc = func(string, io.Writer) { routed = true }
+
+	t.Cleanup(func() {
+		devCompileFunc = origCompile
+		devGenerateFunc = origGenerate
+		devMigrateFunc = origMigrate
+		devRoutesFunc = origRoutes
+	})
+
+	devPrepare(ProjectConfig{}.withDefaults(), &syncBuffer{})
+
+	if !compiled || !generated || !migrated || !routed {
+		t.Fatalf("devPrepare steps = compiled:%v generated:%v migrated:%v routed:%v, want all true", compiled, generated, migrated, routed)
+	}
+}
+
+// TestDevPrepareContinuesAfterGenerateFailure proves a failing generate is
+// reported and the boot sequence still completes: the server runs the
+// previously generated code.
+func TestDevPrepareContinuesAfterGenerateFailure(t *testing.T) {
+	var migrated, routed bool
+
+	origCompile := devCompileFunc
+	origGenerate := devGenerateFunc
+	origMigrate := devMigrateFunc
+	origRoutes := devRoutesFunc
+
+	devCompileFunc = func(string, io.Writer) error { return nil }
+	devGenerateFunc = func(ProjectConfig, io.Writer) error { return errTestSentinel }
+	devMigrateFunc = func(ProjectConfig, io.Writer) { migrated = true }
+	devRoutesFunc = func(string, io.Writer) { routed = true }
+
+	t.Cleanup(func() {
+		devCompileFunc = origCompile
+		devGenerateFunc = origGenerate
+		devMigrateFunc = origMigrate
+		devRoutesFunc = origRoutes
+	})
+
+	out := &syncBuffer{}
+	devPrepare(ProjectConfig{}.withDefaults(), out)
+
+	if !migrated || !routed {
+		t.Fatalf("migrated:%v routed:%v, want both true after a generate failure", migrated, routed)
+	}
+
+	if !strings.Contains(out.String(), "generate FAILED") {
+		t.Fatalf("expected the generate failure report, got:\n%s", out.String())
+	}
+}
+
+// TestDevGenerateUsesDefaults proves dev's generate is the bare pipeline:
+// empty backend set (the constant default), project schema/server, module
+// path from the project's go.mod.
+func TestDevGenerateUsesDefaults(t *testing.T) {
+	dir := t.TempDir()
+	writeZeverFixture(t, dir, "go.mod", "module example.com/devgen\n\ngo 1.24\n")
+	t.Chdir(dir)
+
+	var got GenerateFullConfig
+	orig := devGenerateFull
+	devGenerateFull = func(cfg GenerateFullConfig) error { got = cfg; return nil }
+	t.Cleanup(func() { devGenerateFull = orig })
+
+	project := ProjectConfig{SchemaDir: "schema", ServerEntry: "cmd/server"}.withDefaults()
+	if err := devGenerate(project, &syncBuffer{}); err != nil {
+		t.Fatalf("devGenerate: %v", err)
+	}
+
+	if got.Backends != "" {
+		t.Fatalf("Backends = %q, want empty (default pipeline)", got.Backends)
+	}
+
+	if got.SchemaDir != project.SchemaDir || got.ServerEntry != project.ServerEntry {
+		t.Fatalf("SchemaDir/ServerEntry = %q/%q, want %q/%q", got.SchemaDir, got.ServerEntry, project.SchemaDir, project.ServerEntry)
+	}
+
+	if got.ModulePath != "example.com/devgen" {
+		t.Fatalf("ModulePath = %q, want %q", got.ModulePath, "example.com/devgen")
+	}
+}
+
+// TestDevAutoMigrateGate pins the safety gate: sqlite auto-applies (a local
+// file is unambiguously safe), a non-sqlite adapter outside a dev
+// ZEVER_ENV is skipped, and a dev ZEVER_ENV opts a non-sqlite adapter
+// back in. Headless, the skip never prompts.
+func TestDevAutoMigrateGate(t *testing.T) {
+	// Not parallel: the cases chdir and mutate the process environment.
+	dir := t.TempDir()
+	schemaDir := filepath.Join(dir, "schema")
+
+	if err := mkdirZeverAll(schemaDir); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	writeZeverFixture(t, schemaDir, "app.zen", zeverUserSchema)
+
+	t.Chdir(dir)
+
+	project := ProjectConfig{SchemaDir: schemaDir, ServerEntry: "cmd/server"}.withDefaults()
+
+	t.Run("sqlite auto-applies", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "production")
+
+		out := &syncBuffer{}
+		devAutoMigrate(project, out)
+
+		if strings.Contains(out.String(), "skipped") {
+			t.Fatalf("sqlite must auto-migrate even outside a dev ZEVER_ENV, got:\n%s", out.String())
+		}
+
+		if _, err := os.Stat(filepath.Join(dir, "data", "app.db")); err != nil {
+			t.Fatalf("auto-migrate did not create the dev database: %v", err)
+		}
+	})
+
+	t.Run("postgres skipped outside dev env", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "production")
+		t.Setenv("DB_ADAPTER", "postgres")
+		t.Setenv("DB_DSN", "postgres://user:pass@localhost:5432/test?sslmode=disable")
+
+		out := &syncBuffer{}
+		devAutoMigrate(project, out)
+
+		if !strings.Contains(out.String(), "auto-migrate skipped") {
+			t.Fatalf("postgres outside a dev ZEVER_ENV must be skipped, got:\n%s", out.String())
+		}
+	})
+
+	t.Run("postgres attempted in dev env", func(t *testing.T) {
+		t.Setenv("ZEVER_ENV", "dev")
+		t.Setenv("DB_ADAPTER", "postgres")
+		t.Setenv("DB_DSN", "postgres://user:pass@localhost:5432/test?sslmode=disable")
+
+		out := &syncBuffer{}
+		devAutoMigrate(project, out)
+
+		if strings.Contains(out.String(), "auto-migrate skipped") {
+			t.Fatalf("a dev ZEVER_ENV must opt postgres back into auto-migrate, got:\n%s", out.String())
+		}
+	})
 }

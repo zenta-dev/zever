@@ -963,7 +963,7 @@ func refCall(name string) string {
 // adapterBindingAlias returns the adapter import alias for sel (see
 // adapterBinding, which also returns the path and Register call).
 func adapterBindingAlias(sel batterySelection) string {
-	alias, _, _ := adapterBinding(sel)
+	alias, _ := adapterBinding(sel)
 
 	return alias
 }
@@ -1062,7 +1062,7 @@ func bareFactoryCall(factory string) string {
 // missing, reusing the existing alias when the path is already imported.
 // Only the import block normalizes; user code is untouched.
 func ensureWiringImports(src string, wf *wiringFile, sel batterySelection, alias string) string {
-	_, path, _ := adapterBinding(sel)
+	_, path := adapterBinding(sel)
 	core := coreModulePath(sel.Battery)
 
 	specs := append([]wiringImport(nil), wf.imports...)
@@ -1092,11 +1092,11 @@ func ensureWiringImports(src string, wf *wiringFile, sel batterySelection, alias
 // nothing else references the old alias, and ensures the core and new
 // adapter imports exist. Only the import block normalizes.
 func swapAdapterImport(wf *wiringFile, sel batterySelection, curAdapter string) string {
-	_, newPath, _ := adapterBinding(sel)
+	_, newPath := adapterBinding(sel)
 	core := coreModulePath(sel.Battery)
 
 	oldSel := batterySelection{Battery: sel.Battery, Adapter: curAdapter}
-	_, oldPath, _ := adapterBinding(oldSel)
+	_, oldPath := adapterBinding(oldSel)
 
 	oldAlias, _ := wf.importAliasFor(oldPath)
 	uses := 0
@@ -1120,7 +1120,7 @@ func swapAdapterImport(wf *wiringFile, sel batterySelection, curAdapter string) 
 	}
 
 	if _, ok := wf.importAliasFor(newPath); !ok {
-		alias, _, _ := adapterBinding(sel)
+		alias, _ := adapterBinding(sel)
 		specs = append(specs, wiringImport{alias: alias, path: newPath})
 	}
 

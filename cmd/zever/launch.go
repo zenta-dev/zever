@@ -165,14 +165,15 @@ func runLaunch(entryDir string, passthroughArgs []string) error {
 
 // startLaunch starts `go run <entryDir> <passthroughArgs...>` in its own
 // process group with the parent's stdio wired through, and returns the running
-// command *without* waiting for it.
+// command *without* waiting for it. env, when non-empty, is layered over the
+// parent environment for the child.
 //
 // It exists for `zever dev`, which has to keep a handle on the child so a file
 // change can stop and relaunch it. runLaunch (the blocking variant every other
 // launcher command uses, and whose behaviour must not change) is layered on top
 // of it. Callers of startLaunch own the child: they must eventually Wait on it,
 // and they install their own signal handling — startLaunch installs none.
-func startLaunch(ctx context.Context, entryDir string, passthroughArgs []string) (*exec.Cmd, error) {
+func startLaunch(ctx context.Context, entryDir string, passthroughArgs []string, env ...string) (*exec.Cmd, error) {
 	// The child's lifetime is governed by forwarded signals, not by a
 	// deadline: runLaunch cancels ctx on a repeated signal to reap `go run`
 	// when the child ignores the first. entryDir comes from the developer's
@@ -180,6 +181,10 @@ func startLaunch(ctx context.Context, entryDir string, passthroughArgs []string)
 	//nolint:gosec // see above
 	cmd := exec.CommandContext(ctx, "go", buildGoRunArgs(entryDir, passthroughArgs)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	isolateProcessGroup(cmd)
 

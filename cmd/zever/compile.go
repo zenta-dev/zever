@@ -436,7 +436,7 @@ func runCompileWith(cfg CompileConfig) error {
 	}
 
 	schemaDir := defaultSchemaDir
-	if pc, err := loadProjectConfig(); err == nil {
+	if pc, pcErr := loadProjectConfig(); pcErr == nil {
 		schemaDir = pc.SchemaDir
 	}
 

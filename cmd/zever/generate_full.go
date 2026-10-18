@@ -216,8 +216,8 @@ func GenerateFull(cfg GenerateFullConfig) error { //nolint:gocyclo
 		finalSpec, _ = resolveBackendSpec(cfg.Backends)
 	}
 
-	if _, err := ensureAppPackage(tag); err != nil {
-		return err
+	if _, appPkgErr := ensureAppPackage(tag); appPkgErr != nil {
+		return appPkgErr
 	}
 
 	data, err := loadServerData(cfg.ModulePath, outDir, schemaDir, cfg.SchemaFiles, rateLimitConfigured(), reflectionEnabled())
@@ -270,7 +270,7 @@ func statDesiredTree(desired map[string][]byte) []fileStatus {
 	statuses := make([]fileStatus, 0, len(desired))
 
 	for path, content := range desired {
-		disk, err := os.ReadFile(path) //nolint:gosec // pipeline compares generated files it owns
+		disk, err := os.ReadFile(path)
 		switch {
 		case err != nil:
 			statuses = append(statuses, fileStatus{Path: path, Status: fileCreated})
@@ -329,20 +329,20 @@ func printUnifiedDiffs(out io.Writer, desired map[string][]byte, statuses []file
 		var old []byte
 
 		if st.Status == fileUpdated {
-			disk, err := os.ReadFile(st.Path) //nolint:gosec // diff preview of a generated file
+			disk, err := os.ReadFile(st.Path)
 			if err == nil {
 				old = disk
 			}
 		}
 
-		_, _ = fmt.Fprintln(out, unifiedDiff(st.Path, old, byPath[st.Path]))
+		_, _ = fmt.Fprintln(out, previewDiff(st.Path, old, byPath[st.Path]))
 	}
 }
 
 // unifiedDiff renders path's old→new as a minimal unified diff: common
 // prefix/suffix lines trimmed, one hunk with up to three context lines each
 // side. It is a preview, not a patch format: no multi-hunk splitting.
-func unifiedDiff(path string, oldBytes, newBytes []byte) string {
+func previewDiff(path string, oldBytes, newBytes []byte) string {
 	oldLines := splitDiffLines(oldBytes)
 	newLines := splitDiffLines(newBytes)
 
@@ -439,7 +439,7 @@ func reportGenerateCheck(cfg GenerateFullConfig, out io.Writer, backendsSpec str
 			continue
 		}
 
-		disk, err := os.ReadFile(st.Path) //nolint:gosec // check compares generated files it owns
+		disk, err := os.ReadFile(st.Path)
 		if err != nil {
 			drift = append(drift, st.Path+" (missing)")
 

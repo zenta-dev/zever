@@ -1,20 +1,95 @@
 // Command server runs this project's HTTP+gRPC API.
 //
-// Scaffolded by `zever generate server`. Thin wrapper over the serve
-// library: all boot behavior lives there, all project wiring in internal/app.
+// Scaffolded by `zever generate server`. Deliberately thin:
+// serve.Main owns boot, signal handling and graceful shutdown; everything
+// with behaviour worth testing belongs in a package of its own.
 package main
 
 import (
+	"flag"
+	"fmt"
+	"net"
 	"os"
+	"strconv"
+
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/serve"
 
 	"example.com/shop/internal/app"
-	"github.com/zenta-dev/zever/serve"
 )
 
 func main() {
-	if err := serve.Main(app.Providers(), app.Modules); err != nil {
-		_, _ = os.Stderr.WriteString("server: " + err.Error() + "\n")
+	addr := flag.String("addr", "", "HTTP listen address (:port or host:port; empty uses PORT, default :8080)")
+	grpcAddr := flag.String("grpc-addr", "", "gRPC listen address (needs auth+permission wired; empty disables)")
+	flag.Parse()
 
+	opts := []serve.Option{}
+
+	if port, err := serverPort(*addr); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
+		os.Exit(1)
+	} else if port != "" {
+		opts = append(opts, serve.WithPort(port))
+	}
+
+	if *grpcAddr != "" {
+		if !grpcWired() {
+			fmt.Fprintln(os.Stderr, "server: -grpc-addr skipped (wire auth+permission via 'zever add auth permission' to enable gRPC)")
+		} else {
+			opts = append(opts, serve.WithGRPCAddr(*grpcAddr))
+		}
+	}
+
+	modules := func(c *container.Container) []serve.Module {
+		return []serve.Module{}
+	}
+
+	if err := serve.Main(app.Providers(), modules, opts...); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
 		os.Exit(1)
 	}
+}
+
+// grpcWired reports whether the project's Providers wire the auth and
+// permission instances gRPC serving requires. It builds a throwaway
+// container (nothing resolves until first use) and inspects the provider
+// labels, mirroring what serve itself demands in setupGRPC.
+func grpcWired() bool {
+	c := container.New(nil, app.Providers()...)
+
+	auth, permission := false, false
+
+	for _, label := range c.Wired() {
+		switch label {
+		case "auth", "auth/default":
+			auth = true
+		case "permission", "permission/default":
+			permission = true
+		}
+	}
+
+	return auth && permission
+}
+
+// serverPort extracts the port from an -addr value (":8080",
+// "127.0.0.1:8080" or bare "8080"), failing closed on garbage. The empty
+// address means "no override".
+func serverPort(addr string) (string, error) {
+	if addr == "" {
+		return "", nil
+	}
+
+	if _, port, err := net.SplitHostPort(addr); err == nil {
+		if port == "" {
+			return "", fmt.Errorf("-addr %q names no port", addr)
+		}
+
+		return port, nil
+	}
+
+	if _, err := strconv.Atoi(addr); err == nil {
+		return addr, nil
+	}
+
+	return "", fmt.Errorf("-addr %q wants :port or host:port", addr)
 }

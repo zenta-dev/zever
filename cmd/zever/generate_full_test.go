@@ -29,7 +29,7 @@ func writeEntityOnlySchema(t *testing.T, dir string) {
 	}
 }
 
-func generateFullFixture(t *testing.T, schema func(t *testing.T, dir string)) string {
+func generateFullFixture(t *testing.T, schema func(t *testing.T, dir string)) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -39,8 +39,6 @@ func generateFullFixture(t *testing.T, schema func(t *testing.T, dir string)) st
 	if schema != nil {
 		schema(t, dir)
 	}
-
-	return dir
 }
 
 // TestResolveBackendSpec pins the override chain: explicit flag wins, then
@@ -113,7 +111,11 @@ func firstGeneratedFile(t *testing.T, dir string) string {
 	var first string
 
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || first != "" {
+		if err != nil {
+			return err
+		}
+
+		if entry.IsDir() || first != "" {
 			return nil
 		}
 
@@ -209,19 +211,19 @@ func TestGenerateFullDiffPrintsWithoutWriting(t *testing.T) {
 
 	victim := firstGeneratedFile(t, filepath.Join("generated", "zenorm"))
 
-	before, err := os.ReadFile(victim) //nolint:gosec // test temp dir
-	if err != nil {
-		t.Fatalf("read %q: %v", victim, err)
+	before, readErr := os.ReadFile(victim)
+	if readErr != nil {
+		t.Fatalf("read %q: %v", victim, readErr)
 	}
 
-	if err := os.WriteFile(victim, append(before, []byte("\n-- stale\n")...), 0o600); err != nil { //nolint:gosec // test temp dir
-		t.Fatalf("write stale: %v", err)
+	if staleErr := os.WriteFile(victim, append(before, []byte("\n-- stale\n")...), 0o600); staleErr != nil { //nolint:gosec // test-controlled temp path
+		t.Fatalf("write stale: %v", staleErr)
 	}
 
 	var out bytes.Buffer
 
-	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &out, Diff: true}); err != nil {
-		t.Fatalf("GenerateFull --diff: %v", err)
+	if diffErr := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &out, Diff: true}); diffErr != nil {
+		t.Fatalf("GenerateFull --diff: %v", diffErr)
 	}
 
 	diff := out.String()
@@ -229,7 +231,7 @@ func TestGenerateFullDiffPrintsWithoutWriting(t *testing.T) {
 		t.Fatalf("diff output is not a unified diff:\n%s", diff)
 	}
 
-	after, err := os.ReadFile(victim) //nolint:gosec // test temp dir
+	after, err := os.ReadFile(victim)
 	if err != nil {
 		t.Fatalf("read %q: %v", victim, err)
 	}
@@ -241,7 +243,6 @@ func TestGenerateFullDiffPrintsWithoutWriting(t *testing.T) {
 
 // TestGenerateFullCheckCleanTree proves --check exits 0 on a fresh tree.
 func TestGenerateFullCheckCleanTree(t *testing.T) {
-
 	generateFullFixture(t, writeEntityOnlySchema)
 
 	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &bytes.Buffer{}}); err != nil {
@@ -262,7 +263,6 @@ func TestGenerateFullCheckCleanTree(t *testing.T) {
 // TestGenerateFullCheckDetectsDrift proves --check fails on stale content
 // and on missing files, writing nothing either way.
 func TestGenerateFullCheckDetectsDrift(t *testing.T) {
-
 	generateFullFixture(t, writeEntityOnlySchema)
 
 	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &bytes.Buffer{}}); err != nil {
@@ -276,13 +276,13 @@ func TestGenerateFullCheckDetectsDrift(t *testing.T) {
 
 	victim := filepath.Join("generated", "atlas", entries[0].Name())
 
-	data, err := os.ReadFile(victim) //nolint:gosec // test temp dir
-	if err != nil {
-		t.Fatalf("read %q: %v", victim, err)
+	data, readErr := os.ReadFile(victim)
+	if readErr != nil {
+		t.Fatalf("read %q: %v", victim, readErr)
 	}
 
-	if err := os.WriteFile(victim, append(data, 0x0a), 0o600); err != nil { //nolint:gosec // test temp dir
-		t.Fatalf("write stale: %v", err)
+	if staleErr := os.WriteFile(victim, append(data, 0x0a), 0o600); staleErr != nil { //nolint:gosec // test-controlled temp path
+		t.Fatalf("write stale: %v", staleErr)
 	}
 
 	checkErr := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &bytes.Buffer{}, Check: true})
@@ -290,7 +290,7 @@ func TestGenerateFullCheckDetectsDrift(t *testing.T) {
 		t.Fatalf("check err = %v, want drift naming the file", checkErr)
 	}
 
-	after, err := os.ReadFile(victim) //nolint:gosec // test temp dir
+	after, err := os.ReadFile(victim)
 	if err != nil {
 		t.Fatalf("read %q: %v", victim, err)
 	}
@@ -312,7 +312,7 @@ func TestGenerateFullCheckDetectsDrift(t *testing.T) {
 // TestGenerateFullCheckStubRules proves R1 under --check: a missing stub is
 // drift (a fresh clone must create it), a modified existing stub is not.
 func TestGenerateFullCheckStubRules(t *testing.T) {
-	generateFullFixture(t, func(t *testing.T, dir string) { writeServerSchema(t, dir) })
+	generateFullFixture(t, writeServerSchema)
 
 	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &bytes.Buffer{}}); err != nil {
 		t.Fatalf("GenerateFull: %v", err)
@@ -320,13 +320,13 @@ func TestGenerateFullCheckStubRules(t *testing.T) {
 
 	stub := filepath.Join("internal", "service", "app", "task_service.go")
 
-	handwritten, err := os.ReadFile(stub) //nolint:gosec // test temp dir
+	handwritten, err := os.ReadFile(stub)
 	if err != nil {
 		t.Fatalf("read stub: %v", err)
 	}
 
 	// A hand-modified stub is never drift.
-	if err := os.WriteFile(stub, append(handwritten, []byte("\n// mine\n")...), 0o600); err != nil { //nolint:gosec // test temp dir
+	if err := os.WriteFile(stub, append(handwritten, []byte("\n// mine\n")...), 0o600); err != nil { //nolint:gosec // test-controlled temp path
 		t.Fatalf("write stub: %v", err)
 	}
 
@@ -348,7 +348,6 @@ func TestGenerateFullCheckStubRules(t *testing.T) {
 // TestGenerateFullCheckStrictOnVersionOnly proves a version-only stamp
 // difference is a note by default and a failure under Strict.
 func TestGenerateFullCheckStrictOnVersionOnly(t *testing.T) {
-
 	generateFullFixture(t, writeEntityOnlySchema)
 
 	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &bytes.Buffer{}}); err != nil {
@@ -362,9 +361,9 @@ func TestGenerateFullCheckStrictOnVersionOnly(t *testing.T) {
 
 	victim := firstGeneratedFile(t, filepath.Join("generated", "zenorm"))
 
-	data, err := os.ReadFile(victim) //nolint:gosec // test temp dir
-	if err != nil {
-		t.Fatalf("read %q: %v", victim, err)
+	data, readErr := os.ReadFile(victim)
+	if readErr != nil {
+		t.Fatalf("read %q: %v", victim, readErr)
 	}
 
 	restamped := bytes.Replace(data, []byte("v"+buildVersion), []byte("v0.0.0-check"), 1)
@@ -372,7 +371,7 @@ func TestGenerateFullCheckStrictOnVersionOnly(t *testing.T) {
 		t.Fatal("restamp changed no bytes; stamp shape changed?")
 	}
 
-	if err := os.WriteFile(victim, restamped, 0o600); err != nil { //nolint:gosec // test temp dir
+	if err := os.WriteFile(victim, restamped, 0o600); err != nil { //nolint:gosec // test-controlled temp path
 		t.Fatalf("write restamped: %v", err)
 	}
 
@@ -427,7 +426,7 @@ func TestCompileSchemaWithDefaultsAutoAddsGRPC(t *testing.T) {
 // scaffold still land. Temp dirs chdir away from the module tree, so the
 // go tool lookup fails there by construction.
 func TestGenerateFullDegradesWithoutGRPCTools(t *testing.T) {
-	generateFullFixture(t, func(t *testing.T, dir string) { writeServerSchema(t, dir) })
+	generateFullFixture(t, writeServerSchema)
 
 	var out bytes.Buffer
 
@@ -449,7 +448,7 @@ func TestGenerateFullDegradesWithoutGRPCTools(t *testing.T) {
 }
 
 func TestGenerateFullExplicitBackendsNoAutoAdd(t *testing.T) {
-	generateFullFixture(t, func(t *testing.T, dir string) { writeServerSchema(t, dir) })
+	generateFullFixture(t, writeServerSchema)
 
 	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Backends: "zenorm", Stdout: &bytes.Buffer{}}); err != nil {
 		t.Fatalf("GenerateFull: %v", err)
@@ -479,7 +478,7 @@ func TestGenerateFullEnvOverride(t *testing.T) {
 // TestGenerateFullKeepsHandwrittenStubs proves the pipeline never rewrites
 // an existing stub (R1: byte-for-byte), even with schema services present.
 func TestGenerateFullKeepsHandwrittenStubs(t *testing.T) {
-	generateFullFixture(t, func(t *testing.T, dir string) { writeServerSchema(t, dir) })
+	generateFullFixture(t, writeServerSchema)
 
 	if err := GenerateFull(GenerateFullConfig{OutDir: "./generated", Stdout: &bytes.Buffer{}}); err != nil {
 		t.Fatalf("GenerateFull: %v", err)
@@ -489,7 +488,7 @@ func TestGenerateFullKeepsHandwrittenStubs(t *testing.T) {
 
 	const handwritten = "package appimpl\n\n// hand written business logic\n"
 
-	if err := os.WriteFile(stub, []byte(handwritten), 0o600); err != nil { //nolint:gosec // test temp dir
+	if err := os.WriteFile(stub, []byte(handwritten), 0o600); err != nil {
 		t.Fatalf("write handwritten stub: %v", err)
 	}
 
@@ -499,7 +498,7 @@ func TestGenerateFullKeepsHandwrittenStubs(t *testing.T) {
 		t.Fatalf("second GenerateFull: %v", err)
 	}
 
-	content, err := os.ReadFile(stub) //nolint:gosec // test temp dir
+	content, err := os.ReadFile(stub)
 	if err != nil {
 		t.Fatalf("read stub: %v", err)
 	}
@@ -514,7 +513,7 @@ func TestGenerateFullKeepsHandwrittenStubs(t *testing.T) {
 func TestUnifiedDiffTable(t *testing.T) {
 	t.Parallel()
 
-	diff := unifiedDiff("gen/a.go", []byte("one\ntwo\nthree\n"), []byte("one\nTWO\nthree\n"))
+	diff := previewDiff("gen/a.go", []byte("one\ntwo\nthree\n"), []byte("one\nTWO\nthree\n"))
 	if !strings.Contains(diff, "--- a/gen/a.go") || !strings.Contains(diff, "+++ b/gen/a.go") {
 		t.Fatalf("diff lacks file headers:\n%s", diff)
 	}
@@ -527,12 +526,12 @@ func TestUnifiedDiffTable(t *testing.T) {
 		t.Fatalf("diff lacks context lines:\n%s", diff)
 	}
 
-	full := unifiedDiff("gen/new.go", nil, []byte("x\n"))
+	full := previewDiff("gen/new.go", nil, []byte("x\n"))
 	if !strings.Contains(full, "+x") {
 		t.Fatalf("missing-file diff must render full adds:\n%s", full)
 	}
 
-	if got := unifiedDiff("gen/same.go", []byte("x\n"), []byte("x\n")); hasDiffBody(got) {
+	if got := previewDiff("gen/same.go", []byte("x\n"), []byte("x\n")); hasDiffBody(got) {
 		t.Fatalf("identical files must render no changed lines:\n%s", got)
 	}
 }

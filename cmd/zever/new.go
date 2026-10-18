@@ -2047,7 +2047,7 @@ func renderWiringContent(tag, modulePath string, selections []batterySelection) 
 	providers := make([]string, 0, len(sorted))
 
 	for _, s := range sorted {
-		alias, path, _ := adapterBinding(s)
+		alias, path := adapterBinding(s)
 		adapterImports = append(adapterImports, moduleImport{Alias: alias, Path: path})
 
 		if core := coreModulePath(s.Battery); !coreSeen[core] {

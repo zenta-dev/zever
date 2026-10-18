@@ -834,7 +834,7 @@ func TestRunNewWiringImportsMatchBatteries(t *testing.T) {
 		{Battery: "ratelimit", Adapter: "memory"},
 		{Battery: "router", Adapter: "stdhttp"},
 	} {
-		alias, path, _ := adapterBinding(sel)
+		alias, path := adapterBinding(sel)
 
 		for _, marker := range []string{`"` + path + `"`, alias + ` "` + path + `"`, "container.Provide("} {
 			if !strings.Contains(wiring, marker) {

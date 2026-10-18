@@ -417,31 +417,49 @@ func TestInterpretServerDoctor(t *testing.T) {
 	}
 }
 
-// TestServerTemplateHasDoctorMode pins the generated server contract: a
-// --doctor flag that prints per-battery JSON without serving.
+// TestServerTemplateHasDoctorMode pins the generated server contract: the
+// listen flags the launchers pass through (-addr/-grpc-addr), the grpcWired
+// gate that keeps gRPC fail-closed on scaffolds without auth+permission,
+// and the serve.Main delegation that owns boot (including --doctor).
 func TestServerTemplateHasDoctorMode(t *testing.T) {
 	t.Parallel()
 
-	for _, want := range []string{`"doctor"`, `batteries`, `runDoctor()`} {
+	for _, want := range []string{
+		`flag.String("addr"`,
+		`flag.String("grpc-addr"`,
+		"serve.Main(app.Providers(), modules, opts...)",
+		"func grpcWired() bool {",
+		"func serverPort(addr string) (string, error) {",
+	} {
 		if !strings.Contains(serverTemplate, want) {
-			t.Fatalf("serverTemplate lacks %q (--doctor mode)", want)
+			t.Fatalf("serverTemplate lacks %q (serve-library contract)", want)
 		}
 	}
 }
 
-// TestDoctorChecksMatchServerTemplate guards the two battery tables against
-// drift: every battery the CLI can check must resolve in the generated
-// server's --doctor mode too.
+// TestDoctorChecksMatchServerTemplate guards the two doctor tables against
+// drift: every battery the generated server's --doctor mode reports on (the
+// serve.Doctor table) must also be a battery the CLI doctor knows how to
+// check, so a server report is never about a battery the CLI cannot
+// explain. The serve-side table is pinned by serve's own tests; this is the
+// parity direction the generated server depends on.
 func TestDoctorChecksMatchServerTemplate(t *testing.T) {
 	t.Parallel()
 
-	for name := range doctorChecksFor(nil, nil) {
-		if name == "config" {
-			continue
-		}
+	cliChecks := doctorChecksFor(nil, nil)
 
-		if !strings.Contains(serverTemplate, `"`+name+`"`) {
-			t.Fatalf("serverTemplate lacks battery %q the CLI doctor checks", name)
+	for _, name := range []string{
+		"log",
+		"router",
+		"db",
+		"observability",
+		"queue",
+		"auth",
+		"permission",
+		"scheduler",
+	} {
+		if _, ok := cliChecks[name]; !ok {
+			t.Fatalf("serve doctor battery %q is not checked by the CLI doctor", name)
 		}
 	}
 }

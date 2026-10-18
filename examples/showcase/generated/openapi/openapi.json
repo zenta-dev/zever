@@ -805,6 +805,7 @@
   },
   "x-zever-generated": {
     "backend": "openapi",
-    "schema": "sha256:548bb077d95407638de315faaf513fcefb946598cc3a3627adb4b2c2416e1ebe"
+    "schema": "sha256:548bb077d95407638de315faaf513fcefb946598cc3a3627adb4b2c2416e1ebe",
+    "version": "v0.7.2"
   }
 }
