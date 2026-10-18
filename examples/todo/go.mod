@@ -43,15 +43,19 @@ require (
 	github.com/zenta-dev/zever/container v0.7.2
 	github.com/zenta-dev/zever/core/auth v0.7.2
 	github.com/zenta-dev/zever/core/authz v0.7.2
+	github.com/zenta-dev/zever/core/cache v0.7.2
 	github.com/zenta-dev/zever/core/db v0.7.2
 	github.com/zenta-dev/zever/core/document v0.7.2
 	github.com/zenta-dev/zever/core/job v0.7.2
 	github.com/zenta-dev/zever/core/log v0.7.2
-	github.com/zenta-dev/zever/core/middleware v0.7.2
+	github.com/zenta-dev/zever/core/observability v0.7.2
 	github.com/zenta-dev/zever/core/password v0.7.2
 	github.com/zenta-dev/zever/core/permission v0.7.2
+	github.com/zenta-dev/zever/core/queue v0.7.2
 	github.com/zenta-dev/zever/core/router v0.7.2
+	github.com/zenta-dev/zever/core/scheduler v0.7.2
 	github.com/zenta-dev/zever/orm v0.7.2
+	github.com/zenta-dev/zever/serve v0.7.2
 	github.com/zenta-dev/zever/shared/apperror v0.7.2
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.2
@@ -73,6 +77,7 @@ replace (
 	github.com/zenta-dev/zever/core/permission => ../../core/permission
 	github.com/zenta-dev/zever/core/router => ../../core/router
 	github.com/zenta-dev/zever/orm => ../../orm
+	github.com/zenta-dev/zever/serve => ../../serve
 	github.com/zenta-dev/zever/shared/apperror => ../../shared/apperror
 )
 
@@ -276,7 +281,6 @@ require (
 	github.com/zenta-dev/zever/core/ai v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/analytics v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/billing v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/cache v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/cdn v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/crypto v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/eventbus v0.7.2 // indirect
@@ -287,15 +291,13 @@ require (
 	github.com/zenta-dev/zever/core/lock v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/mailer v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/media v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/middleware v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/notification v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/observability v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/outbox v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/payment v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/queue v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/rag v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/ratelimit v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/scheduler v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/search v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/secrets v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/session v0.7.2 // indirect
