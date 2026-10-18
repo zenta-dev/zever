@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Env is an injectable process environment: variable name to value. Library
@@ -585,9 +586,9 @@ func camelToSnake(s string) string {
 					buf.WriteByte('_')
 				}
 			}
-			buf.WriteByte(byte(r | 0x20)) // lowercase
+			buf.WriteRune(unicode.ToLower(r))
 		} else {
-			buf.WriteByte(byte(r))
+			buf.WriteRune(r)
 		}
 	}
 	return buf.String()
