@@ -216,7 +216,7 @@ func Providers() []container.Provider {
 		container.Provide(Media, medialocal.New),
 		container.Provide(Notification, notificationlog.New),
 		container.Provide(Observability, observabilitystdout.New),
-		container.Provide(Outbox, func(o outbox.Options) (outbox.Store, error) {
+		container.Provide(Outbox, func(_ outbox.Options) (outbox.Store, error) {
 			return nil, nil
 		}),
 		container.Provide(Password, passwordargon2.New),
@@ -228,7 +228,7 @@ func Providers() []container.Provider {
 		container.Provide(RateLimit, ratelimitmemory.New),
 		container.Provide(Router, routerstdhttp.New),
 		container.Provide(Scheduler, schedulerembedded.New),
-		container.Provide(Search, func(o search.Options) (search.Search, error) {
+		container.Provide(Search, func(_ search.Options) (search.Search, error) {
 			return nil, nil
 		}),
 		container.Provide(Secrets, func(o secrets.Options) (secrets.Secrets, error) {

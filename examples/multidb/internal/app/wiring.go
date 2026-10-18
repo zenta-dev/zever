@@ -10,7 +10,6 @@
 package app
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/zenta-dev/zever/container"
@@ -106,10 +105,11 @@ func (m *dbModule) Mount(r router.Router, c *container.Container) error {
 		return err
 	}
 
-	r.Handle("GET", "/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		_ = primary.Ping(context.Background())
-		_ = analytics.Ping(context.Background())
-		_ = audit.Ping(context.Background())
+	r.Handle("GET", "/healthz", func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		_ = primary.Ping(ctx)
+		_ = analytics.Ping(ctx)
+		_ = audit.Ping(ctx)
 		w.WriteHeader(http.StatusOK)
 	})
 

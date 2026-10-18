@@ -182,7 +182,7 @@ func (m *apiModule) Mount(r router.Router, c *container.Container) error {
 		return err
 	}
 
-	if err := api.EnsureExtraTables(context.Background(), database); err != nil {
+	if err = api.EnsureExtraTables(context.Background(), database); err != nil {
 		return err
 	}
 
