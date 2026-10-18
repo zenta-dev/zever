@@ -292,6 +292,7 @@ require (
 	github.com/zenta-dev/zever/core/scheduler v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/search v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/vectorstore v0.7.2 // indirect
+	github.com/zenta-dev/zever/serve v0.7.2
 	github.com/zenta-dev/zever/shared/cas v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.7.2 // indirect
