@@ -219,8 +219,7 @@ zever outbox purge --before 168h   # processed rows older than 7 days
 ```
 
 Every command accepts `--dsn`, `--table`, and `--config`; without them
-the CLI discovers `zever.yaml` / `zever.yml` / `zever.json` in the working
-directory and applies environment overrides. Run one from a deploy box
+the CLI resolves from environment (`.env` / `.env.local` + process env). Run one from a deploy box
 with database access, not from every replica.
 
 ## Stalled relay readiness
@@ -301,7 +300,7 @@ func relayHealthy() error {
    `noop`. Set `observability.adapter: otlp` (plus `service_name` and
    `endpoint`) and confirm the store was opened with a provider.
 2. `zever outbox status` connects but reports empty counters: the
-   `--table` or `zever.yaml` `outbox.table` does not match the table the
+   `--table` or `OUTBOX_TABLE` env does not match the table the
    relay writes. Compare against `outbox.options.table`.
 3. `dlq requeue` looks successful but the row stays `failed`: another
    process is holding the claim lease, or the publish is failing again
