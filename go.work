@@ -147,6 +147,7 @@ use (
 	./examples/demoapp
 	./examples/showcase
 	./examples/todo
+	./examples/multidb
 	./orm
 	./serve
 	./shared/apperror
