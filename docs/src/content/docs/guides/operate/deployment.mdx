@@ -18,8 +18,8 @@ GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp   # cross-compile
 | Target | Shape | Pick it for |
 |---|---|---|
 | Systemd | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VMs and bare metal. |
-| Kubernetes | Image plus `env:` secrets and a mounted `zever.yaml`. | Orchestrated rollouts. |
-| Container image | `docker build -f examples/showcase/Dockerfile .` | Multi-stage: `golang:1.27.1-trixie` builder (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), final `gcr.io/distroless/static-debian13:nonroot` with an absolute `ENTRYPOINT ["/server"]`. |
+| Kubernetes | Image plus `env:` secrets and `.env` ConfigMap. | Orchestrated rollouts. |
+| Container image | `docker build -f examples/showcase/Dockerfile .` | Multi-stage: `golang:1.27-trixie` builder (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), final `gcr.io/distroless/static-debian13:nonroot` with an absolute `ENTRYPOINT ["/server"]`. |
 | Compose | `DB_PASSWORD=... docker compose up --build` | Scaffolded `compose.yaml` when `zever new` picks `db=postgres` or `*=redis`. Health-gated startup. |
 
 Static builds work because sqlite is pure Go (no cgo) and the distroless static base carries CA certificates for Stripe and cloud TLS. Build from the repo root; the builder runs with `GOWORK=off`. The worker follows the same pattern with `./cmd/worker`. Build from a clean tree at a tag and keep the SBOM. Tagged releases build static binaries and SBOMs with SLSA provenance; verify before deploy:
@@ -31,7 +31,7 @@ gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
 
 ## Configure and inject secrets
 
-Ship a strict file for structure and set secrets and per-environment deltas through env. Layering stays `defaults < file < env`, and `config.Default()` never reaches production because its crypto key is deterministic and public. See [Configuration](../configuration/).
+Ship an `.env` file for structure and set secrets and per-environment deltas through env. Layering is `defaults < .env < .env.local < process env`, and `config.Default()` never reaches production because its crypto key is deterministic and public. See [Configuration](../configuration/).
 
 ```sh
 DB_ADAPTER=postgres
@@ -51,24 +51,24 @@ DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app'
 AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
 ```
 
-Load with an explicit path (`config.Load("/etc/myapp/zever.yaml")`) so a wrong working directory cannot fall back to sqlite. Keep secrets in env or mounted files, and prefer [Secrets](../../security/secrets/) with Vault for payment credentials (SOC2 and PCI expect a real secrets manager). The `env` adapter cannot rotate at runtime: rotate by restarting with new values. Print only `cfg.RedactedServices()` at boot.
-
-## Shut down in order
-
-Build one container per process, resolve services in handlers, and close on SIGINT or SIGTERM:
+Resolve with an explicit env (`config.FromEnv()`) so a wrong working directory cannot fall back to sqlite. Keep secrets in env or mounted files, and prefer [Secrets](../../security/secrets/) with Vault for payment credentials (SOC2 and PCI expect a real secrets manager). The `env` adapter cannot rotate at runtime: rotate by restarting with new values. Print only `cfg.RedactedServices()` at boot.
 
 ```go title="main.go"
-cfg, err := config.Load("/etc/myapp/zever.yaml")
+env, err := config.FromEnv()
 if err != nil {
-	log.Fatal(err)
+    log.Fatal(err)
 }
-c := container.New(cfg)
+cfg, err := config.Resolve(env)
+if err != nil {
+    log.Fatal(err)
+}
+c := container.New(cfg, app.Providers()...)
 
 srv := &http.Server{Addr: ":8080", Handler: routes(c)}
 go func() {
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
-	}
+    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+        log.Fatal(err)
+    }
 }()
 
 <-sigCh // SIGINT or SIGTERM
@@ -76,150 +76,109 @@ ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 defer cancel()
 _ = srv.Shutdown(ctx)
 if err := c.Close(ctx); err != nil {
-	log.Fatal(err)
+    log.Fatal(err)
 }
 ```
 
-`Close(ctx)` closes only resolved services, dependents first and `cache`/`queue` leaves last, joining failures with `errors.Join`. Panics surface as `container.ClosePanicError` and timeouts as `container.CloseTimeoutError`. Both are value types, so match them with value `errors.As` targets or the match never fires. A timeout parent also flushes buffered spans through `Shutdown(ctx)`. Order details: [Container](../../../concepts/container/).
+## Shut down in order
 
-The generated server (`zever generate server`) does this already: it traps SIGINT and SIGTERM, flips gRPC health to `NOT_SERVING`, calls `GracefulStop()`, runs `httpServer.Shutdown`, then closes the container on a timeout context. Load balancers stop routing before in-flight RPCs drop.
+Build one container per process, resolve services in handlers, and close on SIGINT or SIGTERM:
 
-## Wire health probes
+```go title="main.go"
+env, err := config.FromEnv()
+if err != nil {
+    log.Fatal(err)
+}
+cfg, err := config.Resolve(env)
+if err != nil {
+    log.Fatal(err)
+}
+c := container.New(cfg, app.Providers()...)
 
-| Endpoint | Behavior | Use as |
-|---|---|---|
-| `GET /healthz` | Always 200, no dependency checks. | Liveness. |
-| `GET /readyz` | 200 when the DB ping (3s timeout) and gRPC health succeed, else 503. | Readiness. |
+srv := &http.Server{Addr: ":8080", Handler: routes(c)}
+go func() {
+    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+        log.Fatal(err)
+    }
+}()
 
-```yaml
-livenessProbe:
-  httpGet: {path: /healthz, port: 8080}
-readinessProbe:
-  httpGet: {path: /readyz, port: 8080}
+<-sigCh // SIGINT or SIGTERM
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+_ = srv.Shutdown(ctx)
+if err := c.Close(ctx); err != nil {
+    log.Fatal(err)
+}
 ```
 
-## Terminate TLS at the generated server
+## Health probes
 
-The generated server (`zever generate server`) serves TLS on both
-listeners from one shared configuration when the `router` battery
-carries certificate paths. The floor is TLS 1.2; without these options
-both listeners stay plaintext.
+Wire `/healthz` and `/readyz`:
 
-```sh
-ROUTER_ADAPTER=stdhttp
-ROUTER_TLS_CERT=/etc/myapp/tls/server.crt
-ROUTER_TLS_KEY=/etc/myapp/tls/server.key
-ROUTER_TLS_CLIENT_CA=/etc/myapp/tls/client-ca.crt
+```go
+r.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+    w.WriteHeader(http.StatusOK)
+})
+r.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+    if err := c.DB().Ping(r.Context()); err != nil {
+        http.Error(w, "db", http.StatusServiceUnavailable)
+        return
+    }
+    w.WriteHeader(http.StatusOK)
+}
 ```
 
-```sh
-ROUTER_TLS_CERT=/etc/myapp/tls/server.crt
-ROUTER_TLS_KEY=/etc/myapp/tls/server.key
-ROUTER_TLS_CLIENT_CA=/etc/myapp/tls/client-ca.crt   # mTLS only
-```
+Configure liveness on `/healthz` (no deps) and readiness on `/readyz` (with 3s db timeout). In Kubernetes, the `readinessProbe` timeout must exceed the db timeout so a slow query doesn't flip the probe.
 
-Rules:
+## Graceful shutdown
 
-- `tls_cert` and `tls_key` must be set together. `config.Validate`
-  rejects an unpaired path fail-closed at load, and the server fails
-  fast with a fix hint when key material cannot be read or parsed.
-- `tls_client_ca` without the pair is rejected: a client CA with no
-  server identity serves nothing to verify against.
-- Serving plaintext on a non-loopback address logs one warning per
-  listener at startup. Plaintext loopback stays quiet as the
-  local-dev default; terminate at the load balancer instead when you
-  prefer TLS off the box, and keep the warning as your reminder.
-- Keep key files out of the image: mount them (secret volume, tmpfs)
-  and restrict permissions (`0600`, owned by the service user).
+On SIGTERM the generated server flips gRPC health to `NOT_SERVING`, calls `GracefulStop()`, shuts the HTTP server down, and closes the container, all within a 10 second grace. Keep `terminationGracePeriodSeconds` above that plus any `preStop` delay.
 
-## Scale across replicas
+A short `preStop` delay lets endpoint removal propagate before SIGTERM. The reference image is distroless and has no shell; the example uses the native `sleep` lifecycle handler (Kubernetes 1.30+). On older clusters, add a tiny static sleep binary.
 
-Process-local defaults break when you add a second instance. Switch these adapters before scaling out:
+## Config reload
 
-| Battery | Production setting | Why |
-|---|---|---|
-| [Resilience](../resilience/) | `redis` | Replicas share one breaker per dependency (unique `redis.prefix` per environment). |
-| [Rate limiting](../../security/ratelimit/) | `redis` | Per-instance buckets multiply the limit. |
-| [Locks and idempotency](../../security/lock-idempotency/) | `redis` (idempotency also `db`) | `memory` allows double booking and duplicate effects. |
-| [Outbox](../../background/outbox/) | `db` on postgres, with a `Publisher` wired through the adapter constructor | Relay claims with `FOR UPDATE SKIP LOCKED`, so any number of replicas can relay one table. A container-opened store records but cannot `Start` its relay. `cdc` needs `wal_level=logical`. Consumers dedupe through `outbox.Inbox` (delivery is at least once). The relay emits `outbox.*` gauges, counters, and histograms through the provider on `outbox.Options.Provider` (nil disables telemetry, errors are discarded), so alert rules need `observability.adapter: otlp`. Failures land in the DLQ and repair with `zever outbox status` to `dlq list` to `dlq requeue --id/--all`, while `zever outbox purge --before 168h` trims processed history without touching undelivered rows. Full metric names, alert rules, and runbook: [Outbox Ops](../../background/outbox-ops/). |
-| [Workflows](../../background/workflows/) | `postgres` | `memory` loses in-flight runs on restart. Lease-based recovery lets a second replica reclaim after a crash. Set `DSN` (empty selects sqlite for dev). |
-| [Feature flags](../flags/) | `firebase` if flags change live | `static` is per-process. |
+Log level and the rate limiter swap on SIGHUP; everything else needs a rollout. A rolling restart (`kubectl rollout restart deployment/myapp-server`) is the supported way to change anything else.
 
-Postgres: set `max_conns` and `min_conns` (and `max_conn_lifetime`, `max_conn_idle_time`) so the summed `MaxConns` across `db`, `search`, and `vectorstore` pools stays below the server `max_connections`. TLS has a 1.2 floor when enabled, and the DSN is never logged. Use `sslmode=disable` only in ephemeral environments.
+## Scaling
 
-Outbound gRPC: `c.GRPCClient(target, opts...)` caches one `*grpc.ClientConn` per target and closes it with the container. Credentials fail closed (`ErrNoCredentials`). Use `WithTLS` with a CA bundle in production; `WithInsecure` is for loopback and dev only.
+Run more than one replica only with shared-state adapters (`redis`, `db`) for cache, queue, session, lock, rate-limit. With more than one scheduler replica, wire a locker so a cron slot fires once; otherwise run the scheduler in a single replica. Scale workers on queue depth (`queue.Length`) with an autoscaler such as KEDA rather than on CPU.
 
-## Harden for production
-
-- Set `log` to `slog` or `zerolog`, not `pretty`.
-- Set `observability` to `otlp` with `endpoint: host:port` and `service_name`. The default `stdout` keeps traces on the box. The OTLP adapter sets W3C `TraceContext` and `Baggage` propagators globally, and `middleware.Tracing` makes one path-only span per request. Cross-service propagation follows one contract: extract inbound W3C `traceparent`/`tracestate`/`baggage` before the server span starts, inject the current context on every outbound call, and continue stored context on the async path (`core/outbox` `Record` headers to `traceprop.StartConsumeSpan`). Baggage carries three fixed keys (`tenant.id`, `user.id`, `correlation.id`), set once at ingress and read downstream; values are untrusted, short, and never secrets. Attribute keys use OTel semconv names (`http.request.method`, `url.path`, `http.response.status_code`, gRPC `rpc.*`, messaging `messaging.*`), so update saved dashboards and alert rules from the old keys. Verify in the collector, not by inspection: one request through two services must resolve to a single trace ID. See [Cross-Service Tracing](./cross-service-tracing/).
-- Replace the `noop` permission adapter. See [Authorization](../../security/authz-permissions/).
-- Set `ratelimit` `rate` and `burst` for public routes and choose a fail mode per endpoint. Generated servers chain `Recover`, `RequestLogger`, `Tracing`, then `middleware.RateLimit` when the schema enables it.
-- Run `govulncheck` (blocking on `main`, informational on PRs).
-
-<Aside type="caution" title="Never run dev tools in production">
-`zever dev` is a local watcher and `zever tinker` evaluates arbitrary Go against a live container. Run the compiled binary behind your supervisor only.
+<Aside type="caution">
+Do not use a `memory` cache, queue, session, lock, or rate-limit adapter with more than one replica: each pod holds its own state. Point them at Redis or your database. See [Choosing batteries](../../extend/choosing-batteries/).
 </Aside>
 
-## Run the rollout
+## Migrations
 
-<Steps>
-1. Review the migration plan against the live database. `migrate.Plan` has no side effects, and `ComputeRollback` gives a rollback plan to keep with the release.
-2. Roll out one process per container. New pods must pass `/readyz` before receiving traffic.
-3. Apply migrations (`zever db migrate`, or `migrate.Apply` in code) before or with the rollout, never after traffic shifts to code that needs the new schema.
-4. Verify:
+Run `zever db migrate` as a Kubernetes Job (or an init step in your pipeline) before rolling out a schema change, not inside every pod. Use a distinct Job per release so a failed migration blocks the rollout instead of racing replicas.
 
-   ```sh
-   curl -fsS http://localhost:8080/healthz
-   curl -fsS http://localhost:8080/readyz
-   zever db migrate --dry-run schema/*.zen --adapter=postgres --dsn="$DB_DSN"   # expect: no DDL statements
-   ```
+## Profiling and debugging
 
-5. Confirm `/healthz` and `/readyz` return 200 (503 means a failing DB ping or non-serving gRPC health, so hold the rollout), the release checksum is recorded in migration bookkeeping (a re-run is a no-op), and traces reach the collector.
-6. Confirm trace continuity after rollout: one sampled request across services shows a single trace ID with correct parent and child links, and no service starts a fresh root. A two-root trace means the inbound `traceparent` was not extracted.
-7. Confirm relay signals healthy: `outbox.pending` flat, `outbox.failed` at 0, `outbox.relay_errors` silent, and `zever outbox status` shows `stalled false`. Triage a non-empty DLQ through [Outbox Ops](../../background/outbox-ops/) (fix the root cause, then `zever outbox dlq requeue --all`), never purge blind. Decide `outbox.stall_readiness` deliberately: `true` pulls a stalled replica out of rotation via `/readyz` 503 plus gRPC `NOT_SERVING`, while off suits shared tables where shedding traffic is worse than alerting.
-8. Arm outbox alerting on the `outbox.*` series (pending growth, oldest-pending age past the 5m `db.DefaultStallAfter`, `failed_total` increase, `relay_errors` rate, publish p99), with the runbook link reachable from the alert.
-6. Drill secret rotation: stage the new value (`DB_DSN`, `AUTH_JWT_SECRET`) in the supervisor, restart one replica, and confirm `/readyz` is 200 with the old value revoked.
-7. Drill `SIGTERM`: confirm `Shutdown` and `Close` finish inside the grace period and buffered spans flush.
-</Steps>
+The generated server can expose pprof on a loopback-only listener (`--pprof-addr`). In a cluster, set `PPROF_ADDR=127.0.0.1:6060` on the pod and reach it with a port-forward rather than a Service:
 
-## Troubleshooting
+```sh
+kubectl port-forward deploy/myapp-server 6060:6060
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
+```
 
-<details>
-<summary>The process starts on sqlite despite a postgres file</summary>
+See [Profiling with pprof](../observability/#profiling-with-pprof). Never run `zever tinker` against production.
 
-`Load("")` probed the wrong directory, or env overrode the adapter. Pass the explicit path and check that `DB_ADAPTER` is unset or correct.
-</details>
+## Hardening checklist
 
-<details>
-<summary>`Load` fails with an unknown field at deploy</summary>
-
-The file uses a pre-rename key (`maxconns`) or a typo. Rename to snake_case (`max_conns`) and check the [config reference](../../../reference/config/).
-</details>
-
-<details>
-<summary>SIGTERM hangs past the grace period</summary>
-
-`Close(ctx)` has no deadline, or an adapter blocks. Wrap shutdown in `context.WithTimeout` (about 10s) and check the blocking adapter's `Close`.
-</details>
-
-<details>
-<summary>Traces never arrive in the collector</summary>
-
-`observability` is still on the `stdout` default. Set `otlp` with `endpoint` as `host:port` (no scheme) and a `service_name`.
-</details>
-
-<details>
-<summary>Secrets appear in supervisor logs</summary>
-
-Raw options were printed at boot. Print `cfg.RedactedServices()` only, and audit `log.Fatal(err)` paths for echoed values.
-</details>
-
-## Related
+- [ ] Distroless, non-root, read-only rootfs, drop all capabilities
+- [ ] Secrets in Secret (not ConfigMap), rotate by restart
+- [ ] Readiness probe with db timeout
+- [ ] Liveness on `/healthz` (no deps)
+- [ ] `preStop` delay + `terminationGracePeriodSeconds`
+- [ ] Read-only rootfs, drop ALL capabilities
+- [ ] NetworkPolicy: deny all egress except db, redis, otel, allowed APIs
+- [ ] `PodDisruptionBudget` with `minAvailable`
+- [ ] Rolling restart for config changes (SIGHUP only reloads log/ratelimit)
+- [ ] Migrations as separate Job before rollout
 
 <CardGrid>
-  <LinkCard title="Configuration" href="../configuration/" description="Layering, strict files, redaction." />
-  <LinkCard title="Lifecycle" href="../../../concepts/lifecycle/" description="The four process phases." />
-  <LinkCard title="Migrations and seeding" href="../../data/migrations-seeding/" description="Plan, apply, roll back." />
-  <LinkCard title="Upgrade" href="../upgrade/" description="Roll a bumped binary to production." />
+  <LinkCard title="Kubernetes" href="../kubernetes/" description="Manifests for server, worker, PDB, HPA." />
+  <LinkCard title="Configuration" href="../configuration/" description="Env-only, `.env`, `.env.local`, defaults." />
+  <LinkCard title="Secrets" href="../security/secrets/" description="Vault, env, rotation." />
+  <LinkCard title="FAQ and troubleshooting" href="../faq-troubleshooting/" description="Common problems." />
 </CardGrid>

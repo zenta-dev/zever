@@ -343,4 +343,4 @@ Measured on this machine (Go 1.27.2, linux/amd64, warm page cache, medians of 5 
 
 The floor build is ~80% smaller (~5x) and ~32% faster to start; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs). In-process `--help` (`BenchmarkHelpStartup`, ~99 µs/op) is unchanged — the delta is binary mapping and package init, not dispatch.
 
-Repro: `go build -o /tmp/zever-full ./cmd/zever && /tmp/zever-full build --adapters=log,router --out /tmp/zever-slim && ls -lh /tmp/zever-full /tmp/zever-slim`, then `printf 'log:\n  adapter: slog\nrouter:\n  adapter: stdhttp\n' > /tmp/slimdemo/zever.yaml && /tmp/zever-slim doctor --config /tmp/slimdemo/zever.yaml` (exit 0, all OK).
+Repro: `go build -o /tmp/zever-full ./cmd/zever && /tmp/zever-full build --adapters=log,router --out /tmp/zever-slim && ls -lh /tmp/zever-full /tmp/zever-slim`, then `printf 'LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\n' > /tmp/slimdemo/.env && /tmp/zever-slim doctor` (exit 0, all OK).

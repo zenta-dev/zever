@@ -58,7 +58,7 @@ CACHE_ADAPTER=redis
 CACHE_ADDR=redis:6379
 ```
 
-Env equivalents use `<SERVICE>_<FIELD>` with no prefix: `DB_ADAPTER=postgres`, `DB_MAXCONNS=20`, `CACHE_ADAPTER=redis`. Handlers keep calling `c.DB()` and `c.Cache()`; register the adapter module for the name you choose. `zever doctor --config zever.yaml` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
+Env vars use `<SERVICE>_<FIELD>` for default instance, `<SERVICE>__<NAME>__<FIELD>` for named instances: `DB_ADAPTER=postgres`, `DB__ANALYTICS__DSN=...`, `CACHE_ADAPTER=redis`. Handlers keep calling `c.DB()` and `c.Cache()`; register the adapter module for the name you choose. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
 
 Most swaps are invisible to handlers: placeholders stay `?` on both `db` drivers (postgres rewrites to `$n` before pgx) and route params read through `router.Param`. Where backends differ, the adapter fails fast or documents the gap. Two known gaps:
 
