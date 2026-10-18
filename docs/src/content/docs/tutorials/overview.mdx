@@ -98,7 +98,7 @@ Both servers require `AUTH_JWT_SECRET` of at least 32 bytes and fail closed with
 <Steps>
 
 1. `schema/*.zen` (full apps only) holds the domain. Never hand-edit `generated/` next to it.
-2. `zever.yaml` lists explicit zero-infra adapters. Its diff against `config.Default()` is the deploy surface.
+2. `wiring.go` lists explicit typed providers.
 3. `db/seed` holds idempotent demo data; `cmd/server` and `cmd/worker` mirror `zever generate server` / `zever generate worker`.
 4. Tests sit next to the code they cover. The `// Output:` comments are runnable claims, not prose.
 
