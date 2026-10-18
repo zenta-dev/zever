@@ -13,21 +13,17 @@ import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components
 
 <Tabs>
   <TabItem label="sqlite">
-```yaml title="zever.yaml"
-search:
-  adapter: db
-  options:
-    dsn: ./data/search.db
+```sh
+SEARCH_ADAPTER=db
+SEARCH_DSN=./data/search.db
 ```
   </TabItem>
   <TabItem label="meilisearch">
-```yaml title="zever.yaml"
-search:
-  adapter: meilisearch
-  options:
-    host: http://localhost:7700
-    api_key: dev-only-key
-    allow_insecure: true   # http is local dev only; omit for https
+```sh
+SEARCH_ADAPTER=meilisearch
+SEARCH_HOST=http://localhost:7700
+SEARCH_API_KEY=dev-only-key
+SEARCH_ALLOW_INSECURE=true
 ```
   </TabItem>
 </Tabs>

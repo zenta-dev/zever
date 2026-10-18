@@ -11,11 +11,9 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 `stub` is the default: zero-infra, in memory, safe in tests.
 
-```yaml title="zever.yaml"
-billing:
-  adapter: stub
-  options:
-    sandbox: true
+```sh
+BILLING_ADAPTER=stub
+BILLING_SANDBOX=true
 ```
 
 Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint` (absolute URL), `sandbox`. Env vars mirror the keys. See the [billing config reference](../../../reference/config/#billing).

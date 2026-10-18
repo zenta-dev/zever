@@ -11,12 +11,10 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 `stub` (the default) moves no money or network traffic. `auto_approve: true` marks payments `succeeded` immediately, testing the success path without a webhook.
 
-```yaml title="zever.yaml"
-payment:
-  adapter: stub
-  options:
-    auto_approve: true
-    max_webhook_bytes: 1048576
+```sh
+PAYMENT_ADAPTER=stub
+PAYMENT_AUTO_APPROVE=true
+PAYMENT_MAX_WEBHOOK_BYTES=1048576
 ```
 
 Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint`, `sandbox`. Payment adds `webhook_secret` (never logged, keep in env), `auto_approve`, and `max_webhook_bytes` (default 1MiB, negative rejected). Env vars mirror the keys. See the [payment config reference](../../../reference/config/#payment).

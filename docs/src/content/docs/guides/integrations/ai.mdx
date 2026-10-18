@@ -11,13 +11,11 @@ Unlike most services, `ai` has no zero-infra default. `config.Default()` selects
 
 ## Quick start
 
-```yaml title="zever.yaml"
-ai:
-  adapter: anthropic
-  options:
-    api_key: sk-...
-    model: claude-opus-4
-    timeout: 30s
+```sh
+AI_ADAPTER=anthropic
+AI_API_KEY=sk-...
+AI_MODEL=claude-opus-4
+AI_TIMEOUT=30s
 ```
 
 ```sh

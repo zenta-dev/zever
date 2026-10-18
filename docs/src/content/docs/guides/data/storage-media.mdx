@@ -13,27 +13,23 @@ Pick `local` for a single instance: it writes under `root` and needs no infra. P
 
 <Tabs>
   <TabItem label="local">
-```yaml title="zever.yaml"
-storage:
-  adapter: local
-  options:
-    root: ./data/storage
-    secret: dev-only-hmac-secret
-    url_base: http://localhost:8080/files
+```sh
+STORAGE_ADAPTER=local
+STORAGE_ROOT=./data/storage
+STORAGE_SECRET=dev-only-hmac-secret
+STORAGE_URL_BASE=http://localhost:8080/files
 ```
   </TabItem>
   <TabItem label="s3">
-```yaml title="zever.yaml"
-storage:
-  adapter: s3
-  options:
-    region: us-east-1
-    endpoint: https://s3.us-east-1.amazonaws.com
-    access_key_id: AKIAEXAMPLE
-    secret_access_key: prod-secret-here
-    policy_sync: manual
-    sync_fail: warn
-    url_base: https://files.example.com
+```sh
+STORAGE_ADAPTER=s3
+STORAGE_REGION=us-east-1
+STORAGE_ENDPOINT=https://s3.us-east-1.amazonaws.com
+STORAGE_ACCESS_KEY_ID=AKIAEXAMPLE
+STORAGE_SECRET_ACCESS_KEY=prod-secret-here
+STORAGE_POLICY_SYNC=manual
+STORAGE_SYNC_FAIL=warn
+STORAGE_URL_BASE=https://files.example.com
 ```
   </TabItem>
 </Tabs>
@@ -89,16 +85,11 @@ The interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a
 
 `policy` is a flat map: `default` covers unlisted buckets, every other key is a bucket. Each bucket sets `read`, `write`, `update`, and `delete` rules with `public`, `allow`, and `deny` (deny wins). `*` matches any authenticated subject, `anonymous` matches everyone.
 
-```yaml title="zever.yaml"
-storage:
-  adapter: local
-  options:
-    policy:
-      default:
-        read: { allow: ["*"] }
-      receipts:
-        read: { allow: ["owner"], deny: ["anonymous"] }
-        write: { allow: ["owner"] }
+```sh
+STORAGE_ADAPTER=local
+# STORAGE_POLICY_DEFAULT_READ: no string form in env; set it in Go with container.WithOptions
+# STORAGE_POLICY_RECEIPTS_READ: no string form in env; set it in Go with container.WithOptions
+# STORAGE_POLICY_RECEIPTS_WRITE: no string form in env; set it in Go with container.WithOptions
 ```
 
 Storage and media adapters are independent; keep them aligned to avoid cross-store copies. See the [adapters matrix](../../../reference/adapters-matrix/).

@@ -9,13 +9,10 @@ Use `job.Dispatcher` for deferred or retryable work (confirmation mail, push, we
 
 ## Quick start
 
-```yaml title="zever.yaml"
-queue:
-  adapter: memory
-scheduler:
-  adapter: embedded
-  options:
-    close_timeout: 5000000000 # 5s, integer nanoseconds in files
+```sh
+QUEUE_ADAPTER=memory
+SCHEDULER_ADAPTER=embedded
+SCHEDULER_CLOSE_TIMEOUT=5s
 ```
 
 ```sh

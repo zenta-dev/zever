@@ -101,20 +101,18 @@ The relay is not started here. `Start` publishes stored messages through the sam
 
 ## Configure the outbox
 
-```yaml title="zever.yaml"
-outbox:
-  adapter: db
-  options:
-    dsn: postgres://app:secret@db:5432/app # empty selects sqlite :memory:
-    table: outbox
-    inbox_table: inbox
-    publisher: eventbus # informational: eventbus | queue | ""
-    poll_interval: 1000000000 # default 1s
-    batch_size: 100
-    max_attempts: 5
-    retention: 604800000000000 # default 7d
-    lock_seconds: 30
-    dedicated_pool: false
+```sh
+OUTBOX_ADAPTER=db
+OUTBOX_DSN=postgres://app:secret@db:5432/app
+OUTBOX_TABLE=outbox
+OUTBOX_INBOX_TABLE=inbox
+OUTBOX_PUBLISHER=eventbus
+OUTBOX_POLL_INTERVAL=1s
+OUTBOX_BATCH_SIZE=100
+OUTBOX_MAX_ATTEMPTS=5
+OUTBOX_RETENTION=604800000000000
+OUTBOX_LOCK_SECONDS=30
+OUTBOX_DEDICATED_POOL=false
 ```
 
 ```sh
@@ -137,14 +135,12 @@ Core never imports `eventbus` or `queue`. Your wiring bridges a transport to the
 
 The cdc adapter emits inside the caller's transaction, so a rollback drops the event. Its consumer tails the WAL through a replication slot and acknowledges the LSN only after a successful publish.
 
-```yaml title="zever.yaml"
-outbox:
-  adapter: cdc
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    prefix: zever_outbox          # logical-replication message prefix
-    slot: zever_outbox_slot       # replication slot
-    publication: zever_outbox_pub # pgoutput publication
+```sh
+OUTBOX_ADAPTER=cdc
+OUTBOX_DSN=postgres://app:secret@db:5432/app
+OUTBOX_PREFIX=zever_outbox
+OUTBOX_SLOT=zever_outbox_slot
+OUTBOX_PUBLICATION=zever_outbox_pub
 ```
 
 The cdc adapter requires non-empty `dsn`, `slot`, `publication`, and `prefix`. Live cdc tests are gated behind `POSTGRES_DSN`.

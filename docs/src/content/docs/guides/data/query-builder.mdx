@@ -11,11 +11,9 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 Resolve `db` once; the dialect resolves per call from `conn.Dialect()`.
 
-```yaml title="zever.yaml"
-db:
-  adapter: sqlite
-  options:
-    path: app.db
+```sh
+DB_ADAPTER=sqlite
+DB_PATH=app.db
 ```
 
 ```go title="main.go"

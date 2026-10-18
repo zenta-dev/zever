@@ -11,11 +11,9 @@ One `Geo` interface covers `Geocode`, `ReverseGeocode`, and `Distance` (meters),
 
 `static` (the default) serves a file-backed list from memory, offline and deterministic; `path` points at a JSON fixture.
 
-```yaml title="zever.yaml"
-geo:
-  adapter: static
-  options:
-    path: data/cities.json
+```sh
+GEO_ADAPTER=static
+GEO_PATH=data/cities.json
 ```
 
 ```go title="main.go" check
@@ -58,20 +56,16 @@ The bookings example pins `geo.adapter: static`; its tests point `cfg.Geo.Option
 
 `osm` is free OpenStreetMap geocoding when Google-grade accuracy is not needed; it requires a `user_agent` per Nominatim policy. `google` is for accuracy with an API key budget.
 
-```yaml title="zever.yaml"
-geo:
-  adapter: osm
-  options:
-    endpoint: https://nominatim.openstreetmap.org
-    user_agent: bookings-demo/1.0
+```sh
+GEO_ADAPTER=osm
+GEO_ENDPOINT=https://nominatim.openstreetmap.org
+GEO_USER_AGENT=bookings-demo/1.0
 ```
 
-```yaml title="zever.yaml"
-geo:
-  adapter: google
-  options:
-    api_key: your-key   # or GEO_API_KEY in env; YAML does not expand ${...}
-    base_url: https://maps.googleapis.com
+```sh
+GEO_ADAPTER=google
+GEO_API_KEY=your-key
+GEO_BASE_URL=https://maps.googleapis.com
 ```
 
 `Validate` rejects a negative `timeout` or `max_response_body`, and any `base_url` or `endpoint` that is not `https` unless `allow_insecure`. Outbound requests dial only globally routable addresses and never follow redirects; a local tile/mock endpoint needs `allow_private: true`, which logs a line at startup. Env vars mirror the keys. See the [geo config reference](../../../reference/config/#geo).

@@ -33,24 +33,17 @@ gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
 
 Ship a strict file for structure and set secrets and per-environment deltas through env. Layering stays `defaults < file < env`, and `config.Default()` never reaches production because its crypto key is deterministic and public. See [Configuration](../configuration/).
 
-```yaml title="/etc/myapp/zever.yaml"
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-    min_conns: 2
-cache:
-  adapter: redis
-  options:
-    addr: redis:6379
-log:
-  adapter: slog
-observability:
-  adapter: otlp
-  options:
-    endpoint: otel:4317
-    service_name: myapp
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+DB_MIN_CONNS=2
+CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
+LOG_ADAPTER=slog
+OBSERVABILITY_ADAPTER=otlp
+OBSERVABILITY_ENDPOINT=otel:4317
+OBSERVABILITY_SERVICE_NAME=myapp
 ```
 
 ```sh
@@ -112,15 +105,11 @@ listeners from one shared configuration when the `router` battery
 carries certificate paths. The floor is TLS 1.2; without these options
 both listeners stay plaintext.
 
-```yaml title="/etc/myapp/zever.yaml"
-router:
-  adapter: stdhttp
-  options:
-    tls_cert: /etc/myapp/tls/server.crt
-    tls_key: /etc/myapp/tls/server.key
-    # tls_client_ca enables mutual TLS: clients must present a
-    # certificate signed by this CA on both HTTP and gRPC.
-    tls_client_ca: /etc/myapp/tls/client-ca.crt
+```sh
+ROUTER_ADAPTER=stdhttp
+ROUTER_TLS_CERT=/etc/myapp/tls/server.crt
+ROUTER_TLS_KEY=/etc/myapp/tls/server.key
+ROUTER_TLS_CLIENT_CA=/etc/myapp/tls/client-ca.crt
 ```
 
 ```sh

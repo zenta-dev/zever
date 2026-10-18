@@ -43,12 +43,10 @@ true <nil>
 
 Use `header` for multi-tenant SaaS APIs where a gateway or client sets a per-call header (default `X-Tenant-ID`, `DefaultHeader`). With `X-Tenant-ID: acme` metadata, `Resolve` returns `acme`. The header wins; otherwise `subdomain_regex` matches the first capture group against the lowercased `Host` metadata. With neither, `Resolve` returns `tenant.ErrNotFound`. Meta keys match case-insensitively, and patterns prone to catastrophic backtracking are rejected at `Open`. Strip or overwrite the tenant header at your edge, since the adapter trusts it.
 
-```yaml title="zever.yaml"
-tenant:
-  adapter: header
-  options:
-    header: X-Tenant-ID
-    subdomain_regex: ^(?P<tenant>[a-z0-9-]+)\.example\.com$
+```sh
+TENANT_ADAPTER=header
+TENANT_HEADER=X-Tenant-ID
+TENANT_SUBDOMAIN_REGEX=^(?P<tenant>[a-z0-9-]+)\.example\.com$
 ```
 
 ```sh

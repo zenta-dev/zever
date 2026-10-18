@@ -41,11 +41,9 @@ With no file arguments, `migrate` discovers `.zen` files under the schema direct
 
 The CLI and the app share the same `db` settings.
 
-```yaml title="zever.yaml"
-db:
-  adapter: sqlite
-  options:
-    path: app.db
+```sh
+DB_ADAPTER=sqlite
+DB_PATH=app.db
 ```
 
 sqlite defaults to `app.db`; `:memory:` forces a single connection even with `max_conns`. On postgres `min_conns` is a real pool minimum, on sqlite `SetMaxIdleConns`. See the [db options](../../../reference/config/#db).
@@ -132,13 +130,11 @@ zever db migrate schema/app.zen --adapter=postgres --dsn='...' --lock-timeout=10
 
 Unset flags fall back to `db.options` from the config file (`DB_LOCK_TIMEOUT` / `DB_STATEMENT_TIMEOUT` in the environment):
 
-```yaml title="zever.yaml"
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    lock_timeout: 10000000000 # 10s in nanoseconds; duration strings only work as env vars
-    statement_timeout: 30000000000 # 30s in nanoseconds
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_LOCK_TIMEOUT=10s
+DB_STATEMENT_TIMEOUT=30s
 ```
 
 In code, set `migrate.PlanOptions{LockTimeout: 10 * time.Second, StatementTimeout: 30 * time.Second}`; the plan carries them into `Apply`. Zero disables each; negative fails `Plan` with `ErrInvalidTimeout`. A concurrent index build skips them (it runs outside a transaction, where `SET LOCAL` has no scope).

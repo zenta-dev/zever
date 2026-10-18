@@ -11,11 +11,9 @@ Stay on `log` until a real channel is wired: it writes instead of sending. Pick 
 
 ## Quick start
 
-```yaml title="zever.yaml"
-notification:
-  adapter: log
-  options:
-    timeout: 30000000000 # 30s default when zero
+```sh
+NOTIFICATION_ADAPTER=log
+NOTIFICATION_TIMEOUT=30s
 ```
 
 ```go title="main.go" check
@@ -67,26 +65,20 @@ The `twilio` and `fcm` blocks are nested maps under `options`, beside the top-le
 
 <Tabs>
   <TabItem label="Twilio (SMS)">
-```yaml title="zever.yaml"
-notification:
-  adapter: twilio
-  options:
-    timeout: 30000000000
-    twilio:
-      account_sid: ACxxxxxxxxxxxxxxxx
-      auth_token: prod-secret-here
-      from_number: +15551234567
+```sh
+NOTIFICATION_ADAPTER=twilio
+NOTIFICATION_TIMEOUT=30s
+NOTIFICATION_TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxx
+NOTIFICATION_TWILIO_AUTH_TOKEN=prod-secret-here
+NOTIFICATION_TWILIO_FROM_NUMBER=+15551234567
 ```
   </TabItem>
   <TabItem label="FCM (push)">
-```yaml title="zever.yaml"
-notification:
-  adapter: fcm
-  options:
-    timeout: 30000000000
-    fcm:
-      project_id: bookings-prod
-      service_account: /run/secrets/fcm.json
+```sh
+NOTIFICATION_ADAPTER=fcm
+NOTIFICATION_TIMEOUT=30s
+NOTIFICATION_FCM_PROJECT_ID=bookings-prod
+NOTIFICATION_FCM_SERVICE_ACCOUNT=/run/secrets/fcm.json
 ```
   </TabItem>
 </Tabs>

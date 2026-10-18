@@ -22,14 +22,11 @@ Zever config is one block per service, shaped `{ adapter, options }`. This page 
 | Plugins | A top-level `plugins` map holds third-party services as `{adapter, options}` envelopes. The envelope is strict, but the options pass through raw and the plugin validates them. Env can override only `<PLUGIN>_ADAPTER`. |
 | Exceptions | The `secrets` env adapter reads secrets with a non-empty `prefix` (default `ZEVER`, so `ZEVER_FOO` is secret `FOO`). CLI switches use `ZEVER_INTERACTIVE` and `ZEVER_NO_HINT`. |
 
-```yaml title="zever.yaml"
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-log:
-  adapter: slog
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+LOG_ADAPTER=slog
 ```
 
 ```sh
@@ -128,12 +125,10 @@ DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, 
 - Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
 - Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so remove those lines before a downgrade.
 
-```yaml title="zever.yaml"
-search:
-  adapter: db
-  options:
-    dsn: "postgres://app:secret@db:5432/app?sslmode=require"
-    dedicated_pool: false
+```sh
+SEARCH_ADAPTER=db
+SEARCH_DSN=postgres://app:secret@db:5432/app?sslmode=require
+SEARCH_DEDICATED_POOL=false
 ```
 
 ## Service reference
@@ -161,13 +156,11 @@ LLM completions, chat, and embeddings. Every backend needs a key, so there is no
 | `insecure_skip_verify` | boolean | `false` | Disables TLS certificate verification for self-signed test servers. Logs a warning at startup |
 | `timeout` | duration | `0` | Request timeout |
 
-```yaml title="zever.yaml"
-ai:
-  adapter: anthropic
-  options:
-    api_key: sk-ant-...
-    model: claude-sonnet-4-5
-    timeout: 30000000000
+```sh
+AI_ADAPTER=anthropic
+AI_API_KEY=sk-ant-...
+AI_MODEL=claude-sonnet-4-5
+AI_TIMEOUT=30s
 ```
 
 ### `analytics`
@@ -190,12 +183,10 @@ Event tracking, identify, and group calls.
 | `max_properties_bytes` | integer | `65536` | Bounds the JSON-encoded properties payload size |
 | `max_properties` | integer | `0` | Bounds the number of properties per call |
 
-```yaml title="zever.yaml"
-analytics:
-  adapter: posthog
-  options:
-    api_key: phc_...
-    group_type: organization
+```sh
+ANALYTICS_ADAPTER=posthog
+ANALYTICS_API_KEY=phc_...
+ANALYTICS_GROUP_TYPE=organization
 ```
 
 ### `auth`
@@ -225,14 +216,11 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 
 The `session` adapter has no file-settable options: its `session.Store` is injected from Go.
 
-```yaml title="zever.yaml"
-auth:
-  adapter: jwt
-  options:
-    jwt:
-      secret: change-me-to-at-least-32-bytes
-      issuer: my-app
-      max_ttl: 3600000000000
+```sh
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=change-me-to-at-least-32-bytes
+AUTH_JWT_ISSUER=my-app
+AUTH_JWT_MAX_TTL=1h
 ```
 
 ### `billing`
@@ -253,11 +241,9 @@ Customers, subscriptions, and invoices through a billing provider.
 | `endpoint` | string | `""` | Optional custom provider endpoint URL |
 | `sandbox` | boolean | `false` | Selects the provider sandbox environment |
 
-```yaml title="zever.yaml"
-billing:
-  adapter: stripe
-  options:
-    secret_key: sk_live_...
+```sh
+BILLING_ADAPTER=stripe
+BILLING_SECRET_KEY=sk_live_...
 ```
 
 ### `cache`
@@ -285,12 +271,10 @@ Redis connection keys, documented in [Redis connection options](#redis-connectio
 
 The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The `adapter` field inside `options` is a legacy duplicate and is omitted here; use the outer `adapter` string.
 
-```yaml title="zever.yaml"
-cache:
-  adapter: redis
-  options:
-    addr: localhost:6379
-    require_tls: true
+```sh
+CACHE_ADAPTER=redis
+CACHE_ADDR=localhost:6379
+CACHE_REQUIRE_TLS=true
 ```
 
 ### `cdn`
@@ -310,12 +294,10 @@ Invalidates cached content at the edge. `noop` discards purges (default); `cloud
 | `zone_id` | string | `""` | Cloudflare zone ID to purge (cloudflare adapter) |
 | `base_url` | string | `""` | Overrides the Cloudflare API endpoint (cloudflare adapter) |
 
-```yaml title="zever.yaml"
-cdn:
-  adapter: cloudflare
-  options:
-    api_token: CLOUDFLARE_API_TOKEN
-    zone_id: CLOUDFLARE_ZONE_ID
+```sh
+CDN_ADAPTER=cloudflare
+CDN_API_TOKEN=CLOUDFLARE_API_TOKEN
+CDN_ZONE_ID=CLOUDFLARE_ZONE_ID
 ```
 
 ### `crypto`
@@ -342,12 +324,10 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 
 The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not a file option. Use `local` for file-only setups.
 
-```yaml title="zever.yaml"
-crypto:
-  adapter: local
-  options:
-    key: <base64-32-bytes>
-    sign_key: <base64-64-bytes>
+```sh
+CRYPTO_ADAPTER=local
+CRYPTO_KEY=<base64-32-bytes>
+CRYPTO_SIGN_KEY=<base64-64-bytes>
 ```
 
 ### `db`
@@ -371,13 +351,11 @@ SQL connection pool. Other db-backed services borrow this pool when their DSN ma
 | `path` | string | `""` | SQLite database file path |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-```yaml title="zever.yaml"
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-    max_conn_lifetime: 300000000000
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+DB_MAX_CONN_LIFETIME=5m
 ```
 
 ### `document`
@@ -408,12 +386,10 @@ Render documents to PDF or images locally, through a remote service, or with LaT
 | `latex_sandbox` | string | `auto` | OS sandbox (bubblewrap) for LaTeX: `auto`, `required`, or `off` |
 | `latex_allow_unsafe_source` | boolean | `false` | Disables the LaTeX source pre-scan (absolute or `..` file paths, shell-escape packages). Trusted sources only |
 
-```yaml title="zever.yaml"
-document:
-  adapter: latex
-  options:
-    latex_command: pdflatex
-    timeout: 60000000000
+```sh
+DOCUMENT_ADAPTER=latex
+DOCUMENT_LATEX_COMMAND=pdflatex
+DOCUMENT_TIMEOUT=1m
 ```
 
 ### `eventbus`
@@ -438,13 +414,10 @@ In-process or Redis publish/subscribe.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
-```yaml title="zever.yaml"
-eventbus:
-  adapter: redis
-  options:
-    redis:
-      addr: localhost:6379
-      prefix: events
+```sh
+EVENTBUS_ADAPTER=redis
+EVENTBUS_REDIS_ADDR=localhost:6379
+EVENTBUS_REDIS_PREFIX=events
 ```
 
 ### `flag`
@@ -466,13 +439,10 @@ Feature flags from a static file or Firebase. Options nest under the adapter nam
 | `firebase.service_account` | string | `""` | Path to the service account JSON key file |
 | `firebase.timeout` | duration | `30s` | Operation timeout |
 
-```yaml title="zever.yaml"
-flag:
-  adapter: static
-  options:
-    static:
-      path: flags.json
-      reload: true
+```sh
+FLAG_ADAPTER=static
+FLAG_STATIC_PATH=flags.json
+FLAG_STATIC_RELOAD=true
 ```
 
 ### `geo`
@@ -498,11 +468,9 @@ Geocoding and reverse geocoding.
 | `allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
 | `user_agent` | string | `""` | User-Agent for OSM Nominatim |
 
-```yaml title="zever.yaml"
-geo:
-  adapter: osm
-  options:
-    user_agent: my-app/1.0 (ops@example.com)
+```sh
+GEO_ADAPTER=osm
+GEO_USER_AGENT=my-app/1.0 (ops@example.com)
 ```
 
 ### `i18n`
@@ -527,13 +495,10 @@ Message catalogs. Options nest under the adapter name.
 | `remote.allow_insecure` | boolean | `false` | Permits http:// endpoints |
 | `remote.allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
 
-```yaml title="zever.yaml"
-i18n:
-  adapter: embed
-  options:
-    embed:
-      dir: locales
-      fallback: en
+```sh
+I18N_ADAPTER=embed
+I18N_EMBED_DIR=locales
+I18N_EMBED_FALLBACK=en
 ```
 
 ### `idempotency`
@@ -558,13 +523,10 @@ Reserve-then-commit store that makes retried requests safe.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
-```yaml title="zever.yaml"
-idempotency:
-  adapter: redis
-  options:
-    ttl: 86400000000000
-    redis:
-      addr: localhost:6379
+```sh
+IDEMPOTENCY_ADAPTER=redis
+IDEMPOTENCY_TTL=24h
+IDEMPOTENCY_REDIS_ADDR=localhost:6379
 ```
 
 ### `lock`
@@ -588,12 +550,10 @@ Distributed leases with a TTL.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
 
-```yaml title="zever.yaml"
-lock:
-  adapter: redis
-  options:
-    addr: localhost:6379
-    ttl: 30000000000
+```sh
+LOCK_ADAPTER=redis
+LOCK_ADDR=localhost:6379
+LOCK_TTL=30s
 ```
 
 ### `log`
@@ -611,11 +571,9 @@ Structured logging. Only the minimum level is configurable here.
 |---|---|---|---|
 | `min_level` | integer | `0` | Minimum severity emitted by the logger: `0` debug, `1` info, `2` warn, `3` error, `4` fatal. In a file it is an integer, not a name. |
 
-```yaml title="zever.yaml"
-log:
-  adapter: slog
-  options:
-    min_level: 1   # 0 debug, 1 info, 2 warn, 3 error, 4 fatal
+```sh
+LOG_ADAPTER=slog
+LOG_MIN_LEVEL=1
 ```
 
 ### `mailer`
@@ -639,15 +597,13 @@ Outbound email. `host` and `port` are required by validation, so the default `lo
 | `timeout` | duration | `30s` | Operation timeout |
 | `max_message_size` | integer | `10 MiB` | Maximum message size in bytes |
 
-```yaml title="zever.yaml"
-mailer:
-  adapter: smtp
-  options:
-    host: smtp.example.com
-    port: 587
-    username: apikey
-    password: secret
-    encryption: starttls
+```sh
+MAILER_ADAPTER=smtp
+MAILER_HOST=smtp.example.com
+MAILER_PORT=587
+MAILER_USERNAME=apikey
+MAILER_PASSWORD=secret
+MAILER_ENCRYPTION=starttls
 ```
 
 ### `media`
@@ -678,14 +634,12 @@ Image and video storage and derivation, locally or on S3.
 | `ffmpeg` | string | `ffmpeg` | Ffmpeg binary path |
 | `ffprobe` | string | `ffprobe` | Ffprobe binary path |
 
-```yaml title="zever.yaml"
-media:
-  adapter: s3
-  options:
-    bucket: my-media
-    region: us-east-1
-    access_key_id: AKIA...
-    secret_access_key: ...
+```sh
+MEDIA_ADAPTER=s3
+MEDIA_BUCKET=my-media
+MEDIA_REGION=us-east-1
+MEDIA_ACCESS_KEY_ID=AKIA...
+MEDIA_SECRET_ACCESS_KEY=...
 ```
 
 ### `notification`
@@ -708,14 +662,11 @@ SMS and push notifications. Twilio and FCM options nest under their names.
 | `fcm.project_id` | string | `""` | Firebase project ID |
 | `fcm.service_account` | string | `""` | Path to the service account JSON key file |
 
-```yaml title="zever.yaml"
-notification:
-  adapter: twilio
-  options:
-    twilio:
-      account_sid: AC...
-      auth_token: ...
-      from_number: "+15551234567"
+```sh
+NOTIFICATION_ADAPTER=twilio
+NOTIFICATION_TWILIO_ACCOUNT_SID=AC...
+NOTIFICATION_TWILIO_AUTH_TOKEN=...
+NOTIFICATION_TWILIO_FROM_NUMBER=+15551234567
 ```
 
 ### `observability`
@@ -743,13 +694,11 @@ Traces and metrics, to stdout or an OTLP collector.
 | `sample_ratio` | number | `0` | Trace sampling probability in [0,1] |
 | `attr_value_limit` | integer | `0` | Caps string attribute values; 0 selects the default |
 
-```yaml title="zever.yaml"
-observability:
-  adapter: otlp
-  options:
-    endpoint: collector:4317
-    service_name: my-app
-    sample_ratio: 0.1
+```sh
+OBSERVABILITY_ADAPTER=otlp
+OBSERVABILITY_ENDPOINT=collector:4317
+OBSERVABILITY_SERVICE_NAME=my-app
+OBSERVABILITY_SAMPLE_RATIO=0.1
 ```
 
 ### `outbox`
@@ -781,13 +730,11 @@ Transactional outbox and inbox with a polling relay, or postgres logical-replica
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 | `retry` | object |  | Backoff policy. Keys are listed in [Retry policy](#retry-policy). |
 
-```yaml title="zever.yaml"
-outbox:
-  adapter: db
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    poll_interval: 1000000000
-    publisher: eventbus
+```sh
+OUTBOX_ADAPTER=db
+OUTBOX_DSN=postgres://app:secret@db:5432/app
+OUTBOX_POLL_INTERVAL=1s
+OUTBOX_PUBLISHER=eventbus
 ```
 
 ### `password`
@@ -809,15 +756,13 @@ Argon2id password hashing. All five parameters are range-validated.
 | `salt_length` | integer | `16` | Salt length in bytes in the range 8-64 |
 | `key_length` | integer | `32` | Derived key length in bytes in the range 16-128 |
 
-```yaml title="zever.yaml"
-password:
-  adapter: argon2id
-  options:
-    time: 3
-    memory: 65536
-    threads: 4
-    salt_length: 16
-    key_length: 32
+```sh
+PASSWORD_ADAPTER=argon2id
+PASSWORD_TIME=3
+PASSWORD_MEMORY=65536
+PASSWORD_THREADS=4
+PASSWORD_SALT_LENGTH=16
+PASSWORD_KEY_LENGTH=32
 ```
 
 ### `payment`
@@ -843,12 +788,10 @@ Payment intents and webhooks. The `stub` adapter performs no webhook verificatio
 
 The refund idempotency store (`Idempotency`) is injected from Go and is not a file option.
 
-```yaml title="zever.yaml"
-payment:
-  adapter: stripe
-  options:
-    secret_key: sk_live_...
-    webhook_secret: whsec_...
+```sh
+PAYMENT_ADAPTER=stripe
+PAYMENT_SECRET_KEY=sk_live_...
+PAYMENT_WEBHOOK_SECRET=whsec_...
 ```
 
 ### `permission`
@@ -879,14 +822,11 @@ Authorization checks from inline rules, RBAC roles, or Casbin files.
 | `OwnedOnly` | boolean | `false` | Restrict the rule to resources owned by the subject. |
 | `OwnedAttr` | string | `""` | Resource attribute carrying the owner ID. Required when `OwnedOnly` is true. |
 
-```yaml title="zever.yaml"
-permission:
-  adapter: rbac
-  options:
-    rules:
-      - Role: admin
-        Action: "*"
-        Effect: allow
+```sh
+PERMISSION_ADAPTER=rbac
+PERMISSION_RULES_- ROLE=admin
+PERMISSION_RULES_ACTION=*
+PERMISSION_RULES_EFFECT=allow
 ```
 
 ### `queue`
@@ -913,12 +853,10 @@ Message queue with visibility timeouts.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
 
-```yaml title="zever.yaml"
-queue:
-  adapter: redis
-  options:
-    addr: localhost:6379
-    visibility_timeout: 30000000000
+```sh
+QUEUE_ADAPTER=redis
+QUEUE_ADDR=localhost:6379
+QUEUE_VISIBILITY_TIMEOUT=30s
 ```
 
 ### `ratelimit`
@@ -944,12 +882,10 @@ Token-bucket rate limiting. `rate` and `burst` are required.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
-```yaml title="zever.yaml"
-ratelimit:
-  adapter: memory
-  options:
-    rate: 100
-    burst: 200
+```sh
+RATELIMIT_ADAPTER=memory
+RATELIMIT_RATE=100
+RATELIMIT_BURST=200
 ```
 
 ### `resilience`
@@ -984,14 +920,11 @@ Retry, timeout, circuit breaker, and bulkhead policies.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
-```yaml title="zever.yaml"
-resilience:
-  adapter: memory
-  options:
-    timeout: 5000000000
-    breaker:
-      enabled: true
-      consecutive_failures: 5
+```sh
+RESILIENCE_ADAPTER=memory
+RESILIENCE_TIMEOUT=5s
+RESILIENCE_BREAKER_ENABLED=true
+RESILIENCE_BREAKER_CONSECUTIVE_FAILURES=5
 ```
 
 ### `router`
@@ -1009,11 +942,9 @@ HTTP router adapter.
 |---|---|---|---|
 | `app_name` | string | `app` | Application name used by adapters, defaulting to "app" when empty |
 
-```yaml title="zever.yaml"
-router:
-  adapter: fiber
-  options:
-    app_name: my-app
+```sh
+ROUTER_ADAPTER=fiber
+ROUTER_APP_NAME=my-app
 ```
 
 ### `scheduler`
@@ -1035,9 +966,8 @@ Cron-style scheduler. It resolves the job dispatcher, so it shares the process-w
 
 `scheduler.Options.Dispatcher` is required and is injected in code, so a file `options` block replaces it with nil and `Load` fails with `dispatcher_is_required`. Leave `options` out of the file and set `close_timeout`, `dsn`, and `dedicated_pool` with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
 
-```yaml title="zever.yaml"
-scheduler:
-  adapter: postgres
+```sh
+SCHEDULER_ADAPTER=postgres
 ```
 
 ### `search`
@@ -1059,12 +989,10 @@ Full-text search. `db` is the canonical name; `postgres` and `sqlite` stay as al
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 | `allow_insecure` | boolean | `false` | Permits an http:// Host for testing |
 
-```yaml title="zever.yaml"
-search:
-  adapter: meilisearch
-  options:
-    host: https://search.example.com
-    api_key: ...
+```sh
+SEARCH_ADAPTER=meilisearch
+SEARCH_HOST=https://search.example.com
+SEARCH_API_KEY=...
 ```
 
 ### `secrets`
@@ -1091,13 +1019,11 @@ Secret lookup from the environment or Vault. `prefix` is required.
 | `prefix` | string | `ZEVER (config default)` | Scopes secret names to one namespace |
 | `region` | string | `""` | AWS region |
 
-```yaml title="zever.yaml"
-secrets:
-  adapter: vault
-  options:
-    addr: https://vault.example.com
-    token_file: /run/secrets/vault-token
-    mount: secret
+```sh
+SECRETS_ADAPTER=vault
+SECRETS_ADDR=https://vault.example.com
+SECRETS_TOKEN_FILE=/run/secrets/vault-token
+SECRETS_MOUNT=secret
 ```
 
 ### `session`
@@ -1121,13 +1047,10 @@ Server-side session store.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
-```yaml title="zever.yaml"
-session:
-  adapter: redis
-  options:
-    ttl: 900000000000
-    redis:
-      addr: localhost:6379
+```sh
+SESSION_ADAPTER=redis
+SESSION_TTL=15m
+SESSION_REDIS_ADDR=localhost:6379
 ```
 
 ### `storage`
@@ -1167,13 +1090,11 @@ Object storage with presigned URLs and an optional access policy.
 
 `<op>` is one of `read` (downloads), `write` (new objects), `update` (overwrites), or `delete`.
 
-```yaml title="zever.yaml"
-storage:
-  adapter: s3
-  options:
-    region: us-east-1
-    access_key_id: AKIA...
-    secret_access_key: ...
+```sh
+STORAGE_ADAPTER=s3
+STORAGE_REGION=us-east-1
+STORAGE_ACCESS_KEY_ID=AKIA...
+STORAGE_SECRET_ACCESS_KEY=...
 ```
 
 ### `tenant`
@@ -1193,11 +1114,9 @@ Tenant resolution from a fixed ID, a header, or a subdomain.
 | `subdomain_regex` | string | `""` | Optional subdomain matching pattern |
 | `id` | string | `default` | Fixed tenant ID for the single-tenant backend |
 
-```yaml title="zever.yaml"
-tenant:
-  adapter: header
-  options:
-    header: X-Tenant-ID
+```sh
+TENANT_ADAPTER=header
+TENANT_HEADER=X-Tenant-ID
 ```
 
 ### `vectorstore`
@@ -1220,13 +1139,11 @@ Embedding storage and similarity search. `db` is canonical; `sqlite` and `pgvect
 | `dimension` | integer | `1536` | Expected embedding dimension |
 | `allow_insecure` | boolean | `false` | Permits an http:// URL for testing |
 
-```yaml title="zever.yaml"
-vectorstore:
-  adapter: qdrant
-  options:
-    url: https://qdrant.example.com
-    api_key: ...
-    dimension: 1536
+```sh
+VECTORSTORE_ADAPTER=qdrant
+VECTORSTORE_URL=https://qdrant.example.com
+VECTORSTORE_API_KEY=...
+VECTORSTORE_DIMENSION=1536
 ```
 
 ### `webhook`
@@ -1254,12 +1171,10 @@ Signed webhook delivery with retries, directly over HTTP or through the queue.
 
 `Logger` is injected from Go and is not a file option.
 
-```yaml title="zever.yaml"
-webhook:
-  adapter: http
-  options:
-    timeout: 10000000000
-    max_retries: 5
+```sh
+WEBHOOK_ADAPTER=http
+WEBHOOK_TIMEOUT=10s
+WEBHOOK_MAX_RETRIES=5
 ```
 
 ### `workflow`
@@ -1281,10 +1196,8 @@ Durable workflow runs. An empty DSN selects sqlite, a postgres URL selects postg
 | `table` | string | `""` | Workflow-runs table name |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-```yaml title="zever.yaml"
-workflow:
-  adapter: db
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    table: workflow_runs
+```sh
+WORKFLOW_ADAPTER=db
+WORKFLOW_DSN=postgres://app:secret@db:5432/app
+WORKFLOW_TABLE=workflow_runs
 ```

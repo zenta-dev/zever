@@ -13,19 +13,16 @@ Pick `noop` for local development (default, no infra); pick `cloudflare` when fi
 
 <Tabs>
   <TabItem label="noop">
-```yaml title="zever.yaml"
-cdn:
-  adapter: noop
+```sh
+CDN_ADAPTER=noop
 ```
   </TabItem>
   <TabItem label="cloudflare">
-```yaml title="zever.yaml"
-cdn:
-  adapter: cloudflare
-  options:
-    api_token: cf-api-token-here
-    zone_id: 023e105f4ecef8ad9ca31a8372d0c353
-    base_url: https://api.cloudflare.com/client/v4
+```sh
+CDN_ADAPTER=cloudflare
+CDN_API_TOKEN=cf-api-token-here
+CDN_ZONE_ID=023e105f4ecef8ad9ca31a8372d0c353
+CDN_BASE_URL=https://api.cloudflare.com/client/v4
 ```
   </TabItem>
 </Tabs>

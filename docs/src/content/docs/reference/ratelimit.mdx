@@ -18,12 +18,10 @@ Resolve through the container with `c.RateLimit()`. Use `redis` when limits must
 
 Service key: `ratelimit`. `rate` and `burst` are required. File example:
 
-```yaml title="zever.yaml"
-ratelimit:
-  adapter: memory
-  options:
-    rate: 100
-    burst: 200
+```sh
+RATELIMIT_ADAPTER=memory
+RATELIMIT_RATE=100
+RATELIMIT_BURST=200
 ```
 
 ```sh

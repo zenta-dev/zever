@@ -9,11 +9,9 @@ Use `workflow` for multi-step runs (onboarding, payouts, provisioning) that must
 
 ## Quick start
 
-```yaml title="zever.yaml"
-workflow:
-  adapter: memory
-  options:
-    namespace: bookings
+```sh
+WORKFLOW_ADAPTER=memory
+WORKFLOW_NAMESPACE=bookings
 ```
 
 ```go title="main.go" check

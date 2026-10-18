@@ -1,27 +1,87 @@
 # container
 
 `container` wires every configured service into one lazily resolved instance
-per process, built once from a `config.Config`.
+per process. Build it once with explicit typed providers, or fall back to the
+config-based accessors for a quick start.
 
 ```go
 import (
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/db"
 )
 
-c := container.New(config.Default())
+// One Ref per service instance, one Provide per adapter.
+var DB = db.DefaultRef()
+
+func Providers() []container.Provider {
+	return []container.Provider{container.Provide(DB, sqlite.New)}
+}
+
+c := container.New(nil, Providers()...)
 db, err := c.DB()
 ```
 
 There is no global state and no `init()` wiring. A server and a worker
-process each build their own `Container` from the same config. `New(nil)`
+process each build their own `Container` from the same providers. `New(nil)`
 is valid: an untouched container closes cleanly without opening anything.
 
-## Adapters
+## Typed wiring (Ref and Provide)
 
-The container wires no adapters itself. Every adapter registers caller-side
-via its own module's `Register()` — one call, no I/O, idempotent. Each
-adapter lives in its own module under `adapters/<battery>/<name>`:
+The container never resolves an adapter by name on its own. A `ref.Ref[T, O]`
+names one wired instance by `Service` (the config service key) and `Name`
+(`"default"` unless renamed); `container.Provide` binds it to a factory.
+
+```go
+import (
+	"github.com/zenta-dev/zever/adapters/cache/memory"
+	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/cache"
+	"github.com/zenta-dev/zever/core/db"
+)
+
+var DB = db.DefaultRef()
+var Cache = cache.DefaultRef()
+
+func Providers() []container.Provider {
+	return []container.Provider{
+		container.Provide(DB, sqlite.New),
+		container.Provide(Cache, memory.New),
+	}
+}
+```
+
+`core/<battery>` exposes `Ref(name)` and `DefaultRef()` for each service.
+`container.Get(c, ref)` resolves any wired ref; the accessors (`c.DB()`,
+`c.Cache()`) resolve the default instance when a provider exists and
+otherwise fall back to the config path.
+
+Dependency forms: `Provide`, `Provide1`, `Provide2`, and `Provide3` take
+typed dependencies in order. `container.Option` values customize one call:
+`Lazy` (default), `Eager` (build during `New`), `Optional` (a missing
+dependency resolves to its zero value), and `WithOptions` (run a typed
+applier after the env overlay).
+
+Options for a provider start from `config.DefaultOptions(service, name)`,
+then `config.ApplyEnv` overlays the process environment, then `WithOptions`
+appliers run. Explicit options win over env. A named instance reads
+`SERVICE__NAME__*` env keys, not `SERVICE_*`.
+
+Graph validation runs at `New`: duplicate refs, missing non-`Optional`
+dependencies, and dependency cycles are recorded per ref and surfaced by
+`Get`. The errors are `DuplicateRefError`, `NotWiredError`, and
+`DependencyCycleError` (wrapping `ErrDuplicateRef`, `ErrNotWired`,
+`ErrDependencyCycle`). `c.Wired()` lists the wired refs as `service[/name]`
+labels in sorted order. `zever explain` prints the same graph with drivers,
+dependencies, and env keys.
+
+## Legacy config path
+
+Adapters also register caller-side through each battery's core registry
+(`adapters/<battery>/<name>`). The config-based accessors use that registry
+when no provider covers the default ref:
 
 ```go
 import (
@@ -31,12 +91,13 @@ import (
 
 authjwt.Register()
 dbsqlite.Register()
+
+c := container.New(config.Default())
 ```
 
 Resolving an unregistered adapter fails with `UnknownAdapterError`
 naming the missing `Register` call. `cmd/zever` registers every adapter
-at startup, so CLI behavior is unchanged. Generated apps register only
-the adapters they selected.
+at startup, so CLI behavior is unchanged. Prefer `Provide` for new code.
 
 ## Accessors
 
@@ -257,12 +318,17 @@ untouched services stay untouched, so a failing factory on an unused
 service cannot fail shutdown.
 
 ```
-scheduler, job        dependents holding a queue ref, first
+provided instances    wired refs, reverse dependency order, first
+scheduler, job        dependents holding a queue ref
 snapshots             everything without explicit ordering
 cache, queue          leaf dependencies, last
 db, registry pools    shared pools, after every borrower (no use-after-close)
 grpcServer            independent GracefulStop/Stop, bounded by ctx
 ```
+
+Provided instances close in reverse dependency order so dependents shut
+down before the pools and services they borrowed. Only resolved providers
+close; `Lazy` providers that were never requested stay untouched.
 
 Details:
 

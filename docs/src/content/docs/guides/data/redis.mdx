@@ -11,26 +11,15 @@ Most stateful services default to an in-memory adapter with a Redis twin: develo
 
 Point each shared service at the same `addr`. `cache`, `queue`, and `lock` read flat keys; `session`, `ratelimit`, `eventbus`, and `idempotency` nest a `redis` block.
 
-```yaml title="zever.yaml"
-cache:            # cache, queue, lock: flat keys
-  adapter: redis
-  options:
-    addr: redis:6379
-    pool_size: 20
-    min_idle_conns: 2
-queue:
-  adapter: redis
-  options:
-    addr: redis:6379
-lock:
-  adapter: redis
-  options:
-    addr: redis:6379
-session:          # session, ratelimit, eventbus, idempotency: nested redis block
-  adapter: redis
-  options:
-    redis:
-      addr: redis:6379
+```sh
+OPTIONS_ADDR=redis:6379
+OPTIONS_POOL_SIZE=20
+OPTIONS_MIN_IDLE_CONNS=2
+QUEUE_ADAPTER=redis
+QUEUE_ADDR=redis:6379
+LOCK_ADAPTER=redis
+LOCK_ADDR=redis:6379
+OPTIONS_REDIS_ADDR=redis:6379
 ```
 
 ```sh

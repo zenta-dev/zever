@@ -9,13 +9,11 @@ import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components
 
 ## Quick start
 
-```yaml title="zever.yaml"
-queue:
-  adapter: memory
-  options:
-    visibility_timeout: 30000000000 # 30s, integer nanoseconds in files
-    poll_timeout: 1000000000        # 1s
-    buffer: 100
+```sh
+QUEUE_ADAPTER=memory
+QUEUE_VISIBILITY_TIMEOUT=30s
+QUEUE_POLL_TIMEOUT=1s
+QUEUE_BUFFER=100
 ```
 
 ```go title="main.go" check
@@ -62,22 +60,18 @@ Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `
 
 <Tabs>
   <TabItem label="Redis">
-```yaml title="zever.yaml"
-queue:
-  adapter: redis
-  options:
-    addr: localhost:6379
-    db: 0
-    prefix: bookings
+```sh
+QUEUE_ADAPTER=redis
+QUEUE_ADDR=localhost:6379
+QUEUE_DB=0
+QUEUE_PREFIX=bookings
 ```
   </TabItem>
   <TabItem label="Database">
-```yaml title="zever.yaml"
-queue:
-  adapter: db
-  options:
-    dsn: postgres://app:secret@db:5432/app  # postgres URL or sqlite path
-    table: queue_messages
+```sh
+QUEUE_ADAPTER=db
+QUEUE_DSN=postgres://app:secret@db:5432/app
+QUEUE_TABLE=queue_messages
 ```
   </TabItem>
 </Tabs>

@@ -18,13 +18,10 @@ Resolve through the container with `c.Flag()`. Swapping backends is a config cha
 
 Service key: `flag`. File example:
 
-```yaml title="zever.yaml"
-flag:
-  adapter: static
-  options:
-    static:
-      path: flags.json
-      reload: true
+```sh
+FLAG_ADAPTER=static
+FLAG_STATIC_PATH=flags.json
+FLAG_STATIC_RELOAD=true
 ```
 
 ```sh
