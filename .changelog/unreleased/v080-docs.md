@@ -1,0 +1,1 @@
+- docs(docs): v0.8.0 docs sweep — env-only config surface (config reference + configuration/deployment/migration guides), 3-command curl quickstart journey (`zever new` → `zever dev` → curl), new serve/README.md runtime reference, and provider/adapter + background/data/integrations/operate/security page refreshes.
