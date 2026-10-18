@@ -1,0 +1,1 @@
+- feat(examples): todo, bookings, showcase, demoapp rewritten to typed `container.Provide`/`Provide1` wiring plus `serve.Main` entrypoints, each with `.env.example`; new `examples/multidb` demonstrates primary + named `DB__ANALYTICS__` + named audit sqlite DBs via typed `db.Ref`.
