@@ -26,6 +26,12 @@ var ErrInvalidOptions = errors.New("db: invalid options")
 // ErrNotFound is returned when a record cannot be found.
 var ErrNotFound = errors.New("db: not found")
 
+// ErrNoSuchTable is returned when a referenced table does not exist. Adapters
+// wrap this (see NoSuchTableError) so callers can use errors.Is to detect
+// missing-table failures and surface actionable hints, such as the migrate
+// hint in serve.
+var ErrNoSuchTable = errors.New("db: no such table")
+
 // ErrNestedTx is returned when a transaction is started inside another transaction.
 var ErrNestedTx = errors.New("db: nested transaction not supported")
 
@@ -115,4 +121,28 @@ func (e TxError) Error() string {
 // Unwrap returns the underlying transaction failure.
 func (e TxError) Unwrap() error {
 	return e.Err
+}
+
+// NoSuchTableError reports a missing-table failure, wrapping the adapter's
+// underlying error so errors.Is(err, ErrNoSuchTable) and errors.Is(err, the
+// underlying cause) both match.
+type NoSuchTableError struct {
+	// Table is the missing table name.
+	Table string
+	// Err is the underlying adapter failure.
+	Err error
+}
+
+// Error returns a human-readable missing-table message.
+func (e *NoSuchTableError) Error() string {
+	if e.Table != "" {
+		return fmt.Sprintf("db: no such table: %s: %v", e.Table, e.Err)
+	}
+
+	return fmt.Sprintf("db: no such table: %v", e.Err)
+}
+
+// Unwrap returns ErrNoSuchTable and the underlying error.
+func (e *NoSuchTableError) Unwrap() error {
+	return errors.Join(ErrNoSuchTable, e.Err)
 }

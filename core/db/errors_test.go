@@ -86,6 +86,40 @@ func TestDuplicateAliases_compat(t *testing.T) {
 	}
 }
 
+// TestNoSuchTableSentinel proves ErrNoSuchTable is a distinct db-prefixed
+// sentinel and that NoSuchTableError unwraps to it (errors.Is) while also
+// exposing the underlying cause.
+func TestNoSuchTableSentinel(t *testing.T) {
+	t.Parallel()
+
+	if !strings.HasPrefix(ErrNoSuchTable.Error(), "db: ") {
+		t.Errorf("ErrNoSuchTable = %q, want db: prefix", ErrNoSuchTable.Error())
+	}
+
+	inner := errors.New("sqlite: no such table: users")
+	err := &NoSuchTableError{Table: "users", Err: inner}
+
+	if !errors.Is(err, ErrNoSuchTable) {
+		t.Error("NoSuchTableError does not unwrap to ErrNoSuchTable")
+	}
+
+	if !errors.Is(err, inner) {
+		t.Error("NoSuchTableError does not unwrap to underlying cause")
+	}
+
+	if got := err.Unwrap(); !errors.Is(got, ErrNoSuchTable) || !errors.Is(got, inner) {
+		t.Errorf("Unwrap() = %v, want both ErrNoSuchTable and the inner error", got)
+	}
+
+	if !strings.Contains(err.Error(), "db: no such table") {
+		t.Errorf("NoSuchTableError.Error() = %q, want no such table message", err.Error())
+	}
+
+	if errors.Is(ErrNoSuchTable, ErrNotFound) {
+		t.Error("ErrNoSuchTable should not match ErrNotFound")
+	}
+}
+
 func TestErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
