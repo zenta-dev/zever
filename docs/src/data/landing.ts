@@ -107,38 +107,38 @@ export const SWAP: SwapService[] = [
   {
     id: 'db', label: 'db', call: 'db, err := c.DB()',
     adapters: [
-      { id: 'sqlite', config: 'db:\n  adapter: sqlite\n  options:\n    path: data/app.db' },
-      { id: 'postgres', config: 'db:\n  adapter: postgres\n  options:\n    dsn: ${DB_DSN}\n    max_conns: 20' },
+      { id: 'sqlite', config: 'DB_ADAPTER=sqlite\nDB_PATH=data/app.db' },
+      { id: 'postgres', config: 'DB_ADAPTER=postgres\nDB_DSN=${DB_DSN}\nDB_MAX_CONNS=20' },
     ],
   },
   {
     id: 'cache', label: 'cache', call: 'cache, err := c.Cache()',
     adapters: [
-      { id: 'memory', config: 'cache:\n  adapter: memory\n  options:\n    max_entries: 10000' },
-      { id: 'redis', config: 'cache:\n  adapter: redis\n  options:\n    addr: ${REDIS_ADDR}' },
+      { id: 'memory', config: 'CACHE_ADAPTER=memory\nCACHE_MAX_ENTRIES=10000' },
+      { id: 'redis', config: 'CACHE_ADAPTER=redis\nCACHE_ADDR=${REDIS_ADDR}' },
     ],
   },
   {
     id: 'queue', label: 'queue', call: 'q, err := c.Queue()',
     adapters: [
-      { id: 'memory', config: 'queue:\n  adapter: memory' },
-      { id: 'redis', config: 'queue:\n  adapter: redis\n  options:\n    addr: ${REDIS_ADDR}' },
-      { id: 'db', config: 'queue:\n  adapter: db' },
+      { id: 'memory', config: 'QUEUE_ADAPTER=memory' },
+      { id: 'redis', config: 'QUEUE_ADAPTER=redis\nQUEUE_ADDR=${REDIS_ADDR}' },
+      { id: 'db', config: 'QUEUE_ADAPTER=db' },
     ],
   },
   {
     id: 'storage', label: 'storage', call: 'store, err := c.Storage()',
     adapters: [
-      { id: 'local', config: 'storage:\n  adapter: local\n  options:\n    root: ./uploads' },
-      { id: 's3', config: 'storage:\n  adapter: s3\n  options:\n    bucket: ${S3_BUCKET}' },
-      { id: 'r2', config: 'storage:\n  adapter: r2\n  options:\n    bucket: ${R2_BUCKET}' },
+      { id: 'local', config: 'STORAGE_ADAPTER=local\nSTORAGE_ROOT=./uploads' },
+      { id: 's3', config: 'STORAGE_ADAPTER=s3\nSTORAGE_BUCKET=${S3_BUCKET}' },
+      { id: 'r2', config: 'STORAGE_ADAPTER=r2\nSTORAGE_BUCKET=${R2_BUCKET}' },
     ],
   },
   {
     id: 'mailer', label: 'mailer', call: 'm, err := c.Mailer()',
     adapters: [
-      { id: 'log', config: 'mailer:\n  adapter: log' },
-      { id: 'smtp', config: 'mailer:\n  adapter: smtp\n  options:\n    host: ${SMTP_HOST}' },
+      { id: 'log', config: 'MAILER_ADAPTER=log' },
+      { id: 'smtp', config: 'MAILER_ADAPTER=smtp\nMAILER_HOST=${SMTP_HOST}' },
     ],
   },
 ];
@@ -200,7 +200,7 @@ export const STATS = [
 export const FAQ = [
   { q: 'Is Zever a web framework?', a: 'No. It compiles a schema into plumbing (ORM, specs, DDL, routing glue) and wires services through one container. Handlers and business logic stay yours.' },
   { q: 'Does it generate business logic?', a: 'Never. Only the infrastructure that logic runs on.' },
-  { q: 'How do I move from sqlite to postgres?', a: 'Change `db.adapter` in config. Code calling `c.DB()` is untouched.' },
+  { q: 'How do I move from sqlite to postgres?', a: 'Change `DB_ADAPTER` in `.env`. Code calling `c.DB()` is untouched.' },
   { q: 'Do I need infrastructure to start?', a: 'No. Defaults use sqlite, memory, local, log and noop adapters, so the first build passes on a clean machine.' },
   { q: 'What happens to misconfiguration?', a: 'Config is strictly decoded: unknown services or fields fail at load, not at 3am.' },
   { q: 'Can AI agents drive it?', a: 'Yes. The CLI is agent-friendly, `generate` supports `--dry-run`, and there is an MCP codegen backend plus an agent skill.' },
@@ -221,3 +221,4 @@ export const FOOTER_COLS = [
   { title: 'Reference', links: [['CLI', 'reference/cli'], ['Config', 'reference/config'], ['Adapters matrix', 'reference/adapters-matrix'], ['Agent skill', 'guides/extend/agent-skill']] },
   { title: 'Project', links: [['Contribute', 'contribute'], ['Upgrade', 'guides/operate/upgrade']] },
 ];
+

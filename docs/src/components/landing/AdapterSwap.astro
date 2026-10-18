@@ -12,7 +12,7 @@ const ys = SWAP.map((_, i) => 22 + i * 30);
   id="swap"
   eyebrow="Swap, don't rewrite"
   title="Change the config. <em>Never the handler.</em>"
-  lede="Every battery is a small interface with interchangeable adapters. Pick one in zever.yaml; your code keeps calling the same accessor."
+  lede="Every battery is a small interface with interchangeable adapters. Pick one in .env; your code keeps calling the same accessor."
   grid
 >
   <div class="zl-swap zl-reveal" data-swap>
@@ -30,8 +30,8 @@ const ys = SWAP.map((_, i) => 22 + i * 30);
 
     <div class="zl-swap-grid">
       <figure class="zl-swap-pane">
-        <figcaption><span>zever.yaml</span><span class="zl-swap-tag zl-swap-tag--changed" data-changed hidden>changed</span></figcaption>
-        <pre><code data-yaml>{lines.map((l) => <span class="zl-ln" data-g=" ">{l || ' '}</span>)}</code></pre>
+        <figcaption><span>.env</span><span class="zl-swap-tag zl-swap-tag--changed" data-changed hidden>changed</span></figcaption>
+        <pre><code data-env>{lines.map((l) => <span class="zl-ln" data-g=" ">{l || ' '}</span>)}</code></pre>
       </figure>
 
       <figure class="zl-swap-pane zl-swap-pane--pinned">
