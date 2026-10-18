@@ -3,8 +3,8 @@ module github.com/zenta-dev/zever/adapters/db/sqlite
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/db v0.7.2
-	github.com/zenta-dev/zever/shared/lrucache v0.7.2
+	github.com/zenta-dev/zever/core/db v0.8.0
+	github.com/zenta-dev/zever/shared/lrucache v0.8.0
 	modernc.org/sqlite v1.60.1
 )
 
@@ -14,8 +14,8 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

@@ -76,7 +76,7 @@ Create a module and fetch the Zever modules you need at the same pinned version.
 
 ```sh
 go mod init example.com/myapp
-go get github.com/zenta-dev/zever/config@v0.7.2 github.com/zenta-dev/zever/container@v0.7.2 github.com/zenta-dev/zever/adapters/db/sqlite@v0.7.2
+go get github.com/zenta-dev/zever/config@v0.8.0 github.com/zenta-dev/zever/container@v0.8.0 github.com/zenta-dev/zever/adapters/db/sqlite@v0.8.0
 ```
 
 <Aside type="note" title="`go install` for the CLI">
@@ -203,7 +203,7 @@ Cause: the binaries landed in a directory outside `PATH`. Fix: add `~/.local/bin
 <details>
 <summary>`go install ...@version` fails with a replace-directive error</summary>
 
-Cause: the tag predates v0.7.2 (v0.7.1 and earlier commit `replace` directives in `cmd/zever/go.mod`), or you are installing a module other than `cmd/zever`. Fix: install `github.com/zenta-dev/zever/cmd/zever@v0.7.2` or later, or use the installer above or a prebuilt release binary.
+Cause: the tag predates v0.7.2 (v0.7.1 and earlier commit `replace` directives in `cmd/zever/go.mod`), or you are installing a module other than `cmd/zever`. Fix: install `github.com/zenta-dev/zever/cmd/zever@v0.8.0` or later, or use the installer above or a prebuilt release binary.
 </details>
 
 <details>

@@ -1,8 +1,0 @@
-- **Breaking:** `cli`: removed the `--config` file flag from `doctor`, `config show`, and `outbox` (service config is env-only: `.env`/`.env.local` discovery plus the process environment). Pointing `--config` at a file is now an unknown-flag error (exit 2).
-- **Breaking:** `cli`: canonical runtime spellings are now `worker` and `schedule run`; the legacy `queue:work` and `schedule:run` spellings still run but are hidden from `--help`.
-- **Breaking:** `cli`: `zever explain` with no operation path now prints the wiring graph (refs, drivers, typed dependencies, env keys per ref) instead of a usage error; `zever explain <service>` and `zever explain <service>/<name>` scope it to one ref.
-- feat(cli): grouped `--help` (Start, Build, Data, Run & ops); bare `zever` renders the same command tree and exits 1, `--help` exits 0.
-- feat(cli): project layout resolves defaults < `ZEVER_SCHEMA_DIR` / `ZEVER_GENERATED_DIR` / `ZEVER_SERVER_ENTRY` / `ZEVER_WORKER_ENTRY` / `ZEVER_TINKER_ENTRY` / `ZEVER_SEED_ENTRY`; legacy `zever.yaml` project keys stay ignored.
-- feat(cli): `config show` prints effective env-derived values per instance (`service/NAME`, redacted, never raw secrets).
-- feat(cli): `doctor` scopes checks to `Container.Wired()` refs when providers are wired and falls back to every known battery otherwise; exit codes stay 0/1/2 with a stable `--json` envelope.
-- feat(cli): `db migrate` resolves `--adapter`/`--dsn` from the env-derived DB config when the flags are unset.

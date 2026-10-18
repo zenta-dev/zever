@@ -1,3 +1,0 @@
-- fix(db): add `ErrNoSuchTable` sentinel and `NoSuchTableError` so missing-table failures are detectable via `errors.Is`, including the underlying cause.
-- fix(serve): `isNoSuchTable`/`withMigrateHint` prefer the `db.ErrNoSuchTable` sentinel with a string-match fallback for legacy message shapes.
-- fix(serve): gRPC auth/permission resolution failure surfaces an actionable hint (`zever add auth permission`, or declare `auth: none`) while keeping `errors.Is` compatibility.

@@ -3,10 +3,10 @@ module github.com/zenta-dev/zever/adapters/queue/memory
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/observability v0.7.2
-	github.com/zenta-dev/zever/core/queue v0.7.2
-	github.com/zenta-dev/zever/shared/msgspan v0.7.2
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2
+	github.com/zenta-dev/zever/core/observability v0.8.0
+	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/shared/msgspan v0.8.0
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0
 	go.opentelemetry.io/otel/trace v1.47.0
 )
 
@@ -14,10 +14,10 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/db v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect

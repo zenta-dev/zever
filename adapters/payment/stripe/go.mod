@@ -6,12 +6,12 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/db v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
@@ -27,10 +27,10 @@ replace github.com/zenta-dev/zever/shared/providersopt => ../../../shared/provid
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1
-	github.com/zenta-dev/zever/core/idempotency v0.7.2
-	github.com/zenta-dev/zever/core/payment v0.7.2
-	github.com/zenta-dev/zever/shared/httpclient v0.7.2
-	github.com/zenta-dev/zever/shared/providersclient v0.7.2
+	github.com/zenta-dev/zever/core/idempotency v0.8.0
+	github.com/zenta-dev/zever/core/payment v0.8.0
+	github.com/zenta-dev/zever/shared/httpclient v0.8.0
+	github.com/zenta-dev/zever/shared/providersclient v0.8.0
 )
 
 replace github.com/zenta-dev/zever/core/idempotency => ../../../core/idempotency

@@ -1,3 +1,0 @@
-- **Breaking:** `container`: `New` takes variadic `Provider` wiring (`Provide`, `Provide1/2/3`); explicit `ref.Ref` instances resolve via `Get`. Zero-provider `New(cfg)` keeps the legacy lazy config path unchanged.
-- feat(container): generic `Ref`/`Provide` typed wiring with construction-time graph validation (duplicate refs, missing deps, cycles), lazy builds with retry-on-error, `Optional` deps, `Eager` providers, reverse-dependency `Close`, and `Wired` labels.
-- feat(ref): new `shared/ref` leaf module with the comparable `Ref[T, O]` key both `core/*` and `container` agree on; every battery gains `Ref(name)`/`DefaultRef()` helpers.

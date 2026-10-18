@@ -10,132 +10,132 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/traefik/yaegi v0.16.1
-	github.com/zenta-dev/zever/adapters/ai/anthropic v0.7.2
-	github.com/zenta-dev/zever/adapters/ai/gemini v0.7.2
-	github.com/zenta-dev/zever/adapters/ai/ollama v0.7.2
-	github.com/zenta-dev/zever/adapters/ai/openai v0.7.2
-	github.com/zenta-dev/zever/adapters/analytics/log v0.7.2
-	github.com/zenta-dev/zever/adapters/analytics/posthog v0.7.2
-	github.com/zenta-dev/zever/adapters/auth/jwt v0.7.2
-	github.com/zenta-dev/zever/adapters/auth/oidc v0.7.2
-	github.com/zenta-dev/zever/adapters/auth/session v0.7.2
-	github.com/zenta-dev/zever/adapters/billing/paddle v0.7.2
-	github.com/zenta-dev/zever/adapters/billing/stripe v0.7.2
-	github.com/zenta-dev/zever/adapters/billing/stub v0.7.2
-	github.com/zenta-dev/zever/adapters/cache/db v0.7.2
-	github.com/zenta-dev/zever/adapters/cache/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/cache/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/cdn/cloudflare v0.7.2
-	github.com/zenta-dev/zever/adapters/cdn/noop v0.7.2
-	github.com/zenta-dev/zever/adapters/crypto/kms v0.7.2
-	github.com/zenta-dev/zever/adapters/crypto/local v0.7.2
-	github.com/zenta-dev/zever/adapters/db/postgres v0.7.2
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.2
-	github.com/zenta-dev/zever/adapters/document/latex v0.7.2
-	github.com/zenta-dev/zever/adapters/document/local v0.7.2
-	github.com/zenta-dev/zever/adapters/document/remote v0.7.2
-	github.com/zenta-dev/zever/adapters/eventbus/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/eventbus/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/flag/firebase v0.7.2
-	github.com/zenta-dev/zever/adapters/flag/static v0.7.2
-	github.com/zenta-dev/zever/adapters/geo/google v0.7.2
-	github.com/zenta-dev/zever/adapters/geo/osm v0.7.2
-	github.com/zenta-dev/zever/adapters/geo/static v0.7.2
-	github.com/zenta-dev/zever/adapters/i18n/embed v0.7.2
-	github.com/zenta-dev/zever/adapters/i18n/remote v0.7.2
-	github.com/zenta-dev/zever/adapters/idempotency/db v0.7.2
-	github.com/zenta-dev/zever/adapters/idempotency/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/idempotency/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/lock/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/lock/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/log/noop v0.7.2
-	github.com/zenta-dev/zever/adapters/log/pretty v0.7.2
-	github.com/zenta-dev/zever/adapters/log/slog v0.7.2
-	github.com/zenta-dev/zever/adapters/log/zerolog v0.7.2
-	github.com/zenta-dev/zever/adapters/mailer/log v0.7.2
-	github.com/zenta-dev/zever/adapters/mailer/smtp v0.7.2
-	github.com/zenta-dev/zever/adapters/media/local v0.7.2
-	github.com/zenta-dev/zever/adapters/media/s3 v0.7.2
-	github.com/zenta-dev/zever/adapters/notification/fcm v0.7.2
-	github.com/zenta-dev/zever/adapters/notification/log v0.7.2
-	github.com/zenta-dev/zever/adapters/notification/twilio v0.7.2
-	github.com/zenta-dev/zever/adapters/observability/noop v0.7.2
-	github.com/zenta-dev/zever/adapters/observability/otlp v0.7.2
-	github.com/zenta-dev/zever/adapters/observability/stdout v0.7.2
-	github.com/zenta-dev/zever/adapters/outbox/cdc v0.7.2
-	github.com/zenta-dev/zever/adapters/outbox/db v0.7.2
-	github.com/zenta-dev/zever/adapters/outbox/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/password/argon2 v0.7.2
-	github.com/zenta-dev/zever/adapters/payment/paddle v0.7.2
-	github.com/zenta-dev/zever/adapters/payment/stripe v0.7.2
-	github.com/zenta-dev/zever/adapters/payment/stub v0.7.2
-	github.com/zenta-dev/zever/adapters/permission/casbin v0.7.2
-	github.com/zenta-dev/zever/adapters/permission/noop v0.7.2
-	github.com/zenta-dev/zever/adapters/permission/rbac v0.7.2
-	github.com/zenta-dev/zever/adapters/queue/db v0.7.2
-	github.com/zenta-dev/zever/adapters/queue/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/queue/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/ratelimit/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/resilience/inproc v0.7.2
-	github.com/zenta-dev/zever/adapters/resilience/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/router/fiber v0.7.2
-	github.com/zenta-dev/zever/adapters/router/stdhttp v0.7.2
-	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.7.2
-	github.com/zenta-dev/zever/adapters/scheduler/postgres v0.7.2
-	github.com/zenta-dev/zever/adapters/search/db v0.7.2
-	github.com/zenta-dev/zever/adapters/search/meilisearch v0.7.2
-	github.com/zenta-dev/zever/adapters/secrets/env v0.7.2
-	github.com/zenta-dev/zever/adapters/secrets/vault v0.7.2
-	github.com/zenta-dev/zever/adapters/session/db v0.7.2
-	github.com/zenta-dev/zever/adapters/session/memory v0.7.2
-	github.com/zenta-dev/zever/adapters/session/redis v0.7.2
-	github.com/zenta-dev/zever/adapters/storage/local v0.7.2
-	github.com/zenta-dev/zever/adapters/storage/r2 v0.7.2
-	github.com/zenta-dev/zever/adapters/storage/s3 v0.7.2
-	github.com/zenta-dev/zever/adapters/tenant/header v0.7.2
-	github.com/zenta-dev/zever/adapters/tenant/single v0.7.2
-	github.com/zenta-dev/zever/adapters/vectorstore/db v0.7.2
-	github.com/zenta-dev/zever/adapters/vectorstore/qdrant v0.7.2
-	github.com/zenta-dev/zever/adapters/webhook/http v0.7.2
-	github.com/zenta-dev/zever/adapters/webhook/queue v0.7.2
-	github.com/zenta-dev/zever/adapters/workflow/db v0.7.2
-	github.com/zenta-dev/zever/adapters/workflow/memory v0.7.2
-	github.com/zenta-dev/zever/config v0.7.2
-	github.com/zenta-dev/zever/container v0.7.2
-	github.com/zenta-dev/zever/core/ai v0.7.2
-	github.com/zenta-dev/zever/core/analytics v0.7.2
-	github.com/zenta-dev/zever/core/auth v0.7.2
-	github.com/zenta-dev/zever/core/cache v0.7.2
-	github.com/zenta-dev/zever/core/cdn v0.7.2
-	github.com/zenta-dev/zever/core/crypto v0.7.2
-	github.com/zenta-dev/zever/core/db v0.7.2
-	github.com/zenta-dev/zever/core/document v0.7.2
-	github.com/zenta-dev/zever/core/eventbus v0.7.2
-	github.com/zenta-dev/zever/core/flag v0.7.2
-	github.com/zenta-dev/zever/core/geo v0.7.2
-	github.com/zenta-dev/zever/core/i18n v0.7.2
-	github.com/zenta-dev/zever/core/idempotency v0.7.2
-	github.com/zenta-dev/zever/core/lock v0.7.2
-	github.com/zenta-dev/zever/core/log v0.7.2
-	github.com/zenta-dev/zever/core/mailer v0.7.2
-	github.com/zenta-dev/zever/core/notification v0.7.2
-	github.com/zenta-dev/zever/core/observability v0.7.2
-	github.com/zenta-dev/zever/core/outbox v0.7.2
-	github.com/zenta-dev/zever/core/payment v0.7.2
-	github.com/zenta-dev/zever/core/permission v0.7.2
-	github.com/zenta-dev/zever/core/queue v0.7.2
-	github.com/zenta-dev/zever/core/ratelimit v0.7.2
-	github.com/zenta-dev/zever/core/router v0.7.2
-	github.com/zenta-dev/zever/core/secrets v0.7.2
-	github.com/zenta-dev/zever/core/session v0.7.2
-	github.com/zenta-dev/zever/core/storage v0.7.2
-	github.com/zenta-dev/zever/core/tenant v0.7.2
-	github.com/zenta-dev/zever/core/webhook v0.7.2
-	github.com/zenta-dev/zever/core/workflow v0.7.2
-	github.com/zenta-dev/zever/dsl v0.7.2
-	github.com/zenta-dev/zever/orm v0.7.2
-	github.com/zenta-dev/zever/serve v0.7.2
+	github.com/zenta-dev/zever/adapters/ai/anthropic v0.8.0
+	github.com/zenta-dev/zever/adapters/ai/gemini v0.8.0
+	github.com/zenta-dev/zever/adapters/ai/ollama v0.8.0
+	github.com/zenta-dev/zever/adapters/ai/openai v0.8.0
+	github.com/zenta-dev/zever/adapters/analytics/log v0.8.0
+	github.com/zenta-dev/zever/adapters/analytics/posthog v0.8.0
+	github.com/zenta-dev/zever/adapters/auth/jwt v0.8.0
+	github.com/zenta-dev/zever/adapters/auth/oidc v0.8.0
+	github.com/zenta-dev/zever/adapters/auth/session v0.8.0
+	github.com/zenta-dev/zever/adapters/billing/paddle v0.8.0
+	github.com/zenta-dev/zever/adapters/billing/stripe v0.8.0
+	github.com/zenta-dev/zever/adapters/billing/stub v0.8.0
+	github.com/zenta-dev/zever/adapters/cache/db v0.8.0
+	github.com/zenta-dev/zever/adapters/cache/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/cache/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/cdn/cloudflare v0.8.0
+	github.com/zenta-dev/zever/adapters/cdn/noop v0.8.0
+	github.com/zenta-dev/zever/adapters/crypto/kms v0.8.0
+	github.com/zenta-dev/zever/adapters/crypto/local v0.8.0
+	github.com/zenta-dev/zever/adapters/db/postgres v0.8.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.8.0
+	github.com/zenta-dev/zever/adapters/document/latex v0.8.0
+	github.com/zenta-dev/zever/adapters/document/local v0.8.0
+	github.com/zenta-dev/zever/adapters/document/remote v0.8.0
+	github.com/zenta-dev/zever/adapters/eventbus/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/eventbus/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/flag/firebase v0.8.0
+	github.com/zenta-dev/zever/adapters/flag/static v0.8.0
+	github.com/zenta-dev/zever/adapters/geo/google v0.8.0
+	github.com/zenta-dev/zever/adapters/geo/osm v0.8.0
+	github.com/zenta-dev/zever/adapters/geo/static v0.8.0
+	github.com/zenta-dev/zever/adapters/i18n/embed v0.8.0
+	github.com/zenta-dev/zever/adapters/i18n/remote v0.8.0
+	github.com/zenta-dev/zever/adapters/idempotency/db v0.8.0
+	github.com/zenta-dev/zever/adapters/idempotency/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/idempotency/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/lock/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/lock/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/log/noop v0.8.0
+	github.com/zenta-dev/zever/adapters/log/pretty v0.8.0
+	github.com/zenta-dev/zever/adapters/log/slog v0.8.0
+	github.com/zenta-dev/zever/adapters/log/zerolog v0.8.0
+	github.com/zenta-dev/zever/adapters/mailer/log v0.8.0
+	github.com/zenta-dev/zever/adapters/mailer/smtp v0.8.0
+	github.com/zenta-dev/zever/adapters/media/local v0.8.0
+	github.com/zenta-dev/zever/adapters/media/s3 v0.8.0
+	github.com/zenta-dev/zever/adapters/notification/fcm v0.8.0
+	github.com/zenta-dev/zever/adapters/notification/log v0.8.0
+	github.com/zenta-dev/zever/adapters/notification/twilio v0.8.0
+	github.com/zenta-dev/zever/adapters/observability/noop v0.8.0
+	github.com/zenta-dev/zever/adapters/observability/otlp v0.8.0
+	github.com/zenta-dev/zever/adapters/observability/stdout v0.8.0
+	github.com/zenta-dev/zever/adapters/outbox/cdc v0.8.0
+	github.com/zenta-dev/zever/adapters/outbox/db v0.8.0
+	github.com/zenta-dev/zever/adapters/outbox/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/password/argon2 v0.8.0
+	github.com/zenta-dev/zever/adapters/payment/paddle v0.8.0
+	github.com/zenta-dev/zever/adapters/payment/stripe v0.8.0
+	github.com/zenta-dev/zever/adapters/payment/stub v0.8.0
+	github.com/zenta-dev/zever/adapters/permission/casbin v0.8.0
+	github.com/zenta-dev/zever/adapters/permission/noop v0.8.0
+	github.com/zenta-dev/zever/adapters/permission/rbac v0.8.0
+	github.com/zenta-dev/zever/adapters/queue/db v0.8.0
+	github.com/zenta-dev/zever/adapters/queue/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/queue/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/ratelimit/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/resilience/inproc v0.8.0
+	github.com/zenta-dev/zever/adapters/resilience/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/router/fiber v0.8.0
+	github.com/zenta-dev/zever/adapters/router/stdhttp v0.8.0
+	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.8.0
+	github.com/zenta-dev/zever/adapters/scheduler/postgres v0.8.0
+	github.com/zenta-dev/zever/adapters/search/db v0.8.0
+	github.com/zenta-dev/zever/adapters/search/meilisearch v0.8.0
+	github.com/zenta-dev/zever/adapters/secrets/env v0.8.0
+	github.com/zenta-dev/zever/adapters/secrets/vault v0.8.0
+	github.com/zenta-dev/zever/adapters/session/db v0.8.0
+	github.com/zenta-dev/zever/adapters/session/memory v0.8.0
+	github.com/zenta-dev/zever/adapters/session/redis v0.8.0
+	github.com/zenta-dev/zever/adapters/storage/local v0.8.0
+	github.com/zenta-dev/zever/adapters/storage/r2 v0.8.0
+	github.com/zenta-dev/zever/adapters/storage/s3 v0.8.0
+	github.com/zenta-dev/zever/adapters/tenant/header v0.8.0
+	github.com/zenta-dev/zever/adapters/tenant/single v0.8.0
+	github.com/zenta-dev/zever/adapters/vectorstore/db v0.8.0
+	github.com/zenta-dev/zever/adapters/vectorstore/qdrant v0.8.0
+	github.com/zenta-dev/zever/adapters/webhook/http v0.8.0
+	github.com/zenta-dev/zever/adapters/webhook/queue v0.8.0
+	github.com/zenta-dev/zever/adapters/workflow/db v0.8.0
+	github.com/zenta-dev/zever/adapters/workflow/memory v0.8.0
+	github.com/zenta-dev/zever/config v0.8.0
+	github.com/zenta-dev/zever/container v0.8.0
+	github.com/zenta-dev/zever/core/ai v0.8.0
+	github.com/zenta-dev/zever/core/analytics v0.8.0
+	github.com/zenta-dev/zever/core/auth v0.8.0
+	github.com/zenta-dev/zever/core/cache v0.8.0
+	github.com/zenta-dev/zever/core/cdn v0.8.0
+	github.com/zenta-dev/zever/core/crypto v0.8.0
+	github.com/zenta-dev/zever/core/db v0.8.0
+	github.com/zenta-dev/zever/core/document v0.8.0
+	github.com/zenta-dev/zever/core/eventbus v0.8.0
+	github.com/zenta-dev/zever/core/flag v0.8.0
+	github.com/zenta-dev/zever/core/geo v0.8.0
+	github.com/zenta-dev/zever/core/i18n v0.8.0
+	github.com/zenta-dev/zever/core/idempotency v0.8.0
+	github.com/zenta-dev/zever/core/lock v0.8.0
+	github.com/zenta-dev/zever/core/log v0.8.0
+	github.com/zenta-dev/zever/core/mailer v0.8.0
+	github.com/zenta-dev/zever/core/notification v0.8.0
+	github.com/zenta-dev/zever/core/observability v0.8.0
+	github.com/zenta-dev/zever/core/outbox v0.8.0
+	github.com/zenta-dev/zever/core/payment v0.8.0
+	github.com/zenta-dev/zever/core/permission v0.8.0
+	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/core/ratelimit v0.8.0
+	github.com/zenta-dev/zever/core/router v0.8.0
+	github.com/zenta-dev/zever/core/secrets v0.8.0
+	github.com/zenta-dev/zever/core/session v0.8.0
+	github.com/zenta-dev/zever/core/storage v0.8.0
+	github.com/zenta-dev/zever/core/tenant v0.8.0
+	github.com/zenta-dev/zever/core/webhook v0.8.0
+	github.com/zenta-dev/zever/core/workflow v0.8.0
+	github.com/zenta-dev/zever/dsl v0.8.0
+	github.com/zenta-dev/zever/orm v0.8.0
+	github.com/zenta-dev/zever/serve v0.8.0
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/mod v0.42.0
 )
@@ -282,38 +282,38 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.75.0 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/agent v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/billing v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/job v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/media v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/password v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/rag v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/resilience v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/scheduler v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/search v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/vectorstore v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/cas v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/dbconn v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/firebase v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/grpcclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/httpclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/kvstore v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/mcpclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/outboxbridge v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/providersclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/providersopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisclient v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/s3opts v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
+	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/agent v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/billing v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/job v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/media v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/password v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/resilience v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/scheduler v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/search v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/vectorstore v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/cas v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/dbconn v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/firebase v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/grpcclient v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/httpclient v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/kvstore v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/mcpclient v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/outboxbridge v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/providersclient v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/providersopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisclient v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/s3opts v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.45.0 // indirect

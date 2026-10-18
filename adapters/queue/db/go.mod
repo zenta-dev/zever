@@ -3,15 +3,15 @@ module github.com/zenta-dev/zever/adapters/queue/db
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/adapters/db/postgres v0.7.2
-	github.com/zenta-dev/zever/adapters/db/sqlite v0.7.2
-	github.com/zenta-dev/zever/core/db v0.7.2
-	github.com/zenta-dev/zever/core/observability v0.7.2
-	github.com/zenta-dev/zever/core/queue v0.7.2
-	github.com/zenta-dev/zever/orm v0.7.2
-	github.com/zenta-dev/zever/shared/dbconn v0.7.2
-	github.com/zenta-dev/zever/shared/msgspan v0.7.2
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2
+	github.com/zenta-dev/zever/adapters/db/postgres v0.8.0
+	github.com/zenta-dev/zever/adapters/db/sqlite v0.8.0
+	github.com/zenta-dev/zever/core/db v0.8.0
+	github.com/zenta-dev/zever/core/observability v0.8.0
+	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/orm v0.8.0
+	github.com/zenta-dev/zever/shared/dbconn v0.8.0
+	github.com/zenta-dev/zever/shared/msgspan v0.8.0
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0
 )
 
 require (
@@ -27,11 +27,11 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/shared/lrucache v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
@@ -75,6 +75,8 @@ replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observability/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../memory
+
+replace github.com/zenta-dev/zever/adapters/queue/db => ../db
 
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
 

@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/posthog/posthog-go v1.34.0
-	github.com/zenta-dev/zever/core/analytics v0.7.2
+	github.com/zenta-dev/zever/core/analytics v0.8.0
 )
 
 require (
@@ -13,8 +13,8 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )

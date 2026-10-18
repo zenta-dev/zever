@@ -4,9 +4,9 @@ go 1.27.2
 
 require (
 	github.com/PaddleHQ/paddle-go-sdk/v5 v5.2.0
-	github.com/zenta-dev/zever/core/billing v0.7.2
-	github.com/zenta-dev/zever/shared/httpclient v0.7.2
-	github.com/zenta-dev/zever/shared/providersopt v0.7.2
+	github.com/zenta-dev/zever/core/billing v0.8.0
+	github.com/zenta-dev/zever/shared/httpclient v0.8.0
+	github.com/zenta-dev/zever/shared/providersopt v0.8.0
 )
 
 require (
@@ -16,9 +16,9 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect

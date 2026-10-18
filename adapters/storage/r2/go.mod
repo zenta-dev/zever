@@ -21,16 +21,16 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4 // indirect
 	github.com/aws/smithy-go v1.28.5 // indirect
-	github.com/zenta-dev/zever/core/log v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/log v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 )
 
 replace github.com/zenta-dev/zever/shared/s3opts => ../../../shared/s3opts
 
 require (
-	github.com/zenta-dev/zever/core/storage v0.7.2
-	github.com/zenta-dev/zever/shared/s3opts v0.7.2
+	github.com/zenta-dev/zever/core/storage v0.8.0
+	github.com/zenta-dev/zever/shared/s3opts v0.8.0
 )
 
 replace github.com/zenta-dev/zever/core/storage => ../../../core/storage

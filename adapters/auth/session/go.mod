@@ -3,17 +3,17 @@ module github.com/zenta-dev/zever/adapters/auth/session
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/adapters/session/memory v0.7.2
-	github.com/zenta-dev/zever/core/auth v0.7.2
-	github.com/zenta-dev/zever/core/session v0.7.2
+	github.com/zenta-dev/zever/adapters/session/memory v0.8.0
+	github.com/zenta-dev/zever/core/auth v0.8.0
+	github.com/zenta-dev/zever/core/session v0.8.0
 )
 
 require (
-	github.com/zenta-dev/zever/core/db v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/core/db v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 )
 
 replace (

@@ -3,9 +3,9 @@ module github.com/zenta-dev/zever/adapters/ai/gemini
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/core/ai v0.7.2
-	github.com/zenta-dev/zever/shared/codec v0.7.2
-	github.com/zenta-dev/zever/shared/httpclient v0.7.2
+	github.com/zenta-dev/zever/core/ai v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
+	github.com/zenta-dev/zever/shared/httpclient v0.8.0
 	go.uber.org/goleak v1.3.0
 	google.golang.org/genai v1.74.0
 )
@@ -23,10 +23,10 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.23 // indirect
 	github.com/googleapis/gax-go/v2 v2.26.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/zenta-dev/zever/shared/endpoint v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect

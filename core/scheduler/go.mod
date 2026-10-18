@@ -3,13 +3,13 @@ module github.com/zenta-dev/zever/core/scheduler
 go 1.27.2
 
 require (
-	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.7.2
-	github.com/zenta-dev/zever/core/db v0.7.2
-	github.com/zenta-dev/zever/core/job v0.7.2
-	github.com/zenta-dev/zever/core/log v0.7.2
-	github.com/zenta-dev/zever/core/queue v0.7.2
-	github.com/zenta-dev/zever/shared/ref v0.7.2
-	github.com/zenta-dev/zever/shared/registry v0.7.2
+	github.com/zenta-dev/zever/adapters/scheduler/embedded v0.8.0
+	github.com/zenta-dev/zever/core/db v0.8.0
+	github.com/zenta-dev/zever/core/job v0.8.0
+	github.com/zenta-dev/zever/core/log v0.8.0
+	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/shared/ref v0.8.0
+	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
 
 require (
@@ -17,14 +17,14 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/zenta-dev/zever/adapters/log/noop v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/cache v0.7.2 // indirect
-	github.com/zenta-dev/zever/core/observability v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/msgspan v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/redisopt v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/retry v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/traceprop v0.7.2 // indirect
+	github.com/zenta-dev/zever/adapters/log/noop v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/cache v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/observability v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/msgspan v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/retry v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
@@ -49,6 +49,8 @@ replace github.com/zenta-dev/zever/adapters/cache/memory => ../../adapters/cache
 replace github.com/zenta-dev/zever/adapters/log/noop => ../../adapters/log/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
+
+replace github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
 
 replace github.com/zenta-dev/zever/core/cache => ../cache
 

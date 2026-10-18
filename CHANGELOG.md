@@ -5,7 +5,48 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.8.0] - 2026-10-18
+- ci(gates): v0.8.0 friction regression tests — headless 3-command quickstart journey (`zever new` → `zever dev` boot + readiness probe → curl) with wall-clock budget, scaffold `go vet`/`go test`/`golangci-lint` legs, compile-fail fixtures gate (typed-Ref misuse must not build), 60s `.env` fuzz smoke, and a non-gating benchstat 5% regression signal for `orm` + `container` hot paths.
+
+- **Breaking:** `cli`: removed the `--config` file flag from `doctor`, `config show`, and `outbox` (service config is env-only: `.env`/`.env.local` discovery plus the process environment). Pointing `--config` at a file is now an unknown-flag error (exit 2).
+- **Breaking:** `cli`: canonical runtime spellings are now `worker` and `schedule run`; the legacy `queue:work` and `schedule:run` spellings still run but are hidden from `--help`.
+- **Breaking:** `cli`: `zever explain` with no operation path now prints the wiring graph (refs, drivers, typed dependencies, env keys per ref) instead of a usage error; `zever explain <service>` and `zever explain <service>/<name>` scope it to one ref.
+- feat(cli): grouped `--help` (Start, Build, Data, Run & ops); bare `zever` renders the same command tree and exits 1, `--help` exits 0.
+- feat(cli): project layout resolves defaults < `ZEVER_SCHEMA_DIR` / `ZEVER_GENERATED_DIR` / `ZEVER_SERVER_ENTRY` / `ZEVER_WORKER_ENTRY` / `ZEVER_TINKER_ENTRY` / `ZEVER_SEED_ENTRY`; legacy `zever.yaml` project keys stay ignored.
+- feat(cli): `config show` prints effective env-derived values per instance (`service/NAME`, redacted, never raw secrets).
+- feat(cli): `doctor` scopes checks to `Container.Wired()` refs when providers are wired and falls back to every known battery otherwise; exit codes stay 0/1/2 with a stable `--json` envelope.
+- feat(cli): `db migrate` resolves `--adapter`/`--dsn` from the env-derived DB config when the flags are unset.
+
+- **Breaking:** `config`: removed file-based configuration (`Load`, `discover`, `decodeFile`, `merge`, `SchemaJSON`, `config/schema/*`, `toml:`/`yaml:` tags). Service config is env-only: `FromEnv()` + `Resolve(env)`. Legacy `zever.yaml`/`.yml`/`.json` files are ignored; see `config/README.md` migration.
+- **Breaking:** `config`: unknown keys under a wired service prefix (`DB_BOGUS=1`, `AUTH_TOKEN`) now fail `Resolve`/`ApplyEnv` with a did-you-mean hint instead of being silently ignored. Unknown service heads (`PATH`, `FOO_BAR`) are still ignored.
+- **Breaking:** `config`: `zever new` no longer scaffolds `zever.yaml`/`zever.schema.json`, and the reference `Dockerfile` no longer copies `zever.yaml`. `zever doctor`/`config show` `--config` now takes a dotenv file.
+- feat(config): stdlib-only `.env` parser (`LoadEnv`, `FromEnv`): quotes, `#` comments, `export` prefix, `${VAR}` expansion, fail-closed errors naming file+line, 10 MiB file / 1 MiB line bounds.
+- feat(config): instance-aware env (`SERVICE__NAME__FIELD`) via `ApplyEnv(env, service, name, dst)`, `InstanceNames(env, service)`, `DefaultOptions(service, name)`, and `Resolve(env)`.
+
+- **Breaking:** `container`: `New` takes variadic `Provider` wiring (`Provide`, `Provide1/2/3`); explicit `ref.Ref` instances resolve via `Get`. Zero-provider `New(cfg)` keeps the legacy lazy config path unchanged.
+- feat(container): generic `Ref`/`Provide` typed wiring with construction-time graph validation (duplicate refs, missing deps, cycles), lazy builds with retry-on-error, `Optional` deps, `Eager` providers, reverse-dependency `Close`, and `Wired` labels.
+- feat(ref): new `shared/ref` leaf module with the comparable `Ref[T, O]` key both `core/*` and `container` agree on; every battery gains `Ref(name)`/`DefaultRef()` helpers.
+
+- docs(docs): v0.8.0 docs sweep — env-only config surface (config reference + configuration/deployment/migration guides), 3-command curl quickstart journey (`zever new` → `zever dev` → curl), new serve/README.md runtime reference, and provider/adapter + background/data/integrations/operate/security page refreshes.
+
+- fix(db): add `ErrNoSuchTable` sentinel and `NoSuchTableError` so missing-table failures are detectable via `errors.Is`, including the underlying cause.
+- fix(serve): `isNoSuchTable`/`withMigrateHint` prefer the `db.ErrNoSuchTable` sentinel with a string-match fallback for legacy message shapes.
+- fix(serve): gRPC auth/permission resolution failure surfaces an actionable hint (`zever add auth permission`, or declare `auth: none`) while keeping `errors.Is` compatibility.
+
+- feat(examples): rewrite todo/bookings/showcase/demoapp to typed `container.Provide`/`Provide1` wiring with `serve.Main` entrypoints, plus `.env.example` per example; add `examples/multidb` with primary + second named DB (`DB__ANALYTICS__*`) + sqlite audit DB wired via typed `Ref`s.
+
+- **Breaking:** `zever generate` with no subcommand now runs the full pipeline (compile with `gogen,zenorm,atlas,openapi`, auto-adding `proto,protogogen` when the schema declares services; override with `--backend` or `ZEVER_BACKENDS`) instead of erroring, and supports `--diff` (print unified diff, write nothing) and `--check` (exit non-zero on drift).
+- **Breaking:** generated file stamps now carry the CLI version (`// Code generated by zever vX.Y.Z; DO NOT EDIT.` plus `schema-hash:`); `zever compile --check` treats a version-only difference as a note unless `--strict` is passed.
+- feat(cli): generated `cmd/server/main.go` is now a thin wrapper over the `serve` library (`serve.Main(app.Providers(), app.Modules)`); service implementations scaffold once under `internal/service/<module>/` and are never overwritten (`zever generate --diff` previews, default generate prints a summary of what changed).
+- feat(cli): `zever dev` now runs check, generate, sqlite auto-migrate (dev `ZEVER_ENV` only, otherwise prompts), then watches and restarts while printing server URLs and the route table.
+
+- **Breaking:** `cli`: `zever new` scaffolds the minimal tree (go.mod, schema/app.zen, cmd/server/main.go on `serve.Main`, internal/app/wiring.go with typed `Providers`/`Modules`, internal/service/hello, .env, .env.example, .gitignore, README); worker, seed, Docker, CI, lint, compose and k8s files moved to opt-in `zever add` recipes. `--profile` is a deprecated alias printing its `--with` replacement; `zever.yaml`/`zever.schema.json` are never written.
+- feat(cli): `zever new --with` selects batteries with optional adapter pins; `.env` carries per-project random dev secrets and `.env.example` is generated from the wired Options structs.
+- feat(cli): `zever add <battery>[/<adapter>] [--name N] [--uses R]` edits wiring.go with a go/ast insert-only edit (Ref var plus `container.Provide`/`Provide1` entry), prints the unified diff before applying (`--diff` prints only, `--yes` skips the prompt), swaps adapters with `--force`, and appends `.env.example` sections; recipes `docker|ci|lint|compose|worker|seed|k8s` write their files from templates.
+- feat(cli): actionable hints for tidy failures, unknown batteries/adapters (did-you-mean), taken names and outdated Go toolchains.
+- feat(cli): scaffolded `cmd/server/main.go` accepts the `-addr`/`-grpc-addr` flags `zever dev` and `zever serve` pass through, so the requested listen port is honored; gRPC binds only when auth+permission are wired, otherwise a one-line notice explains the skip.
+
+- feat(serve): new `serve` library for generated servers: `Run`/`Main`/`Worker` boot, mount, and graceful-shutdown runtime with `/healthz`+`/readyz`, opt-in gRPC (fail-closed authz, reflection off by default), TLS 1.2+ floor, security headers, request body limits, actionable startup errors, and `Doctor` resolve-all reports.
 
 ## [v0.7.2] - 2026-10-17
 

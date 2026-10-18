@@ -4,16 +4,16 @@ go 1.27.2
 
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
 )
 
 require (
 	github.com/anthonynsimon/bild v0.17.1
-	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.7.2
-	github.com/zenta-dev/zever/core/media v0.7.2
+	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.8.0
+	github.com/zenta-dev/zever/core/media v0.8.0
 )
 
 replace github.com/zenta-dev/zever/core/media => ../../../core/media

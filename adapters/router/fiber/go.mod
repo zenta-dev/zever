@@ -11,8 +11,8 @@ require (
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/molecule-man/go-brrr v1.1.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/zenta-dev/zever/shared/ref v0.7.2 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.7.2 // indirect
+	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 )
 
@@ -20,9 +20,9 @@ require (
 	github.com/gofiber/adaptor/v2 v2.2.1
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/valyala/fasthttp v1.75.0
-	github.com/zenta-dev/zever/adapters/log/noop v0.7.2
-	github.com/zenta-dev/zever/core/log v0.7.2
-	github.com/zenta-dev/zever/core/router v0.7.2
+	github.com/zenta-dev/zever/adapters/log/noop v0.8.0
+	github.com/zenta-dev/zever/core/log v0.8.0
+	github.com/zenta-dev/zever/core/router v0.8.0
 )
 
 replace github.com/zenta-dev/zever/adapters/log/noop => ../../log/noop

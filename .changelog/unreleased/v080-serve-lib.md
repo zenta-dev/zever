@@ -1,1 +1,0 @@
-- feat(serve): new `serve` library for generated servers: `Run`/`Main`/`Worker` boot, mount, and graceful-shutdown runtime with `/healthz`+`/readyz`, opt-in gRPC (fail-closed authz, reflection off by default), TLS 1.2+ floor, security headers, request body limits, actionable startup errors, and `Doctor` resolve-all reports.

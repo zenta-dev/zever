@@ -12,7 +12,7 @@ import (
 
 const (
 	serverName             = "zever-mcp"
-	serverVersion          = "0.7.2"
+	serverVersion          = "0.8.0"
 	defaultProtocolVersion = "2024-11-05"
 )
 
