@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="zever" src=".github/zever.jpg" width="320">
+  <img alt="zever" src=".github/zever.svg" width="320">
 </p>
 
 # zever

@@ -1,0 +1,1 @@
+- chore(docs): update README, docs logo, favicon, and OG/icon PNGs to the new brand mark (`.github/zever.svg`); remove superseded `.github/zever.jpg`.
