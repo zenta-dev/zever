@@ -119,8 +119,12 @@ func TestRunGenerateDispatchesEntity(t *testing.T) {
 }
 
 func TestRunGenerateSubcommandErrors(t *testing.T) {
+	// Bare `zever generate` runs the full pipeline, so it needs a project:
+	// outside one it fails instead of printing the subcommand usage.
+	withWorkingDir(t, t.TempDir())
+
 	if err := runGenerate(nil); err == nil {
-		t.Fatalf("expected an error for a missing subcommand")
+		t.Fatalf("expected an error for a bare generate outside a project")
 	}
 
 	if err := runGenerate([]string{"nonsense"}); err == nil {
@@ -131,6 +135,16 @@ func TestRunGenerateSubcommandErrors(t *testing.T) {
 	// through currentModulePath rather than silently resolving elsewhere.
 	if err := runGenerate([]string{"tinker"}); err == nil {
 		t.Fatalf("expected an error for tinker without a go.mod")
+	}
+
+	// A schema-looking positional routes to the full pipeline, not the
+	// module path: it fails here only for lack of a project.
+	if err := runGenerate([]string{"schema/app.zen"}); err == nil {
+		t.Fatalf("expected an error for a schema path outside a project")
+	}
+
+	if err := runGenerate([]string{"entit"}); err == nil {
+		t.Fatalf("expected an error for a near-miss subcommand")
 	}
 
 	for _, help := range []string{"-h", "--help", "help"} {

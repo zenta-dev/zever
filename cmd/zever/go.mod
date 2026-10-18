@@ -135,6 +135,7 @@ require (
 	github.com/zenta-dev/zever/core/workflow v0.7.2
 	github.com/zenta-dev/zever/dsl v0.7.2
 	github.com/zenta-dev/zever/orm v0.7.2
+	github.com/zenta-dev/zever/serve v0.7.2
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/mod v0.42.0
 )

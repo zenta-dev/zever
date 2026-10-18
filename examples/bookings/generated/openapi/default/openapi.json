@@ -383,6 +383,7 @@
   },
   "x-zever-generated": {
     "backend": "openapi",
-    "schema": "sha256:c0da6b3cb3cfc4188c475225a4e9a38751b4aa7112cb50cccf58bbe465aedac2"
+    "schema": "sha256:c0da6b3cb3cfc4188c475225a4e9a38751b4aa7112cb50cccf58bbe465aedac2",
+    "version": "v0.7.2"
   }
 }
