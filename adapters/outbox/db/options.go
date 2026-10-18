@@ -52,32 +52,32 @@ type Options struct {
 	// Options holds the shared DB pool configuration.
 	coredb.Options
 	// Table is the outbox table name. Default DefaultTable.
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// InboxTable is the inbox table name. Default DefaultInboxTable.
-	InboxTable string `json:"inbox_table" toml:"inbox_table" yaml:"inbox_table"`
+	InboxTable string `json:"inbox_table"`
 	// Publisher receives recorded messages. Required to Start the relay.
-	Publisher outbox.Publisher `json:"-" toml:"-" yaml:"-"`
+	Publisher outbox.Publisher `json:"-"`
 	// Transport is the informational transport selector the relay publishes
 	// through, mirroring core outbox.Options.Publisher: outbox.PublisherEventBus,
 	// outbox.PublisherQueue, or "" (unset). It is reported as the
 	// messaging.system span attribute and falls back to the adapter name when
 	// empty. Go-API-only: never decoded from configuration files.
-	Transport string `json:"-" toml:"-" yaml:"-"`
+	Transport string `json:"-"`
 	// PollInterval is the relay poll cadence. Default DefaultPollInterval.
-	PollInterval time.Duration `json:"poll_interval" toml:"poll_interval" yaml:"poll_interval"`
+	PollInterval time.Duration `json:"poll_interval"`
 	// BatchSize caps how many messages one poll claims. Default DefaultBatchSize.
-	BatchSize int `json:"batch_size" toml:"batch_size" yaml:"batch_size"`
+	BatchSize int `json:"batch_size"`
 	// MaxAttempts is the publish attempt cap before DLQ. Default DefaultMaxAttempts.
-	MaxAttempts int `json:"max_attempts" toml:"max_attempts" yaml:"max_attempts"`
+	MaxAttempts int `json:"max_attempts"`
 	// Retry is the per-attempt backoff applied after a publish failure.
-	Retry retry.Policy `json:"retry" toml:"retry" yaml:"retry"`
+	Retry retry.Policy `json:"retry"`
 	// Retention is how long processed messages are kept. Default DefaultRetention.
-	Retention time.Duration `json:"retention" toml:"retention" yaml:"retention"`
+	Retention time.Duration `json:"retention"`
 	// LockSeconds is the claim lease in seconds. Default DefaultLockSeconds.
-	LockSeconds int `json:"lock_seconds" toml:"lock_seconds" yaml:"lock_seconds"`
+	LockSeconds int `json:"lock_seconds"`
 	// Provider emits relay metrics and spans. Nil disables telemetry. It is
 	// Go-API-only: never decoded from configuration files.
-	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
+	Provider observability.Provider `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

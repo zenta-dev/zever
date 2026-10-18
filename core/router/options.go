@@ -10,23 +10,23 @@ import (
 // Options holds typed configuration for router adapters.
 type Options struct {
 	// AppName is the application name used by adapters, defaulting to "app" when empty.
-	AppName string `json:"app_name" toml:"app_name" yaml:"app_name"`
+	AppName string `json:"app_name"`
 	// TLSCertFile is the path to the PEM-encoded TLS certificate the
 	// generated server presents on its HTTP and gRPC listeners. Empty
 	// disables TLS (plaintext). Must be paired with TLSKeyFile.
-	TLSCertFile string `json:"tls_cert" toml:"tls_cert" yaml:"tls_cert"`
+	TLSCertFile string `json:"tls_cert"`
 	// TLSKeyFile is the path to the PEM-encoded TLS private key matching
 	// TLSCertFile. Empty disables TLS (plaintext). Must be paired with
 	// TLSCertFile.
-	TLSKeyFile string `json:"tls_key" toml:"tls_key" yaml:"tls_key"`
+	TLSKeyFile string `json:"tls_key"`
 	// TLSClientCAFile is the path to a PEM-encoded CA bundle used to
 	// verify client certificates (mutual TLS) on the HTTP and gRPC
 	// listeners. Empty disables client verification. Requires the
 	// TLSCertFile/TLSKeyFile pair: a client CA without a server identity
 	// serves nothing to verify against.
-	TLSClientCAFile string `json:"tls_client_ca" toml:"tls_client_ca" yaml:"tls_client_ca"`
+	TLSClientCAFile string `json:"tls_client_ca"`
 	// Logger emits skipped-route warnings. Defaults to a no-op logger when nil.
-	Logger log.Logger `json:"-" toml:"-" yaml:"-"`
+	Logger log.Logger `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

@@ -33,7 +33,7 @@ type Options struct {
 	// Options holds the shared outbox configuration.
 	outbox.Options
 	// Publisher receives replicated messages. Required to Start the consumer.
-	Publisher outbox.Publisher `json:"-" toml:"-" yaml:"-"`
+	Publisher outbox.Publisher `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations. The DSN,

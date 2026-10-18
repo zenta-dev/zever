@@ -34,15 +34,15 @@ const PrefixSecure = "__Secure-"
 // Prefix field). The default is no prefix.
 type Options struct {
 	// Name is the cookie name. Empty defaults to DefaultName.
-	Name string `json:"name" toml:"name" yaml:"name"`
+	Name string `json:"name"`
 	// Path is the cookie Path attribute. Empty defaults to DefaultPath.
-	Path string `json:"path" toml:"path" yaml:"path"`
+	Path string `json:"path"`
 	// Domain is the cookie Domain attribute. Empty means no Domain
 	// attribute is sent (host-only cookie). A non-empty Domain widens the
 	// cookie's scope to the named host and all its subdomains, so it is
 	// ignored (omitted) when Prefix is PrefixHost, which must stay
 	// host-only to keep the prefix's guarantee.
-	Domain string `json:"domain" toml:"domain" yaml:"domain"`
+	Domain string `json:"domain"`
 	// Prefix is the cookie-name security prefix: PrefixHost ("__Host-"),
 	// PrefixSecure ("__Secure-"), or "" for none. When set, New prepends
 	// it to Name and forces the prefix's required attributes: __Host-
@@ -50,21 +50,21 @@ type Options struct {
 	// cookie to subdomains, defeating the host-only guarantee); __Secure-
 	// forces Secure. Any other value is ignored. SameSite is independent
 	// of the prefix and keeps its own default.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 	// Secure controls the Secure attribute. Nil defaults to true
 	// (HTTPS-only); set to a false pointer to explicitly allow the
 	// cookie over plain HTTP, e.g. for local development.
-	Secure *bool `json:"secure" toml:"secure" yaml:"secure"`
+	Secure *bool `json:"secure"`
 	// HTTPOnly controls the http.Cookie HttpOnly attribute. Nil defaults
 	// to true (inaccessible to JavaScript); set to a false pointer to
 	// explicitly expose the cookie to scripts.
-	HTTPOnly *bool `json:"http_only" toml:"http_only" yaml:"http_only"`
+	HTTPOnly *bool `json:"http_only"`
 	// SameSite controls the SameSite attribute. The zero value defaults
 	// to http.SameSiteLaxMode; set explicitly to
 	// http.SameSiteDefaultMode, http.SameSiteStrictMode, or
 	// http.SameSiteNoneMode to override. SameSiteNoneMode forces Secure
 	// (browsers reject SameSite=None cookies that are not Secure).
-	SameSite http.SameSite `json:"same_site" toml:"same_site" yaml:"same_site"`
+	SameSite http.SameSite `json:"same_site"`
 	// MaxAge is the cookie lifetime in seconds. Zero means a session
 	// cookie: no Max-Age or Expires attribute is sent, and the browser
 	// discards the cookie when it closes. A negative value deletes the
@@ -72,7 +72,7 @@ type Options struct {
 	// sets both Max-Age and Expires. int seconds (not time.Duration) is
 	// required by net/http; every other duration in the repo is
 	// time.Duration.
-	MaxAge int `json:"max_age" toml:"max_age" yaml:"max_age"`
+	MaxAge int `json:"max_age"`
 }
 
 // Config aliases Options for compatibility.

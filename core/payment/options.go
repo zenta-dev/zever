@@ -31,11 +31,11 @@ const (
 type Options struct {
 	providersopt.Common
 	// WebhookSecret holds the webhook verification secret. It is never logged.
-	WebhookSecret string `json:"webhook_secret" toml:"webhook_secret" yaml:"webhook_secret" zever:"secret"`
+	WebhookSecret string `json:"webhook_secret" zever:"secret"`
 	// AutoApprove marks new payments as succeeded instead of pending.
-	AutoApprove bool `json:"auto_approve" toml:"auto_approve" yaml:"auto_approve"`
+	AutoApprove bool `json:"auto_approve"`
 	// MaxWebhookBytes bounds the webhook payload size.
-	MaxWebhookBytes int `json:"max_webhook_bytes" toml:"max_webhook_bytes" yaml:"max_webhook_bytes"`
+	MaxWebhookBytes int `json:"max_webhook_bytes"`
 	// Idempotency holds the optional refund idempotency store. Nil skips the guard.
 	Idempotency idempotency.Store
 }

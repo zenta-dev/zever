@@ -19,33 +19,33 @@ const DefaultTimeout = 60 * time.Second
 // Options configures the Ollama adapter.
 type Options struct {
 	// Addr is the Ollama server base URL. Empty means DefaultAddr.
-	Addr string `json:"addr" toml:"addr" yaml:"addr"`
+	Addr string `json:"addr"`
 	// Model is the default model when callers pass an empty model.
-	Model string `json:"model" toml:"model" yaml:"model"`
+	Model string `json:"model"`
 	// Timeout bounds each HTTP exchange. Non-positive means DefaultTimeout.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// AllowInsecure permits a plain-http Addr for non-loopback hosts.
 	// Default false: https required for non-loopback hosts. Loopback http
 	// (the DefaultAddr host) is always permitted for local development.
 	// AllowInsecure no longer disables TLS verification; set
 	// InsecureSkipVerify explicitly for self-signed test servers.
-	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	AllowInsecure bool `json:"allow_insecure"`
 	// AllowPrivate permits dialing private, loopback, and link-local
 	// addresses. Default false, so the loopback DefaultAddr needs an
 	// explicit opt-in: only globally routable addresses are dialed,
 	// redirects are never followed, and the adapter logs a line at open
 	// when enabled.
-	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
+	AllowPrivate bool `json:"allow_private"`
 	// InsecureSkipVerify disables TLS certificate verification for
 	// self-signed test servers. Default false: verification always on.
 	// Enable only for testing; the adapter logs a warning at open.
-	InsecureSkipVerify bool `json:"insecure_skip_verify" toml:"insecure_skip_verify" yaml:"insecure_skip_verify"`
+	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 	// Transport overrides the HTTP round tripper. Nil means http.DefaultTransport.
 	// Tests use a hand-fake transport; production leaves it nil.
-	Transport http.RoundTripper `json:"-" toml:"-" yaml:"-"`
+	Transport http.RoundTripper `json:"-"`
 	// Logger receives the open-time notices for AllowPrivate and
 	// InsecureSkipVerify. Nil means slog.Default().
-	Logger *slog.Logger `json:"-" toml:"-" yaml:"-"`
+	Logger *slog.Logger `json:"-"`
 }
 
 // ErrInvalidAddr is returned when Options.Addr fails endpoint validation.

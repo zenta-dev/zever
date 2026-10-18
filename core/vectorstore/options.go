@@ -18,18 +18,18 @@ const (
 // Options configures vectorstore backend selection and connection.
 type Options struct {
 	// DSN holds the sqlite path or postgres URL.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
-	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	DedicatedPool bool `json:"dedicated_pool"`
 	// URL holds the Qdrant address.
-	URL string `json:"url" toml:"url" yaml:"url"`
+	URL string `json:"url"`
 	// APIKey holds the backend credential and is never logged.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
+	APIKey string `json:"api_key" zever:"secret"`
 	// Dimension holds the expected embedding dimension.
-	Dimension int `json:"dimension" toml:"dimension" yaml:"dimension"`
+	Dimension int `json:"dimension"`
 	// AllowInsecure permits an http:// URL for testing. Default false (https only).
-	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	AllowInsecure bool `json:"allow_insecure"`
 }
 
 // Validate checks options for consistency, joining all violations.

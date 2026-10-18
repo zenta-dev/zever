@@ -10,26 +10,26 @@ import (
 // Options holds typed configuration for the vault secrets adapter.
 type Options struct {
 	// Addr is the Vault server address. Required.
-	Addr string `json:"addr" toml:"addr" yaml:"addr"`
+	Addr string `json:"addr"`
 	// Token is the Vault authentication token.
-	Token string `json:"token" toml:"token" yaml:"token"`
+	Token string `json:"token"`
 	// TokenFile reads the Vault token from a file when Token is empty.
-	TokenFile string `json:"token_file" toml:"token_file" yaml:"token_file"`
+	TokenFile string `json:"token_file"`
 	// Mount is the Vault KV mount path. Required.
-	Mount string `json:"mount" toml:"mount" yaml:"mount"`
+	Mount string `json:"mount"`
 	// Namespace is the Vault namespace.
-	Namespace string `json:"namespace" toml:"namespace" yaml:"namespace"`
+	Namespace string `json:"namespace"`
 	// AllowInsecure permits a plain-http Addr for test setups (httptest
 	// servers speak http only). Default false: Addr must use https, since
 	// the token travels in the X-Vault-Token header and plain http sends
 	// it in cleartext. Enabling this logs a warning at open.
-	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	AllowInsecure bool `json:"allow_insecure"`
 	// AllowInsecureTokenFilePerms permits a TokenFile readable beyond its
 	// owner (any group/other permission bit, i.e. broader than 0600).
 	// Default false: such a file fails closed, since any local user could
 	// steal the token. Restrict the file to 0600 instead; enabling this
 	// logs a warning at open.
-	AllowInsecureTokenFilePerms bool `json:"allow_insecure_token_file_perms" toml:"allow_insecure_token_file_perms" yaml:"allow_insecure_token_file_perms"`
+	AllowInsecureTokenFilePerms bool `json:"allow_insecure_token_file_perms"`
 }
 
 // Validate checks Options for consistency, joining all violations.

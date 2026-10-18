@@ -14,27 +14,27 @@ import (
 // Options configures provider construction.
 type Options struct {
 	// Endpoint is the collector address as host:port.
-	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	Endpoint string `json:"endpoint"`
 	// ServiceName identifies the service emitting telemetry.
-	ServiceName string `json:"service_name" toml:"service_name" yaml:"service_name"`
+	ServiceName string `json:"service_name"`
 	// Insecure disables TLS; only allowed for loopback endpoints.
-	Insecure bool `json:"insecure" toml:"insecure" yaml:"insecure"`
+	Insecure bool `json:"insecure"`
 	// SetGlobals registers the provider as the global default.
-	SetGlobals bool `json:"set_globals" toml:"set_globals" yaml:"set_globals"`
+	SetGlobals bool `json:"set_globals"`
 	// Verbose enables debug logging.
-	Verbose bool `json:"verbose" toml:"verbose" yaml:"verbose"`
+	Verbose bool `json:"verbose"`
 	// CAFile is the path to a PEM-encoded CA bundle.
-	CAFile string `json:"ca_file" toml:"ca_file" yaml:"ca_file"`
+	CAFile string `json:"ca_file"`
 	// CertFile is the path to a PEM-encoded client certificate.
-	CertFile string `json:"cert_file" toml:"cert_file" yaml:"cert_file"`
+	CertFile string `json:"cert_file"`
 	// KeyFile is the path to a PEM-encoded client key.
-	KeyFile string `json:"key_file" toml:"key_file" yaml:"key_file"`
+	KeyFile string `json:"key_file"`
 	// Headers are outbound request headers.
-	Headers map[string]string `json:"headers" toml:"headers" yaml:"headers"`
+	Headers map[string]string `json:"headers"`
 	// SampleRatio is the trace sampling probability in [0,1].
-	SampleRatio float64 `json:"sample_ratio" toml:"sample_ratio" yaml:"sample_ratio"`
+	SampleRatio float64 `json:"sample_ratio"`
 	// AttrValueLimit caps string attribute values; 0 selects the default.
-	AttrValueLimit int `json:"attr_value_limit" toml:"attr_value_limit" yaml:"attr_value_limit"`
+	AttrValueLimit int `json:"attr_value_limit"`
 }
 
 // Validate checks options for consistency, joining all violations.

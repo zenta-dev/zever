@@ -31,27 +31,27 @@ type RedisOptions struct {
 	// way for a caller to tune them for a hot eventbus.
 	redisopt.Options
 	// Prefix is the key prefix for Redis eventbus data.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 }
 
 // Options configures eventbus behavior and adapter-specific settings.
 type Options struct {
 	// BufferSize is the per-topic buffer size. Zero means the adapter default.
-	BufferSize int `json:"buffer_size" toml:"buffer_size" yaml:"buffer_size"`
+	BufferSize int `json:"buffer_size"`
 	// MaxHandlers is the maximum handler count. Zero means the adapter default.
-	MaxHandlers int `json:"max_handlers" toml:"max_handlers" yaml:"max_handlers"`
+	MaxHandlers int `json:"max_handlers"`
 	// HandlerTimeout is the per-handler delivery timeout. Zero means the adapter default.
-	HandlerTimeout time.Duration `json:"handler_timeout" toml:"handler_timeout" yaml:"handler_timeout"`
+	HandlerTimeout time.Duration `json:"handler_timeout"`
 	// CloseTimeout is the shutdown timeout. Zero means the adapter default.
-	CloseTimeout time.Duration `json:"close_timeout" toml:"close_timeout" yaml:"close_timeout"`
+	CloseTimeout time.Duration `json:"close_timeout"`
 	// OnPanic handles handler panics. It is never validated.
-	OnPanic func(topic string, msg Message, r any) `json:"-" toml:"-" yaml:"-"`
+	OnPanic func(topic string, msg Message, r any) `json:"-"`
 	// Provider emits the producer span an adapter opens for every publish and
 	// the consumer span it opens for every delivery. Nil disables telemetry.
 	// It is Go-API-only: never decoded from configuration files.
-	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
+	Provider observability.Provider `json:"-"`
 	// Redis holds Redis-specific connection configuration.
-	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	Redis RedisOptions `json:"redis"`
 }
 
 // Validate checks options for consistency, joining all violations.

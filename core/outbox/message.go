@@ -14,20 +14,20 @@ const MaxIDLen = 255
 // json/toml/yaml tags so it round-trips through file configuration and JSON.
 type Message struct {
 	// ID uniquely identifies the message. Required, at most MaxIDLen bytes.
-	ID string `json:"id" toml:"id" yaml:"id"`
+	ID string `json:"id"`
 	// Topic is the destination topic. Required.
-	Topic string `json:"topic" toml:"topic" yaml:"topic"`
+	Topic string `json:"topic"`
 	// Key is an optional partition/routing key.
-	Key string `json:"key,omitempty" toml:"key,omitempty" yaml:"key,omitempty"`
+	Key string `json:"key,omitempty"`
 	// Payload is the raw message body.
-	Payload []byte `json:"payload,omitempty" toml:"payload,omitempty" yaml:"payload,omitempty"`
+	Payload []byte `json:"payload,omitempty"`
 	// Headers holds metadata attached to the message.
-	Headers map[string]string `json:"headers,omitempty" toml:"headers,omitempty" yaml:"headers,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 	// CreatedAt is the message creation timestamp. Zero means "stamp now"
 	// for adapters that persist it.
-	CreatedAt time.Time `json:"created_at,omitempty" toml:"created_at,omitempty" yaml:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Attempts is the delivery attempt count observed by the publisher.
-	Attempts int `json:"attempts" toml:"attempts" yaml:"attempts"`
+	Attempts int `json:"attempts"`
 }
 
 // Validate reports whether the message is well-formed: ID and Topic must be

@@ -49,22 +49,22 @@ type Options struct {
 	// Options holds the shared DB pool configuration.
 	coredb.Options
 	// Table is the queue-messages table name. Default DefaultTable.
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// Owner identifies this instance as a claim holder. Default random.
-	Owner string `json:"owner" toml:"owner" yaml:"owner"`
+	Owner string `json:"owner"`
 	// VisibilityTimeout is the duration a popped message stays invisible.
-	VisibilityTimeout time.Duration `json:"visibility_timeout" toml:"visibility_timeout" yaml:"visibility_timeout"`
+	VisibilityTimeout time.Duration `json:"visibility_timeout"`
 	// PollTimeout is the duration Pop waits for a message before empty.
-	PollTimeout time.Duration `json:"poll_timeout" toml:"poll_timeout" yaml:"poll_timeout"`
+	PollTimeout time.Duration `json:"poll_timeout"`
 	// PollInterval is the cadence Pop retries claim while waiting.
-	PollInterval time.Duration `json:"poll_interval" toml:"poll_interval" yaml:"poll_interval"`
+	PollInterval time.Duration `json:"poll_interval"`
 	// ReclaimBatch caps how many stale claims one sweep releases.
-	ReclaimBatch int `json:"reclaim_batch" toml:"reclaim_batch" yaml:"reclaim_batch"`
+	ReclaimBatch int `json:"reclaim_batch"`
 	// Buffer caps buffered ready messages per topic. <= 0 is unbounded.
-	Buffer int `json:"buffer" toml:"buffer" yaml:"buffer"`
+	Buffer int `json:"buffer"`
 	// Provider emits the producer span opened for every push. Nil disables
 	// telemetry. It is Go-API-only: never decoded from configuration files.
-	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
+	Provider observability.Provider `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

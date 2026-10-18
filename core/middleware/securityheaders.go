@@ -37,28 +37,28 @@ const DefaultSecurityHeadersFrameOptions = "SAMEORIGIN"
 type SecurityHeadersOptions struct {
 	// HSTSMaxAge emits Strict-Transport-Security with this max-age when
 	// positive. Zero (default) omits the header: set it only behind TLS.
-	HSTSMaxAge time.Duration `json:"hsts_max_age" toml:"hsts_max_age" yaml:"hsts_max_age"`
+	HSTSMaxAge time.Duration `json:"hsts_max_age"`
 	// HSTSIncludeSubDomains appends includeSubDomains to the HSTS value.
 	// It defaults true because an API host without it leaves sibling
 	// hosts downgradeable; set false only when a sibling must stay HTTP.
-	HSTSIncludeSubDomains *bool `json:"hsts_include_subdomains" toml:"hsts_include_subdomains" yaml:"hsts_include_subdomains"`
+	HSTSIncludeSubDomains *bool `json:"hsts_include_subdomains"`
 	// HSTSPreload appends preload to the HSTS value. It defaults false:
 	// preload is a one-way commitment via the browser preload list.
-	HSTSPreload bool `json:"hsts_preload" toml:"hsts_preload" yaml:"hsts_preload"`
+	HSTSPreload bool `json:"hsts_preload"`
 	// FrameOptions sets X-Frame-Options. It defaults to SAMEORIGIN; empty
 	// omits the header (for apps that enforce framing via CSP frame-ancestors
 	// instead, since Carson-era browsers prefer CSP on conflict).
-	FrameOptions string `json:"frame_options" toml:"frame_options" yaml:"frame_options"`
+	FrameOptions string `json:"frame_options"`
 	// ContentSecurityPolicy sets Content-Security-Policy. Empty (default)
 	// omits the header: a policy that fits every app does not exist, so
 	// the app opts in explicitly.
-	ContentSecurityPolicy string `json:"content_security_policy" toml:"content_security_policy" yaml:"content_security_policy"`
+	ContentSecurityPolicy string `json:"content_security_policy"`
 	// ReferrerPolicy sets Referrer-Policy. It defaults to
 	// strict-origin-when-cross-origin; empty omits the header.
-	ReferrerPolicy string `json:"referrer_policy" toml:"referrer_policy" yaml:"referrer_policy"`
+	ReferrerPolicy string `json:"referrer_policy"`
 	// PermissionsPolicy sets Permissions-Policy. It defaults to a locked-down
 	// camera/microphone/geolocation denial; empty omits the header.
-	PermissionsPolicy string `json:"permissions_policy" toml:"permissions_policy" yaml:"permissions_policy"`
+	PermissionsPolicy string `json:"permissions_policy"`
 }
 
 // Validate rejects fail-open shapes: a negative HSTS max-age.

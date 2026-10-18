@@ -34,33 +34,33 @@ const (
 // Options configures media backend selection and limits.
 type Options struct {
 	// Root is the local storage root directory.
-	Root string `json:"root" toml:"root" yaml:"root"`
+	Root string `json:"root"`
 	// BaseURL is the base URL for served assets.
-	BaseURL string `json:"base_url" toml:"base_url" yaml:"base_url"`
+	BaseURL string `json:"base_url"`
 	// MaxDownloadBytes bounds a single download in bytes.
-	MaxDownloadBytes int64 `json:"max_download_bytes" toml:"max_download_bytes" yaml:"max_download_bytes"`
+	MaxDownloadBytes int64 `json:"max_download_bytes"`
 	// MaxPixels bounds the decoded image pixel count.
-	MaxPixels int64 `json:"max_pixels" toml:"max_pixels" yaml:"max_pixels"`
+	MaxPixels int64 `json:"max_pixels"`
 	// DerivedTTL is the time-to-live for derived assets.
-	DerivedTTL time.Duration `json:"derived_ttl" toml:"derived_ttl" yaml:"derived_ttl"`
+	DerivedTTL time.Duration `json:"derived_ttl"`
 	// PresignTTL is the time-to-live for presigned URLs.
-	PresignTTL time.Duration `json:"presign_ttl" toml:"presign_ttl" yaml:"presign_ttl"`
+	PresignTTL time.Duration `json:"presign_ttl"`
 	// MaxDuration bounds media duration. Zero means unlimited.
-	MaxDuration time.Duration `json:"max_duration" toml:"max_duration" yaml:"max_duration"`
+	MaxDuration time.Duration `json:"max_duration"`
 	// Endpoint holds the optional custom storage endpoint URL.
-	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	Endpoint string `json:"endpoint"`
 	// Region is the storage region.
-	Region string `json:"region" toml:"region" yaml:"region"`
+	Region string `json:"region"`
 	// Bucket is the storage bucket name.
-	Bucket string `json:"bucket" toml:"bucket" yaml:"bucket"`
+	Bucket string `json:"bucket"`
 	// AccessKeyID holds the storage access key. It is never logged.
-	AccessKeyID string `json:"access_key_id" toml:"access_key_id" yaml:"access_key_id" zever:"secret"`
+	AccessKeyID string `json:"access_key_id" zever:"secret"`
 	// SecretAccessKey holds the storage secret key. It is never logged.
-	SecretAccessKey string `json:"secret_access_key" toml:"secret_access_key" yaml:"secret_access_key" zever:"secret"`
+	SecretAccessKey string `json:"secret_access_key" zever:"secret"`
 	// FFmpeg is the ffmpeg binary path.
-	FFmpeg string `json:"ffmpeg" toml:"ffmpeg" yaml:"ffmpeg"`
+	FFmpeg string `json:"ffmpeg"`
 	// FFProbe is the ffprobe binary path.
-	FFProbe string `json:"ffprobe" toml:"ffprobe" yaml:"ffprobe"`
+	FFProbe string `json:"ffprobe"`
 }
 
 // Validate checks options for consistency, joining all violations.

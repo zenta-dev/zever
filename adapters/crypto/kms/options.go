@@ -10,24 +10,24 @@ import (
 // Options holds typed configuration for the kms crypto adapter.
 type Options struct {
 	// Key is the optional base64-encoded 32-byte key backing MAC computation.
-	Key string `json:"key" toml:"key" yaml:"key"`
+	Key string `json:"key"`
 	// SignKey is the optional base64-encoded 64-byte signing key.
-	SignKey string `json:"sign_key" toml:"sign_key" yaml:"sign_key"`
+	SignKey string `json:"sign_key"`
 	// KeyID is the primary KMS key identifier. Required.
-	KeyID string `json:"key_id" toml:"key_id" yaml:"key_id"`
+	KeyID string `json:"key_id"`
 	// KeyIDs lists accepted KMS key identifiers for rotation.
-	KeyIDs []string `json:"key_ids" toml:"key_ids" yaml:"key_ids"`
+	KeyIDs []string `json:"key_ids"`
 	// Region is the KMS region.
-	Region string `json:"region" toml:"region" yaml:"region"`
+	Region string `json:"region"`
 	// Endpoint overrides the KMS endpoint.
-	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	Endpoint string `json:"endpoint"`
 	// UseEnvelope selects envelope encryption. Always true for this adapter;
 	// kept for parity with core crypto.Options.
-	UseEnvelope bool `json:"use_envelope" toml:"use_envelope" yaml:"use_envelope"`
+	UseEnvelope bool `json:"use_envelope"`
 	// DevStub opts New into the deterministic no-boundary stub client.
 	// Test/dev only: New fails closed without it, so a production config
 	// selecting this adapter can never silently lose the KMS boundary.
-	DevStub bool `json:"dev_stub" toml:"dev_stub" yaml:"dev_stub"`
+	DevStub bool `json:"dev_stub"`
 }
 
 // Validate checks Options for consistency, joining all violations.

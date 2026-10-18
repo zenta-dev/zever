@@ -18,26 +18,26 @@ import (
 // single event target instead of sharing one key across all deliveries.
 type Options struct {
 	// Timeout is the per-delivery operation timeout. Zero means the adapter default.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// MaxRetries is the number of delivery retries after the initial attempt.
 	// Zero means no retries.
-	MaxRetries int `json:"max_retries" toml:"max_retries" yaml:"max_retries"`
+	MaxRetries int `json:"max_retries"`
 	// AllowPrivateTargets permits http(s) targets resolving to private addresses.
 	// It exists for tests and controlled networks; leave false in production.
-	AllowPrivateTargets bool `json:"allow_private_targets" toml:"allow_private_targets" yaml:"allow_private_targets"`
+	AllowPrivateTargets bool `json:"allow_private_targets"`
 	// QueueAdapter names the queue adapter backing the queue adapter.
-	QueueAdapter string `json:"queue_adapter" toml:"queue_adapter" yaml:"queue_adapter"`
+	QueueAdapter string `json:"queue_adapter"`
 	// QueueOpts carries the queue backend settings for the queue adapter.
-	QueueOpts queue.Options `json:"queue_opts" toml:"queue_opts" yaml:"queue_opts"`
+	QueueOpts queue.Options `json:"queue_opts"`
 	// DeadLetterTopic is the queue topic for deliveries that exhaust retries.
-	DeadLetterTopic string `json:"dead_letter_topic" toml:"dead_letter_topic" yaml:"dead_letter_topic"`
+	DeadLetterTopic string `json:"dead_letter_topic"`
 	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
 	Logger log.Logger
 	// ReplayTolerance bounds how far a signature's embedded timestamp may
 	// drift from the verifier's clock before verification rejects it as
 	// expired or replayed, on top of the HMAC check itself. Zero means the
 	// adapter default (5 minutes).
-	ReplayTolerance time.Duration `json:"replay_tolerance" toml:"replay_tolerance" yaml:"replay_tolerance"`
+	ReplayTolerance time.Duration `json:"replay_tolerance"`
 }
 
 // Validate checks options for consistency, joining all violations.

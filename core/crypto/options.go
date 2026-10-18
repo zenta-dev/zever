@@ -19,26 +19,26 @@ type Options struct {
 	// optional: envelope encryption uses data keys from KMS, and Key (when
 	// present) only backs MAC computation. When any KMS field is set
 	// (KeyID, KeyIDs, Region, Endpoint, UseEnvelope), Key may be empty.
-	Key string `json:"key" toml:"key" yaml:"key" zever:"secret"`
+	Key string `json:"key" zever:"secret"`
 	// SignKey is the base64-encoded 64-byte signing key.
-	SignKey string `json:"sign_key" toml:"sign_key" yaml:"sign_key" zever:"secret"`
+	SignKey string `json:"sign_key" zever:"secret"`
 	// KeyID is the primary KMS key identifier used for envelope encryption.
-	KeyID string `json:"key_id" toml:"key_id" yaml:"key_id"`
+	KeyID string `json:"key_id"`
 	// KeyIDs lists accepted KMS key identifiers for rotation. Encrypt uses
 	// KeyID; Decrypt accepts envelopes sealed under KeyID or any KeyIDs entry.
-	KeyIDs []string `json:"key_ids" toml:"key_ids" yaml:"key_ids"`
+	KeyIDs []string `json:"key_ids"`
 	// Region is the KMS region (e.g. AWS region).
-	Region string `json:"region" toml:"region" yaml:"region"`
+	Region string `json:"region"`
 	// Endpoint overrides the KMS endpoint (custom KMS, tests, VPC endpoints).
-	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	Endpoint string `json:"endpoint"`
 	// UseEnvelope selects KMS envelope encryption. When true, KeyID is required.
-	UseEnvelope bool `json:"use_envelope" toml:"use_envelope" yaml:"use_envelope"`
+	UseEnvelope bool `json:"use_envelope"`
 	// AllowDevKey permits the deterministic public dev/test key
 	// (DevCryptoKey) for local development. When false (the default), the
 	// local adapter rejects that key unless ZEVER_ENV is dev, test, or
 	// development (see crypto.DevKeyAllowed). Production must leave this
 	// unset and supply a real Key.
-	AllowDevKey bool `json:"allow_dev_key" toml:"allow_dev_key" yaml:"allow_dev_key"`
+	AllowDevKey bool `json:"allow_dev_key"`
 }
 
 // Validate checks options for consistency, joining all violations.

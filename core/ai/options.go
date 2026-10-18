@@ -10,27 +10,27 @@ import (
 
 // Options configures the AI backend.
 type Options struct {
-	APIKey  string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
-	Model   string `json:"model" toml:"model" yaml:"model"`
-	BaseURL string `json:"base_url" toml:"base_url" yaml:"base_url"`
+	APIKey  string `json:"api_key" zever:"secret"`
+	Model   string `json:"model"`
+	BaseURL string `json:"base_url"`
 	// AllowInsecure permits an http BaseURL for testing. Default false (https
 	// only). AllowInsecure no longer disables TLS verification; set
 	// InsecureSkipVerify explicitly for self-signed test servers.
-	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	AllowInsecure bool `json:"allow_insecure"`
 	// AllowPrivate permits dialing private, loopback, and link-local
 	// addresses (required for a local Ollama/sidecar BaseURL). Default
 	// false: only globally routable addresses are dialed, redirects are
 	// never followed, and the adapter logs a line at open when enabled.
-	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
+	AllowPrivate bool `json:"allow_private"`
 	// InsecureSkipVerify disables TLS certificate verification for
 	// self-signed test servers. Default false: verification always on.
 	// Enable only for testing; the adapter logs a warning at open.
-	InsecureSkipVerify bool          `json:"insecure_skip_verify" toml:"insecure_skip_verify" yaml:"insecure_skip_verify"`
-	Timeout            time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	InsecureSkipVerify bool          `json:"insecure_skip_verify"`
+	Timeout            time.Duration `json:"timeout"`
 	// Logger receives the adapter's open-time notices (allow_private and
 	// insecure_skip_verify). Nil uses slog.Default(). It is never loaded
 	// from configuration and never validated.
-	Logger *slog.Logger `json:"-" toml:"-" yaml:"-"`
+	Logger *slog.Logger `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

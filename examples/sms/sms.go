@@ -49,7 +49,7 @@ func ParseAdapter(s string) (Adapter, error) {
 // Options configures SMS backend construction.
 type Options struct {
 	// From is the sender identity (phone number or short code).
-	From string `json:"from" toml:"from" yaml:"from"`
+	From string `json:"from"`
 }
 
 // Validate checks options for consistency.

@@ -40,14 +40,14 @@ type Options struct {
 	// PoolOptions holds the shared DB pool configuration.
 	PoolOptions coredb.Options
 	// Table is the scheduler-slots table name. Default DefaultTable.
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// Owner identifies this replica as a lease holder. Default random.
-	Owner string `json:"owner" toml:"owner" yaml:"owner"`
+	Owner string `json:"owner"`
 	// LeaseTTL is the slot lease granted to a claim holder.
-	LeaseTTL time.Duration `json:"lease_ttl" toml:"lease_ttl" yaml:"lease_ttl"`
+	LeaseTTL time.Duration `json:"lease_ttl"`
 	// FireTimeout bounds each tick's load/claim/dispatch against a hung DB.
 	// Zero means DefaultFireTimeout; negative fails validation.
-	FireTimeout time.Duration `json:"fire_timeout" toml:"fire_timeout" yaml:"fire_timeout"`
+	FireTimeout time.Duration `json:"fire_timeout"`
 }
 
 // Validate checks options for consistency, joining all violations.

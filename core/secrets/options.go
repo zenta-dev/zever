@@ -4,27 +4,27 @@ package secrets
 // Fields are a union of all adapter options; each adapter uses only what it needs.
 type Options struct {
 	// Addr is the Vault server address.
-	Addr string `json:"addr" toml:"addr" yaml:"addr"`
+	Addr string `json:"addr"`
 	// Token is the Vault authentication token.
-	Token string `json:"token" toml:"token" yaml:"token" zever:"secret"`
+	Token string `json:"token" zever:"secret"`
 	// TokenFile reads the Vault token from a file when Token is empty.
-	TokenFile string `json:"token_file" toml:"token_file" yaml:"token_file"`
+	TokenFile string `json:"token_file"`
 	// Mount is the Vault KV mount path.
-	Mount string `json:"mount" toml:"mount" yaml:"mount"`
+	Mount string `json:"mount"`
 	// Namespace is the Vault namespace.
-	Namespace string `json:"namespace" toml:"namespace" yaml:"namespace"`
+	Namespace string `json:"namespace"`
 	// AllowInsecure permits a plain-http Vault Addr for test setups.
 	// Default false (https only).
-	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	AllowInsecure bool `json:"allow_insecure"`
 	// AllowInsecureTokenFilePerms permits a Vault TokenFile readable
 	// beyond its owner. Default false (0600 or stricter required).
-	AllowInsecureTokenFilePerms bool `json:"allow_insecure_token_file_perms" toml:"allow_insecure_token_file_perms" yaml:"allow_insecure_token_file_perms"`
+	AllowInsecureTokenFilePerms bool `json:"allow_insecure_token_file_perms"`
 	// ProjectID is the GCP project ID.
-	ProjectID string `json:"project_id" toml:"project_id" yaml:"project_id"`
+	ProjectID string `json:"project_id"`
 	// Prefix scopes secret names to one namespace.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 	// Region is the AWS region.
-	Region string `json:"region" toml:"region" yaml:"region"`
+	Region string `json:"region"`
 }
 
 // Validate checks options for consistency, joining all violations.

@@ -17,21 +17,21 @@ const (
 // Options configures scheduler behavior.
 type Options struct {
 	// Dispatcher enqueues jobs when a cron tick fires. Required.
-	Dispatcher *job.Dispatcher `json:"-" toml:"-" yaml:"-"`
+	Dispatcher *job.Dispatcher `json:"-"`
 	// Locker deduplicates each schedule slot across scheduler instances.
 	// Nil means no cross-instance dedup (single-instance mode).
-	Locker *job.UniqueLocker `json:"-" toml:"-" yaml:"-"`
+	Locker *job.UniqueLocker `json:"-"`
 	// Logger reports schedule errors. Zero means the adapter default.
-	Logger log.Logger `json:"-" toml:"-" yaml:"-"`
+	Logger log.Logger `json:"-"`
 	// CloseTimeout bounds Stop's wait for running ticks.
 	// Zero means DefaultCloseTimeout; negative fails validation.
-	CloseTimeout time.Duration `json:"close_timeout" toml:"close_timeout" yaml:"close_timeout"`
+	CloseTimeout time.Duration `json:"close_timeout"`
 	// DSN is the postgres connection string or sqlite path for the postgres
 	// adapter. Empty selects a private in-memory database.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
-	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	DedicatedPool bool `json:"dedicated_pool"`
 }
 
 // Validate checks options for consistency, joining all violations.

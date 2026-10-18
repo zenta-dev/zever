@@ -17,11 +17,11 @@ const (
 // Options configures tenant backend selection and resolution.
 type Options struct {
 	// Header holds the header name carrying the tenant ID.
-	Header string `json:"header" toml:"header" yaml:"header"`
+	Header string `json:"header"`
 	// SubdomainRegex holds the optional subdomain matching pattern.
-	SubdomainRegex string `json:"subdomain_regex" toml:"subdomain_regex" yaml:"subdomain_regex"`
+	SubdomainRegex string `json:"subdomain_regex"`
 	// ID holds the fixed tenant ID for the single-tenant backend.
-	ID string `json:"id" toml:"id" yaml:"id"`
+	ID string `json:"id"`
 }
 
 // Validate checks options for consistency, joining all violations.

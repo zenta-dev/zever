@@ -17,15 +17,15 @@ const (
 // Options holds typed configuration for the argon2id hasher.
 type Options struct {
 	// Time is the number of iterations.
-	Time uint32 `json:"time" toml:"time" yaml:"time"`
+	Time uint32 `json:"time"`
 	// Memory is the memory usage in KiB.
-	Memory uint32 `json:"memory" toml:"memory" yaml:"memory"`
+	Memory uint32 `json:"memory"`
 	// Threads is the parallelism degree.
-	Threads uint8 `json:"threads" toml:"threads" yaml:"threads"`
+	Threads uint8 `json:"threads"`
 	// SaltLen is the salt length in bytes.
-	SaltLen uint32 `json:"salt_length" toml:"salt_length" yaml:"salt_length"`
+	SaltLen uint32 `json:"salt_length"`
 	// KeyLen is the derived key length in bytes.
-	KeyLen uint32 `json:"key_length" toml:"key_length" yaml:"key_length"`
+	KeyLen uint32 `json:"key_length"`
 }
 
 // ParseOptionsTyped fills zero values with defaults, then validates.

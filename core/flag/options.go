@@ -12,29 +12,29 @@ const DefaultTimeout = 30 * time.Second
 // StaticOptions configures the static file-backed flag adapter.
 type StaticOptions struct {
 	// Path is the flag file path. Empty means an empty flag set.
-	Path string `json:"path" toml:"path" yaml:"path"`
+	Path string `json:"path"`
 	// Reload enables file reloading.
-	Reload bool `json:"reload" toml:"reload" yaml:"reload"`
+	Reload bool `json:"reload"`
 }
 
 // FirebaseOptions configures the Firebase-backed flag adapter.
 type FirebaseOptions struct {
 	// ProjectID is the Firebase project ID. Required.
-	ProjectID string `json:"project_id" toml:"project_id" yaml:"project_id"`
+	ProjectID string `json:"project_id"`
 	// ServiceAccount is the path to the service account JSON key file. Required.
-	ServiceAccount string `json:"service_account" toml:"service_account" yaml:"service_account"`
+	ServiceAccount string `json:"service_account"`
 	// Timeout is the operation timeout. Zero means the default.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 }
 
 // Options configures flag client construction.
 type Options struct {
 	// Static carries the static adapter settings.
-	Static StaticOptions `json:"static" toml:"static" yaml:"static"`
+	Static StaticOptions `json:"static"`
 	// Firebase carries the Firebase adapter settings.
-	Firebase FirebaseOptions `json:"firebase" toml:"firebase" yaml:"firebase"`
+	Firebase FirebaseOptions `json:"firebase"`
 	// Logger emits reload warnings. Defaults to a no-op logger when nil.
-	Logger log.Logger `json:"-" toml:"-" yaml:"-"`
+	Logger log.Logger `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

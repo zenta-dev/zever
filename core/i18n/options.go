@@ -14,38 +14,38 @@ const DefaultTimeout = 30 * time.Second
 // EmbedOptions configures the embedded-catalog adapter.
 type EmbedOptions struct {
 	// FS is the file system holding message catalogs.
-	FS fs.FS `json:"-" toml:"-" yaml:"-"`
+	FS fs.FS `json:"-"`
 	// Dir is the catalog directory. Empty means the adapter default (".").
-	Dir string `json:"dir" toml:"dir" yaml:"dir"`
+	Dir string `json:"dir"`
 	// Fallback is the fallback locale. Empty means none.
-	Fallback string `json:"fallback" toml:"fallback" yaml:"fallback"`
+	Fallback string `json:"fallback"`
 }
 
 // RemoteOptions configures the remote-service adapter.
 type RemoteOptions struct {
 	// Endpoint is the remote service base URL. Empty means unconfigured.
-	Endpoint string `json:"endpoint" toml:"endpoint" yaml:"endpoint"`
+	Endpoint string `json:"endpoint"`
 	// APIKey is the remote service credential.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key" zever:"secret"`
+	APIKey string `json:"api_key" zever:"secret"`
 	// Timeout is the operation timeout. Zero means the default.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// MaxInFlight caps concurrent requests. Zero means adapter default (1000).
-	MaxInFlight int `json:"max_in_flight" toml:"max_in_flight" yaml:"max_in_flight"`
+	MaxInFlight int `json:"max_in_flight"`
 	// AllowInsecure permits http:// endpoints. Default false (https only).
-	AllowInsecure bool `json:"allow_insecure" toml:"allow_insecure" yaml:"allow_insecure"`
+	AllowInsecure bool `json:"allow_insecure"`
 	// AllowPrivate permits dialing private, loopback, and link-local
 	// addresses (required for a local catalog sidecar Endpoint). Default
 	// false: only globally routable addresses are dialed, redirects are
 	// never followed, and the adapter logs a line at open when enabled.
-	AllowPrivate bool `json:"allow_private" toml:"allow_private" yaml:"allow_private"`
+	AllowPrivate bool `json:"allow_private"`
 }
 
 // Options configures backend construction.
 type Options struct {
 	// Embed carries the embedded-catalog adapter settings.
-	Embed EmbedOptions `json:"embed" toml:"embed" yaml:"embed"`
+	Embed EmbedOptions `json:"embed"`
 	// Remote carries the remote-service adapter settings.
-	Remote RemoteOptions `json:"remote" toml:"remote" yaml:"remote"`
+	Remote RemoteOptions `json:"remote"`
 }
 
 // Validate checks options for consistency, joining all violations.

@@ -31,12 +31,12 @@ type Options struct {
 	// Options holds the shared DB pool configuration.
 	coredb.Options
 	// Table is the cache table name. Default DefaultTable.
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// Prefix is the key prefix for cache data. Default "cache".
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 	// TTL is the default entry lifetime. Zero means per-call ttl governs
 	// (ttl <= 0 persists).
-	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
+	TTL time.Duration `json:"ttl"`
 }
 
 // Validate checks options for consistency, joining all violations.

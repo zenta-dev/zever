@@ -24,24 +24,24 @@ type RedisOptions struct {
 	// way for a caller to tune them for a hot idempotency store.
 	redisopt.Options
 	// Prefix is the key prefix for Redis idempotency data.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 }
 
 // Options configures idempotency store construction.
 type Options struct {
 	// TTL is the default reservation lifetime. Zero means DefaultTTL.
-	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
+	TTL time.Duration `json:"ttl"`
 	// DSN is the postgres connection string or sqlite path for the db
 	// adapter. Empty selects a private in-memory database.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
-	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	DedicatedPool bool `json:"dedicated_pool"`
 	// Redis holds Redis-specific connection configuration.
-	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	Redis RedisOptions `json:"redis"`
 	// MaxEntries bounds the number of stored records in the memory adapter
 	// before least-recently-used eviction. Non-positive means DefaultMaxEntries.
-	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
+	MaxEntries int `json:"max_entries"`
 }
 
 // Validate checks options for consistency, joining all violations.

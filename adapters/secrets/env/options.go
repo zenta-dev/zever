@@ -8,7 +8,7 @@ import (
 // Options holds typed configuration for the env secrets adapter.
 type Options struct {
 	// Prefix scopes secret names to one environment variable namespace. Required.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 }
 
 // Validate checks Options for consistency, joining all violations.

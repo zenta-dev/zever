@@ -27,29 +27,29 @@ type RedisOptions struct {
 	// way for a caller to tune them for a hot ratelimit store.
 	redisopt.Options
 	// Prefix is the key prefix for Redis ratelimit data.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 }
 
 // Options configures ratelimit behavior and adapter-specific settings.
 type Options struct {
 	// Rate is the token refill rate per second. Required, must be > 0 and finite.
-	Rate float64 `json:"rate" toml:"rate" yaml:"rate"`
+	Rate float64 `json:"rate"`
 	// Burst is the maximum bucket size. Required, must be > 0.
-	Burst int `json:"burst" toml:"burst" yaml:"burst"`
+	Burst int `json:"burst"`
 	// IdleTTL is the idle entry TTL. Zero means the adapter default; negative fails.
-	IdleTTL time.Duration `json:"idle_ttl" toml:"idle_ttl" yaml:"idle_ttl"`
+	IdleTTL time.Duration `json:"idle_ttl"`
 	// SweepInterval is the idle-entry sweep interval. Zero means the adapter default; negative fails.
-	SweepInterval time.Duration `json:"sweep_interval" toml:"sweep_interval" yaml:"sweep_interval"`
+	SweepInterval time.Duration `json:"sweep_interval"`
 	// MaxEntries bounds the number of stored buckets in the memory adapter
 	// before least-recently-used eviction. Non-positive means DefaultMaxEntries.
-	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
+	MaxEntries int `json:"max_entries"`
 	// Redis holds Redis-specific connection configuration.
-	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	Redis RedisOptions `json:"redis"`
 	// TrustedProxies lists CIDRs (or bare IPs) of proxies whose
 	// X-Forwarded-For headers are honored for rate-limit keys. Empty
 	// means no proxy is trusted and keys always derive from the peer
 	// address. See ParseTrustedProxies.
-	TrustedProxies []string `json:"trusted_proxies" toml:"trusted_proxies" yaml:"trusted_proxies"`
+	TrustedProxies []string `json:"trusted_proxies"`
 }
 
 // Validate checks options for consistency, joining all violations.

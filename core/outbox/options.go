@@ -45,48 +45,48 @@ const (
 type Options struct {
 	// DSN is the postgres connection string or sqlite path for the db
 	// adapter. Empty selects a private in-memory database.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 	// Table is the outbox table name. Empty means DefaultTable.
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// InboxTable is the inbox table name. Empty means DefaultInboxTable.
-	InboxTable string `json:"inbox_table" toml:"inbox_table" yaml:"inbox_table"`
+	InboxTable string `json:"inbox_table"`
 	// Publisher records which transport the relay publishes through:
 	// "eventbus", "queue", or "" (unset). Informational only.
-	Publisher string `json:"publisher" toml:"publisher" yaml:"publisher"`
+	Publisher string `json:"publisher"`
 	// PollInterval is the relay poll cadence. Zero means DefaultPollInterval.
-	PollInterval time.Duration `json:"poll_interval" toml:"poll_interval" yaml:"poll_interval"`
+	PollInterval time.Duration `json:"poll_interval"`
 	// BatchSize caps how many messages one poll claims. Zero means
 	// DefaultBatchSize.
-	BatchSize int `json:"batch_size" toml:"batch_size" yaml:"batch_size"`
+	BatchSize int `json:"batch_size"`
 	// MaxAttempts is the publish attempt cap. Zero means DefaultMaxAttempts.
-	MaxAttempts int `json:"max_attempts" toml:"max_attempts" yaml:"max_attempts"`
+	MaxAttempts int `json:"max_attempts"`
 	// Retry is the per-attempt backoff policy applied after a publish failure.
-	Retry retry.Policy `json:"retry" toml:"retry" yaml:"retry"`
+	Retry retry.Policy `json:"retry"`
 	// Retention is how long processed messages are kept. Zero means
 	// DefaultRetention.
-	Retention time.Duration `json:"retention" toml:"retention" yaml:"retention"`
+	Retention time.Duration `json:"retention"`
 	// LockSeconds is the claim lease in seconds. Zero means DefaultLockSeconds.
-	LockSeconds int `json:"lock_seconds" toml:"lock_seconds" yaml:"lock_seconds"`
+	LockSeconds int `json:"lock_seconds"`
 	// NotifyChannel is the postgres LISTEN/NOTIFY channel (cdc adapter).
-	NotifyChannel string `json:"notify_channel" toml:"notify_channel" yaml:"notify_channel"`
+	NotifyChannel string `json:"notify_channel"`
 	// Prefix is the logical-replication message prefix (cdc adapter).
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 	// Slot is the logical-replication slot name (cdc adapter).
-	Slot string `json:"slot" toml:"slot" yaml:"slot"`
+	Slot string `json:"slot"`
 	// Publication is the logical-replication publication name (cdc adapter).
-	Publication string `json:"publication" toml:"publication" yaml:"publication"`
+	Publication string `json:"publication"`
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
-	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	DedicatedPool bool `json:"dedicated_pool"`
 	// StallReadiness opts the relay into the container readiness aggregate: while
 	// Status().Stalled is true, container.Ready reports the process as not ready
 	// so orchestrators stop routing traffic to an instance whose messages are
 	// backing up. Default false keeps readiness purely dependency-based; the
 	// container reads this flag, adapters ignore it.
-	StallReadiness bool `json:"stall_readiness" toml:"stall_readiness" yaml:"stall_readiness"`
+	StallReadiness bool `json:"stall_readiness"`
 	// Provider emits relay metrics and spans. Nil disables telemetry. It is
 	// Go-API-only: never decoded from configuration files.
-	Provider observability.Provider `json:"-" toml:"-" yaml:"-"`
+	Provider observability.Provider `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

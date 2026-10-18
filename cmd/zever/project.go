@@ -33,12 +33,12 @@ const (
 // per-command flags (--entry and friends) override the resolved entrypoint
 // where the command defines one.
 type ProjectConfig struct {
-	SchemaDir    string `json:"schema_dir"    yaml:"schema_dir"`
-	GeneratedDir string `json:"generated_dir" yaml:"generated_dir"`
-	ServerEntry  string `json:"server_entry"  yaml:"server_entry"`
-	WorkerEntry  string `json:"worker_entry"  yaml:"worker_entry"`
-	TinkerEntry  string `json:"tinker_entry"  yaml:"tinker_entry"`
-	SeedEntry    string `json:"seed_entry"    yaml:"seed_entry"`
+	SchemaDir    string `json:"schema_dir"`
+	GeneratedDir string `json:"generated_dir"`
+	ServerEntry  string `json:"server_entry"`
+	WorkerEntry  string `json:"worker_entry"`
+	TinkerEntry  string `json:"tinker_entry"`
+	SeedEntry    string `json:"seed_entry"`
 }
 
 // Default project conventions. They apply unconditionally: layout is not

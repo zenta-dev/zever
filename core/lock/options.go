@@ -21,19 +21,19 @@ type Options struct {
 	redisopt.ConnectOptions
 	// URL is the Redis connection URL.
 	// When set it takes precedence over Addr.
-	URL string `json:"url" toml:"url" yaml:"url"`
+	URL string `json:"url"`
 	// Prefix scopes lock keys to one namespace.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 	// TTL is the default lease lifetime.
-	TTL time.Duration `json:"ttl" toml:"ttl" yaml:"ttl"`
+	TTL time.Duration `json:"ttl"`
 	// RetryInterval is how long Acquire waits between attempts.
-	RetryInterval time.Duration `json:"retry_interval" toml:"retry_interval" yaml:"retry_interval"`
+	RetryInterval time.Duration `json:"retry_interval"`
 	// MaxEntries bounds the number of stored leases before LRU eviction.
 	// Past the bound the least-recently-used live lease is evicted and its
 	// holder observes lock.ErrNotHeld on Extend/Unlock. Non-positive means
 	// the memory adapter default (1000). Callers needing effectively
 	// unbounded storage set a large value knowingly.
-	MaxEntries int `json:"max_entries" toml:"max_entries" yaml:"max_entries"`
+	MaxEntries int `json:"max_entries"`
 }
 
 // Validate checks options for consistency, joining all violations.

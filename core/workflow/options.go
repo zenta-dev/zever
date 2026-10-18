@@ -13,21 +13,21 @@ import (
 type PostgresOptions struct {
 	// DSN is the postgres connection string. Empty selects sqlite
 	// (dev/test); set DSN opens postgres for durable runs.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 	// Table is the workflow-runs table name. Empty selects the adapter
 	// default (DefaultTable in adapters/workflow/db).
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
-	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	DedicatedPool bool `json:"dedicated_pool"`
 }
 
 // Options holds typed configuration for workflow adapters.
 type Options struct {
 	// HostPort is the workflow server address.
-	HostPort string `json:"host_port" toml:"host_port" yaml:"host_port"`
+	HostPort string `json:"host_port"`
 	// Namespace is the workflow namespace.
-	Namespace string `json:"namespace" toml:"namespace" yaml:"namespace"`
+	Namespace string `json:"namespace"`
 
 	// PostgresOptions holds postgres-specific connection configuration.
 	PostgresOptions

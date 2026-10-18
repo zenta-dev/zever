@@ -27,19 +27,19 @@ const (
 // Options configures mailer construction.
 type Options struct {
 	// Host is the SMTP server hostname.
-	Host string `json:"host" toml:"host" yaml:"host"`
+	Host string `json:"host"`
 	// Port is the SMTP server port (1-65535).
-	Port int `json:"port" toml:"port" yaml:"port"`
+	Port int `json:"port"`
 	// Username is the SMTP auth username.
-	Username string `json:"username" toml:"username" yaml:"username"`
+	Username string `json:"username"`
 	// Password is the SMTP auth password.
-	Password string `json:"password" toml:"password" yaml:"password" zever:"secret"`
+	Password string `json:"password" zever:"secret"`
 	// Encryption is the transport encryption mode. Empty means STARTTLS.
-	Encryption Encryption `json:"encryption" toml:"encryption" yaml:"encryption"`
+	Encryption Encryption `json:"encryption"`
 	// Timeout is the operation timeout. Zero means the default.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// MaxMessageSize is the maximum message size in bytes. Zero means the default.
-	MaxMessageSize int `json:"max_message_size" toml:"max_message_size" yaml:"max_message_size"`
+	MaxMessageSize int `json:"max_message_size"`
 }
 
 // Validate checks options for consistency, joining all violations.

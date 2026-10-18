@@ -44,11 +44,11 @@ var allPerms = []Perm{PermRead, PermWrite, PermUpdate, PermDelete}
 // Rule is the access rule for a single permission.
 type Rule struct {
 	// Public allows unsigned access when true.
-	Public bool `json:"public,omitempty" yaml:"public,omitempty" mapstructure:"public"`
+	Public bool `json:"public,omitempty" mapstructure:"public"`
 	// Allow lists subjects granted access.
-	Allow []Subject `json:"allow,omitempty" yaml:"allow,omitempty" mapstructure:"allow"`
+	Allow []Subject `json:"allow,omitempty" mapstructure:"allow"`
 	// Deny lists subjects refused access; deny wins over allow.
-	Deny []Subject `json:"deny,omitempty" yaml:"deny,omitempty" mapstructure:"deny"`
+	Deny []Subject `json:"deny,omitempty" mapstructure:"deny"`
 }
 
 // Policy is the per-bucket access policy. Each permission has its own rule.
@@ -56,15 +56,15 @@ type Rule struct {
 // at decode time.
 type Policy struct { //nolint:recvcheck // Validate normalizes in place; readers stay on values so map results remain callable
 	// Version is the policy schema version, defaulting to "0" when empty.
-	Version string `json:"version,omitempty" yaml:"version,omitempty" mapstructure:"version"`
+	Version string `json:"version,omitempty" mapstructure:"version"`
 	// Read governs downloads and reads.
-	Read Rule `json:"read,omitempty" yaml:"read,omitempty" mapstructure:"read"`
+	Read Rule `json:"read,omitempty" mapstructure:"read"`
 	// Write governs creation of new objects.
-	Write Rule `json:"write,omitempty" yaml:"write,omitempty" mapstructure:"write"`
+	Write Rule `json:"write,omitempty" mapstructure:"write"`
 	// Update governs overwrites of existing objects.
-	Update Rule `json:"update,omitempty" yaml:"update,omitempty" mapstructure:"update"`
+	Update Rule `json:"update,omitempty" mapstructure:"update"`
 	// Delete governs deletions.
-	Delete Rule `json:"delete,omitempty" yaml:"delete,omitempty" mapstructure:"delete"`
+	Delete Rule `json:"delete,omitempty" mapstructure:"delete"`
 }
 
 func (p Policy) ruleFor(perm Perm) Rule {

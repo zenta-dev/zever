@@ -8,16 +8,16 @@ import (
 // Options configures checker construction.
 type Options struct {
 	// Rules lists the authorization rules.
-	Rules []Rule `json:"rules" toml:"rules" yaml:"rules"`
+	Rules []Rule `json:"rules"`
 	// ModelPath is the path to the Casbin model file.
-	ModelPath string `json:"model_path" toml:"model_path" yaml:"model_path"`
+	ModelPath string `json:"model_path"`
 	// PolicyPath is the path to the Casbin policy file.
-	PolicyPath string `json:"policy_path" toml:"policy_path" yaml:"policy_path"`
+	PolicyPath string `json:"policy_path"`
 	// Roles is a subject-ID to allowed-roles allowlist gating privilege
 	// escalation: a subject may only be granted a role (asserted via
 	// Subject.Roles at check time) that appears in its list here. It is
 	// not a role-hierarchy or inheritance map.
-	Roles map[string][]string `json:"roles" toml:"roles" yaml:"roles"`
+	Roles map[string][]string `json:"roles"`
 }
 
 // Validate checks options for consistency, joining all violations.

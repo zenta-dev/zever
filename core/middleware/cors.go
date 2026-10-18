@@ -29,15 +29,15 @@ const DefaultCORSMaxAge time.Duration = 0
 // and passed here. Timeouts stay time.Duration per repo convention and render
 // to delay-seconds on the wire.
 type Options struct {
-	AllowedOrigins   []string `json:"allowed_origins" toml:"allowed_origins" yaml:"allowed_origins"`
-	AllowedMethods   []string `json:"allowed_methods" toml:"allowed_methods" yaml:"allowed_methods"`
-	AllowedHeaders   []string `json:"allowed_headers" toml:"allowed_headers" yaml:"allowed_headers"`
-	ExposedHeaders   []string `json:"exposed_headers" toml:"exposed_headers" yaml:"exposed_headers"`
-	AllowCredentials bool     `json:"allow_credentials" toml:"allow_credentials" yaml:"allow_credentials"`
+	AllowedOrigins   []string `json:"allowed_origins"`
+	AllowedMethods   []string `json:"allowed_methods"`
+	AllowedHeaders   []string `json:"allowed_headers"`
+	ExposedHeaders   []string `json:"exposed_headers"`
+	AllowCredentials bool     `json:"allow_credentials"`
 	// MaxAge bounds preflight caching in whole seconds on the wire;
 	// sub-second values truncate down (anything below one second omits
 	// the header, same as unset).
-	MaxAge time.Duration `json:"max_age" toml:"max_age" yaml:"max_age"`
+	MaxAge time.Duration `json:"max_age"`
 }
 
 // Validate rejects fail-open shapes: empty origin/method lists, blank entries,

@@ -34,11 +34,11 @@ type Options struct {
 	// Options holds the shared DB pool configuration.
 	coredb.Options
 	// Table is the workflow-runs table name. Default DefaultTable.
-	Table string `json:"table" toml:"table" yaml:"table"`
+	Table string `json:"table"`
 	// Owner identifies this replica as a lease holder. Default random.
-	Owner string `json:"owner" toml:"owner" yaml:"owner"`
+	Owner string `json:"owner"`
 	// LeaseTTL is the claim lease granted to a run owner.
-	LeaseTTL time.Duration `json:"lease_ttl" toml:"lease_ttl" yaml:"lease_ttl"`
+	LeaseTTL time.Duration `json:"lease_ttl"`
 }
 
 // Validate checks options for consistency, joining all violations.

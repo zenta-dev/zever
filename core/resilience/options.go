@@ -51,7 +51,7 @@ type RedisOptions struct {
 	redisopt.Options
 	// Prefix is the key namespace for Redis resilience data. Empty means
 	// DefaultRedisPrefix.
-	Prefix string `json:"prefix" toml:"prefix" yaml:"prefix"`
+	Prefix string `json:"prefix"`
 }
 
 // BreakerOptions configures the circuit breaker. Enabled false disables the
@@ -61,23 +61,23 @@ type RedisOptions struct {
 // ratio meets FailureRatio.
 type BreakerOptions struct {
 	// Enabled turns the circuit breaker on.
-	Enabled bool `json:"enabled" toml:"enabled" yaml:"enabled"`
+	Enabled bool `json:"enabled"`
 	// MaxRequests is the number of probes allowed while half-open.
-	MaxRequests uint32 `json:"max_requests" toml:"max_requests" yaml:"max_requests"`
+	MaxRequests uint32 `json:"max_requests"`
 	// Interval is the closed-state window before counts reset.
-	Interval time.Duration `json:"interval" toml:"interval" yaml:"interval"`
+	Interval time.Duration `json:"interval"`
 	// BucketPeriod is the rolling-window bucket width; Interval becomes a multiple of it.
-	BucketPeriod time.Duration `json:"bucket_period" toml:"bucket_period" yaml:"bucket_period"`
+	BucketPeriod time.Duration `json:"bucket_period"`
 	// Timeout is the open-state duration before the breaker half-opens.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// MinRequests is the minimum request count before the failure ratio applies.
-	MinRequests int `json:"min_requests" toml:"min_requests" yaml:"min_requests"`
+	MinRequests int `json:"min_requests"`
 	// FailureRatio is the failure ratio in [0,1] that trips the breaker.
-	FailureRatio float64 `json:"failure_ratio" toml:"failure_ratio" yaml:"failure_ratio"`
+	FailureRatio float64 `json:"failure_ratio"`
 	// ConsecutiveFailures trips the breaker after this many consecutive failures.
-	ConsecutiveFailures int `json:"consecutive_failures" toml:"consecutive_failures" yaml:"consecutive_failures"`
+	ConsecutiveFailures int `json:"consecutive_failures"`
 	// IsSuccessful classifies a non-nil error as success when it returns true.
-	IsSuccessful func(error) bool `json:"-" toml:"-" yaml:"-"`
+	IsSuccessful func(error) bool `json:"-"`
 }
 
 // BulkheadOptions configures the bulkhead. MaxConcurrent <= 0 disables it.
@@ -85,29 +85,29 @@ type BreakerOptions struct {
 // the caller context is done.
 type BulkheadOptions struct {
 	// MaxConcurrent is the number of concurrent executions admitted.
-	MaxConcurrent int `json:"max_concurrent" toml:"max_concurrent" yaml:"max_concurrent"`
+	MaxConcurrent int `json:"max_concurrent"`
 	// MaxQueue bounds the number of waiters; <= 0 is unbounded.
-	MaxQueue int `json:"max_queue" toml:"max_queue" yaml:"max_queue"`
+	MaxQueue int `json:"max_queue"`
 	// MaxWait bounds how long a caller waits for a slot; <= 0 waits indefinitely.
-	MaxWait time.Duration `json:"max_wait" toml:"max_wait" yaml:"max_wait"`
+	MaxWait time.Duration `json:"max_wait"`
 }
 
 // Options configures resilience behavior for a Manager and the Guards it creates.
 type Options struct {
 	// Name is the base name applied to the breaker.
-	Name string `json:"name" toml:"name" yaml:"name"`
+	Name string `json:"name"`
 	// Timeout bounds the whole operation, including retries.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// Retry configures retry backoff; MaxAttempts <= 1 disables retries.
-	Retry retry.Policy `json:"retry" toml:"retry" yaml:"retry"`
+	Retry retry.Policy `json:"retry"`
 	// Breaker configures the circuit breaker.
-	Breaker BreakerOptions `json:"breaker" toml:"breaker" yaml:"breaker"`
+	Breaker BreakerOptions `json:"breaker"`
 	// Bulkhead configures the bulkhead.
-	Bulkhead BulkheadOptions `json:"bulkhead" toml:"bulkhead" yaml:"bulkhead"`
+	Bulkhead BulkheadOptions `json:"bulkhead"`
 	// OnStateChange is called on every circuit-breaker state transition.
-	OnStateChange func(name string, from, to State) `json:"-" toml:"-" yaml:"-"`
+	OnStateChange func(name string, from, to State) `json:"-"`
 	// Redis holds Redis-specific connection configuration for the redis adapter.
-	Redis RedisOptions `json:"redis" toml:"redis" yaml:"redis"`
+	Redis RedisOptions `json:"redis"`
 }
 
 // Validate checks options for consistency, joining all violations.

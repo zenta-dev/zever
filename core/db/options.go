@@ -15,31 +15,31 @@ import (
 // Path holds the SQLite database file path.
 type Options struct {
 	// DSN holds the Postgres connection string.
-	DSN string `json:"dsn" toml:"dsn" yaml:"dsn"`
+	DSN string `json:"dsn"`
 	// MaxConns caps the connection pool size.
-	MaxConns int `json:"max_conns" toml:"max_conns" yaml:"max_conns"`
+	MaxConns int `json:"max_conns"`
 	// MinConns is the minimum pool size for Postgres and the idle
 	// connection target for SQLite.
-	MinConns int `json:"min_conns" toml:"min_conns" yaml:"min_conns"`
+	MinConns int `json:"min_conns"`
 	// MaxConnLifetime bounds how long a pooled connection may be reused.
-	MaxConnLifetime time.Duration `json:"max_conn_lifetime" toml:"max_conn_lifetime" yaml:"max_conn_lifetime"`
+	MaxConnLifetime time.Duration `json:"max_conn_lifetime"`
 	// MaxConnIdleTime bounds how long a pooled connection may stay idle.
-	MaxConnIdleTime time.Duration `json:"max_conn_idle_time" toml:"max_conn_idle_time" yaml:"max_conn_idle_time"`
+	MaxConnIdleTime time.Duration `json:"max_conn_idle_time"`
 	// Path holds the SQLite database file path.
-	Path string `json:"path" toml:"path" yaml:"path"`
+	Path string `json:"path"`
 	// DedicatedPool opts out of container-level pool sharing. The container
 	// consults it when borrowing a shared pool for an exact-DSN match;
 	// direct adapter construction ignores it, and the db service itself
 	// ignores it (it owns the pool borrowers share).
-	DedicatedPool bool `json:"dedicated_pool" toml:"dedicated_pool" yaml:"dedicated_pool"`
+	DedicatedPool bool `json:"dedicated_pool"`
 	// LockTimeout caps how long one migration statement may wait for a lock
 	// on postgres, applied via SET LOCAL lock_timeout inside the
 	// statement's own transaction by orm/migrate. Zero disables it.
-	LockTimeout time.Duration `json:"lock_timeout" toml:"lock_timeout" yaml:"lock_timeout"`
+	LockTimeout time.Duration `json:"lock_timeout"`
 	// StatementTimeout caps how long one migration statement may run on
 	// postgres, applied via SET LOCAL statement_timeout inside the
 	// statement's own transaction by orm/migrate. Zero disables it.
-	StatementTimeout time.Duration `json:"statement_timeout" toml:"statement_timeout" yaml:"statement_timeout"`
+	StatementTimeout time.Duration `json:"statement_timeout"`
 }
 
 // Validate checks options for consistency, joining all violations.
