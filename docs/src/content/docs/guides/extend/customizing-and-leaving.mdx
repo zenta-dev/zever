@@ -13,8 +13,8 @@ Zever generates plumbing, never business logic. This page is the escape-hatch ma
 |---|---|---|
 | `schema/*.zen` | You | The single source of truth. Everything else derives from it. |
 | `generated/*` | Compiler (`zever compile`) | Never hand-edit. Regenerate, or gate drift (below). |
-| `internal/app/app.go`, `cmd/*`, `db/seed/*` | You after eject | Scaffolded once by `zever new`; thereafter yours. The server template resolves a fixed battery set — delete what you don't call. |
-| `zever.yaml` | You | Batteries and adapters; strict keys only. |
+| `internal/app/wiring.go`, `cmd/*`, `db/seed/*` | You after eject | Scaffolded once by `zever new`; thereafter yours. The server template resolves a fixed battery set — delete what you don't call. |
+| `.env.example` | You | Batteries and adapters via env vars; strict keys only. |
 | `.github/workflows/ci.yml` | You after eject | Scaffolded once; regenerate step plus the `--check` drift gate. |
 
 Every file under `generated/` starts with a provenance header recording the backend and the schema revision that produced it (the zever release is deliberately left out, so upgrading the CLI never changes committed output):
@@ -45,7 +45,7 @@ What is explicitly out: editing generated files between runs (the next compile o
 | `api` | Minimal plus `cache`, `queue`, `session`, `password`, `scheduler`, `outbox`, `idempotency`, `lock` | 492 |
 | `full` | Every known battery | 649 |
 
-Counts are `go list -deps ./...` package counts (including stdlib and test dependencies) for a freshly scaffolded Go 1.27 project at v0.6.1, measured 2026-10-13. Direct `require` lines: 22 / 38 / 82. Grow with `zever add <battery>` instead of starting full: each addition is three append-only edits (`go.mod`, `internal/app/app.go`, `zever.yaml`) that never overwrite hand-written code.
+Counts are `go list -deps ./...` package counts (including stdlib and test dependencies) for a freshly scaffolded Go 1.27 project at v0.6.1, measured 2026-10-13. Direct `require` lines: 22 / 38 / 82. Grow with `zever add <battery>` instead of starting full: each addition is three append-only edits (`go.mod`, `internal/app/wiring.go`, `.env.example`) that never overwrite hand-written code.
 
 ```sh
 zever new hello --profile api --dir ./hello
@@ -152,7 +152,7 @@ See [Write a plugin](./write-a-plugin/) for shipping a new *adapter*; backends a
 <Steps>
 
 1. Freeze the plumbing: run `zever compile` once and commit `generated/`.
-2. Trim the entrypoints: delete the `c.<Battery>()` calls you never use from `cmd/server/main.go` (and their imports from `internal/app/app.go` plus the `zever.yaml` stanzas).
+2. Trim the entrypoints: delete the `c.<Battery>()` calls you never use from `cmd/server/main.go` (and their imports from `internal/app/wiring.go` plus the `.env.example` stanzas).
 3. Swap adapters in place: each battery resolves by name, so replacing `db=sqlite` with your own store is a config plus `Register` change, not a rewrite.
 4. Drop the framework requires you no longer import (`go mod tidy` proves it: the build passes with a shrinking `go.mod`).
 5. Keep the schema as documentation, or keep compiling: the generated ORM and OpenAPI specs have no runtime dependency on the CLI.

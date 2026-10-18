@@ -25,7 +25,7 @@ Everything on that line is compile-time only; runtime imports only its output (t
 
 ## Keep compile input and runtime config apart
 
-The compiler reads schema files and backend flags, never runtime config (`zever.yaml` plus env). Schema errors come from `.zen` files; service errors (adapters, DSNs, secrets) come from `config.Load`.
+The compiler reads schema files and backend flags, never runtime config (env only). Schema errors come from `.zen` files; service errors (adapters, DSNs, secrets) come from `config.FromEnv`.
 
 ## Compile, then run against generated output
 
