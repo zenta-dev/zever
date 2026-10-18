@@ -9,9 +9,8 @@ Every service logs through one interface, `log.Logger`. Swap the adapter and eve
 
 ## Quick start
 
-```yaml title="zever.yaml"
-log:
-  adapter: slog   # default; also zerolog, pretty, noop
+```sh
+LOG_ADAPTER=slog
 ```
 
 ```sh

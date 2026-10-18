@@ -74,17 +74,13 @@ Key the lock on the contended range and the idempotency key on a stable external
 
 `memory` is invisible to other replicas, so a second instance can double-book or duplicate webhook effects. Move both to `redis`, or `idempotency` to `db`.
 
-```yaml title="zever.yaml"
-lock:
-  adapter: redis
-  options:
-    ttl: 30000000000         # 30s lease (nanoseconds in files)
-    retry_interval: 50000000 # 50ms
-    prefix: bookings:
-idempotency:
-  adapter: redis
-  options:
-    ttl: 86400000000000      # 24h reservation
+```sh
+LOCK_ADAPTER=redis
+LOCK_TTL=30s
+LOCK_RETRY_INTERVAL=50ms
+LOCK_PREFIX=bookings:
+IDEMPOTENCY_ADAPTER=redis
+IDEMPOTENCY_TTL=24h
 ```
 
 ```sh

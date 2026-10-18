@@ -9,9 +9,8 @@ description: Guard routes and RPCs with allow or deny checks using noop, RBAC, o
 
 The default `noop` denies every check with `implicit_deny`: a placeholder until real policies exist, never for a protected deployment.
 
-```yaml title="zever.yaml"
-permission:
-  adapter: rbac   # noop (default), rbac, casbin
+```sh
+PERMISSION_ADAPTER=rbac
 ```
 
 ```sh

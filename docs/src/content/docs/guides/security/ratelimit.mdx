@@ -9,12 +9,10 @@ description: Bound request rates per key with token buckets in memory or shared 
 
 The default is `memory` with `rate: 10`, `burst: 20`. `rate` (refill per second) and `burst` (bucket size) are both required, over zero, and finite.
 
-```yaml title="zever.yaml"
-ratelimit:
-  adapter: memory
-  options:
-    rate: 10
-    burst: 20
+```sh
+RATELIMIT_ADAPTER=memory
+RATELIMIT_RATE=10
+RATELIMIT_BURST=20
 ```
 
 ```go title="main.go"
@@ -43,15 +41,12 @@ The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!
 
 Per-instance buckets multiply the effective limit (`limit x replica count`); switch to `redis` once more than one replica serves traffic.
 
-```yaml title="zever.yaml"
-ratelimit:
-  adapter: redis
-  options:
-    rate: 100
-    burst: 200
-    redis:
-      addr: 127.0.0.1:6379
-      prefix: rl:
+```sh
+RATELIMIT_ADAPTER=redis
+RATELIMIT_RATE=100
+RATELIMIT_BURST=200
+RATELIMIT_REDIS_ADDR=127.0.0.1:6379
+RATELIMIT_REDIS_PREFIX=rl:
 ```
 
 ```sh

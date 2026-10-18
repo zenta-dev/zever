@@ -1,104 +1,200 @@
 ---
-title: Migrate to the multi-module layout
-description: Move old flat imports to core, adapters, and shared modules, and fix UnknownAdapterError.
+title: Migrate from v0.7 to v0.8
+description: Move service config to environment variables, wire adapters with Provide, and run generated servers through serve.Main.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Follow this page when a bump breaks imports from the old flat layout (top-level `auth/`, `db/`, `cache/`, `internal/dsl/`, `container/adapters` bundles) or when resolution fails with `UnknownAdapterError`. The new layout is a multi-module monorepo.
+v0.8 changes how a project configures and boots. Service config is environment-only, adapters wire through typed `container.Provide` calls, `zever new` scaffolds a smaller tree, and generated servers delegate boot to `serve.Main`. This page maps every change to its replacement.
 
-## The new layout
+## Service config is env-only
 
-| Path | Role |
-|---|---|
-| `core/<b>` | Battery interface plus `Register` and `Open` registry (the container resolves). |
-| `adapters/<b>/<a>` | One Go module per adapter. `Register()` wires it into its `core` registry. |
-| `shared/*` | SDK-free helpers, one module each. |
-| `config`, `container`, `orm`, `dsl`, `cmd/zever` | Separate modules. |
+`zever.yaml`, `zever.yml`, and `zever.json` are gone. `config.Load` is gone. `config.FromEnv()` plus `config.Resolve(env)` replace them. A legacy file in the working directory is ignored, and `config.FromEnv` prints a one-line warning naming the file.
 
-Releases are lockstep: one version, with per-module tags `<path>/vX.Y.Z` via `tools/tag-release.sh`. The scaffold floor is `log, router`. Add more batteries with the `zever new` picker (`--interactive`, `--batteries`, `--adapters`, `--list-batteries`) or `zever add <battery>[/<adapter>]`.
+Translate each `adapter:` and `options:` key to an uppercase env variable. Every service uses `<SERVICE>_<FIELD>`; named instances use `<SERVICE>__<NAME>__<FIELD>`.
 
-## Rewrite imports
-
-| Old import (under `github.com/zenta-dev/zever/`) | New import | Notes |
+| Service | Env prefix | Default adapter |
 |---|---|---|
-| `auth` | `core/auth` | Interface and registry. |
-| `auth/jwt` | `adapters/auth/jwt` | `jwt.Register()` |
-| `db` | `core/db` | Interface and registry. |
-| `db/sqlite` | `adapters/db/sqlite` | `sqlite.Register()` |
-| `db/postgres` | `adapters/db/postgres` | `postgres.Register()` |
-| `cache` | `core/cache` | Interface and registry. |
-| `cache/redis` | `adapters/cache/redis` | `redis.Register()` |
-| `queue/redis` | `adapters/queue/redis` | `redis.Register()` |
-| `router/fiber` | `adapters/router/fiber` | `fiber.Register()` |
-| `password/argon2` | `adapters/password/argon2` | `argon2.Register()` |
-| `scheduler/embedded` | `adapters/scheduler/embedded` | `embedded.Register()` |
-| `codec` | `shared/codec` | Helper, no registry. |
-| `internal/redis` | `shared/redisclient` and `shared/redisopt` | Split: client vs options. |
-| `internal/retry` | `shared/retry` | Helper. |
-| `internal/endpoint` | `shared/endpoint` | Helper. |
-| `internal/dsl/...` | `dsl/...` | Compiler frontend moved. |
-| `container/adapters` (flat bundle) | Per-adapter `Register()` calls | The bundle and `RegisterAll` are deleted. |
+| ai | `AI_` | anthropic |
+| analytics | `ANALYTICS_` | log |
+| auth | `AUTH_` | jwt |
+| billing | `BILLING_` | stub |
+| cache | `CACHE_` | memory |
+| cdn | `CDN_` | noop |
+| crypto | `CRYPTO_` | local |
+| db | `DB_` | sqlite |
+| document | `DOCUMENT_` | local |
+| eventbus | `EVENTBUS_` | memory |
+| flag | `FLAG_` | static |
+| geo | `GEO_` | static |
+| i18n | `I18N_` | embed |
+| idempotency | `IDEMPOTENCY_` | memory |
+| lock | `LOCK_` | memory |
+| log | `LOG_` | slog |
+| mailer | `MAILER_` | log |
+| media | `MEDIA_` | local |
+| notification | `NOTIFICATION_` | log |
+| observability | `OBSERVABILITY_` | stdout |
+| outbox | `OUTBOX_` | db |
+| password | `PASSWORD_` | argon2id |
+| payment | `PAYMENT_` | stub |
+| permission | `PERMISSION_` | noop |
+| queue | `QUEUE_` | memory |
+| ratelimit | `RATELIMIT_` | memory |
+| resilience | `RESILIENCE_` | memory |
+| router | `ROUTER_` | stdhttp |
+| scheduler | `SCHEDULER_` | embedded |
+| search | `SEARCH_` | db |
+| secrets | `SECRETS_` | env |
+| session | `SESSION_` | memory |
+| storage | `STORAGE_` | local |
+| tenant | `TENANT_` | single |
+| vectorstore | `VECTORSTORE_` | db |
+| webhook | `WEBHOOK_` | http |
+| workflow | `WORKFLOW_` | memory |
 
-Every other battery follows the same pattern: `core/<b>` for the interface, `adapters/<b>/<a>` for each driver. The full module list is in the [adapters matrix](../../../reference/adapters-matrix/).
+Example:
 
-Run `tools/migrate-imports.sh` from a checkout of the new layout. It derives battery and adapter names from `core/*` and `adapters/*/*` and rewrites only quoted import strings, then runs `gofmt`:
-
-```sh
-tools/migrate-imports.sh --root /path/to/zever --check ./myapp   # list files that would change
-tools/migrate-imports.sh --root /path/to/zever ./myapp           # rewrite in place
-go mod tidy                                                      # per touched module
+```diff title="zever.yaml -> .env"
+-db:
+-  adapter: postgres
+-  options:
+-    dsn: postgres://app:secret@db:5432/app
+-    max_conns: 20
+-log:
+-  adapter: slog
++DB_ADAPTER=postgres
++DB_DSN=postgres://app:secret@db:5432/app
++DB_MAXCONNS=20
++LOG_ADAPTER=slog
 ```
 
-## Register the adapters you use
+Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes `<SERVICE>_<KEY>` uppercased; one nesting level flattens with a single underscore (`jwt.secret` under auth becomes `AUTH_JWT_SECRET`); durations are Go strings in env (`5s`, `1m`), not integer nanoseconds. Keys with no string form (maps, lists) cannot move to env. Full mapping and defaults: [Config reference](../../reference/config/).
 
-Add the adapter modules you resolve and call their `Register()` before `container.New`. An unregistered adapter fails resolution with `UnknownAdapterError`, hinting at the forgotten call.
+## Wire adapters with Provide
 
-```go title="main.go"
+The container no longer resolves adapters through name registries. `zever new` scaffolds one `Ref` var plus one `container.Provide` entry per instance, and `zever add <battery>` inserts more. Adapters still expose a `Register()` for the core registry, but the container path is `Provide`.
+
+```diff title="internal/app/wiring.go"
+-package app
+-
+-var DBRef = db.Ref("default")
++package app
++
++var DB = db.DefaultRef()
++var Log = log.DefaultRef()
++
++func Providers() []container.Provider {
++	return []container.Provider{
++		container.Provide(DB, dbsqlite.New),
++		container.Provide(Log, container.WrapNoErr(logslog.New)),
++	}
++}
+```
+
+Resolve through the container with `container.Get`, or keep using the accessors when the default instance is wired:
+
+```go title="internal/app/wiring.go"
 import (
-    dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-    cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/db"
 )
 
-dbsqlite.Register()
-cacheredis.Register()
+var DB = db.DefaultRef()
+
+// Providers wires DB to the sqlite adapter; Get(c, DB) returns the *sql.DB handle.
 ```
 
-## Use the workspace for development
+`Provide1`, `Provide2`, and `Provide3` add typed dependencies. Options come from `config.DefaultOptions` overlaid with env, then `container.WithOptions` appliers run last:
 
-A committed `go.work` at the repo root covers every workspace module (`examples/external-sms` and `docs/examples` stay outside by design). `go build ./...` and `go test ./...` from the root resolve through it, and CI runs per-module standalone commands with `GOWORK=off`.
-
-```sh
-go work init ./config ./container ./orm ./dsl ./cmd/zever ./core/db ./adapters/db/sqlite
-go work use ./core/cache ./adapters/cache/redis ./shared/redisclient
-go build ./...
+```diff title="internal/app/wiring.go"
+ return []container.Provider{
+-	container.Provide(DB, dbsqlite.New),
++	container.Provide(DB, dbsqlite.New, container.WithOptions(func(o *db.Options) {
++		o.MaxConns = 25
++	})),
+ }
 ```
 
-## Troubleshooting
+Graph validation runs at `container.New`: duplicate `Ref`s, missing non-`Optional` dependencies, and cycles surface from `container.Get` with typed `DuplicateRefError`, `NotWiredError`, or `DependencyCycleError`. `zever explain` prints the wiring graph. See [Container](../../concepts/container/).
 
-<details>
-<summary>`UnknownAdapterError` after a bump</summary>
+## Scaffold flags
 
-The adapter module is not required or `Register()` is not called. Run `go get` for the `adapters/<b>/<a>` module and call `Register()` before `container.New`.
-</details>
+`zever new` picks batteries with `--with`, not `--profile`. `--profile` still works as a deprecated alias that prints the equivalent `--with` form.
 
-<details>
-<summary>`go build` fails importing `internal/dsl`</summary>
+```diff
+-zever new hello --profile api
++zever new hello --with cache,queue=redis,auth
+```
 
-The path moved. Rewrite it to `github.com/zenta-dev/zever/dsl/...`.
-</details>
+`--batteries` and `--adapters` still work. `zever new` scaffolds the minimal tree (about eight files): `go.mod`, `schema/app.zen`, `cmd/server/main.go`, `internal/app/wiring.go`, `internal/service/hello`, `.env`, `.env.example`, and `.gitignore`. Recipes such as `docker`, `ci`, `worker`, `seed`, `compose`, and `k8s` are opt-in via `zever add <recipe>`.
 
-<details>
-<summary>`container/adapters` import fails</summary>
+## Generated servers use serve.Main
 
-The flat bundles are deleted. Replace them with per-adapter `Register()` calls.
-</details>
+The generated `cmd/server/main.go` is thin. It parses `-addr` and `-grpc-addr`, then calls `serve.Main` with the app's providers and modules. `serve.Main` owns config resolution, container construction, signal handling, and graceful shutdown.
+
+```diff title="cmd/server/main.go"
+-func main() {
+-	// build container, resolve router, start http.Server, wait for signal
+-}
++func main() {
++	addr := flag.String("addr", "", "HTTP listen address (empty uses PORT, default :8080)")
++	grpcAddr := flag.String("grpc-addr", "", "gRPC listen address (empty disables)")
++	flag.Parse()
++
++	var opts []serve.Option
++	if port, err := serverPort(*addr); err == nil && port != "" {
++		opts = append(opts, serve.WithPort(port))
++	}
++	if *grpcAddr != "" {
++		opts = append(opts, serve.WithGRPCAddr(*grpcAddr))
++	}
++
++	if err := serve.Main(app.Providers(), app.Modules(), opts...); err != nil {
++		fmt.Fprintln(os.Stderr, "server:", err)
++		os.Exit(1)
++	}
++}
+```
+
+Listen addresses and runtime toggles come from env or options: `PORT` (default `8080`), `GRPC_ADDR` (empty disables gRPC), `PPROF_ADDR` (loopback pprof, empty disables), `GRPC_REFLECTION`, and `ZEVER_ENV`. Security defaults stay fail-closed: reflection off unless opted in, TLS 1.2 floor, security headers, and refusal of the deterministic dev crypto key outside a dev `ZEVER_ENV`. See [Serve module](https://github.com/zenta-dev/zever/tree/main/serve).
+
+## CLI surface
+
+- `worker` and `schedule run` are the canonical commands. `queue:work` and `schedule:run` still work as hidden aliases.
+- `doctor` scopes its report to wired providers; it no longer takes `--config`.
+- `config show` prints per-instance redacted values and no longer takes `--config`.
+- `zever explain` prints the wiring graph when invoked bare, or one service's wiring for `zever explain db` / `zever explain db/analytics`.
+- `zever add <battery>/<adapter>` edits `internal/app/wiring.go` with `go/ast`, appends to `.env.example`, and runs `go get` plus `go mod tidy`.
+
+## Project layout settings
+
+Project layout is defaults-only, overridable by six `ZEVER_*` variables (no file, no `--config` flag):
+
+| Variable | Overrides | Default |
+|---|---|---|
+| `ZEVER_SCHEMA_DIR` | `.zen` schema directory | `schema` |
+| `ZEVER_GENERATED_DIR` | generated-code directory | `generated` |
+| `ZEVER_SERVER_ENTRY` | server entrypoint package | `cmd/server` |
+| `ZEVER_WORKER_ENTRY` | worker entrypoint package | `cmd/worker` |
+| `ZEVER_TINKER_ENTRY` | tinker shim entrypoint | `cmd/tinker-shim` |
+| `ZEVER_SEED_ENTRY` | seed entrypoint package | `db/seed` |
+
+## Migration checklist
+
+1. Move every `zever.yaml` stanza to `.env` or the process environment using the table above.
+2. Delete `zever.yaml`; `config.FromEnv` warns if one remains in the working directory.
+3. Replace `config.Load(...)` with `config.FromEnv()` plus `config.Resolve(env)`.
+4. Replace adapter `Register()` wiring with `container.Provide` entries in `internal/app/wiring.go`.
+5. Replace `--profile` with `--with` in scripts and CI.
+6. Regenerate the server entrypoint so it calls `serve.Main` with providers and modules.
+7. Update Kubernetes manifests to inject `env:` from a Secret (no mounted config file).
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Every adapter module path and Register call." />
-  <LinkCard title="Project layout" href="../../../start/project-layout/" description="The module layout." />
-  <LinkCard title="Installation" href="../../../start/installation/" description="Toolchain and first build." />
-  <LinkCard title="Upgrade" href="../upgrade/" description="Bump procedure and known breaks." />
+  <LinkCard title="Configuration" href="../configuration/" description="Env layering, precedence, and fail-closed rules." />
+  <LinkCard title="Container" href="../../concepts/container/" description="Typed Refs, Provide, and the wiring graph." />
+  <LinkCard title="Config reference" href="../../reference/config/" description="Every service, key, and default." />
+  <LinkCard title="Quickstart" href="../../start/quickstart/" description="Scaffold and serve a working endpoint." />
 </CardGrid>

@@ -11,14 +11,12 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 `local` (default, `adapters/media/local`) writes under `root` and suits single instances and tests. `s3` (`adapters/media/s3`) needs `bucket`, `region`, and credentials. Transforms call the configured `ffmpeg` and `ffprobe` binaries.
 
-```yaml title="zever.yaml"
-media:
-  adapter: local
-  options:
-    root: /var/media
-    max_download_bytes: 67108864
-    max_pixels: 50000000
-    presign_ttl: 3600000000000   # nanoseconds
+```sh
+MEDIA_ADAPTER=local
+MEDIA_ROOT=/var/media
+MEDIA_MAX_DOWNLOAD_BYTES=67108864
+MEDIA_MAX_PIXELS=50000000
+MEDIA_PRESIGN_TTL=1h
 ```
 
 Defaults: `root` `/tmp/media`, `base_url` `/media`, `ffmpeg` and `ffprobe` on `PATH`, `max_download_bytes` 64 MiB, `max_pixels` 52428800, `derived_ttl` 10m, `presign_ttl` 1h (max 7 days), `max_duration` unlimited, `region` `us-east-1`. Durations are nanoseconds; env accepts `"1h"`. `Validate` rejects negative bounds. See the [media options](../../../reference/config/#media).

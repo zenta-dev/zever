@@ -40,15 +40,12 @@ Expected output: span lines in human-readable form.
 
 Use `otlp` to reach a real collector. Replicas all funnel into one collector keyed by `service_name`.
 
-```yaml title="zever.yaml"
-observability:
-  adapter: otlp
-  options:
-    service_name: bookings
-    endpoint: collector:4317   # host:port, no scheme or path
-    sample_ratio: 0.1
-    headers:
-      x-tenant: acme
+```sh
+OBSERVABILITY_ADAPTER=otlp
+OBSERVABILITY_SERVICE_NAME=bookings
+OBSERVABILITY_ENDPOINT=collector:4317
+OBSERVABILITY_SAMPLE_RATIO=0.1
+OBSERVABILITY_HEADERS_X-TENANT=acme
 ```
 
 Env names follow the usual scheme: `OBSERVABILITY_ADAPTER`, `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`.

@@ -13,21 +13,17 @@ import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components
 
 <Tabs>
   <TabItem label="db">
-```yaml title="zever.yaml"
-vectorstore:
-  adapter: db
-  options:
-    dimension: 1536
-    dsn: ":memory:"
+```sh
+VECTORSTORE_ADAPTER=db
+VECTORSTORE_DIMENSION=1536
+VECTORSTORE_DSN=:memory:
 ```
   </TabItem>
   <TabItem label="qdrant">
-```yaml title="zever.yaml"
-vectorstore:
-  adapter: qdrant
-  options:
-    url: http://localhost:6333
-    api_key: dev-only-key
+```sh
+VECTORSTORE_ADAPTER=qdrant
+VECTORSTORE_URL=http://localhost:6333
+VECTORSTORE_API_KEY=dev-only-key
 ```
   </TabItem>
 </Tabs>

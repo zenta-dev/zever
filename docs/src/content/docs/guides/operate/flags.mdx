@@ -11,13 +11,10 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 `static` (the default) loads a JSON file once and costs no network call per evaluation. Use it for tests, offline dev, and rollouts that can ship with a deploy.
 
-```yaml title="zever.yaml"
-flag:
-  adapter: static
-  options:
-    static:
-      path: data/flags.json
-      reload: false
+```sh
+FLAG_ADAPTER=static
+FLAG_STATIC_PATH=data/flags.json
+FLAG_STATIC_RELOAD=false
 ```
 
 ```go title="main.go"
@@ -57,14 +54,11 @@ An empty static `path` is valid and means an empty flag set. Because the fallbac
 
 Use `firebase` when product or growth must change a flag live. It adds a real dependency and a 30s default operation timeout (`DefaultTimeout`). Durations in files are integer nanoseconds.
 
-```yaml title="zever.yaml"
-flag:
-  adapter: firebase
-  options:
-    firebase:
-      project_id: my-project
-      service_account: /run/secrets/firebase.json
-      timeout: 30000000000
+```sh
+FLAG_ADAPTER=firebase
+FLAG_FIREBASE_PROJECT_ID=my-project
+FLAG_FIREBASE_SERVICE_ACCOUNT=/run/secrets/firebase.json
+FLAG_FIREBASE_TIMEOUT=30s
 ```
 
 ```sh

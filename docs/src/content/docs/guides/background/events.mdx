@@ -9,14 +9,12 @@ import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components
 
 ## Quick start
 
-```yaml title="zever.yaml"
-eventbus:
-  adapter: memory
-  options:
-    buffer_size: 1024
-    max_handlers: 128
-    handler_timeout: 30000000000 # 30s, integer nanoseconds in files
-    close_timeout: 5000000000
+```sh
+EVENTBUS_ADAPTER=memory
+EVENTBUS_BUFFER_SIZE=1024
+EVENTBUS_MAX_HANDLERS=128
+EVENTBUS_HANDLER_TIMEOUT=30s
+EVENTBUS_CLOSE_TIMEOUT=5s
 ```
 
 ```go title="main.go" check
@@ -62,18 +60,15 @@ Use `redis` when a publish on one process must reach a subscriber on another; ca
 
 <Tabs>
   <TabItem label="YAML">
-```yaml title="zever.yaml"
-eventbus:
-  adapter: redis
-  options:
-    buffer_size: 1024
-    redis:
-      addr: localhost:6379
-      db: 0
-      prefix: bookings
-      pool_size: 20
-      min_idle_conns: 2
-      pool_timeout: 5000000000
+```sh
+EVENTBUS_ADAPTER=redis
+EVENTBUS_BUFFER_SIZE=1024
+EVENTBUS_REDIS_ADDR=localhost:6379
+EVENTBUS_REDIS_DB=0
+EVENTBUS_REDIS_PREFIX=bookings
+EVENTBUS_REDIS_POOL_SIZE=20
+EVENTBUS_REDIS_MIN_IDLE_CONNS=2
+EVENTBUS_REDIS_POOL_TIMEOUT=5s
 ```
   </TabItem>
   <TabItem label="Env">

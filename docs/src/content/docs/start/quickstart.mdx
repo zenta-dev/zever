@@ -1,11 +1,11 @@
 ---
 title: Quickstart
-description: Go from an empty folder to a running API in five commands.
+description: Install, scaffold a project, and serve a working endpoint in three commands.
 ---
 
 import { Steps, Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-You will define one entity and two RPCs in a `.zen` schema, then check it, compile it, create the database, and serve it. It takes about five minutes. You need Go 1.27+ and the `zever` CLI ([installation](../installation/)):
+You will install Zever, scaffold a project, and serve a working `GET /hello` endpoint. It takes about five minutes. You need Go 1.27+ and the `zever` CLI ([installation](../installation/)).
 
 <Tabs syncKey="os">
 <TabItem label="Linux">
@@ -35,136 +35,59 @@ Then check it with `zever --version`.
 
 ## Scaffold the project
 
-Create the project and fetch its dependencies:
-
 ```sh
-zever new hello --dir ./hello --force
+zever new hello
 cd hello
 ```
 
-`zever new` already runs `go mod tidy`, so the project builds as-is.
+`zever new` writes the minimal tree: `schema/app.zen`, `cmd/server/main.go`, `internal/app/wiring.go`, the sample `internal/service/hello` module, `.env`, `.env.example`, `.gitignore`, and a `README.md`. It also runs `go mod tidy`, so the project builds as-is.
 
 Expected output (abridged):
 
 ```text
-✔ scaffolded "hello" into ./hello
-  wrote hello/schema/app.zen
+✔ scaffolded "hello" into hello
+  wrote hello/internal/app/wiring.go
   wrote hello/cmd/server/main.go
+  wrote hello/internal/service/hello/service.go
 ```
 
-Start small with `--profile minimal` (bootable floor only), `--profile api` (adds cache, queue, session, password, scheduler, and reliability batteries), or `--profile full` (every battery). See [Customizing and leaving zever](../extend/customizing-and-leaving/) for the "batteries you actually need" table with measured dependency footprints.
+The battery picker adds more services: `zever new hello --with cache,queue=redis,auth` (or `--interactive` for the prompt). `--with` takes a comma-separated list of batteries with optional adapter pins. See [Customizing and leaving zever](../extend/customizing-and-leaving/) for the "batteries you actually need" table with measured dependency footprints.
 
-## Define the schema
+## Serve it
 
-Replace `schema/app.zen` with a `Task` entity and a service that exposes it:
-
-```zen title="schema/app.zen"
-entity Task {
-  id: uuid @primary
-  title: string @validate(min_len: 1, max_len: 200)
-  done: bool
-  created_at: timestamp @default(now())
-}
-
-service TaskService {
-  rpc CreateTask(title: string) -> Task {
-    http: POST "/v1/tasks"
-    auth: required
-  }
-
-  rpc ListTasks() -> Task {
-    http: GET "/v1/tasks"
-    auth: required
-    paginated: true
-  }
-}
-```
-
-## Run the five commands
-
-<Steps>
-
-1. Validate the schema. This writes nothing.
-
-   ```sh
-   zever check schema/app.zen
-   ```
-
-   ```text
-   OK 1 file(s) valid
-   ```
-
-2. Compile it into a typed ORM, an OpenAPI document, and migration DDL.
-
-   ```sh
-   zever compile --backend=zenorm,atlas,openapi --out ./generated schema/app.zen
-   ```
-
-   ```text
-   ✔ compiled 1 file(s) → ./generated (4 outputs, backends: zenorm,atlas,openapi)
-   ```
-
-3. Preview the SQL without touching the database.
-
-   ```sh
-   zever db migrate --dry-run --adapter=sqlite schema/app.zen
-   ```
-
-   The output ends with:
-
-   ```text
-   dry run — no changes applied
-   1 statement(s) would be executed
-   ```
-
-4. Create the sqlite database.
-
-   ```sh
-   zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
-   ```
-
-   ```text
-   OK applied 1 statement(s) via sqlite
-   ```
-
-5. Serve the API. The server listens on `:8080` (HTTP) and `:9090` (gRPC).
-   Service configuration is env-only: export the secrets the boot
-   batteries need first (32+ byte JWT secret).
-
-   ```sh
-   export AUTH_JWT_SECRET=0123456789abcdef0123456789abcdef
-   export AUTH_JWT_ISSUER=dev
-   zever serve
-   ```
-
-</Steps>
-
-In a second terminal, check that the server is up. `/healthz` returns HTTP 200 with an empty body:
+Run the watcher. It compiles, starts the server on `:8080`, and restarts on schema or source changes:
 
 ```sh
-curl -i localhost:8080/healthz
+zever dev
+```
+
+```text
+{"time":"...","level":"INFO","msg":"http server listening","addr":":8080"}
+```
+
+`zever serve` runs the same server without watching. In a second terminal, call the sample endpoint:
+
+```sh
+curl -i localhost:8080/hello
 ```
 
 ```text
 HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"hello":"world"}
 ```
 
-The RPC routes are registered, but the freshly scaffolded server has no
-handlers behind them yet, so they return `404 page not found` until you write
-them — Zever generates the plumbing, not your business logic:
-
-```sh
-zever routes schema/app.zen
-```
-
-```text
-POST /v1/tasks -> (root).TaskService.CreateTask
-GET /v1/tasks -> (root).TaskService.ListTasks
-```
+The sample module registers `GET /hello` and resolves the logger from the container. `GET /healthz` always returns 200, and `GET /readyz` returns 200 once the database ping succeeds.
 
 ## What you built
 
-One schema now drives validation, the typed ORM, the OpenAPI document, and the table DDL. The handlers behind `CreateTask` and `ListTasks` are yours to write: Zever generates the plumbing, not your business logic.
+`zever new` scaffolds a typed wiring file, not a config file. `internal/app/wiring.go` declares one `Ref` per service and one `container.Provide` entry per instance, and `cmd/server/main.go` hands those providers plus the modules to `serve.Main`. Adding a battery later is one command:
+
+```sh
+zever add cache/redis
+zever add db --name analytics
+```
 
 ## Next steps
 

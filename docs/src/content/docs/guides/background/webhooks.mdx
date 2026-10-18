@@ -9,19 +9,16 @@ Use `webhook` for signed outbound event delivery. The interface covers `Register
 
 ## Quick start
 
-```yaml title="zever.yaml"
-webhook:
-  adapter: queue
-  options:
-    timeout: 10000000000 # 10s, integer nanoseconds in files
-    max_retries: 3
-    queue_adapter: memory
-    queue_opts:
-      visibility_timeout: 30000000000 # must exceed timeout
-      poll_timeout: 1000000000
-      buffer: 100
-    dead_letter_topic: webhook.dead
-    replay_tolerance: 300000000000 # default 5m
+```sh
+WEBHOOK_ADAPTER=queue
+WEBHOOK_TIMEOUT=10s
+WEBHOOK_MAX_RETRIES=3
+WEBHOOK_QUEUE_ADAPTER=memory
+WEBHOOK_QUEUE_OPTS_VISIBILITY_TIMEOUT=30s
+WEBHOOK_QUEUE_OPTS_POLL_TIMEOUT=1s
+WEBHOOK_QUEUE_OPTS_BUFFER=100
+WEBHOOK_DEAD_LETTER_TOPIC=webhook.dead
+WEBHOOK_REPLAY_TOLERANCE=300000000000
 ```
 
 ```sh

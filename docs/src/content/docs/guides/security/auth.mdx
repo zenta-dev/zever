@@ -13,12 +13,9 @@ Set a 32+ byte JWT secret, then resolve the service; `Open` refuses shorter secr
 
 <Tabs>
   <TabItem label="YAML">
-```yaml title="zever.yaml"
-auth:
-  adapter: jwt
-  options:
-    jwt:
-      secret: change-me-to-at-least-32-bytes
+```sh
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=change-me-to-at-least-32-bytes
 ```
   </TabItem>
   <TabItem label="env">
@@ -43,19 +40,13 @@ if err != nil {
 
 List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported — use a custom auth adapter if you need them. `alg: none` tokens are rejected.
 
-```yaml title="zever.yaml"
-auth:
-  adapter: jwt
-  options:
-    jwt:
-      secret: previous-secret-at-least-32-bytes-long
-      keys:
-        - kid: "2026-09"
-          secret: previous-secret-at-least-32-bytes-long
-        - kid: "2026-10"
-          secret: new-secret-at-least-32-bytes-long-here
-      active_kid: "2026-10"
-      leeway: 30000000000 # ~30s of clock-skew tolerance for exp/nbf
+```sh
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=previous-secret-at-least-32-bytes-long
+AUTH_JWT_KEYS_- KID=2026-09
+AUTH_JWT_KEYS_SECRET=previous-secret-at-least-32-bytes-long
+AUTH_JWT_ACTIVE_KID=2026-10
+AUTH_JWT_LEEWAY=30s
 ```
 
 Tokens carrying a future `nbf` (not-before) claim are rejected; `exp` is always required. Both honor `leeway`, which defaults to `0` (strict).

@@ -9,14 +9,12 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 ## Quick start
 
-```yaml title="zever.yaml"
-analytics:
-  adapter: log
-  options:
-    anonymous_id: anonymous
-    group_type: organization
-    max_properties_bytes: 65536
-    max_properties: 100
+```sh
+ANALYTICS_ADAPTER=log
+ANALYTICS_ANONYMOUS_ID=anonymous
+ANALYTICS_GROUP_TYPE=organization
+ANALYTICS_MAX_PROPERTIES_BYTES=65536
+ANALYTICS_MAX_PROPERTIES=100
 ```
 
 Defaults: `anonymous_id` `"anonymous"`, `group_type` `"organization"`, `max_properties_bytes` 64KiB. `endpoint` needs scheme and host; `max_properties` bounds count; negatives are rejected. Env vars mirror the keys. See the [analytics config reference](../../../reference/config/#analytics).

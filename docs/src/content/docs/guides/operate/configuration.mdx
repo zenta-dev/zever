@@ -11,21 +11,14 @@ Zever config layers typed defaults, a strict YAML or JSON file, and best-effort 
 
 Later layers win: `defaults < file < env`. `config.Default()` returns zero-infra adapters (memory, local, sqlite, log, noop). `config.Load(path)` overlays a file and the process env, then validates, so an unknown adapter or unparsable value fails at load, not mid-request.
 
-```yaml title="zever.yaml"
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-cache:
-  adapter: redis
-  options:
-    addr: redis:6379
-auth:
-  adapter: jwt
-  options:
-    jwt:
-      secret: prod-secret-at-least-32-bytes-long
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 ```
 
 Load it with `config.Load("zever.yaml")`, then `container.New(cfg)`. `container.New(nil)` is valid for tests that never load a file. Accessors (`c.DB()`, `c.Cache()`) resolve lazily and retry after an error. See [Container](../../../concepts/container/).

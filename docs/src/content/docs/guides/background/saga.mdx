@@ -9,11 +9,9 @@ Use a saga for multi-resource operations you cannot fit in one database transact
 
 ## Quick start
 
-```yaml title="zever.yaml"
-workflow:
-  adapter: memory
-  options:
-    namespace: bookings
+```sh
+WORKFLOW_ADAPTER=memory
+WORKFLOW_NAMESPACE=bookings
 ```
 
 ```go title="main.go" check

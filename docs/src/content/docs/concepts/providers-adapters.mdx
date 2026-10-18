@@ -43,29 +43,19 @@ func Register() { _ = db.Register(db.SQLite, New) }
 
 Development uses zero infrastructure; production changes names only:
 
-```yaml title="zever.yaml"
-# dev: zero infra
-db:
-  adapter: sqlite
-  options:
-    path: data/app.db
-cache:
-  adapter: memory
-queue:
-  adapter: memory
+```sh
+DB_ADAPTER=sqlite
+DB_PATH=data/app.db
+CACHE_ADAPTER=memory
+QUEUE_ADAPTER=memory
 ```
 
-```yaml title="zever.yaml"
-# prod: same code, real backends
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    max_conns: 20
-cache:
-  adapter: redis
-  options:
-    addr: redis:6379
+```sh
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
 ```
 
 Env equivalents use `<SERVICE>_<FIELD>` with no prefix: `DB_ADAPTER=postgres`, `DB_MAXCONNS=20`, `CACHE_ADAPTER=redis`. Handlers keep calling `c.DB()` and `c.Cache()`; register the adapter module for the name you choose. `zever doctor --config zever.yaml` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.

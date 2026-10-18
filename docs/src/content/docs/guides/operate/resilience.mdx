@@ -65,13 +65,10 @@ Branch on sentinel errors with `errors.Is`:
 
 `Default()` enables every policy with bounded values (5s timeout, 3 attempts, 100 concurrent, 1s admission wait); treat it as a safe start, not a tuning endpoint. Durations in files are integer nanoseconds. Full key list: [resilience config reference](../../../reference/config/#resilience).
 
-```yaml title="zever.yaml"
-resilience:
-  adapter: memory
-  options:
-    timeout: 5000000000   # bounds the whole operation
-    breaker:
-      enabled: true
+```sh
+RESILIENCE_ADAPTER=memory
+RESILIENCE_TIMEOUT=5s
+RESILIENCE_BREAKER_ENABLED=true
 ```
 
 ```sh
@@ -86,15 +83,11 @@ RESILIENCE_BREAKER_ENABLED=true
 
 `memory` (the default) is process-local, so each replica trips on its own view. Use `redis` when replicas calling the same dependency should trip together. Only breaker state is shared; timeout, retry, and bulkhead stay process-local.
 
-```yaml title="zever.yaml"
-resilience:
-  adapter: redis
-  options:
-    breaker:
-      enabled: true
-    redis:
-      addr: 127.0.0.1:6379
-      prefix: resilience   # default; use one per environment
+```sh
+RESILIENCE_ADAPTER=redis
+RESILIENCE_BREAKER_ENABLED=true
+RESILIENCE_REDIS_ADDR=127.0.0.1:6379
+RESILIENCE_REDIS_PREFIX=resilience
 ```
 
 The redis adapter pings at construction (3s budget) and fails closed when Redis is unreachable. Live redis tests are gated behind `REDIS_ADDR`. Adapters are `memory` (`adapters/resilience/inproc`, the default) and `redis` (`adapters/resilience/redis`, distributed breaker state).
