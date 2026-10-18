@@ -135,6 +135,7 @@ require (
 	github.com/zenta-dev/zever/core/workflow v0.7.2
 	github.com/zenta-dev/zever/dsl v0.7.2
 	github.com/zenta-dev/zever/orm v0.7.2
+	github.com/zenta-dev/zever/serve v0.7.2
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/mod v0.42.0
 )
@@ -292,7 +293,6 @@ require (
 	github.com/zenta-dev/zever/core/scheduler v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/search v0.7.2 // indirect
 	github.com/zenta-dev/zever/core/vectorstore v0.7.2 // indirect
-	github.com/zenta-dev/zever/serve v0.7.2
 	github.com/zenta-dev/zever/shared/cas v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.7.2 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.7.2 // indirect
