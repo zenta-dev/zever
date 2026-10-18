@@ -115,6 +115,12 @@ func TestNoSuchTableSentinel(t *testing.T) {
 		t.Errorf("NoSuchTableError.Error() = %q, want no such table message", err.Error())
 	}
 
+	// Empty table name exercises the other Error() branch.
+	errEmpty := &NoSuchTableError{Err: errors.New("boom")}
+	if !strings.Contains(errEmpty.Error(), "db: no such table") {
+		t.Errorf("NoSuchTableError empty table = %q, want no such table message", errEmpty.Error())
+	}
+
 	if errors.Is(ErrNoSuchTable, ErrNotFound) {
 		t.Error("ErrNoSuchTable should not match ErrNotFound")
 	}
