@@ -9,7 +9,9 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 // TestMountErrorNamesModule proves a failing Mount fails the boot naming
@@ -124,5 +126,69 @@ func TestNoSuchTableHintsMigrate(t *testing.T) {
 
 	if withMigrateHint(nil) != nil {
 		t.Fatal("withMigrateHint(nil) != nil")
+	}
+}
+
+// TestNoSuchTableSentinelHintsMigrate proves withMigrateHint recognizes a
+// db.ErrNoSuchTable-wrapped failure via errors.Is (not only string match),
+// naming the migrate command while keeping the cause discoverable.
+func TestNoSuchTableSentinelHintsMigrate(t *testing.T) {
+	t.Parallel()
+
+	cause := &db.NoSuchTableError{Table: "users", Err: errors.New("sqlite: no such table: users")}
+
+	if got := withMigrateHint(cause); !strings.Contains(got.Error(), "zever db migrate") || !errors.Is(got, cause) || !errors.Is(got, db.ErrNoSuchTable) {
+		t.Fatalf("withMigrateHint = %v, want migrate hint wrapping the cause and ErrNoSuchTable", got)
+	}
+
+	if !isNoSuchTable(cause) {
+		t.Fatal("isNoSuchTable = false, want true for ErrNoSuchTable-wrapped error")
+	}
+
+	// A non-missing-table error passes through unchanged.
+	other := errors.New("db: ping: connection refused")
+	if got := withMigrateHint(other); !errors.Is(got, other) || strings.Contains(got.Error(), "zever db migrate") {
+		t.Fatalf("withMigrateHint = %v, want passthrough", got)
+	}
+}
+
+// TestSetupGRPCUnwiredAuthNamesAddHint proves a gRPC boot with auth not wired
+// fails with the actionable add-auth hint while keeping the underlying error
+// discoverable via errors.Is.
+func TestSetupGRPCUnwiredAuthNamesAddHint(t *testing.T) {
+	c := container.New(config.Default(), wireStubProviders(t, nil, stubLogger{})...)
+
+	logger, err := c.Log()
+	if err != nil {
+		t.Fatalf("c.Log: %v", err)
+	}
+
+	obs, err := c.Observability()
+	if err != nil {
+		t.Fatalf("c.Observability: %v", err)
+	}
+
+	limiter, err := c.RateLimit()
+	if err != nil {
+		t.Fatalf("c.RateLimit: %v", err)
+	}
+
+	_, _, err = setupGRPC(c, nil, logger, obs, limiter, nil, "127.0.0.1:0")
+
+	if err == nil {
+		t.Fatal("setupGRPC = nil, want auth error")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "zever add auth permission") {
+		t.Fatalf("setupGRPC err = %q, want add-auth hint", msg)
+	}
+
+	if !strings.Contains(msg, "auth: none") {
+		t.Fatalf("setupGRPC err = %q, want auth: none hint", msg)
+	}
+
+	if !errors.Is(err, auth.ErrUnknownAdapter) {
+		t.Fatalf("setupGRPC err = %v, want errors.Is auth.ErrUnknownAdapter", err)
 	}
 }

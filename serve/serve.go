@@ -25,6 +25,7 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/crypto"
+	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/middleware"
 	"github.com/zenta-dev/zever/core/observability"
@@ -225,9 +226,25 @@ func requireGRPCAddr(mods []Module, grpcAddr string) error {
 // sqlite/postgres message shape at the boundary.
 const noSuchTableHint = "pending migrations? run `zever db migrate`"
 
-// isNoSuchTable reports whether err looks like a missing-table failure.
+// grpcAuthHint is the actionable hint surfaced when gRPC is enabled but auth
+// and permission are not wired. It names the `zever add` command and the
+// `auth: none` escape hatch.
+const grpcAuthHint = "wire auth+permission via `zever add auth permission`, or declare `auth: none`"
+
+// isNoSuchTable reports whether err looks like a missing-table failure. It
+// prefers the db.ErrNoSuchTable sentinel (errors.Is) so wrapped adapter
+// failures are detected reliably, with a string-match fallback for legacy
+// message shapes.
 func isNoSuchTable(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "no such table")
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, db.ErrNoSuchTable) {
+		return true
+	}
+
+	return strings.Contains(err.Error(), "no such table")
 }
 
 // withMigrateHint wraps a resolve-db failure, appending the migrate command
@@ -625,12 +642,12 @@ func setupGRPC(c *container.Container, mods []Module, logger log.Logger, obs obs
 
 	authInst, err := c.Auth()
 	if err != nil {
-		return nil, nil, fmt.Errorf("serve: resolve auth: %w", err)
+		return nil, nil, fmt.Errorf("serve: resolve auth: %w (%s)", err, grpcAuthHint)
 	}
 
 	permInst, err := c.Permission()
 	if err != nil {
-		return nil, nil, fmt.Errorf("serve: resolve permission: %w", err)
+		return nil, nil, fmt.Errorf("serve: resolve permission: %w (%s)", err, grpcAuthHint)
 	}
 
 	// One interceptor, attached once below, covers every service registered
