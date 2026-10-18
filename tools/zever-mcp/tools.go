@@ -179,7 +179,7 @@ type serviceSummary struct {
 
 // schemaSummary is the resolved-schema overview returned by zever_schema.
 type schemaSummary struct {
-	Modules []moduleSummary ``
+	Modules []moduleSummary `json:"modules"`
 }
 
 // summarize builds a schemaSummary from a resolved schema.
