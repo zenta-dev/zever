@@ -40,7 +40,7 @@ func main() {
 		}
 	}
 
-	modules := func(c *container.Container) []serve.Module {
+	modules := func(_ *container.Container) []serve.Module {
 		return []serve.Module{}
 	}
 
