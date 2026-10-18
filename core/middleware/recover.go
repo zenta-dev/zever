@@ -17,7 +17,7 @@ import (
 // recovery and rate-limit denials return. The client never sees the panic
 // value: internal detail stays in the logs.
 type errorBody struct {
-	Error string ``
+	Error string `json:"error"`
 }
 
 // errorBodyCodec encodes errorBody for HTTP error responses. Shared by
