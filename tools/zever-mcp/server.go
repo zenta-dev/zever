@@ -192,7 +192,7 @@ func (s *Server) handle(ctx context.Context, req rpcRequest) rpcResponse {
 
 // initializeParams is the subset of the MCP initialize request this server uses.
 type initializeParams struct {
-	ProtocolVersion string `json:"protocolVersion"`
+	ProtocolVersion string ``
 }
 
 // supportedProtocolVersions is the set of MCP versions this server implements.
@@ -244,8 +244,8 @@ func (s *Server) toolList() []map[string]any {
 
 // callParams is the MCP tools/call request payload.
 type callParams struct {
-	Name      string         `json:"name"`
-	Arguments map[string]any `json:"arguments"`
+	Name      string         ``
+	Arguments map[string]any ``
 }
 
 // callTool resolves and runs a tool, mapping handler errors to MCP tool

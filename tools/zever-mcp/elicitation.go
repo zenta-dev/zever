@@ -24,8 +24,8 @@ const (
 
 // elicitResult carries a client's answer to an elicitation request.
 type elicitResult struct {
-	Action  string         `json:"action"`
-	Content map[string]any `json:"content,omitempty"`
+	Action  string         ``
+	Content map[string]any ``
 }
 
 // senderFunc delivers one server-originated message to the client. It is set
@@ -102,10 +102,10 @@ func (s *Server) elicit(ctx context.Context, message string, schema map[string]a
 // when its ID matches. It reports whether the message was consumed.
 func (s *Server) deliverResponse(raw json.RawMessage) bool {
 	var probe struct {
-		ID     *int64          `json:"id"`
-		Method string          `json:"method,omitempty"`
-		Result json.RawMessage `json:"result,omitempty"`
-		Error  *rpcError       `json:"error,omitempty"`
+		ID     *int64          ``
+		Method string          ``
+		Result json.RawMessage ``
+		Error  *rpcError       ``
 	}
 
 	if err := json.Unmarshal(raw, &probe); err != nil {

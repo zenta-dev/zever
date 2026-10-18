@@ -9,9 +9,9 @@ import (
 // MemoryOptions configures the in-memory cache backend.
 type MemoryOptions struct {
 	// SweepInterval controls how often expired entries are purged.
-	SweepInterval time.Duration `json:"sweep_interval"`
+	SweepInterval time.Duration ``
 	// MaxEntries bounds the number of stored entries before eviction.
-	MaxEntries int `json:"max_entries"`
+	MaxEntries int ``
 }
 
 // RedisOptions configures the Redis-backed cache backend.
@@ -20,36 +20,36 @@ type RedisOptions struct {
 	redisopt.ConnectOptions
 	// URL holds the Redis connection URL.
 	// When set it takes precedence over Addr.
-	URL string `json:"url"`
+	URL string ``
 
 	// PoolSize limits the Redis connection pool size.
-	PoolSize int `json:"pool_size"`
+	PoolSize int ``
 	// MinIdleConns sets the minimum number of idle Redis connections.
-	MinIdleConns int `json:"min_idle_conns"`
+	MinIdleConns int ``
 	// PoolTimeout bounds waiting for a Redis connection from the pool.
-	PoolTimeout time.Duration `json:"pool_timeout"`
+	PoolTimeout time.Duration ``
 	// MaxConnIdleTime bounds how long a Redis connection may stay idle.
-	MaxConnIdleTime time.Duration `json:"max_conn_idle_time"`
+	MaxConnIdleTime time.Duration ``
 	// MaxConnLifetime bounds the total lifetime of a Redis connection.
-	MaxConnLifetime time.Duration `json:"max_conn_lifetime"`
+	MaxConnLifetime time.Duration ``
 }
 
 // Options configures cache backend selection and backend-specific settings.
 type Options struct {
 	// Adapter selects the cache backend to open.
-	Adapter Adapter `json:"adapter"`
+	Adapter Adapter ``
 	// Capacity hints at the expected number of cache entries.
-	Capacity int `json:"capacity"`
+	Capacity int ``
 
 	// Verbose enables additional diagnostic output.
-	Verbose bool `json:"verbose"`
+	Verbose bool ``
 
 	// DSN is the postgres connection string or sqlite path for the db
 	// adapter. Empty selects a private in-memory database.
-	DSN string `json:"dsn"`
+	DSN string ``
 	// DedicatedPool opts out of container-level pool sharing. Default false
 	// shares one pool per exact DSN; true opens a private pool.
-	DedicatedPool bool `json:"dedicated_pool"`
+	DedicatedPool bool ``
 
 	// MemoryOptions holds in-memory backend settings.
 	MemoryOptions

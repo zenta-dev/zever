@@ -18,8 +18,8 @@ import (
 // compileInput is the shared schema source accepted by every tool. Files takes
 // precedence over Dir when both are set; at least one is required.
 type compileInput struct {
-	Dir   string            `json:"dir"`
-	Files map[string]string `json:"files"`
+	Dir   string            ``
+	Files map[string]string ``
 }
 
 // decodeArgs re-encodes a tool argument map into a typed struct.
@@ -163,23 +163,23 @@ func compileTool() toolDef {
 
 // moduleSummary is a compact description of one schema module.
 type moduleSummary struct {
-	Name     string           `json:"name"`
-	Version  string           `json:"version,omitempty"`
-	Entities []string         `json:"entities,omitempty"`
-	Messages []string         `json:"messages,omitempty"`
-	Enums    []string         `json:"enums,omitempty"`
-	Services []serviceSummary `json:"services,omitempty"`
+	Name     string           ``
+	Version  string           ``
+	Entities []string         ``
+	Messages []string         ``
+	Enums    []string         ``
+	Services []serviceSummary ``
 }
 
 // serviceSummary is a compact description of one service.
 type serviceSummary struct {
-	Name       string   `json:"name"`
-	Operations []string `json:"operations,omitempty"`
+	Name       string   ``
+	Operations []string ``
 }
 
 // schemaSummary is the resolved-schema overview returned by zever_schema.
 type schemaSummary struct {
-	Modules []moduleSummary `json:"modules"`
+	Modules []moduleSummary ``
 }
 
 // summarize builds a schemaSummary from a resolved schema.
@@ -252,9 +252,9 @@ func schemaTool() toolDef {
 
 // explainInput names a schema element by dotted path.
 type explainInput struct {
-	Dir   string            `json:"dir"`
-	Files map[string]string `json:"files"`
-	Path  string            `json:"path"`
+	Dir   string            ``
+	Files map[string]string ``
+	Path  string            ``
 }
 
 // explainTool describes a module, entity, message, service or operation.

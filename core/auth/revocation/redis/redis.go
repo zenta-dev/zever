@@ -37,9 +37,9 @@ type Options struct {
 	// ConnectOptions holds the shared Redis connection settings.
 	redisopt.ConnectOptions
 	// URL is the Redis connection URL. When set it takes precedence over Addr.
-	URL string `json:"url"`
+	URL string ``
 	// Prefix scopes revocation keys to one namespace. Empty uses defaultPrefix.
-	Prefix string `json:"prefix"`
+	Prefix string ``
 }
 
 type store struct {

@@ -105,7 +105,7 @@ func resourceList() []map[string]any {
 
 // resourceReadParams is the resources/read request payload.
 type resourceReadParams struct {
-	URI string `json:"uri"`
+	URI string ``
 }
 
 // readResource serves one static resource by URI.

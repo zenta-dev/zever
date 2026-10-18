@@ -550,14 +550,47 @@ func normEqualFold(a, b string) bool {
 }
 
 // jsonFieldName reports the encoding/json key for a struct field: the tag
-// name when present, otherwise the Go field name.
+// name when present, otherwise the Go field name converted to snake_case.
 func jsonFieldName(sf reflect.StructField) string {
 	if tag, ok := sf.Tag.Lookup("json"); ok {
 		if name, _, _ := strings.Cut(tag, ","); name != "" {
 			return name
 		}
 	}
-	return sf.Name
+	// No json tag: convert Go field name (CamelCase) to snake_case.
+	// Handles abbreviations (API -> api, DB -> db, ID -> id, JWT -> jwt, etc.)
+	return camelToSnake(sf.Name)
+}
+
+// camelToSnake converts CamelCase to snake_case.
+// Handles abbreviations: APIKey -> api_key, DBConn -> db_conn, ID -> id, JWTToken -> jwt_token, etc.
+func camelToSnake(s string) string {
+	if s == "" {
+		return ""
+	}
+	var buf strings.Builder
+	buf.Grow(len(s) * 2)
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				prev := s[i-1]
+				next := byte(0)
+				if i+1 < len(s) {
+					next = s[i+1]
+				}
+				// Add underscore before uppercase if:
+				// - previous char is lowercase (camelCase boundary)
+				// - next char is lowercase (abbreviation boundary like APIKey -> api_key)
+				if (prev >= 'a' && prev <= 'z') || (next >= 'a' && next <= 'z') {
+					buf.WriteByte('_')
+				}
+			}
+			buf.WriteByte(byte(r | 0x20)) // lowercase
+		} else {
+			buf.WriteByte(byte(r))
+		}
+	}
+	return buf.String()
 }
 
 // fieldCandidates lists v's exported field names (JSON key, embedded

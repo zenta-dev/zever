@@ -16,7 +16,7 @@ import (
 func JudgeScorer(client ai.AI, model string) func(ctx context.Context, output, expected string) (float64, error) {
 	return func(ctx context.Context, output, expected string) (float64, error) {
 		var out struct {
-			Score float64 `json:"score"`
+			Score float64 ``
 		}
 
 		msgs := []ai.Message{{

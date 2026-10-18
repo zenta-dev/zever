@@ -14,20 +14,20 @@ const MaxIDLen = 255
 // json/toml/yaml tags so it round-trips through file configuration and JSON.
 type Message struct {
 	// ID uniquely identifies the message. Required, at most MaxIDLen bytes.
-	ID string `json:"id"`
+	ID string ``
 	// Topic is the destination topic. Required.
-	Topic string `json:"topic"`
+	Topic string ``
 	// Key is an optional partition/routing key.
-	Key string `json:"key,omitempty"`
+	Key string ``
 	// Payload is the raw message body.
-	Payload []byte `json:"payload,omitempty"`
+	Payload []byte ``
 	// Headers holds metadata attached to the message.
-	Headers map[string]string `json:"headers,omitempty"`
+	Headers map[string]string ``
 	// CreatedAt is the message creation timestamp. Zero means "stamp now"
 	// for adapters that persist it.
-	CreatedAt time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time ``
 	// Attempts is the delivery attempt count observed by the publisher.
-	Attempts int `json:"attempts"`
+	Attempts int ``
 }
 
 // Validate reports whether the message is well-formed: ID and Topic must be

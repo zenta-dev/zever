@@ -34,7 +34,7 @@ var newTicker = time.NewTicker
 type Options struct {
 	// MaxEntries caps the number of tracked revocations. <= 0 uses
 	// DefaultMaxEntries.
-	MaxEntries int `json:"max_entries"`
+	MaxEntries int ``
 }
 
 var _ revocation.Store = (*store)(nil)

@@ -50,16 +50,16 @@ type verdict struct {
 
 // frame mirrors one govulncheck trace frame (only decided fields kept).
 type frame struct {
-	Function string `json:"function"`
+	Function string ``
 }
 
 // findingMsg mirrors one {"finding": {...}} stream object.
 type findingMsg struct {
 	Finding struct {
-		OSV          string  `json:"osv"`
-		FixedVersion string  `json:"fixed_version"`
-		Trace        []frame `json:"trace"`
-	} `json:"finding"`
+		OSV          string  ``
+		FixedVersion string  ``
+		Trace        []frame ``
+	} ``
 }
 
 // parseFindings decodes a govulncheck -json object stream, returning every
@@ -100,7 +100,7 @@ func parseFindings(r io.Reader) ([]finding, error) {
 
 // allowFile mirrors the allowlist JSON document.
 type allowFile struct {
-	Allowlist []allowEntry `json:"allowlist"`
+	Allowlist []allowEntry ``
 }
 
 // parseAllowlist decodes and validates the allowlist document: every entry

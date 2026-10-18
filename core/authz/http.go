@@ -11,7 +11,7 @@ import (
 
 // authzErrorBody is the JSON error body written by writeAuthzError.
 type authzErrorBody struct {
-	Error string `json:"error"`
+	Error string ``
 }
 
 var authzErrorCodec = codec.JSONCodec[authzErrorBody]{}

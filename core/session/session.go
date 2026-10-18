@@ -11,15 +11,15 @@ import (
 // Session is a server-side session record.
 type Session struct {
 	// ID uniquely identifies the session. It is a secret.
-	ID string `json:"id"`
+	ID string ``
 	// Data holds arbitrary session values.
-	Data map[string]any `json:"data"`
+	Data map[string]any ``
 	// CreatedAt is when the session was created.
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time ``
 	// UpdatedAt is when the session was last saved.
-	UpdatedAt time.Time `json:"updated_at"`
+	UpdatedAt time.Time ``
 	// ExpiresAt is when the session expires. Zero means no expiry.
-	ExpiresAt time.Time `json:"expires_at"`
+	ExpiresAt time.Time ``
 }
 
 // NewSession creates a Session with id, empty data, and lifetimes
