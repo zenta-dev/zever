@@ -93,11 +93,13 @@ func Resolve(env Env) (*Config, error) {
 // default, matching the old file+env layering).
 func stripAdapterKeys(env Env) Env {
 	out := make(Env, len(env))
+	adapters := adapterEnvKeys()
+
 outer:
 	for key, value := range env {
 		upper := strings.ToUpper(key)
-		for _, svc := range knownServiceNames() {
-			if upper == strings.ToUpper(svc)+"_ADAPTER" {
+		for _, adapter := range adapters {
+			if upper == adapter {
 				continue outer
 			}
 		}
@@ -106,17 +108,43 @@ outer:
 	return out
 }
 
+// adapterEnvKeys returns the uppercased SERVICE_ADAPTER key of every known
+// service. The set is built once per call: the ambient environment holds
+// hundreds of unrelated keys, and none of them needs the service list
+// rebuilt for every key.
+func adapterEnvKeys() []string {
+	names := knownServiceNames()
+	out := make([]string, 0, len(names))
+
+	for _, svc := range names {
+		out = append(out, strings.ToUpper(svc)+"_ADAPTER")
+	}
+
+	return out
+}
+
 // lookupEnvKey finds key (already uppercased) in env case-insensitively,
 // reporting the value. When several cases of the same key exist, the last
 // in sorted order wins, keeping multi-case environments deterministic.
 func lookupEnvKey(env Env, key string) (string, bool) {
-	var found bool
-	var value string
-	for _, k := range sortedEnvKeys(env) {
-		if strings.ToUpper(k) == key {
-			value, found = env[k], true
+	var (
+		found bool
+		value string
+		best  string
+	)
+
+	for k, v := range env {
+		if strings.ToUpper(k) != key {
+			continue
+		}
+
+		// Sorted order wins: the greatest matching key is the last one
+		// in sorted order.
+		if !found || k > best {
+			best, value, found = k, v, true
 		}
 	}
+
 	return value, found
 }
 
@@ -128,6 +156,28 @@ func sortedEnvKeys(env Env) []string {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
+	return keys
+}
+
+// prefixedEnvKeys returns the env keys that belong to the wired prefix, in
+// sorted order. Filtering before sorting keeps the walk proportional to the
+// service's own keys instead of the whole environment: a service owns a
+// handful of keys, while the process environment holds hundreds of
+// unrelated ones. The order matches sortedEnvKeys over the whole
+// environment, so the diagnostics stay deterministic.
+func prefixedEnvKeys(env Env, prefix string, named bool) []string {
+	var keys []string
+
+	for key := range env {
+		if _, ok := applyPrefixKey(key, prefix, named); !ok {
+			continue
+		}
+
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
 	return keys
 }
 
@@ -190,7 +240,7 @@ func ApplyEnv(env Env, service, name string, dst any) error {
 	if candidates == nil {
 		candidates = fieldCandidates(root)
 	}
-	for _, key := range sortedEnvKeys(env) {
+	for _, key := range prefixedEnvKeys(env, prefix, named) {
 		rest, ok := applyPrefixKey(key, prefix, named)
 		if !ok {
 			continue

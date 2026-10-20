@@ -1,8 +1,62 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 )
+
+// ambientEnv returns a deterministic environment shaped like a real process
+// environment: hundreds of unrelated variables plus a few service keys. The
+// service keys are the only ones a service's overlay may read.
+func ambientEnv() Env {
+	const ambient = 216
+
+	env := make(Env, ambient+4)
+	for i := 0; i < ambient; i++ {
+		env[fmt.Sprintf("AMBIENT_%03d", i)] = "value"
+	}
+
+	env["DB_ADAPTER"] = "sqlite"
+	env["DB_MAXCONNS"] = "20"
+	env["DB_PATH"] = "/tmp/zever-bench.db"
+	env["LOG_ADAPTER"] = "slog"
+
+	return env
+}
+
+// BenchmarkApplyEnvAmbient measures the environment overlay against a
+// process-sized environment: the walk must cost the service's own keys, not
+// every ambient variable.
+func BenchmarkApplyEnvAmbient(b *testing.B) {
+	env := ambientEnv()
+	cfg := Default()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+			b.Fatalf("ApplyEnv: %v", err)
+		}
+	}
+}
+
+// BenchmarkResolveEnvAmbient measures the full env-only resolution against a
+// process-sized environment.
+func BenchmarkResolveEnvAmbient(b *testing.B) {
+	env := ambientEnv()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		cfg, err := Resolve(env)
+		if err != nil {
+			b.Fatalf("Resolve: %v", err)
+		}
+		if cfg.DB.Options.MaxConns != 20 {
+			b.Fatalf("max_conns = %d, want 20", cfg.DB.Options.MaxConns)
+		}
+	}
+}
 
 // BenchmarkDefault measures building the zero-infrastructure default config.
 func BenchmarkDefault(b *testing.B) {
