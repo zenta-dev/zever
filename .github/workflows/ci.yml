@@ -200,6 +200,28 @@ jobs:
       - name: Check module graph closure
         run: go run ./tools/modgraph --check
 
+  # Struct-tag gate: AST-based check that file-decoded Options and JSON wire
+  # types keep their json/toml/yaml tags (see the serialization rule in
+  # AGENTS.md). The `make check-tags` target lands via fix/restore-json-tags;
+  # the job is wired here now so the gate turns green as soon as that branch
+  # merges.
+  check-tags:
+    name: check-tags
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Check struct tags (AST)
+        run: make check-tags
+
   # Conformance gate: runs every in-kit conformance suite (core/<battery>)
   # plus every cross-adapter conformance suite (adapters/<battery>/<adapter>).
   # All suites are hermetic (memory/local-backed, miniredis, sqlite, stubs;
@@ -841,7 +863,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-24.04
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags]
     steps:
       - name: Aggregate results
         run: |
