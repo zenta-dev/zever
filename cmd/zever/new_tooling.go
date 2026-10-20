@@ -223,7 +223,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/usr
 // invocations. The CLI is installed from the release binary via install.sh:
 // `go install` of cmd/zever only works from the release that ships a
 // replace-free cmd/zever/go.mod (v0.7.2), so scaffolds pinned to older
-// versions could not build.
+// versions could not build. The runner image is pinned to ubuntu-24.04
+// (matching the zever repo) so new projects do not inherit the
+// ubuntu-latest migration to Ubuntu 26.
 func renderCIGitHubWorkflow(goVersion, cliPin, backends string) string {
 	if goVersion == "" {
 		goVersion = defaultGoVersion
@@ -254,7 +256,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
