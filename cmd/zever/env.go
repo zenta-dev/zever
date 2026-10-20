@@ -50,10 +50,13 @@ func resolveServiceConfig(configPath string) (*config.Config, error) {
 // wrapEnvConfigError wraps a config resolution failure with the exact-key
 // hint when the failure names an unknown env field, so every command that
 // resolves service config from the environment points at the offending key
-// the same way (see envTypoHint).
+// the same way (see envTypoHint). The hint is a hint like every other: it
+// stays out of the way under ZEVER_NO_HINT or --quiet.
 func wrapEnvConfigError(tag string, env config.Env, err error) error {
-	if hint := envTypoHint(env, err); hint != "" {
-		return fmt.Errorf("%s: %w\n%s", tag, err, hint)
+	if shouldShowHint() {
+		if hint := envTypoHint(env, err); hint != "" {
+			return fmt.Errorf("%s: %w\n%s", tag, err, hint)
+		}
 	}
 
 	return fmt.Errorf("%s: %w", tag, err)
