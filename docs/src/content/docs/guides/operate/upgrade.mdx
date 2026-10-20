@@ -44,7 +44,7 @@ Public API changes (new exports, config struct or default changes, serialization
    ```
 
    Expected output: `upgrade ok: true`. Container construction is stable across bumps (`container.New(nil)` stays valid, and `Close(ctx)` closes only resolved services in dependency order), so if this breaks the changelog names the fix.
-5. Re-validate production config files. Strict decoding turns renames into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`cfg.RedactedServices()`) and close wiring (`Close(ctx)` with a timeout parent).
+5. Re-validate production configuration. Env resolution is strict about the keys it understands, so renames turn into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`cfg.RedactedServices()`) and close wiring (`Close(ctx)` with a timeout parent).
 </Steps>
 
 Pin the CLI to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior and the TUI does not skew from the backend.
@@ -83,7 +83,7 @@ For the multi-module import changes see [Migrate to the multi-module layout](../
 
 ## Release process (maintainers)
 
-Releases bump every version pin together (the file list is in the `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` creates one `<module-path>/vX.Y.Z` tag per module in dependency order (there is no root `go.mod`, so no bare tag). `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
+Releases bump every version pin together (the file list is in the `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` creates one `<module-path>/vX.Y.Z` tag per module in dependency order, plus the bare `vX.Y.Z` release tag the release workflow fires on. Both are published in one atomic push, so the workflow starts only once every module tag is on origin. `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
 
 ## Related
 

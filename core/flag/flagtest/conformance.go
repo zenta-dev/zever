@@ -107,7 +107,7 @@ func checkFallback(ctx context.Context, f flag.Flag) error {
 	}
 
 	var out struct {
-		Enabled bool ``
+		Enabled bool `json:"enabled"`
 	}
 
 	if err := f.JSON(ctx, missing, &out, map[string]any{"enabled": true}); err != nil {

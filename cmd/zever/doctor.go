@@ -361,9 +361,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 		// for the exact-key typo hint (best-effort: a hint failure keeps
 		// the wrapped error, which already carries the did-you-mean).
 		if env, eenv := config.FromEnv(); eenv == nil {
-			if hint := envTypoHint(env, err); hint != "" {
-				return fmt.Errorf("zever doctor: resolve config from env: %w\n%s", err, hint)
-			}
+			return wrapEnvConfigError("zever doctor: resolve config from env", env, err)
 		}
 
 		return fmt.Errorf("zever doctor: resolve config from env: %w", err)
@@ -473,6 +471,13 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 		}
 
 		_, _ = fmt.Fprintf(out, "%s  %s  %s\n", cyan(padded), failMark(), row.Error)
+
+		// Every failing row carries its own next action: the env key to
+		// set when the error names a missing option, else the command
+		// that shows the battery's resolved values.
+		if h := doctorFixHint(row.Name, row.Error); h != "" && shouldShowHint() {
+			_, _ = fmt.Fprintf(out, "%s  %s\n", strings.Repeat(" ", maxLen), dim("hint: "+h))
+		}
 	}
 
 	_, _ = fmt.Fprintln(out, "")
@@ -480,7 +485,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	if failed {
 		summary := fmt.Sprintf("%d OK, %d %s", okCount, failCount, failure("FAIL"))
 		_, _ = fmt.Fprintln(out, dim("Summary: ")+summary)
-		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — check service env (e.g. DB_ADAPTER, AUTH_JWT_SECRET)"))
+		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — each FAIL row above names the fix (the env key to set, or the command to run)"))
 		_, _ = fmt.Fprintln(os.Stderr, dim("zever doctor: one or more batteries failed to resolve (see above)"))
 
 		return fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(rows))

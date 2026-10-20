@@ -28,7 +28,7 @@ permissions: read-all
 jobs:
   analysis:
     name: OpenSSF Scorecard analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       security-events: write # upload SARIF to code scanning
       id-token: write # OIDC for Scorecard publish (no PAT needed)

@@ -220,3 +220,61 @@ func TestNestedModuleSubtreeSkipped(t *testing.T) {
 	}
 	mustEqual(t, "localImports", sortedSet(got), []string{})
 }
+
+// TestFindModulesSkipsWorktreeAndHarnessDirs asserts that modules living in
+// a nested worktree, an agent harness checkout or a vendored copy are not
+// repo modules: a worktree is a full checkout of the repo, so its modules
+// duplicate the repo's own and made the module graph see a module that does
+// not exist in the tagged tree (tag path rule) and made the pin gate read a
+// worktree's go.mod.
+func TestFindModulesSkipsWorktreeAndHarnessDirs(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "libs", "leaf", "go.mod"),
+		"module github.com/zenta-dev/zever/libs/leaf\n\ngo 1.27.0\n")
+	mustWriteFile(t, filepath.Join(root, "libs", "leaf", "leaf.go"), "package leaf\n")
+	// A module that exists only inside a worktree: its module path is the
+	// repo path, so counting it breaks the tag path rule.
+	mustWriteFile(t, filepath.Join(root, ".worktrees", "feature", "tools", "newtool", "go.mod"),
+		"module github.com/zenta-dev/zever/tools/newtool\n\ngo 1.27.0\n")
+	mustWriteFile(t, filepath.Join(root, ".claude", "worktrees", "harness", "go.mod"),
+		"module github.com/zenta-dev/zever/harness\n\ngo 1.27.0\n")
+	mustWriteFile(t, filepath.Join(root, "docs", "node_modules", "pkg", "go.mod"),
+		"module github.com/zenta-dev/zever/vendored\n\ngo 1.27.0\n")
+
+	mods, err := findModules(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustEqual(t, "modules", mods, map[string]string{
+		"github.com/zenta-dev/zever/libs/leaf": "libs/leaf",
+	})
+	mustEqual(t, "tagPathDrift", tagPathDrift(mods), map[string]string{})
+}
+
+// TestSkipModuleDir pins the exclusion set shared with tools/tag-release.sh:
+// the git metadata dir, nested worktrees and the harness checkout dir at the
+// repo root, plus any node_modules copy. A real module dir is never skipped.
+func TestSkipModuleDir(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		rel  string
+		want bool
+	}{
+		{"root", ".", false},
+		{"git dir", ".git", true},
+		{"worktrees", ".worktrees", true},
+		{"harness", ".claude", true},
+		{"node_modules at root", "node_modules", true},
+		{"node_modules nested", "docs/node_modules", true},
+		{"module dir", "libs/leaf", false},
+		{"testdata module dir", "container/testdata/compilefail/sealed", false},
+		{"github dir", ".github", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mustEqual(t, "skipModuleDir", skipModuleDir(tc.rel), tc.want)
+		})
+	}
+}

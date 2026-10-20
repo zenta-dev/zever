@@ -12,9 +12,9 @@ import (
 
 // doctorBattery is one row of the doctor JSON document.
 type doctorBattery struct {
-	Name  string ``
-	OK    bool   ``
-	Error string ``
+	Name  string `json:"name"`
+	OK    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
 }
 
 // Doctor resolves every boot battery through a real container and prints

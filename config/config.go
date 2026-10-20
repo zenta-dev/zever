@@ -47,8 +47,8 @@ import (
 // The adapter names the backend implementation (for example "sqlite");
 // Options carries that backend's typed settings.
 type Service[T any] struct {
-	Adapter string ``
-	Options T      ``
+	Adapter string `json:"adapter"`
+	Options T      `json:"options"`
 }
 
 // ServiceConfig is the display envelope for a single service: the adapter
@@ -56,56 +56,56 @@ type Service[T any] struct {
 // display path for option maps.
 type ServiceConfig struct {
 	// Adapter names the backend implementation (for example "sqlite").
-	Adapter string ``
+	Adapter string `json:"adapter"`
 	// Options carries the backend's redacted settings.
-	Options map[string]any ``
+	Options map[string]any `json:"options"`
 }
 
 // Config holds the resolved typed configuration for every service.
 type Config struct {
-	AI            Service[ai.Options]            ``
-	Analytics     Service[analytics.Options]     ``
-	Auth          Service[auth.Options]          ``
-	Billing       Service[billing.Options]       ``
-	Cache         Service[cache.Options]         ``
-	CDN           Service[cdn.Options]           ``
-	Crypto        Service[crypto.Options]        ``
-	DB            Service[db.Options]            ``
-	Document      Service[document.Options]      ``
-	EventBus      Service[eventbus.Options]      ``
-	Flag          Service[flag.Options]          ``
-	Geo           Service[geo.Options]           ``
-	I18n          Service[i18n.Options]          ``
-	Idempotency   Service[idempotency.Options]   ``
-	Lock          Service[lock.Options]          ``
-	Log           Service[log.Options]           ``
-	Mailer        Service[mailer.Options]        ``
-	Media         Service[media.Options]         ``
-	Notification  Service[notification.Options]  ``
-	Observability Service[observability.Options] ``
-	Outbox        Service[outbox.Options]        ``
-	Password      Service[password.Options]      ``
-	Payment       Service[payment.Options]       ``
-	Permission    Service[permission.Options]    ``
-	Queue         Service[queue.Options]         ``
-	RateLimit     Service[ratelimit.Options]     ``
-	Resilience    Service[resilience.Options]    ``
-	Router        Service[router.Options]        ``
-	Scheduler     Service[scheduler.Options]     ``
-	Search        Service[search.Options]        ``
-	Secrets       Service[secrets.Options]       ``
-	Session       Service[session.Options]       ``
-	Storage       Service[storage.Options]       ``
-	Tenant        Service[tenant.Options]        ``
-	VectorStore   Service[vectorstore.Options]   ``
-	Webhook       Service[webhook.Options]       ``
-	Workflow      Service[workflow.Options]      ``
+	AI            Service[ai.Options]            `json:"ai"`
+	Analytics     Service[analytics.Options]     `json:"analytics"`
+	Auth          Service[auth.Options]          `json:"auth"`
+	Billing       Service[billing.Options]       `json:"billing"`
+	Cache         Service[cache.Options]         `json:"cache"`
+	CDN           Service[cdn.Options]           `json:"cdn"`
+	Crypto        Service[crypto.Options]        `json:"crypto"`
+	DB            Service[db.Options]            `json:"db"`
+	Document      Service[document.Options]      `json:"document"`
+	EventBus      Service[eventbus.Options]      `json:"eventbus"`
+	Flag          Service[flag.Options]          `json:"flag"`
+	Geo           Service[geo.Options]           `json:"geo"`
+	I18n          Service[i18n.Options]          `json:"i18n"`
+	Idempotency   Service[idempotency.Options]   `json:"idempotency"`
+	Lock          Service[lock.Options]          `json:"lock"`
+	Log           Service[log.Options]           `json:"log"`
+	Mailer        Service[mailer.Options]        `json:"mailer"`
+	Media         Service[media.Options]         `json:"media"`
+	Notification  Service[notification.Options]  `json:"notification"`
+	Observability Service[observability.Options] `json:"observability"`
+	Outbox        Service[outbox.Options]        `json:"outbox"`
+	Password      Service[password.Options]      `json:"password"`
+	Payment       Service[payment.Options]       `json:"payment"`
+	Permission    Service[permission.Options]    `json:"permission"`
+	Queue         Service[queue.Options]         `json:"queue"`
+	RateLimit     Service[ratelimit.Options]     `json:"ratelimit"`
+	Resilience    Service[resilience.Options]    `json:"resilience"`
+	Router        Service[router.Options]        `json:"router"`
+	Scheduler     Service[scheduler.Options]     `json:"scheduler"`
+	Search        Service[search.Options]        `json:"search"`
+	Secrets       Service[secrets.Options]       `json:"secrets"`
+	Session       Service[session.Options]       `json:"session"`
+	Storage       Service[storage.Options]       `json:"storage"`
+	Tenant        Service[tenant.Options]        `json:"tenant"`
+	VectorStore   Service[vectorstore.Options]   `json:"vectorstore"`
+	Webhook       Service[webhook.Options]       `json:"webhook"`
+	Workflow      Service[workflow.Options]      `json:"workflow"`
 	// Plugins holds third-party plugin services keyed by plugin name. Each
 	// entry carries the plugin's adapter selection plus its raw, untyped
 	// options: unknown option fields pass through untouched because the
 	// plugin validates them itself (see RegisterPluginValidator). Nil by
 	// default; Default leaves it nil and merge initializes it on first use.
-	Plugins map[string]Service[json.RawMessage] ``
+	Plugins map[string]Service[json.RawMessage] `json:"plugins"`
 }
 
 // knownServiceNames returns the 37 lowercase service names in sorted order.

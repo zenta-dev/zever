@@ -7,23 +7,12 @@ Each `core/<b>` package holds one interface plus a `Register`/`Open` registry, e
 
 ## Swap an adapter by config
 
-```yaml
-cache:
-  adapter: redis
-  options:
-    addr: redis:6379
-queue:
-  adapter: redis
-db:
-  adapter: postgres
-  options:
-    dsn: postgres://app:secret@db:5432/app
-```
-
 ```sh
 CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
 QUEUE_ADAPTER=redis
 DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
 ```
 
 ## Resolve through the container

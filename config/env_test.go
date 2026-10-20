@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -156,15 +157,19 @@ func TestEnvIgnoreUnknownHeads(t *testing.T) {
 	}
 }
 
-// TestEnvUnknownFieldFails pins the fail-fast rule: a key under a WIRED
-// service prefix that resolves to no field is an error, not a silent skip,
-// so typos surface instead of booting with defaults.
+// TestEnvUnknownFieldFails pins the fail-fast rule for typos: a key under a
+// WIRED service prefix that is close to a known field is an error, not a
+// silent skip, so typos surface instead of booting with defaults. The
+// error carries a did-you-mean hint.
+//
+// Keys that are close to NO known field are ambient variables and are
+// ignored instead (see TestEnvIgnoresAmbientVariables); StrictEnvKey turns
+// them back into errors (see TestEnvStrictModeRejectsAmbientKeys).
 func TestEnvUnknownFieldFails(t *testing.T) {
 	t.Parallel()
 	for _, key := range []string{
-		"DB_NOPE_X", "AUTH_TOKEN", "PERMISSION_RULES",
-		"OBSERVABILITY_HEADERS", "SCHEDULER_DISPATCHER_Q",
-		"STORAGE_POLICY_X", "DB_DSN_X", "EVENTBUS_ONPANIC", "SCHEDULER_DISPATCHER",
+		"DB_MAXCONN", "AUTH_JWT_SECRT", "PERMISSION_RULES",
+		"OBSERVABILITY_HEADERS", "STORAGE_POLICY_X", "DB_DSN_X",
 	} {
 		t.Run(key, func(t *testing.T) {
 			t.Parallel()
@@ -178,6 +183,14 @@ func TestEnvUnknownFieldFails(t *testing.T) {
 			}
 			if !errors.Is(err, ErrUnknownField) {
 				t.Fatalf("%s: want ErrUnknownField match: %v", key, err)
+			}
+			if unknown.Suggestion == "" {
+				t.Fatalf("%s: want a did-you-mean suggestion: %v", key, err)
+			}
+			want := fmt.Sprintf("config: unknown field %q for service %q (did you mean %q?)",
+				unknown.Field, unknown.Service, unknown.Suggestion)
+			if err.Error() != want {
+				t.Fatalf("%s: error = %q, want %q", key, err.Error(), want)
 			}
 		})
 	}
@@ -277,5 +290,42 @@ func TestSetOptionFieldDirect(t *testing.T) {
 	n := 1
 	if err := setOptionField("svc", &n, []string{"shown"}, "v"); !errors.As(err, &unknown) {
 		t.Fatalf("want UnknownFieldError, got %v", err)
+	}
+}
+
+// TestCamelToSnake pins the CamelCase -> snake_case conversion used by
+// jsonFieldName for untagged Options fields. Expectations are derived from the
+// implementation in env.go, not from a spec: an uppercase ASCII rune inserts
+// "_" when the previous byte is lowercase ASCII or the next byte is lowercase
+// ASCII, and is otherwise lowercased with no separator. Digits are written
+// verbatim and never trigger a separator, so an uppercase letter is only split
+// off a digit run when the following letter is lowercase (DB2 -> db2,
+// DB2Conn -> db2_conn). Non-ASCII runes are written unchanged: they are never
+// lowercased and never index prev/next, so non-ASCII input cannot panic.
+func TestCamelToSnake(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"A", "a"},
+		{"API", "api"},
+		{"APIKey", "api_key"},
+		{"dbMaxConns", "db_max_conns"},
+		{"HTTPServer", "http_server"},
+		{"OIDCIssuerURL", "oidc_issuer_url"},
+		{"ABCDef", "abc_def"},
+		{"DB2", "db2"},
+		{"DB2Conn", "db2_conn"},
+		{"Max2Retries", "max2_retries"},
+		{"Ünicode", "Ünicode"},
+		{"caféAPIKey", "caféapi_key"},
+	}
+	for _, tt := range tests {
+		if got := camelToSnake(tt.in); got != tt.want {
+			t.Errorf("camelToSnake(%q) = %q, want %q", tt.in, got, tt.want)
+		}
 	}
 }

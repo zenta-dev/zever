@@ -50,7 +50,7 @@ func main() {
 
 The `1` assumes the fixture lists Berlin; `Distance` is haversine over a 6371 km sphere, in meters.
 
-The bookings example pins `geo.adapter: static`; its tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. `ValidCoord` checks WGS84 range and finiteness before coordinates reach a provider.
+The bookings example pins `GEO_ADAPTER=static`; its tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. `ValidCoord` checks WGS84 range and finiteness before coordinates reach a provider.
 
 ## Use OSM or Google in production
 

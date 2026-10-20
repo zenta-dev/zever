@@ -142,7 +142,7 @@ func conformanceDispatchRoundTrip(t *testing.T) {
 	d := &job.Dispatcher{Q: q}
 
 	type kitArgs struct {
-		Name string ``
+		Name string `json:"name"`
 	}
 
 	done := make(chan string, 1)

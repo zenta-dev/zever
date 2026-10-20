@@ -7,17 +7,17 @@ import (
 // Options configures the acme storage adapter.
 type Options struct {
 	// APIKey is the "api_key" option. TODO: document it.
-	APIKey string `json:"api_key" toml:"api_key" yaml:"api_key"`
+	APIKey string `json:"api_key"`
 	// Timeout is the "timeout" option. TODO: document it.
-	Timeout time.Duration `json:"timeout" toml:"timeout" yaml:"timeout"`
+	Timeout time.Duration `json:"timeout"`
 	// MaxRetries is the "max_retries" option. TODO: document it.
-	MaxRetries int `json:"max_retries" toml:"max_retries" yaml:"max_retries"`
+	MaxRetries int `json:"max_retries"`
 	// Endpoints is the "endpoints" option. TODO: document it.
-	Endpoints []string `json:"endpoints" toml:"endpoints" yaml:"endpoints"`
+	Endpoints []string `json:"endpoints"`
 	// UseTLS is the "use_tls" option. TODO: document it.
-	UseTLS bool `json:"use_tls" toml:"use_tls" yaml:"use_tls"`
+	UseTLS bool `json:"use_tls"`
 	// Extra is the "extra" option. TODO: document it.
-	Extra map[string]any `json:"extra" toml:"extra" yaml:"extra"`
+	Extra map[string]any `json:"extra"`
 }
 
 // fieldOr returns the T held at key, or def when the key is missing or held

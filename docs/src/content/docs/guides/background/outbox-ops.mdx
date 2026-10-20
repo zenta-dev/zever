@@ -19,8 +19,8 @@ The relay emits through the `observability.Provider` on
 `outbox.Options.Provider`. Telemetry is best-effort: a nil provider
 makes every metric a no-op, and metric or span errors are discarded
 (`_ =`) so a metrics backend outage can never fail a publish. Production
-therefore needs `observability.adapter: otlp` with `service_name` and an
-`endpoint` (with `stdout` the values print locally, with `noop` they go
+therefore needs `OBSERVABILITY_ADAPTER=otlp` with `OBSERVABILITY_SERVICE_NAME` and an
+`OBSERVABILITY_ENDPOINT` (with `stdout` the values print locally, with `noop` they go
 nowhere). Scope is `outbox`.
 
 | Metric | Type | Meaning |
@@ -218,7 +218,7 @@ zever outbox dlq purge --id msg-01HZX...
 zever outbox purge --before 168h   # processed rows older than 7 days
 ```
 
-Every command accepts `--dsn`, `--table`, and `--config`; without them
+Every command accepts `--dsn` and `--table`; without them
 the CLI resolves from environment (`.env` / `.env.local` + process env). Run one from a deploy box
 with database access, not from every replica.
 
@@ -231,23 +231,20 @@ It is a stronger signal than `pending > 0` (a busy relay is healthy, a
 relay holding old rows is stuck). That 5-minute default is also why the
 SLA alert above is expressed as `> 300`.
 
-Readiness is opt-in. With `outbox.options.stall_readiness: true` the
+Readiness is opt-in. With `OUTBOX_STALL_READINESS=true` the
 generated server's `/readyz` returns 503 and the gRPC health status
 flips to `NOT_SERVING` while `Status().Stalled` holds, which pulls the
 replica out of the load balancer instead of serving traffic it cannot
 fulfil state for:
 
-```yaml
-outbox:
-  adapter: db
-  options:
-    dsn: postgres://app:secret@db:5432/app
-    stall_readiness: true
+```sh
+OUTBOX_ADAPTER=db
+OUTBOX_DSN=postgres://app:secret@db:5432/app
+OUTBOX_STALL_READINESS=true
 ```
 
-The flag belongs under `options:` (service envelopes are strictly
-`{adapter, options}`, so a sibling `stall_readiness:` key is a decode
-error). The check itself is best-effort: a store that fails to resolve is
+The flag belongs to the `outbox` service (`OUTBOX_STALL_READINESS`), not to
+the adapter. The check itself is best-effort: a store that fails to resolve is
 skipped rather than failing readiness, so turning the flag on cannot
 make a process that never wired the outbox permanently unready.
 
@@ -297,11 +294,11 @@ func relayHealthy() error {
 ## Troubleshooting
 
 1. No `outbox.*` metrics at all: the provider is nil or the adapter is
-   `noop`. Set `observability.adapter: otlp` (plus `service_name` and
-   `endpoint`) and confirm the store was opened with a provider.
+   `noop`. Set `OBSERVABILITY_ADAPTER=otlp` (plus `OBSERVABILITY_SERVICE_NAME` and
+   `OBSERVABILITY_ENDPOINT`) and confirm the store was opened with a provider.
 2. `zever outbox status` connects but reports empty counters: the
    `--table` or `OUTBOX_TABLE` env does not match the table the
-   relay writes. Compare against `outbox.options.table`.
+   relay writes. Compare the relay's `OUTBOX_TABLE` value.
 3. `dlq requeue` looks successful but the row stays `failed`: another
    process is holding the claim lease, or the publish is failing again
    on the first attempt and the row has not yet exhausted its budget.

@@ -15,6 +15,8 @@
 # The list is explicit (not a `/**/*` glob) so it matches exactly the
 # modules `make tidy-all` / `make deps-sync` see. `make dependabot-check`
 # fails when this file is stale (e.g. after adding or removing a module).
+# Testdata modules are skipped: they are compile-fail fixtures with
+# deliberately broken dependencies, not real consumers.
 #
 # Usage: bash tools/gen-dependabot.sh          # rewrite the file
 #        bash tools/gen-dependabot.sh --check  # exit 1 if it is stale
@@ -32,7 +34,7 @@ updates:
   - package-ecosystem: gomod
     directories:
 EOF
-  find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -exec dirname {} \; \
+  find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "*/testdata/*" -exec dirname {} \; \
     | LC_ALL=C sort \
     | while IFS= read -r d; do
       if [ "$d" = "." ]; then

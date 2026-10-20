@@ -143,12 +143,12 @@ func TestRunGenerateAdapterFields(t *testing.T) {
 
 	for _, fragment := range []string{
 		`"time"`,
-		"APIKey string `json:\"api_key\" toml:\"api_key\" yaml:\"api_key\"`",
-		"Timeout time.Duration `json:\"timeout\" toml:\"timeout\" yaml:\"timeout\"`",
-		"MaxRetries int `json:\"max_retries\" toml:\"max_retries\" yaml:\"max_retries\"`",
-		"Endpoints []string `json:\"endpoints\" toml:\"endpoints\" yaml:\"endpoints\"`",
-		"UseTLS bool `json:\"use_tls\" toml:\"use_tls\" yaml:\"use_tls\"`",
-		"Extra map[string]any `json:\"extra\" toml:\"extra\" yaml:\"extra\"`",
+		"APIKey string `json:\"api_key\"`",
+		"Timeout time.Duration `json:\"timeout\"`",
+		"MaxRetries int `json:\"max_retries\"`",
+		"Endpoints []string `json:\"endpoints\"`",
+		"UseTLS bool `json:\"use_tls\"`",
+		"Extra map[string]any `json:\"extra\"`",
 		"func ParseOptions(m map[string]any) (Options, error)",
 		`o.APIKey = fieldOr[string](m, "api_key", "")`,
 		`o.Timeout = fieldOr[time.Duration](m, "timeout", 0)`,

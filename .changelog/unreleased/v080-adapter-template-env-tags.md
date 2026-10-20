@@ -1,0 +1,1 @@
+- fix(cli): `zever generate adapter` no longer emits `toml:`/`yaml:` tags in the scaffolded `Options` struct — it emits the `json:` tag only, matching the v0.8.0 env-only config migration (see `config/env.go`).

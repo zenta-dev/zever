@@ -62,17 +62,22 @@ integration tests regenerate with
 
 ## Configuration (`config/`)
 
-Layered, strictly-typed: `defaults < file < env`
-(`config/default.go:50`, `config/config.go:226`).
+Env-only, strictly-typed: `defaults < .env < .env.local < process env`
+(`config/default.go:50`).
 
 - `config.Default()` — zero-infrastructure adapters (memory, local,
   sqlite, log, noop) so tests run with no external services. Ships one
   deterministic dev-only crypto key, never for production.
-- `config.Load(path)` — strict YAML/JSON: unknown services or fields
-  are errors. `Load("")` probes `zever.yaml`/`.yml`/`.json`.
-- Env vars — no prefix, `<SERVICE>_<FIELD>` (for example
-  `DB_MAXCONNS`). Best-effort matching: unknown vars ignored, parse
-  failures on resolved fields error out.
+- `config.FromEnv()` — reads `.env`, then `.env.local`, and overlays the
+  real process environment. `config.Resolve(env)` applies that map over the
+  defaults and validates fail-closed. `config.LoadEnv(files...)` parses
+  explicit dotenv files only. There are no service config files: a legacy
+  `zever.yaml`/`.yml`/`.json` in the working directory is ignored.
+- Env vars — no prefix. The default instance is `<SERVICE>_<FIELD>` (for
+  example `DB_MAXCONNS`), a named instance `<SERVICE>__<NAME>__<FIELD>`.
+  Matching ignores case and `_`; unknown vars are ignored, unknown keys
+  under a wired service prefix and parse failures on resolved fields
+  error out.
 - Never log raw option maps; redact via `config/redact.go:257`
   (`Redact` / `RedactedServices`).
 

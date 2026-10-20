@@ -65,17 +65,23 @@ make generate      # go run ./tools/gengrammar
 
 ### Layer 1: config (`config/`)
 
-Layered, strictly-typed configuration: `defaults < file < env`.
+Env-only, strictly-typed configuration: `defaults < .env < .env.local < process env`.
 
 - `config.Default()` — zero-infrastructure adapters (memory, local, sqlite, log,
   noop, ...) so tests run with no external services. Ships one deterministic
   dev-only crypto key (never for production).
-- `config.Load(path)` — decodes YAML/JSON **strictly**: unknown services or
-  fields are errors. `Load("")` probes `zever.yaml`/`.yml`/`.json` in the cwd.
-- Env vars — **no prefix**, `<SERVICE>_<FIELD>=value` (e.g. `DB_MAXCONNS=20`,
-  `AUTH_JWT_SECRET=...`). Env matching is **best-effort**: unknown variables are
-  silently ignored (so a hostile/noisy process environment can't break startup);
-  only values that fail to parse for a *resolved* field error out.
+- `config.FromEnv()` — reads `.env`, then `.env.local`, and overlays the real
+  process environment; `config.Resolve(env)` applies that map over the defaults
+  and validates fail-closed. `config.LoadEnv(files...)` parses explicit dotenv
+  files only. There are no service config files: a legacy
+  `zever.yaml`/`.yml`/`.json` in the cwd is ignored (one-line warning).
+- Env vars — **no prefix**. The default instance is `<SERVICE>_<FIELD>=value`
+  (e.g. `DB_MAXCONNS=20`, `AUTH_JWT_SECRET=...`); a named instance is
+  `<SERVICE>__<NAME>__<FIELD>=value` and needs a matching named Ref. Env
+  matching is **best-effort** for unknown variables (so a hostile/noisy process
+  environment can't break startup) and ignores case and `_`; an unknown key
+  under a wired service prefix and a value that fails to parse for a
+  *resolved* field both error out.
 - Never log raw option maps (may hold secrets in plain strings) — always go
   through `RedactedServices`/`Redact`.
 - Full adapter-per-service table: `config/README.md`.
@@ -173,7 +179,7 @@ usage to stderr and exits `1` rather than hanging on a prompt; `-i`/`--interacti
 Command groups: Scaffolding (`new`, `add`, `generate`, `extract`), Inspection
 (`compile`, `check`, `breaking`, `fmt`, `doctor`, `config show`, `routes`,
 `explain`, `check-boundaries`, `graph`), Runtime (`serve`, `dev`,
-`queue:work`, `schedule:run`, `tinker`), Database (`db migrate`,
+`worker`, `schedule run`, `tinker`), Database (`db migrate`,
 `db rollback`, `db seed`), Operations (`outbox`, `upgrade`, `uninstall`),
 plus `completion` and `docs`. Global flags: `-i`, `-q`, `--no-color`,
 `--json`, `-V`.

@@ -1,0 +1,307 @@
+# golden_wire_structs.txt — v0.7.2 wire-struct registry for tagcheck.
+#
+# Format: <repo-relative package dir><TAB><struct name><TAB><v0.7.2 source file>
+# Blank lines and # comments are ignored.
+#
+# A struct listed here carried json tags on EVERY exported field at tag
+# v0.7.2, the last release before the v0.8.0 env-only config migration
+# stripped them. tagcheck requires every exported field of these structs to
+# keep a json tag, and fails if a listed struct disappears from the tree (a
+# removal or move must update this list with a justification comment —
+# deliberate and reviewable). Structs that were only partially tagged at
+# v0.7.2 (intentional Go-API-only fields such as Logger or Store handles)
+# are not pinnable by this list and are excluded.
+#
+# How this list was derived (reproducible):
+#   git worktree add /tmp/zever-v072 v0.7.2 --detach
+#   # AST scan of the worktree: struct types whose exported fields ALL carry
+#   # a json tag, skipping _test.go files and DO-NOT-EDIT generated files
+#   # (one-off helper program; the procedure is documented here so the
+#   #  derivation can be re-run and audited)
+#
+# Reconciled against the current tree:
+#   - cmd/zever/cmd/tinker-shim/* (16 structs) re-homed to cmd/zever when
+#     the tinker shim merged into generate_tinker.go / tinker_protocol.go.
+#   - cmd/zever/dbExecResult removed: the tinker shim is now generated into
+#     user projects (tinkerShimTemplate in cmd/zever/generate_tinker.go);
+#     the struct exists only as emitted template text, and the in-repo
+#     protocol mirror cmd/zever/tinker_protocol.go declares the other 15
+#     shim types. Its wire key ("rows_affected") is pinned by the template.
+#   - cmd/zever/projectFile removed: config.Load and file discovery were
+#     deleted in the v0.8.0 env-only migration, so the struct is
+#     intentionally gone.
+#
+# How to extend: when a NEW struct becomes a wire type (JSON request or
+# response, MCP payload, doctor envelope, ...), add a line here and give
+# it json tags from birth. When a wire struct is removed, delete its line
+# and say why here or in the commit message.
+adapters/ai/ollama	Options	adapters/ai/ollama/options.go
+adapters/ai/ollama	chatMessage	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	chatOptions	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	chatRequest	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	chatResponse	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	embedRequest	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	embedResponse	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	ollamaFunction	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	ollamaTool	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	ollamaToolCall	adapters/ai/ollama/ollama.go
+adapters/ai/ollama	streamResponse	adapters/ai/ollama/ollama.go
+adapters/auth/oidc	profileClaims	adapters/auth/oidc/oidc.go
+adapters/cache/db	Options	adapters/cache/db/options.go
+adapters/crypto/kms	Options	adapters/crypto/kms/options.go
+adapters/document/remote	renderRequest	adapters/document/remote/remote.go
+adapters/document/remote	renderResponse	adapters/document/remote/remote.go
+adapters/eventbus/redis	wireMessage	adapters/eventbus/redis/wire.go
+adapters/geo/osm	nominatimResult	adapters/geo/osm/osm.go
+adapters/geo/static	city	adapters/geo/static/static.go
+adapters/i18n/remote	localesResponse	adapters/i18n/remote/remote.go
+adapters/i18n/remote	translateRequest	adapters/i18n/remote/remote.go
+adapters/i18n/remote	translateResponse	adapters/i18n/remote/remote.go
+adapters/idempotency/db	Options	adapters/idempotency/db/options.go
+adapters/mailer/log	logAddress	adapters/mailer/log/log.go
+adapters/mailer/log	logAttachment	adapters/mailer/log/log.go
+adapters/mailer/log	logMessage	adapters/mailer/log/log.go
+adapters/media/ffmpeg	ProbeResult	adapters/media/ffmpeg/ffmpeg.go
+adapters/media/ffmpeg	ProbeStream	adapters/media/ffmpeg/ffmpeg.go
+adapters/media/s3	ffStream	adapters/media/s3/s3.go
+adapters/media/s3	ffprobeOutput	adapters/media/s3/s3.go
+adapters/notification/log	logNotification	adapters/notification/log/log.go
+adapters/observability/stdout	line	adapters/observability/stdout/stdout.go
+adapters/outbox/cdc	Options	adapters/outbox/cdc/options.go
+adapters/outbox/db	Options	adapters/outbox/db/options.go
+adapters/password/argon2	Options	adapters/password/argon2/options.go
+adapters/queue/db	Options	adapters/queue/db/options.go
+adapters/queue/redis	wireMessage	adapters/queue/redis/message.go
+adapters/secrets/env	Options	adapters/secrets/env/options.go
+adapters/secrets/vault	Options	adapters/secrets/vault/options.go
+adapters/session/cookie	Options	adapters/session/cookie/cookie.go
+adapters/session/db	Options	adapters/session/db/options.go
+adapters/session/db	wireSession	adapters/session/db/session.go
+adapters/session/redis	wireSession	adapters/session/redis/redis.go
+adapters/storage/local	objectMeta	adapters/storage/local/metadata.go
+adapters/storage/s3	bucketPolicyDocument	adapters/storage/s3/policy.go
+adapters/storage/s3	bucketPolicyStatement	adapters/storage/s3/policy.go
+adapters/storage/s3	rawPolicyDocument	adapters/storage/s3/policy.go
+adapters/workflow/db	Options	adapters/workflow/db/options.go
+adapters/workflow/db	sagaState	adapters/workflow/db/saga.go
+cmd/zever	Envelope	cmd/zever/output.go
+cmd/zever	JSONDiagnostic	cmd/zever/jsonout.go
+cmd/zever	ProjectConfig	cmd/zever/project.go
+cmd/zever	agentCatalog	cmd/zever/agent.go
+cmd/zever	boolResult	cmd/zever/tinker_protocol.go
+cmd/zever	breakingEntry	cmd/zever/breaking.go
+cmd/zever	buildData	cmd/zever/build.go
+cmd/zever	cacheDeleteArgs	cmd/zever/tinker_protocol.go
+cmd/zever	cacheExistsArgs	cmd/zever/tinker_protocol.go
+cmd/zever	cacheGetArgs	cmd/zever/tinker_protocol.go
+cmd/zever	cacheGetResult	cmd/zever/tinker_protocol.go
+cmd/zever	cacheSetArgs	cmd/zever/tinker_protocol.go
+cmd/zever	commandSpec	cmd/zever/agent.go
+cmd/zever	dbExecArgs	cmd/zever/tinker_protocol.go
+cmd/zever	dbQueryArgs	cmd/zever/tinker_protocol.go
+cmd/zever	dbQueryResult	cmd/zever/tinker_protocol.go
+cmd/zever	doctorRow	cmd/zever/doctor.go
+cmd/zever	exitCodeSpec	cmd/zever/agent.go
+cmd/zever	flagSpec	cmd/zever/agent.go
+cmd/zever	int64Result	cmd/zever/tinker_protocol.go
+cmd/zever	jobDispatchArgs	cmd/zever/tinker_protocol.go
+cmd/zever	outboxDeleteData	cmd/zever/outbox.go
+cmd/zever	outboxPurgeData	cmd/zever/outbox.go
+cmd/zever	outboxRequeueData	cmd/zever/outbox.go
+cmd/zever	outboxStatusData	cmd/zever/outbox.go
+cmd/zever	queueLengthArgs	cmd/zever/tinker_protocol.go
+cmd/zever	queuePushArgs	cmd/zever/tinker_protocol.go
+cmd/zever	routeEntry	cmd/zever/routes.go
+cmd/zever	serverDoctorBattery	cmd/zever/doctor_server.go
+cmd/zever	serverDoctorReport	cmd/zever/doctor_server.go
+cmd/zever	tinkerRequest	cmd/zever/tinker_protocol.go
+cmd/zever	tinkerResponse	cmd/zever/tinker_protocol.go
+cmd/zever	boolResult	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	cacheDeleteArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	cacheExistsArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	cacheGetArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	cacheGetResult	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	cacheSetArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	dbExecArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	dbQueryArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	dbQueryResult	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	int64Result	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	jobDispatchArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	queueLengthArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	queuePushArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	tinkerRequest	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+cmd/zever	tinkerResponse	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
+config	Config	config/config.go
+config	Service	config/config.go
+config	ServiceConfig	config/decode.go
+core/ai	Options	core/ai/options.go
+core/analytics	Options	core/analytics/options.go
+core/auth	JWTKey	core/auth/options.go
+core/auth	JWTOptions	core/auth/options.go
+core/auth	OIDCOptions	core/auth/options.go
+core/auth	Options	core/auth/options.go
+core/auth	SessionOptions	core/auth/options.go
+core/auth/revocation/memory	Options	core/auth/revocation/memory/memory.go
+core/auth/revocation/redis	Options	core/auth/revocation/redis/redis.go
+core/authz	authzErrorBody	core/authz/http.go
+core/cache	MemoryOptions	core/cache/options.go
+core/cache	Options	core/cache/options.go
+core/cache	RedisOptions	core/cache/options.go
+core/cdn	Options	core/cdn/options.go
+core/crypto	Options	core/crypto/options.go
+core/db	Options	core/db/options.go
+core/document	Options	core/document/options.go
+core/eventbus	Options	core/eventbus/options.go
+core/eventbus	RedisOptions	core/eventbus/options.go
+core/flag	FirebaseOptions	core/flag/options.go
+core/flag	Options	core/flag/options.go
+core/flag	StaticOptions	core/flag/options.go
+core/geo	Options	core/geo/options.go
+core/i18n	EmbedOptions	core/i18n/options.go
+core/i18n	Options	core/i18n/options.go
+core/i18n	RemoteOptions	core/i18n/options.go
+core/idempotency	Options	core/idempotency/options.go
+core/idempotency	RedisOptions	core/idempotency/options.go
+core/lock	Options	core/lock/options.go
+core/log	Options	core/log/options.go
+core/mailer	Options	core/mailer/options.go
+core/media	Options	core/media/options.go
+core/middleware	Options	core/middleware/cors.go
+core/middleware	SecurityHeadersOptions	core/middleware/securityheaders.go
+core/middleware	errorBody	core/middleware/recover.go
+core/notification	FCMOptions	core/notification/options.go
+core/notification	Options	core/notification/options.go
+core/notification	TwilioOptions	core/notification/options.go
+core/observability	Options	core/observability/options.go
+core/outbox	Message	core/outbox/message.go
+core/outbox	Options	core/outbox/options.go
+core/password	Options	core/password/options.go
+core/permission	Options	core/permission/options.go
+core/queue	DBOptions	core/queue/options.go
+core/queue	Options	core/queue/options.go
+core/queue	RedisOptions	core/queue/options.go
+core/ratelimit	Options	core/ratelimit/options.go
+core/ratelimit	RedisOptions	core/ratelimit/options.go
+core/resilience	BreakerOptions	core/resilience/options.go
+core/resilience	BulkheadOptions	core/resilience/options.go
+core/resilience	Options	core/resilience/options.go
+core/resilience	RedisOptions	core/resilience/options.go
+core/router	Options	core/router/options.go
+core/scheduler	Options	core/scheduler/options.go
+core/search	Options	core/search/options.go
+core/secrets	Options	core/secrets/options.go
+core/session	Options	core/session/options.go
+core/session	RedisOptions	core/session/options.go
+core/session	Session	core/session/session.go
+core/storage	LocalOptions	core/storage/options.go
+core/storage	Options	core/storage/options.go
+core/storage	Policy	core/storage/policy.go
+core/storage	R2Options	core/storage/options.go
+core/storage	Rule	core/storage/policy.go
+core/storage	S3Options	core/storage/options.go
+core/tenant	Options	core/tenant/options.go
+core/vectorstore	Options	core/vectorstore/options.go
+core/workflow	Options	core/workflow/options.go
+core/workflow	PostgresOptions	core/workflow/options.go
+dsl/backend/mcp	mergedManifest	dsl/backend/mcp/manifest.go
+dsl/backend/mcp	moduleManifest	dsl/backend/mcp/manifest.go
+dsl/backend/mcp	serviceManifest	dsl/backend/mcp/manifest.go
+dsl/backend/mcp	toolManifest	dsl/backend/mcp/manifest.go
+dsl/backend/openapi	components	dsl/backend/openapi/doc.go
+dsl/backend/openapi	info	dsl/backend/openapi/doc.go
+dsl/backend/openapi	mediaType	dsl/backend/openapi/render_path.go
+dsl/backend/openapi	openAPIDoc	dsl/backend/openapi/doc.go
+dsl/backend/openapi	operation	dsl/backend/openapi/render_path.go
+dsl/backend/openapi	parameter	dsl/backend/openapi/render_path.go
+dsl/backend/openapi	requestBody	dsl/backend/openapi/render_path.go
+dsl/backend/openapi	response	dsl/backend/openapi/render_path.go
+dsl/backend/openapi	schemaObject	dsl/backend/openapi/render_schema.go
+dsl/backend/openapi	securityScheme	dsl/backend/openapi/doc.go
+dsl/backend/openapi	xPermission	dsl/backend/openapi/render_path.go
+examples/bookings/internal/api	Booking	examples/bookings/internal/api/bookings.go
+examples/bookings/internal/api	Review	examples/bookings/internal/api/reviews.go
+examples/bookings/internal/api	Space	examples/bookings/internal/api/spaces.go
+examples/bookings/internal/api	bookingResponse	examples/bookings/internal/api/bookings.go
+examples/bookings/internal/api	createBookingRequest	examples/bookings/internal/api/bookings.go
+examples/bookings/internal/api	createReviewRequest	examples/bookings/internal/api/reviews.go
+examples/bookings/internal/api	createSpaceRequest	examples/bookings/internal/api/spaces.go
+examples/bookings/internal/api	loginRequest	examples/bookings/internal/api/users.go
+examples/bookings/internal/api	nearbyResult	examples/bookings/internal/api/spaces.go
+examples/bookings/internal/api	registerRequest	examples/bookings/internal/api/users.go
+examples/bookings/internal/api	updateSpaceRequest	examples/bookings/internal/api/spaces.go
+examples/bookings/internal/service/jobs	SendConfirmationArgs	examples/bookings/internal/service/jobs/confirmation.go
+examples/bookings/internal/service/jobs	confirmationPayload	examples/bookings/internal/service/jobs/confirmation.go
+examples/demoapp/internal/api	aiGenerateRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	createOrderRequest	examples/demoapp/internal/api/orders.go
+examples/demoapp/internal/api	createPostRequest	examples/demoapp/internal/api/posts.go
+examples/demoapp/internal/api	createProductRequest	examples/demoapp/internal/api/products.go
+examples/demoapp/internal/api	cryptoDecryptRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	cryptoEncryptRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	documentRenderRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	eventbusPublishRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	geoGeocodeRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	idempotencyRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	loginRequest	examples/demoapp/internal/api/auth.go
+examples/demoapp/internal/api	notificationRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	permissionCheckRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	registerRequest	examples/demoapp/internal/api/auth.go
+examples/demoapp/internal/api	searchIndexRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	storagePresignRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	vectorQueryRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	vectorUpsertRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	webhookRegisterRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/api	workflowStartRequest	examples/demoapp/internal/api/demo.go
+examples/demoapp/internal/service/jobs	ProcessOrderArgs	examples/demoapp/internal/service/jobs/jobs.go
+examples/demoapp/internal/service/jobs	SendWelcomeEmailArgs	examples/demoapp/internal/service/jobs/jobs.go
+examples/external-sms	Options	examples/external-sms/sms.go
+examples/showcase/internal/api	checkoutItem	examples/showcase/internal/api/orders.go
+examples/showcase/internal/api	checkoutRequest	examples/showcase/internal/api/orders.go
+examples/showcase/internal/api	loginRequest	examples/showcase/internal/api/users.go
+examples/showcase/internal/api	patchProductRequest	examples/showcase/internal/api/products.go
+examples/showcase/internal/api	productRequest	examples/showcase/internal/api/products.go
+examples/showcase/internal/api	productResponse	examples/showcase/internal/api/products.go
+examples/showcase/internal/api	registerRequest	examples/showcase/internal/api/users.go
+examples/showcase/internal/api	reviewRequest	examples/showcase/internal/api/orders.go
+examples/showcase/internal/api	updateProductRequest	examples/showcase/internal/api/products.go
+examples/showcase/internal/service/jobs	ProcessOrderArgs	examples/showcase/internal/service/jobs/orders.go
+examples/showcase/internal/service/jobs	SendConfirmationArgs	examples/showcase/internal/service/jobs/orders.go
+examples/sms	Options	examples/sms/sms.go
+examples/todo/internal/api	Note	examples/todo/internal/api/notes.go
+examples/todo/internal/api	createNoteRequest	examples/todo/internal/api/notes.go
+examples/todo/internal/api	loginRequest	examples/todo/internal/api/users.go
+examples/todo/internal/api	registerRequest	examples/todo/internal/api/users.go
+examples/todo/internal/api	updateNoteRequest	examples/todo/internal/api/notes.go
+shared/mcpclient	inbound	shared/mcpclient/client.go
+shared/mcpclient	request	shared/mcpclient/client.go
+shared/mcpclient	rpcErrorWire	shared/mcpclient/client.go
+shared/providersopt	Common	shared/providersopt/providersopt.go
+shared/redisopt	ConnectOptions	shared/redisopt/connect.go
+shared/redisopt	Options	shared/redisopt/options.go
+shared/s3opts	Options	shared/s3opts/s3opts.go
+tools/affected	output	tools/affected/main.go
+tools/apidiff	baselineEntry	tools/apidiff/apidiff.go
+tools/modgraph	modEditJSON	tools/modgraph/modgraph.go
+tools/vulngate	allowFile	tools/vulngate/vulngate.go
+tools/vulngate	findingMsg	tools/vulngate/vulngate.go
+tools/vulngate	frame	tools/vulngate/vulngate.go
+tools/zever-lsp	completionResolveData	tools/zever-lsp/completion.go
+tools/zever-mcp	callParams	tools/zever-mcp/server.go
+tools/zever-mcp	callToolResult	tools/zever-mcp/protocol.go
+tools/zever-mcp	compileInput	tools/zever-mcp/tools.go
+tools/zever-mcp	doctorInput	tools/zever-mcp/doctor.go
+tools/zever-mcp	elicitResult	tools/zever-mcp/elicitation.go
+tools/zever-mcp	explainInput	tools/zever-mcp/tools.go
+tools/zever-mcp	generateInput	tools/zever-mcp/generate.go
+tools/zever-mcp	initializeParams	tools/zever-mcp/server.go
+tools/zever-mcp	moduleSummary	tools/zever-mcp/tools.go
+tools/zever-mcp	promptGetParams	tools/zever-mcp/prompts.go
+tools/zever-mcp	promptMessage	tools/zever-mcp/prompts.go
+tools/zever-mcp	resourceReadParams	tools/zever-mcp/resources.go
+tools/zever-mcp	routeEntry	tools/zever-mcp/inspect.go
+tools/zever-mcp	routesResult	tools/zever-mcp/inspect.go
+tools/zever-mcp	rpcError	tools/zever-mcp/protocol.go
+tools/zever-mcp	rpcRequest	tools/zever-mcp/protocol.go
+tools/zever-mcp	rpcResponse	tools/zever-mcp/protocol.go
+tools/zever-mcp	schemaSummary	tools/zever-mcp/tools.go
+tools/zever-mcp	serviceSummary	tools/zever-mcp/tools.go
+tools/zever-mcp	textContent	tools/zever-mcp/protocol.go

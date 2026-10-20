@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -108,5 +110,159 @@ func TestClosestPrefixBonus(t *testing.T) {
 				t.Fatalf("closest(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestUnknownSubcommandErrorPutsTheErrorFirst pins the guidance shape the
+// top-level unknown-subcommand path already uses (see run in main.go): the
+// error is the first line, the closest match follows as a hint, and the
+// command that lists the real choices comes last.
+func TestUnknownSubcommandErrorPutsTheErrorFirst(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "")
+
+	err := unknownSubcommandError("zever config", "showw", []string{"show"}, "zever config -h")
+	if err == nil {
+		t.Fatal("unknownSubcommandError: got nil error")
+	}
+
+	lines := strings.Split(err.Error(), "\n")
+	if !strings.HasPrefix(lines[0], `zever config: unknown subcommand "showw"`) {
+		t.Fatalf("first line = %q, want the error", lines[0])
+	}
+
+	if !strings.Contains(err.Error(), `did you mean "show"?`) {
+		t.Fatalf("error lacks the did-you-mean hint: %q", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "zever config -h") {
+		t.Fatalf("error lacks the list command: %q", err.Error())
+	}
+}
+
+// TestUnknownSubcommandErrorKeepsTheSentinel pins that the reworded error
+// still satisfies errors.Is against ErrUnknownSubcommand, so a caller that
+// branches on the sentinel is unaffected by the message change.
+func TestUnknownSubcommandErrorKeepsTheSentinel(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "")
+
+	err := unknownSubcommandError("zever config", "showw", []string{"show"}, "zever config -h")
+	if err == nil {
+		t.Fatal("unknownSubcommandError: got nil error")
+	}
+
+	if !errors.Is(err, ErrUnknownSubcommand) {
+		t.Fatalf("error %q does not match ErrUnknownSubcommand", err.Error())
+	}
+}
+
+// TestUnknownSubcommandErrorSilencesHints pins ZEVER_NO_HINT: the
+// did-you-mean and list-command lines are hints, so silencing hints leaves
+// the failure alone.
+func TestUnknownSubcommandErrorSilencesHints(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "1")
+
+	err := unknownSubcommandError("zever config", "showw", []string{"show"}, "zever config -h")
+	if err == nil {
+		t.Fatal("unknownSubcommandError: got nil error")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "hint:") {
+		t.Fatalf("error carries a hint while ZEVER_NO_HINT is set:\n%s", msg)
+	}
+
+	if !strings.Contains(msg, `unknown subcommand "showw"`) {
+		t.Fatalf("error = %q, want the failure itself", msg)
+	}
+}
+
+// TestUnknownSubcommandErrorWithoutCloseMatch pins the no-close-match
+// shape: the error still names the command that lists the choices.
+func TestUnknownSubcommandErrorWithoutCloseMatch(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "")
+
+	err := unknownSubcommandError("zever db", "zzzzzz", allDB, "zever db -h")
+	if err == nil {
+		t.Fatal("unknownSubcommandError: got nil error")
+	}
+
+	if strings.Contains(err.Error(), "did you mean") {
+		t.Fatalf("error suggests a match that does not exist: %q", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "zever db -h") {
+		t.Fatalf("error lacks the list command: %q", err.Error())
+	}
+}
+
+// TestConfigUnknownSubcommandSkipsUsageDump pins the terminal ergonomics:
+// the error names the bad subcommand instead of burying it under the whole
+// config usage block.
+func TestConfigUnknownSubcommandSkipsUsageDump(t *testing.T) {
+	var err error
+
+	stderr := captureZeverStderr(t, func() {
+		err = runConfig([]string{"showw"})
+	})
+	if err == nil {
+		t.Fatal("runConfig showw: got nil error")
+	}
+
+	if !strings.Contains(err.Error(), `unknown subcommand "showw"`) {
+		t.Fatalf("error = %q, want the unknown subcommand", err.Error())
+	}
+
+	if strings.Contains(stderr, "Usage:") {
+		t.Fatalf("stderr carries a usage dump:\n%s", stderr)
+	}
+}
+
+// TestDBUnknownSubcommandSkipsUsageDump is the db sibling of
+// TestConfigUnknownSubcommandSkipsUsageDump.
+func TestDBUnknownSubcommandSkipsUsageDump(t *testing.T) {
+	var err error
+
+	stderr := captureZeverStderr(t, func() {
+		err = runDB([]string{"migrat"})
+	})
+	if err == nil {
+		t.Fatal("runDB migrat: got nil error")
+	}
+
+	if !strings.Contains(err.Error(), `unknown subcommand "migrat"`) {
+		t.Fatalf("error = %q, want the unknown subcommand", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), `did you mean "migrate"?`) {
+		t.Fatalf("error lacks the did-you-mean hint: %q", err.Error())
+	}
+
+	if strings.Contains(stderr, "Usage:") {
+		t.Fatalf("stderr carries a usage dump:\n%s", stderr)
+	}
+}
+
+// TestGenerateUnknownSubcommandSkipsUsageDump is the generate sibling of
+// TestConfigUnknownSubcommandSkipsUsageDump.
+func TestGenerateUnknownSubcommandSkipsUsageDump(t *testing.T) {
+	var err error
+
+	stderr := captureZeverStderr(t, func() {
+		err = runGenerate([]string{"entitty"})
+	})
+	if err == nil {
+		t.Fatal("runGenerate entitty: got nil error")
+	}
+
+	if !strings.Contains(err.Error(), `unknown subcommand "entitty"`) {
+		t.Fatalf("error = %q, want the unknown subcommand", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), `did you mean "entity"?`) {
+		t.Fatalf("error lacks the did-you-mean hint: %q", err.Error())
+	}
+
+	if strings.Contains(stderr, "Usage:") {
+		t.Fatalf("stderr carries a usage dump:\n%s", stderr)
 	}
 }

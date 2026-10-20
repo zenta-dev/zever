@@ -1,6 +1,6 @@
 # Threat model: config
 
-Audited against `config/` (`default.go`, `decode.go`, `env.go`, `redact.go`,
+Audited against `config/` (`default.go`, `dotenv.go`, `env.go`, `redact.go`,
 `validate.go`, `validate_adapters.go`) at WS6 time. Claims cite code, not intent.
 
 ## Assets
@@ -13,13 +13,17 @@ Audited against `config/` (`default.go`, `decode.go`, `env.go`, `redact.go`,
 
 ## Trust boundaries
 
-- Config file (YAML/JSON) and process environment are **untrusted input** at
-  load time: `Load(path)` decodes **strictly** — unknown services or fields
-  are errors (`decode.go`). `Load("")` probes `zever.yaml`/`.yml`/`.json` in
-  the cwd, so the cwd is part of the trust boundary.
-- Env overlay is **best-effort**: unknown variables are silently ignored so a
-  hostile/noisy environment cannot break startup; only values that fail to
-  parse for a *resolved* field error out (`env.go`, `CLAUDE.md`).
+- Dotenv files (`.env`, `.env.local`) and the process environment are
+  **untrusted input** at load time. `FromEnv()` parses the files fail-closed:
+  a malformed line is an error naming the file and line, never the value
+  (`dotenv.go`). There is no service config file: a legacy
+  `zever.yaml`/`.yml`/`.json` in the cwd is ignored (never read) and only
+  triggers a one-line warning, so it is not a config input path.
+- Env overlay is **best-effort** for unknown variables: unknown heads and
+  bare names are silently ignored so a hostile/noisy environment cannot
+  break startup; only keys that resolve under a wired service prefix and
+  values that fail to parse for a *resolved* field error out (`env.go`,
+  `CLAUDE.md`).
 - Display/logging is a boundary: option maps may hold plaintext secrets.
 
 ## What zever guarantees
@@ -28,9 +32,10 @@ Audited against `config/` (`default.go`, `decode.go`, `env.go`, `redact.go`,
   tests run with no external services; the only deterministic secret is the
   crypto dev key, documented "never production" (`default.go`).
 - The local crypto adapter **rejects the dev key by default**: accepted only
-  with `allow_dev_key: true` or `ZEVER_ENV` in {dev, test, development}
-  (trimmed, case-insensitive `IsDevEnv`); every other environment fails
-  closed with `DevKeyError` (`core/crypto/devkey.go`, `STABILITY.md`).
+  with `CRYPTO_ALLOW_DEV_KEY=true` (the `allow_dev_key` option) or `ZEVER_ENV`
+  in {dev, test, development} (trimmed, case-insensitive `IsDevEnv`); every
+  other environment fails closed with `DevKeyError` (`core/crypto/devkey.go`,
+  `STABILITY.md`).
 - Secrets are redacted by type (`config.Secret`) and by the `zever:"secret"`
   struct tag, plus a key-name denylist as defense-in-depth; DSN/URL-shaped
   values are scrubbed of userinfo and `password=` pairs (`redact.go`).
@@ -42,11 +47,11 @@ Audited against `config/` (`default.go`, `decode.go`, `env.go`, `redact.go`,
 
 ## What the caller must do
 
-- Never ship `Default()` secrets: supply real keys via file or env in any
+- Never ship `Default()` secrets: supply real keys via env in any
   non-dev environment.
 - Never log raw option maps; render through `RedactedServices`/`Redact`.
 - Set `ZEVER_ENV` explicitly (unset counts as non-dev and fails closed).
-- Treat the config file as secret-bearing: restrict file permissions and keep
+- Treat `.env.local` as secret-bearing: restrict file permissions and keep
   it out of version control when it holds real credentials.
 
 ## Explicit non-guarantees

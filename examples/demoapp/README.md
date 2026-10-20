@@ -6,8 +6,8 @@ SQL schema; `container.Container` resolves only explicitly-registered adapters.
 
 This app runs with **zero external services** — every battery uses its
 in-memory/local adapter by default (sqlite files under `data/`). Swap
-adapters in `zever.yaml` or via env (`AUTH_JWT_SECRET`, `DB_MAXCONNS`, …)
-for production.
+adapters in `internal/app/wiring.go` or via env (`AUTH_JWT_SECRET`,
+`DB_MAXCONNS`, …) for production.
 
 > Split with `examples/showcase`: **demoapp = battery breadth over HTTP**
 > (one endpoint per battery, thin handlers), **showcase = DSL depth** (every
@@ -61,7 +61,7 @@ Schema-first DSL: [`schema/app.zen`](schema/app.zen) defines 7 entities
 
 ## Quickstart
 
-Run from `examples/demoapp/` so `zever.yaml` and `data/` resolve:
+Run from `examples/demoapp/` so `data/` resolves:
 
 ```bash
 # 1. Generate all backends (already committed under generated/; re-run to verify, from repo root)
@@ -105,7 +105,7 @@ such in `internal/app/app.go`):
 
 ```bash
 export AUTH_JWT_SECRET="$(head -c 32 /dev/urandom | base64)" # >=32 bytes
-# swap cache to redis, queue to redis, etc. via zever.yaml
+# swap cache to redis, queue to redis, etc. in internal/app/wiring.go
 ```
 
 ## Regenerating code
@@ -122,7 +122,7 @@ zever compile examples/demoapp/schema/app.zen --backend=atlas,gogen,openapi,prot
 Hand-owned, never overwritten: `internal/app/app.go` (adapter selection,
 dev JWT secret, RBAC rules, i18n/storage/search/vector/geo/flag runtime
 defaults), `internal/service/jobs/*` bodies, `internal/service/seed/seed.go`
-bodies, `internal/api/*` handlers, schema, `zever.yaml`, locales/fixtures,
+bodies, `internal/api/*` handlers, schema, locales/fixtures,
 tests. `db/seed/main.go` loads config directly so seeding needs no JWT
 secret.
 
@@ -148,6 +148,6 @@ route-present (their success paths need external credentials/a browser).
 - `internal/service/jobs/jobs.go` — one handler per declared job
 - `internal/service/seed/seed.go` — idempotent demo data via zenorm
 - `locales/en.json`, `locales/fr.json` — embedded i18n catalogs
-- `flags.json`, `zever.yaml` — flag & config demo
+- `flags.json` — flag demo
 - `data/cities.json` — static geo fixture (`*.db` files are gitignored)
 - `cmd/server/main.go`, `cmd/worker/main.go`, `db/seed/main.go` — thin entrypoints

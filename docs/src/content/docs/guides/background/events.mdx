@@ -80,7 +80,7 @@ EVENTBUS_HANDLER_TIMEOUT=30s
   </TabItem>
 </Tabs>
 
-Keys are strict snake_case, with Redis pooling under a nested `redis` block. Zero means the adapter default (`buffer_size` 1024, `max_handlers` 128, `handler_timeout` 30s, `close_timeout` 5s); only negative values fail. Env is best-effort: unknown variables are ignored, unparsable resolved values error. All keys: [eventbus config reference](../../../reference/config/#eventbus).
+Keys are strict snake_case, with Redis pooling under a nested `redis` block. Zero means the adapter default (`buffer_size` 1024, `max_handlers` 128, `handler_timeout` 30s, `close_timeout` 5s); only negative values fail. Env is strict about the keys it understands: an unknown key under a wired service prefix fails with a did-you-mean hint, an unknown service head is ignored, and an unparsable resolved value errors. All keys: [eventbus config reference](../../../reference/config/#eventbus).
 
 | Adapter | Package | Notes |
 |---|---|---|

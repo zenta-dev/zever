@@ -6,7 +6,7 @@ import (
 
 // doctorInput selects the project configuration to diagnose.
 type doctorInput struct {
-	Dir string ``
+	Dir string `json:"dir"`
 }
 
 // doctorTool resolves every battery through the installed CLI and reports

@@ -1,0 +1,5 @@
+package pkg
+
+type wireStruct struct {
+	Name string `json:"name" yaml:"name"`
+}
