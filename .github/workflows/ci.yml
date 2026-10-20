@@ -288,6 +288,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: conformance kits (in-kit suites)
         run: |
           go -C core/agent test -count=1 ./...
@@ -424,6 +431,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          (cd examples/external-sms && GOWORK=off go mod download) && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: out-of-tree proof module (standalone, outside go.work)
         run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
@@ -445,6 +459,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          make -s download-all MODULES="config dsl" && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: Fuzz DSL targets
         working-directory: dsl
         run: |
@@ -472,6 +493,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: Install golangci-lint
         run: make setup-golangci-lint && echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Scaffold, build, vet, test and lint
@@ -496,8 +524,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
-      - name: Download dependencies
-        run: go mod download
+      - name: Download dependencies (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+            go mod download && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: Verify go.mod is tidy
         run: go mod tidy -diff
       - name: go vet
@@ -527,8 +560,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
-      - name: Download dependencies
-        run: go mod download
+      - name: Download dependencies (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+            go mod download && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: Verify go.mod is tidy
         run: go mod tidy -diff
       - name: go vet
@@ -690,6 +728,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          make -s download-all MODULES="core/auth core/crypto core/password core/authz core/payment adapters/payment/stripe adapters/payment/paddle" && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: race + coverage (scoped security modules)
         run: make test-race-all MODULES="core/auth core/crypto core/password core/authz core/payment adapters/payment/stripe adapters/payment/paddle"
       - name: enforce coverage floor
@@ -797,6 +842,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          make -s download-all && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/go/bin
@@ -840,6 +892,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
+      - name: Pre-download modules (retry on transient proxy errors)
+        run: |
+          for i in 1 2 3; do
+          (cd docs/examples && GOWORK=off go mod download) && exit 0
+            echo "download attempt $i failed; retrying"; sleep $((i * 10))
+          done
+          exit 1
       - name: Check doc Go snippets
         run: tools/check-doc-snippets.sh
       - name: Tested doc samples (docs/examples, outside go.work)
