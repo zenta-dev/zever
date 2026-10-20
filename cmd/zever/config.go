@@ -352,7 +352,7 @@ func splitEnvInstance(rest string) (instance, name string) {
 
 // maxEnvKeyChoices caps how many service keys a hint lists, so the line
 // stays readable in a terminal.
-const maxEnvKeyChoices = 8
+const maxEnvKeyChoices = 7
 
 // envKeyChoices lists the env keys a service accepts, for the hint that
 // names them when a stray variable matches no option: the default

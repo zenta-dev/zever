@@ -112,6 +112,22 @@ func TestServiceEnvKeysMatchTheEnvExample(t *testing.T) {
 	}
 }
 
+// TestEnvKeyChoicesStayTerminalReadable pins the cap on the key list: the
+// hint stays short enough to read in a terminal, and the ellipsis marks
+// that the list continues.
+func TestEnvKeyChoicesStayTerminalReadable(t *testing.T) {
+	t.Parallel()
+
+	choices := envKeyChoices("db", "")
+	if len(choices) > maxEnvKeyChoices+1 {
+		t.Fatalf("envKeyChoices(db) = %v, want at most %d entries", choices, maxEnvKeyChoices+1)
+	}
+
+	if choices[len(choices)-1] != "…" {
+		t.Fatalf("envKeyChoices(db) = %v, want the list to end with an ellipsis", choices)
+	}
+}
+
 // TestWrapEnvConfigErrorNamesTheOffendingKey pins the shared wrapper every
 // env-resolving command uses: the failure first, then the hint that names
 // the key to fix.
