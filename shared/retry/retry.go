@@ -52,7 +52,9 @@ type Policy struct {
 	// attempt, and not called after the final attempt (whether that attempt
 	// succeeds or exhausts MaxAttempts) since no further sleep follows it.
 	// It has no effect on NextDelay, which is not attempt-aware in this way.
-	OnRetry func(attempt int, err error)
+	// It is a Go-API-only hook: the json tag keeps it out of the serialized
+	// policy, so a config envelope can render the rest of the policy.
+	OnRetry func(attempt int, err error) `json:"-"`
 }
 
 // JitterMode selects how Policy.Jitter (and, for JitterFlat, Policy.JitterMax)

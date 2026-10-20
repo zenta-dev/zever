@@ -434,10 +434,10 @@ func TestIsSensitiveKey_accessKeyIDGap(t *testing.T) {
 func TestRedactServices_secretTaggedFieldsRedacted(t *testing.T) {
 	t.Parallel()
 
-	// Services whose Options carry no time.Duration field: the JSON
-	// bridge in serviceToMap cannot marshal durations (pre-existing
-	// codec limitation), so Duration-having services redact to an empty
-	// map and cannot exercise field-level assertions here.
+	// These services carry no time.Duration field, so their option maps
+	// hold only plain values and the field-level assertions below stay
+	// exact. Duration-carrying services are covered by
+	// TestRedactedServices_durationsRenderAsStrings.
 	cfg := Default()
 	cfg.Analytics.Options.APIKey = "sk-analytics"
 	cfg.CDN.Options.APIToken = "cdn-token"
