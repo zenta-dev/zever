@@ -29,7 +29,7 @@ CACHE_MIN_IDLE_CONNS=2
   </TabItem>
 </Tabs>
 
-File durations are integer nanoseconds; env accepts Go durations such as `"1m"`. File keys are strict snake_case, so `sweepinterval` is rejected; env matching ignores case and `_` and unknown `CACHE_*` variables. See the [cache options](../../../reference/config/#cache) for every key.
+Durations take Go duration strings such as `"1m"`. Env matching ignores case and `_`, so `CACHE_SWEEPINTERVAL` and `CACHE_SWEEP_INTERVAL` both set `SweepInterval`; an unknown key under the `CACHE_` prefix fails with a did-you-mean hint, while an unknown service head is ignored. See the [cache options](../../../reference/config/#cache) for every key.
 
 ## Cache a value with a TTL
 
@@ -119,7 +119,7 @@ Cause: stale entries hold the old struct shape. Fix: bump the key version and le
 <details>
 <summary>Instance A writes, instance B misses</summary>
 
-Cause: `memory` in a multi-instance deploy. Fix: set `cache.adapter: redis` with a shared `addr` and confirm the host with `RedactedServices`.
+Cause: `memory` in a multi-instance deploy. Fix: set `CACHE_ADAPTER=redis` with a shared `CACHE_ADDR` and confirm the host with `RedactedServices`.
 </details>
 
 <details>

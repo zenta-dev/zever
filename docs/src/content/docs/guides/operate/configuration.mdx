@@ -130,9 +130,9 @@ A resolved field failed to parse. Set an integer. Unset variables are ignored, b
 </details>
 
 <details>
-<summary>`AUTH_TOKEN` does nothing</summary>
+<summary>`AUTH_TOKEN` fails at startup</summary>
 
-Env is best-effort: `AUTH` is known but the remainder matches no field. Set `AUTH_JWT_SECRET`.
+`AUTH` is a wired service prefix, so every key under it must name a field. `AUTH_TOKEN` matches none and fails `config.Resolve` with a did-you-mean hint. Set `AUTH_JWT_SECRET` instead.
 </details>
 
 <Aside type="danger" title="Dev-only keys">

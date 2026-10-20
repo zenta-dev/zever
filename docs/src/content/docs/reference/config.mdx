@@ -12,7 +12,7 @@ Zever config is one block per service, shaped `{ adapter, options }`. This page 
 | Layers | `defaults < .env < .env.local < process env`. Later layers win. |
 | Defaults | `config.Default()` selects zero-infrastructure adapters (memory, local, sqlite, log, noop). The only dev secret is the crypto key, which is deterministic and must never ship to production. |
 | Env | `config.FromEnv()` reads `.env`, then `.env.local`, from the working directory and overlays the real process environment; `config.Resolve(env)` turns that map into the typed `Config`. `config.LoadEnv(files...)` parses explicit dotenv files only (no discovery, no process environment). Env names are uppercase and carry no prefix. The default instance is `<SERVICE>_<FIELD>` (e.g. `DB_MAXCONNS=20`); a named instance is `<SERVICE>__<NAME>__<FIELD>` (e.g. `DB__REPORTING__DSN=postgres://...`) and only reaches the container through a matching named Ref such as `db.Ref("reporting")`. `<SERVICE>_ADAPTER` and `<SERVICE>__<NAME>__ADAPTER` set the adapter. Matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`. A legacy `zever.yaml`/`.yml`/`.json` in the working directory is ignored, with a one-line warning on stderr. |
-| Env strictness | Best-effort. Unknown variables are ignored, so a noisy process environment cannot break startup. Only a value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
+| Env strictness | Strict about the keys it understands. An unknown key under a wired service prefix (`AUTH_TOKEN`, `DB_BOGUS`) fails `Resolve` with an `UnknownFieldError` and a did-you-mean hint. An unknown service head (`PATH`, `FOO_BAR`) and a bare name (`DB`) are ignored, so a noisy process environment cannot break startup. A value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
 | Durations | In env, a Go duration string such as `5s` or `5m`. |
 | Options replace defaults | Env variables overlay one field at a time and do not replace the block. |
 | Unset values | A zero value (`0`, `""`, `false`) means unset: the adapter applies its own default, shown in the Default column when known. |
@@ -219,7 +219,7 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 | `oidc.timeout` | duration | `30s` | Operation timeout |
 | `oidc.allow_insecure` | boolean | `false` | Permits an http:// issuer (and a private-address issuer) for testing |
 
-The `session` adapter has no file-settable options: its `session.Store` is injected from Go.
+The `session` adapter has no env-settable options: its `session.Store` is injected from Go.
 
 ```sh
 AUTH__DEFAULT__ADAPTER=jwt

@@ -158,7 +158,7 @@ A custom wrapper hides the real writer. Forward `Unwrap` so `http.ResponseContro
 <details>
 <summary>Traces are missing</summary>
 
-The provider is probably `noop`. Set `observability.adapter: stdout` (or OTLP) and check for spans named by path with `http.response.status_code`.
+The provider is probably `noop`. Set `OBSERVABILITY_ADAPTER=stdout` (or OTLP) and check for spans named by path with `http.response.status_code`.
 </details>
 
 <details>

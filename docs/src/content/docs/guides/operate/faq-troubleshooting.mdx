@@ -70,7 +70,7 @@ Start the generated server with `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`);
 <details>
 <summary>An environment variable has no effect</summary>
 
-Env matching is best-effort by design: a variable that does not match a resolved field is silently ignored, so a noisy environment cannot break startup. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. A value that does match but cannot be parsed is an error. Layering is `defaults < .env < .env.local < process env`.
+Env is strict about the keys it understands: a variable under a wired service prefix that matches no field fails with a did-you-mean hint. Unknown service heads (`PATH`, `FOO_BAR`) and bare names (`DB`) are ignored, so a noisy environment cannot break startup. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. A value that does match but cannot be parsed is an error. Layering is `defaults < .env < .env.local < process env`.
 </details>
 
 <details>

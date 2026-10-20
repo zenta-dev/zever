@@ -146,7 +146,7 @@ Helpers: `session.NewSession(id, ttl)`, `Session.Clone()`, `Session.Expired(now)
 <details>
 <summary>Login works locally but drops in production</summary>
 
-Two instances run `memory` sessions. Set `session.adapter: redis` with a shared `addr`.
+Two instances run `memory` sessions. Set `SESSION_ADAPTER=redis` with a shared `SESSION_REDIS_ADDR`.
 </details>
 
 <details>

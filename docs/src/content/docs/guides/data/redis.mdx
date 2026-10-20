@@ -94,7 +94,7 @@ Cause: both run `memory` sessions. Fix: point both at the same Redis `addr`.
 <details>
 <summary>Rate limits diverge across replicas</summary>
 
-Cause: `memory` token buckets are per process. Fix: set `ratelimit.adapter: redis`.
+Cause: `memory` token buckets are per process. Fix: set `RATELIMIT_ADAPTER=redis` (with a shared `RATELIMIT_REDIS_ADDR`).
 </details>
 
 <details>
