@@ -44,7 +44,7 @@ Public API changes (new exports, config struct or default changes, serialization
    ```
 
    Expected output: `upgrade ok: true`. Container construction is stable across bumps (`container.New(nil)` stays valid, and `Close(ctx)` closes only resolved services in dependency order), so if this breaks the changelog names the fix.
-5. Re-validate production config files. Strict decoding turns renames into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`cfg.RedactedServices()`) and close wiring (`Close(ctx)` with a timeout parent).
+5. Re-validate production configuration. Env resolution is strict about the keys it understands, so renames turn into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`cfg.RedactedServices()`) and close wiring (`Close(ctx)` with a timeout parent).
 </Steps>
 
 Pin the CLI to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior and the TUI does not skew from the backend.

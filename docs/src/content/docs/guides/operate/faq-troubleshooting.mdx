@@ -64,19 +64,19 @@ Start the generated server with `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`);
 <details>
 <summary>Startup fails with "unknown field" or "unknown service"</summary>
 
-`config.Load` decodes strictly, so a typo or a removed key fails fast instead of being ignored. Check spelling (file keys are snake_case, such as `max_conns`) against the [config reference](../../../reference/config/) and `zever config show`.
+`config.Resolve` fails fast on a key it cannot map to a field, so a typo or a removed key errors instead of being ignored. Check the field name (env matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` are the same key) against the [config reference](../../../reference/config/) and `zever config show`.
 </details>
 
 <details>
 <summary>An environment variable has no effect</summary>
 
-Env matching is best-effort by design: a variable that does not match a resolved field is silently ignored, so a noisy environment cannot break startup. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. A value that does match but cannot be parsed is an error. Layering is `defaults < file < env`.
+Env matching is best-effort by design: a variable that does not match a resolved field is silently ignored, so a noisy environment cannot break startup. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. A value that does match but cannot be parsed is an error. Layering is `defaults < .env < .env.local < process env`.
 </details>
 
 <details>
 <summary>It connects to sqlite even though I configured postgres</summary>
 
-The file was not found. In production, load an explicit path.
+The variable never reached the service. Env names are uppercase and unprefixed: `DB_ADAPTER=postgres` selects the adapter and `DB_DSN=...` sets the connection string. A named instance (`DB__REPORTING__DSN`) only applies to a matching named Ref, not to the default `db` service.
 </details>
 
 <details>

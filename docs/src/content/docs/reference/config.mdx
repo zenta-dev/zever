@@ -9,9 +9,9 @@ Zever config is one block per service, shaped `{ adapter, options }`. This page 
 
 | Rule | Behavior |
 |---|---|
-| Layers | `defaults < env`. Later layers win. |
+| Layers | `defaults < .env < .env.local < process env`. Later layers win. |
 | Defaults | `config.Default()` selects zero-infrastructure adapters (memory, local, sqlite, log, noop). The only dev secret is the crypto key, which is deterministic and must never ship to production. |
-| Env | `config.FromEnv()` / `config.LoadEnv()` reads instance-aware environment variables: `<SERVICE>__<NAME>__<FIELD>=value`, uppercase. Example: `DB__PRIMARY__DSN=postgres://...`, `DB__PRIMARY__MAX_CONNS=20`. The legacy flat format `<SERVICE>_<FIELD>` (e.g. `DB_MAXCONNS`) is still accepted but triggers `warnLegacyConfigFile` logging. Matching ignores case and `_`. `<SERVICE>__<NAME>__ADAPTER` sets the adapter. |
+| Env | `config.FromEnv()` reads `.env`, then `.env.local`, from the working directory and overlays the real process environment; `config.Resolve(env)` turns that map into the typed `Config`. `config.LoadEnv(files...)` parses explicit dotenv files only (no discovery, no process environment). Env names are uppercase and carry no prefix. The default instance is `<SERVICE>_<FIELD>` (e.g. `DB_MAXCONNS=20`); a named instance is `<SERVICE>__<NAME>__<FIELD>` (e.g. `DB__REPORTING__DSN=postgres://...`) and only reaches the container through a matching named Ref such as `db.Ref("reporting")`. `<SERVICE>_ADAPTER` and `<SERVICE>__<NAME>__ADAPTER` set the adapter. Matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`. A legacy `zever.yaml`/`.yml`/`.json` in the working directory is ignored, with a one-line warning on stderr. |
 | Env strictness | Best-effort. Unknown variables are ignored, so a noisy process environment cannot break startup. Only a value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
 | Durations | In env, a Go duration string such as `5s` or `5m`. |
 | Options replace defaults | Env variables overlay one field at a time and do not replace the block. |
@@ -21,14 +21,23 @@ Zever config is one block per service, shaped `{ adapter, options }`. This page 
 | Exceptions | The `secrets` env adapter reads secrets with a non-empty `prefix` (default `ZEVER`, so `ZEVER_FOO` is secret `FOO`). CLI switches use `ZEVER_INTERACTIVE` and `ZEVER_NO_HINT`. |
 
 ```sh
-DB__PRIMARY__ADAPTER=postgres
-DB__PRIMARY__DSN=postgres://app:secret@db:5432/app
-DB__PRIMARY__MAX_CONNS=20
-LOG__DEFAULT__ADAPTER=slog
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+LOG_ADAPTER=slog
+```
+
+A named instance uses the double-underscore form and needs a matching named
+Ref (`db.Ref("reporting")`) wired through `container.Provide`:
+
+```sh
+DB__REPORTING__ADAPTER=postgres
+DB__REPORTING__DSN=postgres://app:secret@db:5432/reporting
+DB__REPORTING__MAX_CONNS=10
 ```
 
 ```sh
-DB__PRIMARY__MAXCONNS=20 DB__PRIMARY__MAXCONNLIFETIME=5m AUTH__DEFAULT__JWT_SECRET=prod-secret-at-least-32-bytes-long zever serve
+DB_MAXCONNS=20 DB_MAXCONNLIFETIME=5m AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long zever serve
 ```
 
 ## Services at a glance
