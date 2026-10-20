@@ -38,6 +38,7 @@ func TestRecipeCIWorkflow(t *testing.T) {
 		"install.sh",
 		"--version v0.6.1",
 		`>> "$GITHUB_PATH"`,
+		"runs-on: ubuntu-24.04",
 	} {
 		if !strings.Contains(content, fragment) {
 			t.Errorf("scaffolded ci.yml lacks %q:\n%s", fragment, content)
@@ -46,6 +47,10 @@ func TestRecipeCIWorkflow(t *testing.T) {
 
 	if strings.Contains(content, "go install") {
 		t.Errorf("scaffolded ci.yml must not use go install (uninstallable before the first release that ships a replace-free cmd/zever):\n%s", content)
+	}
+
+	if strings.Contains(content, "ubuntu-latest") {
+		t.Errorf("scaffolded ci.yml must pin the runner image (ubuntu-latest migrates to Ubuntu 26):\n%s", content)
 	}
 }
 
