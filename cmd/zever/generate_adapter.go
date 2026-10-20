@@ -1778,7 +1778,7 @@ import (
 {{if .HasFields}}type Options struct {
 {{- range .Fields}}
 	// {{.Comment}}
-	{{.GoName}} {{.GoType}} ` + "`json:\"{{.Key}}\" toml:\"{{.Key}}\" yaml:\"{{.Key}}\"`" + `
+	{{.GoName}} {{.GoType}} ` + "`json:\"{{.Key}}\"`" + `
 {{- end}}
 }
 
