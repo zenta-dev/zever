@@ -1357,7 +1357,7 @@ func envExampleSection(sel batterySelection, name string) string {
 	fmt.Fprintf(&b, "%s%sADAPTER=%s\n", prefix, sep, sel.Adapter)
 
 	if opts := config.DefaultOptions(sel.Battery, name); opts != nil {
-		appendEnvKeys(&b, prefix, sep, opts)
+		appendEnvKeys(&b, prefix, sep, opts, scaffoldEnvDefaults(sel.Battery, name))
 	}
 
 	return b.String()

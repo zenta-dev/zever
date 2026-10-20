@@ -434,8 +434,10 @@ func TestScaffoldDepsMinimal(t *testing.T) {
 	}
 }
 
-// TestRunNewPrintsExactlyThreeNextSteps pins the summary contract: exactly
-// three numbered next steps, no more.
+// TestRunNewPrintsExactlyThreeNextSteps pins the summary contract: the
+// next steps are the quickstart, in order -- compile, migrate, serve, then
+// the sample request. A summary that skips the compile/migrate steps
+// sends the developer to a server with no generated code and no database.
 func TestRunNewPrintsExactlyThreeNextSteps(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
@@ -452,14 +454,24 @@ func TestRunNewPrintsExactlyThreeNextSteps(t *testing.T) {
 		}
 	})
 
-	for _, want := range []string{"1.", "2.", "3."} {
+	for _, want := range []string{
+		"1.",
+		"2.",
+		"3.",
+		"4.",
+		"5.",
+		"zever compile --backend=zenorm,proto,atlas schema/app.zen",
+		"zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen",
+		"zever serve",
+		"curl localhost:8080/hello",
+	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("summary lacks step %q:\n%s", want, out)
+			t.Errorf("summary lacks %q:\n%s", want, out)
 		}
 	}
 
-	if strings.Contains(out, "4.") {
-		t.Errorf("summary must print exactly 3 next steps, found a fourth:\n%s", out)
+	if strings.Contains(out, "6.") {
+		t.Errorf("summary must print exactly 5 next steps, found a sixth:\n%s", out)
 	}
 }
 
@@ -1388,7 +1400,7 @@ func TestRenderNewGoModGolden(t *testing.T) {
 // TestRenderNewReadmeMentionsZever pins the rename: no "zengo" may survive
 // in user-facing scaffold text.
 func TestRenderNewReadmeMentionsZever(t *testing.T) {
-	readme := renderNewReadme("acme")
+	readme := renderNewReadme("acme", scaffoldSelections())
 
 	if strings.Contains(readme, "zengo") {
 		t.Fatalf("README still mentions zengo:\n%s", readme)
@@ -1401,7 +1413,80 @@ func TestRenderNewReadmeMentionsZever(t *testing.T) {
 	}
 
 	if strings.Count(readme, "```bash") != 1 {
-		t.Fatalf("README must hold exactly one 4-command quickstart block:\n%s", readme)
+		t.Fatalf("README must hold exactly one quickstart block:\n%s", readme)
+	}
+}
+
+// TestRenderNewReadmeTellsTheTruth pins the README against the scaffold:
+// it must name the same database the schema comment and the CLI hint name
+// (a README pointing at another file makes the server serve a database
+// nobody migrated), the adapter key of every wired battery, and the env
+// keys the generated .env carries a secret for.
+func TestRenderNewReadmeTellsTheTruth(t *testing.T) {
+	selections := []batterySelection{
+		{Battery: "db", Adapter: "sqlite"},
+		{Battery: "log", Adapter: "slog"},
+		{Battery: "auth", Adapter: "jwt"},
+		{Battery: "router", Adapter: "stdhttp"},
+	}
+
+	readme := renderNewReadme("acme", selections)
+
+	for _, fragment := range []string{
+		"zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen",
+		"zever doctor",
+		"DB_ADAPTER=sqlite",
+		"LOG_ADAPTER=slog",
+		"AUTH_ADAPTER=jwt",
+		"ROUTER_ADAPTER=stdhttp",
+		"CRYPTO_KEY",
+		"AUTH_JWT_SECRET",
+		"zever config show",
+	} {
+		if !strings.Contains(readme, fragment) {
+			t.Fatalf("README lacks %q:\n%s", fragment, readme)
+		}
+	}
+
+	// The DSN in the README and the one in the schema comment are the same
+	// file: a mismatch makes the server open a database nobody migrated.
+	schema := renderNewSchema("acme")
+
+	if !strings.Contains(schema, "--dsn=data/app.db") {
+		t.Fatalf("schema comment lacks the data/app.db DSN:\n%s", schema)
+	}
+
+	if strings.Contains(readme, "--dsn=app.db") {
+		t.Fatalf("README names a different DSN than the schema comment:\n%s", readme)
+	}
+}
+
+// TestRenderNewServerAcceptsDoctorArg pins the doctor mode of the
+// scaffolded entrypoint: `zever doctor` runs the built server with
+// --doctor, and the flags below must not swallow that argument (flag.Parse
+// would exit 2 on an unknown flag, and the doctor would fall back to the
+// CLI registry -- reporting batteries the project never wired).
+func TestRenderNewServerAcceptsDoctorArg(t *testing.T) {
+	content, err := renderGoFile("zever new", "server main.go", newServerMainTemplate, struct{ ModulePath string }{"example.com/app"})
+	if err != nil {
+		t.Fatalf("render server main: %v", err)
+	}
+
+	src := string(content)
+
+	for _, fragment := range []string{"doctorMode(os.Args[1:])", `arg == "--doctor"`, "serve.Main(app.Providers(), app.Modules())"} {
+		if !strings.Contains(src, fragment) {
+			t.Fatalf("scaffolded server lacks %q:\n%s", fragment, src)
+		}
+	}
+
+	// The doctor branch must come before flag.Parse, or the unknown
+	// --doctor flag still ends the process.
+	doctorAt := strings.Index(src, "doctorMode(os.Args[1:])")
+	parseAt := strings.Index(src, "flag.Parse()")
+
+	if doctorAt < 0 || parseAt < 0 || doctorAt > parseAt {
+		t.Fatalf("the doctor branch must precede flag.Parse:\n%s", src)
 	}
 }
 

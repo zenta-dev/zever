@@ -71,6 +71,30 @@ func serviceOptionsPtr(t *testing.T, service string) any {
 	return ptr.Interface()
 }
 
+// TestScaffoldedEnvNamesTheDatabase pins the one env value the scaffold
+// writes itself: the sqlite path. The CLI (`zever db migrate --dsn=...`),
+// the server (DB_PATH) and the README must name the SAME file -- a project
+// that migrates one database and serves another fails at its first query.
+func TestScaffoldedEnvNamesTheDatabase(t *testing.T) {
+	t.Parallel()
+
+	const want = "DB_PATH=data/app.db"
+
+	example := string(renderEnvExample(scaffoldSelections()))
+	if !strings.Contains(example, want) {
+		t.Errorf(".env.example lacks %q", want)
+	}
+
+	dev, err := renderDevEnv(scaffoldSelections())
+	if err != nil {
+		t.Fatalf("renderDevEnv: %v", err)
+	}
+
+	if !strings.Contains(string(dev), want) {
+		t.Errorf(".env lacks %q", want)
+	}
+}
+
 // TestScaffoldedEnvKeysResolve pins the .env.example contract: every key
 // the scaffolder writes names a real option, so a fresh project resolves
 // its config. The keys are the options' serialized names (their json

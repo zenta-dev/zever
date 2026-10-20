@@ -19,8 +19,9 @@ func newNewCmd() *cobra.Command {
 		Use:   "new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force] [--with a,b=c] [--yes] [--list-batteries] [--no-tidy] [--dry-run]",
 		Short: "Scaffold a brand new zever application",
 		Long: `Scaffold a brand new, buildable zever application from scratch:
-a fresh go.mod, a starter schema/app.zen, cmd/server + cmd/worker +
-db/seed entrypoints, and internal/app wiring.`,
+a fresh go.mod, a starter schema/app.zen, cmd/server/main.go, the sample
+internal/service/hello module, internal/app wiring, .env, .env.example and
+a README with the quickstart.`,
 		Example: `  zever new myapp
   zever new myapp --module example.com/myapp --dir ./out --force`,
 		Args: cobra.ArbitraryArgs,

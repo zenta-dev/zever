@@ -43,8 +43,8 @@ func printDoctorUsage(fs *flag.FlagSet) {
 		"env (<SERVICE>_<FIELD>, e.g. DB_ADAPTER, AUTH_JWT_SECRET).",
 		"In a project with a server entrypoint the",
 		"checks run inside the built server ("+cmd("go run <entry> --doctor")+")",
-		"against its real container and registrations; otherwise they run in",
-		"the CLI with a note.",
+		"against its real container and registrations; without one every",
+		"known battery is checked in the CLI, with a note.",
 		"",
 		"Shared-pool MaxConns mismatches (a borrower capped differently",
 		"from the first opener) print as pool warnings with the",
@@ -310,6 +310,13 @@ func serverDoctorRows(resolved *config.Config, rep serverDoctorReport, enabled m
 		}
 
 		byName[b.Name] = b
+
+		// The config row comes from the CLI's own validation of the
+		// resolved env (above); the server's own config row would print
+		// the same check twice.
+		if b.Name == "config" {
+			continue
+		}
 
 		if b.Name == "adapters" || enabled == nil || enabled[b.Name] {
 			names = append(names, b.Name)
