@@ -94,7 +94,6 @@ type structInfo struct {
 	line     int
 	exported int
 	tagged   int
-	named    int
 }
 
 // fieldInfo is one exported struct field with its source line.
@@ -597,10 +596,6 @@ func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls
 			for _, field := range fields {
 				if field.State() != wire.StateMissing {
 					info.tagged++
-				}
-
-				if field.State() == wire.StateNamed {
-					info.named++
 				}
 			}
 
