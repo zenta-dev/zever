@@ -1,0 +1,7 @@
+package pkg
+
+// wireStruct is in the golden list but Secret lost its json tag.
+type wireStruct struct {
+	Name   string `json:"name"`
+	Secret string
+}

@@ -76,9 +76,9 @@ func (a *adapter) Issue(_ context.Context, _ string, _ map[string]any, _ time.Du
 // verified ID token. All three keys are always present in Claims.Custom,
 // including zero values when the IdP omits them.
 type profileClaims struct {
-	Email         string ``
-	EmailVerified bool   ``
-	Name          string ``
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
 }
 
 // Verify authenticates rawToken and returns its claims. The token value is

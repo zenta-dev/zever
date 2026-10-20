@@ -146,7 +146,7 @@ func (j JudgeReranker) Rerank(ctx context.Context, query string, sources []Sourc
 // scoreOne judges a single source.
 func (j JudgeReranker) scoreOne(ctx context.Context, query string, s Source) (float64, error) {
 	var out struct {
-		Score float64 ``
+		Score float64 `json:"score"`
 	}
 
 	msgs := []ai.Message{{

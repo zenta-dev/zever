@@ -127,59 +127,59 @@ func NewWithOptions(opts Options) (ai.AI, error) {
 }
 
 type chatRequest struct {
-	Model    string        ``
-	Messages []chatMessage ``
-	Stream   bool          ``
-	Format   any           ``
-	Options  *chatOptions  ``
-	Tools    []ollamaTool  ``
+	Model    string        `json:"model"`
+	Messages []chatMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
+	Format   any           `json:"format,omitempty"`
+	Options  *chatOptions  `json:"options,omitempty"`
+	Tools    []ollamaTool  `json:"tools,omitempty"`
 }
 
 type ollamaTool struct {
-	Type     string         ``
-	Function ollamaFunction ``
+	Type     string         `json:"type"`
+	Function ollamaFunction `json:"function"`
 }
 
 type ollamaFunction struct {
-	Name        string         ``
-	Description string         ``
-	Parameters  map[string]any ``
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
 }
 
 type ollamaToolCall struct {
 	Function struct {
-		Name      string         ``
-		Arguments map[string]any ``
-	} ``
+		Name      string         `json:"name"`
+		Arguments map[string]any `json:"arguments"`
+	} `json:"function"`
 }
 
 type chatMessage struct {
-	Role    string ``
-	Content string ``
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type chatOptions struct {
-	Temperature *float32 ``
-	NumPredict  int      ``
-	TopP        *float32 ``
+	Temperature *float32 `json:"temperature,omitempty"`
+	NumPredict  int      `json:"num_predict,omitempty"`
+	TopP        *float32 `json:"top_p,omitempty"`
 }
 
 type chatResponse struct {
 	Message struct {
-		Content   string           ``
-		ToolCalls []ollamaToolCall ``
-	} ``
-	EvalCount       int ``
-	PromptEvalCount int ``
+		Content   string           `json:"content"`
+		ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
+	} `json:"message"`
+	EvalCount       int `json:"eval_count"`
+	PromptEvalCount int `json:"prompt_eval_count"`
 }
 
 type embedRequest struct {
-	Model string   ``
-	Input []string ``
+	Model string   `json:"model"`
+	Input []string `json:"input"`
 }
 
 type embedResponse struct {
-	Embeddings [][]float32 ``
+	Embeddings [][]float32 `json:"embeddings"`
 }
 
 var (
@@ -255,13 +255,13 @@ func (a *adapter) Generate(ctx context.Context, model string, messages []ai.Mess
 
 type streamResponse struct {
 	Message struct {
-		Content   string           ``
-		ToolCalls []ollamaToolCall ``
-	} ``
-	Done            bool   ``
-	EvalCount       int    ``
-	PromptEvalCount int    ``
-	Error           string ``
+		Content   string           `json:"content"`
+		ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
+	} `json:"message"`
+	Done            bool   `json:"done"`
+	EvalCount       int    `json:"eval_count"`
+	PromptEvalCount int    `json:"prompt_eval_count"`
+	Error           string `json:"error,omitempty"`
 }
 
 // Stream opens a newline-delimited JSON completion stream.

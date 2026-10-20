@@ -1,0 +1,7 @@
+package pkg
+
+// wireStruct carries one present-but-empty tag: the exact shape the
+// v0.8.0 env-only migration stripped.
+type wireStruct struct {
+	Name string ``
+}

@@ -179,6 +179,7 @@ use (
 	./tools/modgraph
 	./tools/zever-lsp
 	./tools/zever-mcp
+	./tools/tagcheck
 	./tools/vulngate
 	./zevertest
 )
@@ -363,6 +364,7 @@ replace github.com/zenta-dev/zever/tools/affected v0.8.0 => ./tools/affected
 replace github.com/zenta-dev/zever/tools/apidiff v0.8.0 => ./tools/apidiff
 replace github.com/zenta-dev/zever/tools/errscan v0.8.0 => ./tools/errscan
 replace github.com/zenta-dev/zever/tools/modgraph v0.8.0 => ./tools/modgraph
+replace github.com/zenta-dev/zever/tools/tagcheck v0.8.0 => ./tools/tagcheck
 replace github.com/zenta-dev/zever/tools/vulngate v0.8.0 => ./tools/vulngate
 replace github.com/zenta-dev/zever/tools/zever-lsp v0.8.0 => ./tools/zever-lsp
 replace github.com/zenta-dev/zever/tools/zever-mcp v0.8.0 => ./tools/zever-mcp
