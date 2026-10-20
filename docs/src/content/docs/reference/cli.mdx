@@ -37,8 +37,7 @@ drives it, never hosts logic.
 curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
-- `zever --help` prints the grouped map (Scaffolding / Inspection /
-  Runtime / Database / Operations).
+- `zever --help` prints the grouped map (Start / Build / Data / Run & ops, plus the additional commands).
 
 ## Config
 
@@ -126,7 +125,7 @@ exit:0
 
 | Group | Equivalent CLI |
 |---|---|
-| Scaffold | `zever new` (battery picker adds beyond the `log, router` floor; `--profile minimal\|api\|full` presets) |
+| Scaffold | `zever new` (battery picker adds beyond the `log, router` floor; `--with a,b=c` selects batteries and adapter pins, `--profile` is a deprecated alias) |
 | Scaffold | `zever add <battery>[/<adapter>]` (adds a battery to an existing project; `zever add -h` prints flags) |
 | Scaffold | `zever generate` (bare and non-interactive: runs the full pipeline, compile with the default backend set, stamp, write, scaffold) |
 | Scaffold | `zever generate tinker` |
@@ -151,7 +150,7 @@ exit:0
 | Database | `zever db seed` |
 | Operations | `zever outbox` (`status`, `dlq list`, `dlq requeue`, `dlq purge`, `purge`; see [Outbox Ops](../../guides/background/outbox-ops/)) |
 | Operations | `zever uninstall` (remove the `zever` and `zever-lsp` binaries; `--dry-run`, `--keep-lsp`, `--yes`/`--force`) |
-| Operations | `zever upgrade` (upgrade the `zever` binary to the latest release; `--version`, `--check`, `--dry-run`, `--yes`/`--force`) |
+| Operations | `zever upgrade` (upgrade the `zever` binary to the latest release; `--version`, `--check`, `--dry-run`, `--project`, `--yes`/`--force`) |
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
 | Tooling | `zever docs --dir <dir>` |
 
@@ -167,33 +166,40 @@ and `check-boundaries`.
 | `-V` | print the CLI version (alias for `--version`) |
 | `--dry-run` | preview file edits / SQL / removals without applying (where supported) |
 | `-i`, `--interactive` | guided `huh` prompts for one-shot commands |
-| `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt) |
-| `--profile minimal\|api\|full` | `zever new`: start-small preset (explicit `--batteries` add to it) |
+| `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt); prefer `--with` |
+| `--with a,b=c` | `zever new`: batteries with optional adapter pins (replaces `--batteries`/`--adapters`) |
+| `--profile minimal\|api\|full` | `zever new`: deprecated alias for `--with` |
 | `--check` | `zever compile`: verify committed output matches a fresh compile, write nothing (exit 1 on drift) |
 | `--strict` | `zever compile --check`: also fail when the committed files differ only in the stamped CLI version |
 | `--no-tidy` | `zever compile`: print a hint instead of running `go mod tidy` when go.mod misses modules the generated code imports |
-| `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt) |
-| `-y`, `--yes` | `zever new`: skip all prompts, scaffold floor plus flags only |
+| `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt); prefer `--with` |
+| `-y`, `--yes` | `zever new`: skip all prompts, scaffold floor plus flags only; `zever add`: apply the wiring.go edit without prompting |
 | `--list-batteries` | `zever new`: print the battery/default-adapter table to stdout and exit |
 | `--module PATH` | `zever new`: Go module path for the new project (default: the app name itself) |
 | `--dir PATH` | `zever new`: output directory (default `./<name>`) |
 | `--framework-version V` | `zever new`: depend on a published Zever version instead of a local replace directive |
-| `--force` | `zever new`: scaffold into a non-empty directory anyway |
+| `--force` | `zever new`: scaffold into a non-empty directory anyway; `zever add`: allow an adapter swap and overwrite existing recipe files |
+| `--name N` | `zever add`: wire a named instance (for example `--name analytics` for `db.Ref("analytics")`) |
+| `--uses R` | `zever add`: declare a boot-order edge on another wired instance (for example `--uses db`) |
+| `--diff` | `zever add`: print the wiring.go diff and change nothing |
+| `--project` | `zever upgrade`: upgrade the current project's go.mod instead of the binary |
 | `-h` | print flags without running |
 
 ### `zever add`
 
 Adds one core battery to an existing project. Synopsis (exactly one
-positional, no prompting):
+positional):
 
 ```sh
-zever add <battery>[/<adapter>] [--adapter NAME] [--force] [--module PATH[@VERSION]] [--dry-run]
+zever add <battery>[/<adapter>] [--adapter NAME] [--name N] [--uses R] [--force] [--module PATH[@VERSION]] [--diff] [--yes] [--dry-run]
 ```
 
-`--adapter` overrides the slash form, `--force` overwrites an existing
-`wiring.go` registration, `--module` names a plugin battery's Go module
-(required for plugin batteries), and `--dry-run` prints the edits
-without writing them.
+`--adapter` overrides the slash form, `--force` allows an adapter swap and
+overwrites existing recipe files, `--module` names a plugin battery's Go
+module (required for plugin batteries), `--name` wires a named instance,
+`--uses` records a boot-order edge on another wired instance, `--diff`
+prints the wiring.go diff and changes nothing, `--yes` applies the edit
+without prompting, and `--dry-run` prints the edits without writing them.
 
 The adapter may be omitted (`zever add cache` selects
 `config.Default()`'s own pick, e.g. `memory`) or pinned explicitly
@@ -201,26 +207,27 @@ The adapter may be omitted (`zever add cache` selects
 batteries are errors. Run it from the project root (the directory
 holding `go.mod`); without one it fails.
 
-Effects (two append-only edits, never overwriting hand-written code):
+Effects (append-only edits, never overwriting hand-written code):
 
+- `internal/app/wiring.go`: a `go/ast` edit that inserts the battery's `Ref`
+  var, its `container.Provide` entry, and the adapter import. Every half is
+  inserted idempotently, so re-adding the same battery is a no-op. Fails if
+  the file has no `Providers` function returning a `[]container.Provider`
+  literal; scaffold it with `zever new` first.
+- `.env.example`: appends the battery's env keys, including the
+  `<SERVICE>__<NAME>__*` section when `--name` wires a named instance.
 - `go.mod`: adds `require` entries for the battery's core and adapter
   modules at the version pinned by the framework require (falling back
   to the CLI's built-in framework version). For local checkouts (a
   `replace github.com/zenta-dev/zever => <local-dir>` marker), matching
   local replaces are derived for both modules. Paths already required
   (any version) or already replaced are left untouched.
-- `internal/app/app.go`: splices in the adapter's named import plus its
-  `Register()` call (gofmt-normalized). Either half already present is
-  skipped, so re-adding the same battery is a no-op. Fails if the file
-  has no import block or no `func New`, scaffold it with
-  `zever generate server` first.
 
-`zever add` does not run `go mod tidy`, run it afterwards so `go.sum`
-catches up, then serve:
+`zever add` then runs `go get` and `go mod tidy` so `go.sum` catches up, and
+serves afterwards:
 
 ```sh
 zever add cache/redis
-go mod tidy
 zever serve
 ```
 
@@ -281,7 +288,15 @@ zever upgrade --check              # print the available version, exit 0
 zever upgrade --dry-run            # print the upgrade plan, download nothing
 zever upgrade --yes                # confirm without prompting
 zever upgrade --version v0.7.0 --yes
+zever upgrade --project --dry-run  # plan the project's go.mod upgrade instead
 ```
+
+`--project` upgrades the current project's `go.mod` instead of the binary:
+it rewrites every framework require to the target version (third-party
+requires and requires pinned to a local path by a `replace` directive stay
+untouched), prints the `**Breaking:**` notes from the releases in between,
+and then tidies the module. It needs a `go.mod` with at least one framework
+require, and it leaves the binary alone.
 
 Versions compare with `golang.org/x/mod/semver`: an already-current
 target prints `already current` and exits 0, and a target older than
