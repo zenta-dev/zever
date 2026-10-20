@@ -220,7 +220,7 @@ func redactedInstances(env config.Env, resolved *config.Config, services map[str
 // instanceAdapter reports the named instance's adapter: SERVICE__NAME__ADAPTER
 // from env (case-insensitive), falling back to the default instance's.
 func instanceAdapter(env config.Env, svc, name, def string) string {
-	want := strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "_ADAPTER"
+	want := strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "__ADAPTER"
 
 	for k, v := range env {
 		if strings.ToUpper(k) == want {
