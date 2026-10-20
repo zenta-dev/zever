@@ -16,26 +16,40 @@ no handlers yet.
 
 ## Runbook outline
 
+Run every command from `examples/bookings/` so `data/` resolves. The two
+secrets the entrypoints need go in `.env` (never commit it):
+
+```sh
+cp .env.example .env
+printf 'AUTH_JWT_SECRET=%s\nCRYPTO_KEY=%s\n' \
+  "$(head -c 32 /dev/urandom | base64)" "$(head -c 32 /dev/urandom | base64)" >> .env
+```
+
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen`
 2. Seed: coming in a later PR.
 3. Serve: coming in a later PR (`zever serve`).
 4. Worker: coming in a later PR (queue `default`/`low` consumers for
    SendConfirmation/SendReminder + embedded scheduler for Reminder cron).
 
+The DSN in step 1 is the file `DB_PATH` points at in `.env`, so the
+migrated tables are the ones the server opens.
+
 ## Doctor note
 
 `zever doctor` reports FAILs that are expected with
 zero-infra defaults, not framework bugs (do not fix framework code):
 
-- ai, auth, geo, i18n: same 4 FAILs as bare defaults (missing api key,
-  jwt secret, cities.json, embed FS).
+- ai, i18n: the batteries this app does not wire (missing api key, embed
+  FS). Two FAILs, expected by default.
+- auth, crypto: FAIL until `AUTH_JWT_SECRET` and `CRYPTO_KEY` are set.
 - db: `data/bookings.db` resolves relative to `examples/bookings/`; run doctor
   from that directory or after migrating.
 - webhook (queue variant): needs its queue reference, wired in a later PR.
 
 ## Worker, seed, webhooks (this PR)
 
-Run from `examples/bookings/` so `data/` resolves:
+Run from `examples/bookings/` so `data/` resolves (the `.env` setup above
+already covers the secrets):
 
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen`
 2. Seed (idempotent, safe to re-run): `go run ./db/seed`
