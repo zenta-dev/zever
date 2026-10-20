@@ -98,6 +98,8 @@ The file is **ignored entirely** — no values are read from it.
 
 Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  adapter=<x>` header per service plus its masked options, then a `<service>/<NAME>` section per named instance.
 
+Duration options (`DB_MAX_CONN_LIFETIME`, `AI_TIMEOUT`, ...) print in the same string form the env layer parses (`30s`, `5m`) — the human table and the `--json` envelope alike — never as a raw nanosecond count.
+
 ```go title="main.go"
 for name, sc := range cfg.RedactedServices() {
     fmt.Println(name, sc.Adapter, sc.Options)

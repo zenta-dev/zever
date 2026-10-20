@@ -7,6 +7,10 @@
 // JSON output is deterministic for stable snapshots. Unsupported features fail
 // closed.
 //
+// Durations: a time.Duration encodes as its canonical string form ("30s"),
+// the form time.ParseDuration and the config env layer accept, and decodes
+// back from that form.
+//
 // DX: Open with JSONCodec[V] directly; there is no Open or Register surface.
 // Options are typed with zero-infra defaults for tests. No service env
 // applies; see config/README.md.

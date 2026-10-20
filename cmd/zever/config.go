@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // errConfigUnknownSubcommand is returned when `zever config` is given no
@@ -220,7 +220,7 @@ func redactedInstances(env config.Env, resolved *config.Config, services map[str
 // instanceAdapter reports the named instance's adapter: SERVICE__NAME__ADAPTER
 // from env (case-insensitive), falling back to the default instance's.
 func instanceAdapter(env config.Env, svc, name, def string) string {
-	want := strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "_ADAPTER"
+	want := strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "__ADAPTER"
 
 	for k, v := range env {
 		if strings.ToUpper(k) == want {
@@ -252,16 +252,18 @@ func sortedInstanceNames(out map[string]config.ServiceConfig, svc string) []stri
 }
 
 // optionsToMap converts typed options to a plain map via the same JSON-tag
-// semantics RedactedServices uses. It never fails: unmarshalable values
-// yield an empty map rather than leaking raw state.
+// semantics RedactedServices uses: the shared codec, so a duration renders as
+// its canonical string form ("30s") exactly as it does for the default
+// instance. It never fails: unmarshalable values yield an empty map rather
+// than leaking raw state.
 func optionsToMap(opts any) map[string]any {
-	b, err := json.Marshal(opts)
+	b, err := codec.JSONCodec[any]{}.Encode(opts)
 	if err != nil {
 		return map[string]any{}
 	}
 
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
+	m, err := (codec.JSONCodec[map[string]any]{}).Decode(b)
+	if err != nil {
 		return map[string]any{}
 	}
 

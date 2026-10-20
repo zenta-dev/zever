@@ -214,7 +214,7 @@ func loadExcepted(path string) (map[string]bool, error) {
 
 		parts := strings.Split(text, "\t")
 		if len(parts) < 2 {
-			return nil, fmt.Errorf("malformed exception line %q", text)
+			return nil, fmt.Errorf("taggolden: malformed exception line %q", text)
 		}
 
 		excepted[parts[0]+"\t"+parts[1]] = true
@@ -275,7 +275,7 @@ func loadRegistry(path string) ([]entry, error) {
 
 		parts := strings.Split(text, "\t")
 		if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-			return nil, fmt.Errorf("malformed registry line %q", text)
+			return nil, fmt.Errorf("taggolden: malformed registry line %q", text)
 		}
 
 		key := parts[0] + "\t" + parts[1]
@@ -369,7 +369,7 @@ func (r *repo) resolve(ctx context.Context, dir, name, release string) ([]wire.F
 		return fields, short, nil
 	}
 
-	return nil, "", fmt.Errorf("wire struct %s in %s carries no json tags in the release %s nor in any commit of its history", name, dir, release)
+	return nil, "", fmt.Errorf("taggolden: wire struct %s in %s carries no json tags in the release %s nor in any commit of its history", name, dir, release)
 }
 
 // candidates returns the commits that touched the declaration of a struct,
