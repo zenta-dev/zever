@@ -11,16 +11,13 @@ The `middleware` package builds plain HTTP middleware and gRPC unary interceptor
 
 Middleware has no config block of its own (only [CORS](../cors/) takes an `Options` value). Configure the services it wraps:
 
-```yaml
-log:
-  adapter: slog
-ratelimit:
-  adapter: memory
-observability:
-  adapter: stdout
+```sh
+LOG_ADAPTER=slog
+RATELIMIT_ADAPTER=memory
+OBSERVABILITY_ADAPTER=stdout
 ```
 
-Set `LOG_ADAPTER=slog` and `RATELIMIT_ADAPTER=memory` to use env instead. Defaults from `config.Default()` run with no external services. Options: [Config reference](../../../reference/config/#ratelimit).
+Defaults from `config.Default()` run with no external services. Options: [Config reference](../../../reference/config/#ratelimit).
 
 ```go title="main.go" check
 package main

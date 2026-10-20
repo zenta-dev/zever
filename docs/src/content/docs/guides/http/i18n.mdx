@@ -3,32 +3,26 @@ title: Internationalization
 description: Translate user-facing strings with an embedded catalog locally and a remote catalog in production.
 ---
 
-import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 `i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary, and production can pull from a remote service through the same interface. Use it for every visible string (confirmations, emails, error explanations), and never concatenate translated fragments: translators need full sentences with placeholders.
 
 ## Quick start
 
-<Tabs>
-  <TabItem label="YAML">
-```yaml
-i18n:
-  adapter: embed   # default: compiled-in catalog
-  options:
-    embed:
-      dir: locales
-      fallback: en
+```sh
+I18N_ADAPTER=embed    # default: compiled-in catalog
+I18N_EMBED_DIR=locales
+I18N_EMBED_FALLBACK=en
 ```
-  </TabItem>
-  <TabItem label="Env">
+
+Switch to `remote` for a shared catalog service:
+
 ```sh
 I18N_ADAPTER=remote
 I18N_REMOTE_ENDPOINT=i18n.internal:8080
 ```
-  </TabItem>
-</Tabs>
 
-Switch to `remote` for a shared catalog service: it takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, `allow_insecure`, and `allow_private` (see the [Config reference](../../../reference/config/#i18n)). Outbound requests dial only globally routable addresses and never follow redirects; a local catalog sidecar needs `allow_private: true`, which logs a line at startup. `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from YAML, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
+The `remote` adapter takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, `allow_insecure`, and `allow_private` (see the [Config reference](../../../reference/config/#i18n)). Outbound requests dial only globally routable addresses and never follow redirects; a local catalog sidecar needs `allow_private: true`, which logs a line at startup. `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from env, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
 
 Catalogs are JSON per locale. A message is plain text or a Go `text/template` string with `{{.name}}` placeholders:
 
