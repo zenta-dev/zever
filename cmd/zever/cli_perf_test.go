@@ -44,12 +44,32 @@ func TestHelpStartupDoesNotBlock(t *testing.T) {
 		// The help still renders the tree: the budget guarded a working
 		// help path, and the render contract stays pinned.
 		help := out.String()
-		for _, want := range []string{"Usage:", "Flags:", "new", "generate"} {
+		for _, want := range []string{"Usage:", "Flags:"} {
 			if !strings.Contains(help, want) {
 				t.Fatalf("--help output missing %q:\n%s", want, help)
 			}
 		}
+		for _, c := range root.Commands() {
+			if c.Hidden {
+				continue
+			}
+			if !helpListsCommand(help, c.Name()) {
+				t.Fatalf("--help output does not list the %q command:\n%s", c.Name(), help)
+			}
+		}
 	})
+}
+
+// helpListsCommand reports whether the rendered help lists a command under
+// its own name: a line whose first field is the command name.
+func helpListsCommand(help, name string) bool {
+	for line := range strings.SplitSeq(help, "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 // TestHelpStartupAllocs caps the heap allocations of one in-process root
