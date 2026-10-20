@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -12,6 +14,26 @@ import (
 // prepends it plain to the Cobra help template so `zever --help` and the
 // unknown-command usage share the same header.
 const usageHeader = "zever — zever toolkit"
+
+// unknownSubcommandError builds the error for an unknown sub-subcommand
+// (the second word of a two-word command): the error first, so it is the
+// first line a developer reads, then the closest match as a hint, then the
+// command that lists the real choices. It mirrors the top-level
+// unknown-subcommand shape (see run in main.go): no usage dump in front of
+// the error.
+func unknownSubcommandError(command, sub string, choices []string, listCmd string) error {
+	msg := fmt.Sprintf("%s: unknown subcommand %q", command, sub)
+
+	if shouldShowHint() {
+		if s := closest(sub, choices); s != "" {
+			msg += "\n" + formatHint(fmt.Sprintf("did you mean %q?", s))
+		}
+
+		msg += "\n" + formatHint("run '"+listCmd+"' to list the subcommands")
+	}
+
+	return errors.New(msg)
+}
 
 // allTopLevel returns every suggestible top-level name derived from the
 // Cobra tree: each subcommand name plus each alias (including the deliberate

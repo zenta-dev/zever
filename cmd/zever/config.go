@@ -46,8 +46,7 @@ func runConfig(args []string) error {
 		printConfigUsage(flag.NewFlagSet("config", flag.ContinueOnError))
 		return nil
 	default:
-		printConfigUsage(flag.NewFlagSet("config", flag.ContinueOnError))
-		return fmt.Errorf("%w: %q", ErrUnknownSubcommand, sub)
+		return unknownSubcommandError("zever config", sub, []string{"show"}, "zever config -h")
 	}
 }
 
