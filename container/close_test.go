@@ -215,7 +215,7 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 		name := typ.Field(i).Name
 		if name == "cfg" || name == "pluginsMu" || name == "plugins" || name == "pools" || name == "rootCtx" || name == "cancelRoot" ||
 			name == "provDefs" || name == "provOrder" || name == "provErrs" || name == "provMu" || name == "provVals" ||
-			name == "env" || name == "envErr" {
+			name == "env" || name == "envErr" || name == "envOnce" {
 			// prov* is the explicit Provide registry (see provide.go):
 			// declaration state and resolution cache, not lazy
 			// services. Provided instances close through the provider

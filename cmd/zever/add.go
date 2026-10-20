@@ -64,6 +64,23 @@ insert-only; a swap replaces exactly one entry). Config is env-only, so the
 adapter selection lands in .env.example, never in a config file. Run it from
 your project root (the directory holding go.mod).`
 
+// addShortUsage returns the compact usage block an argument-count error
+// carries: the command shape, the recipe names, and the pointer to the
+// full reference. It replaces the 40-line addUsageBody in the error path,
+// so a mistyped invocation prints three lines instead of a wall of prose.
+func addShortUsage() string {
+	lines := []string{
+		"usage: zever add <battery>[/<adapter>] [--adapter NAME] [--name N] [--uses R]",
+		"recipes: " + strings.Join(sortedKeys(addRecipeNames), ", "),
+	}
+
+	if shouldShowHint() {
+		lines = append(lines, formatHint("run 'zever add -h' for the full reference, 'zever new --list-batteries' for the battery list"))
+	}
+
+	return joinLines(lines...)
+}
+
 // addRecipeNames are the opt-in file recipes `zever add` writes from
 // templates. No battery shares these names, so the dispatch is exact.
 var addRecipeNames = map[string]bool{
@@ -1417,7 +1434,7 @@ func runAdd(args []string) error {
 	}
 
 	if len(positional) != 1 {
-		return fmt.Errorf("%s: expected exactly one <battery>[/<adapter>] or recipe, got %d\n%s", tag, len(positional), addUsageBody)
+		return fmt.Errorf("%s: expected exactly one <battery>[/<adapter>] or recipe, got %d\n%s", tag, len(positional), addShortUsage())
 	}
 
 	force := flagBool(fs, "force")

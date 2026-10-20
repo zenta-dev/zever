@@ -17,13 +17,24 @@ SBOM ?= sbom.json
 # at root), so every *-all target loops per-module with fail-fast `set -e`.
 # examples/external-sms and docs/examples stay outside `go.work` by design
 # (third-party/consumer proofs); verify them standalone with: GOWORK=off go -C examples/external-sms test ./...
-# .claude/worktrees holds agent harness checkouts, not repo modules: without
-# the exclusion the list balloons past ARG_MAX, `printf` fails, and every
-# *-all loop silently tests nothing (false green).
+# The harness checkout dirs (.git, .worktrees, .claude) are skipped at ANY
+# depth, like tools/modgraph and tools/tag-release.sh do: a worktree nested
+# under a module dir holds a full checkout of the repo, so counting it made
+# the module list differ from the tag list. Without the exclusion the list
+# balloons past ARG_MAX, `printf` fails, and every *-all loop silently tests
+# nothing (false green).
 # Go's own tooling ignores testdata trees; compile-fail fixture modules
 # (container/testdata/compilefail/*) must fail `go build` by design, so
 # they are excluded here like the harness checkouts above.
-ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "*/.git/*" -not -path "*/.worktrees/*" -not -path "*/.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
+
+# The two modules that stay outside `go.work` by design (third-party and
+# consumer proofs). They are not workspace members, so the go command
+# refuses to build them with the workspace loaded: every go invocation
+# below runs with GOWORK=off. They are tidied with the same offline
+# machinery as the workspace modules (tools/gotidy.sh), so a sibling that
+# has no proxy release yet resolves from disk instead of the proxy.
+OUTSIDE_MODULES := docs/examples examples/external-sms
 
 # Matrix sharding: stable round-robin slice of ALL_MODULES. Defaults
 # (TOTAL=1) expand to exactly ALL_MODULES.
@@ -118,9 +129,17 @@ changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** p
 changelog-compile: ## Compile .changelog/unreleased/*.md fragments into the changelog's pending section
 	bash tools/changelog-compile.sh
 
+.PHONY: changelog-compile-check
+changelog-compile-check: ## Assert the changelog keeps a pending ## [Unreleased] section (the release-cut invariant)
+	bash tools/changelog-compile.sh --check
+
 .PHONY: changelog-compile-test
 changelog-compile-test: ## Test the changelog fragment compiler (pending-section rule)
 	bash tools/changelog-compile-test.sh
+
+.PHONY: sbom-test
+sbom-test: ## Test the SBOM resolution script (offline: empty proxy, stubbed cyclonedx-gomod)
+	bash tools/sbom-test.sh
 
 .PHONY: compile-check
 compile-check: ## Verify committed generated code matches the schema (zever compile --check over every example)
@@ -202,7 +221,7 @@ SBOM_OWN_LICENSE ?= Apache-2.0
 sbom: ## Generate a CycloneDX SBOM per module under sbom/ (override list via MODULES)
 	@command -v $(CYCLONEDX_GOMOD) >/dev/null 2>&1 || { printf '%s\n' "cyclonedx-gomod not found: run 'make setup'"; exit 1; }
 	@command -v jq >/dev/null 2>&1 || { printf '%s\n' "jq not found: install jq to stamp own-module licenses"; exit 1; }
-	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && GOWORK=off $(GO) mod download all && GOWORK=off $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" . 2>&1 | grep -v "no licenses detected.*github.com/zenta-dev/zever" || true); jq --arg p "$(SBOM_OWN_PREFIX)" --arg l "$(SBOM_OWN_LICENSE)" '(.metadata.component, .components[]?) |= (if (.name | startswith($$p)) and ((.licenses // []) | length) == 0 then .licenses = [{license: {id: $$l}}] else . end)' "$$root/sbom/$$slug.json" > "$$root/sbom/$$slug.json.tmp" && mv "$$root/sbom/$$slug.json.tmp" "$$root/sbom/$$slug.json"; done
+	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); GO="$(GO)" CYCLONEDX_GOMOD="$(CYCLONEDX_GOMOD)" SBOM_OWN_PREFIX="$(SBOM_OWN_PREFIX)" SBOM_OWN_LICENSE="$(SBOM_OWN_LICENSE)" SBOM_REPO_ROOT="$$root" $(CURDIR)/tools/sbom.sh "$$d" "$$root/sbom/$$slug.json"; done
 
 .PHONY: clean
 clean: ## Remove coverage output and build artifacts
@@ -210,7 +229,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all check-tags err-lint modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test changelog-compile-check sbom-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
@@ -220,6 +239,7 @@ download-all: ## Download dependencies of every module (override list via MODULE
 .PHONY: check-all build-all test-all test-race-all test-race-fast test-race-pr vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) vet ./... && $(CURDIR)/tools/gotidy.sh -diff && $(GO) test -vet=off ./... && $(GO) build ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+	failed=""; for d in $(OUTSIDE_MODULES); do echo "== $$d =="; if ! (cd $$d && GOWORK=off $(CURDIR)/tools/gotidy.sh -diff); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	mkdir -p .coverage; root="$$PWD"; failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); if ! (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
@@ -250,14 +270,14 @@ vet-all: ## Run go vet in every module (override list via MODULES)
 
 tidy-all: ## Run go mod tidy in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(CURDIR)/tools/gotidy.sh); done
+	set -e; for d in $(OUTSIDE_MODULES); do echo "== $$d =="; (cd $$d && GOWORK=off $(CURDIR)/tools/gotidy.sh); done
 
 tidy-check-all: ## Verify go.mod/go.sum are tidy in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(CURDIR)/tools/gotidy.sh -diff); done
+	set -e; for d in $(OUTSIDE_MODULES); do echo "== $$d =="; (cd $$d && GOWORK=off $(CURDIR)/tools/gotidy.sh -diff); done
 
 deps-sync: ## Reconcile dependency versions across all modules after a bump
 	$(MAKE) tidy-all
-	GOWORK=off go -C docs/examples mod tidy
-	GOWORK=off go -C examples/external-sms mod tidy
 
 .PHONY: release-prep
 release-prep: ## Pin the repo for a release: VERSION=vX.Y.Z rewrites cmd/zever/VERSION, installers, docs pins and every intra-repo go.mod require, then tidies
@@ -266,8 +286,6 @@ release-prep: ## Pin the repo for a release: VERSION=vX.Y.Z rewrites cmd/zever/V
 
 deps-sync-check: ## Verify no dependency drift remains after a bump
 	$(MAKE) tidy-check-all
-	GOWORK=off go -C docs/examples mod tidy -diff
-	GOWORK=off go -C examples/external-sms mod tidy -diff
 
 .PHONY: dependabot-check
 dependabot-check: ## Verify .github/dependabot.yml lists every module (regenerate: bash tools/gen-dependabot.sh)

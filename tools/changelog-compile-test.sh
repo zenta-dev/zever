@@ -200,6 +200,179 @@ else
     bad "changelog untouched without fragments"
 fi
 
+# --- scenario 6: the pending section is ## [Unreleased] ------------------------
+say ""
+say "changelog-compile: ## [Unreleased] stays the pending section after the cut"
+
+# The release cut renames the pending section and leaves an empty
+# ## [Unreleased] above it: the next release always has a pending section,
+# tagged or not.
+repo="$(new_repo cut '# Changelog
+
+## [Unreleased]
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+git -C "$repo" tag v0.8.0
+printf -- '- feat(c): after the cut\n' >"$repo/.changelog/unreleased/c-entry.md"
+
+out="$(bash "$COMPILE" "$repo" 2>&1)"; rc=$?
+assert_rc "compile succeeds on a tagged release with an Unreleased section" 0 "$rc"
+assert_contains "compile targets the Unreleased section" "$out" "## [Unreleased]"
+
+changelog="$(cat "$repo/CHANGELOG.md")"
+assert_contains "entry compiled into the Unreleased section" "$changelog" "- feat(c): after the cut"
+unreleased_body="$(printf '%s\n' "$changelog" | sed -n '/^## \[Unreleased\]/,/^## \[v/p')"
+case "$unreleased_body" in
+    *"- feat(c): after the cut"*) ok "entry landed in the Unreleased section" ;;
+    *) bad "entry landed in the Unreleased section" ;;
+esac
+assert_contains "the released section is untouched" "$changelog" "## [v0.8.0] - 2026-10-18"
+
+# --- scenario 7: --check asserts the pending section ----------------------------
+say ""
+say "changelog-compile: --check asserts the pending section"
+
+repo="$(new_repo checkok '# Changelog
+
+## [Unreleased]
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+out="$(bash "$COMPILE" --check "$repo" 2>&1)"; rc=$?
+assert_rc "check passes with an Unreleased section" 0 "$rc"
+assert_contains "check names the pending section" "$out" "## [Unreleased]"
+
+# A changelog whose top section is a release (the v0.8.0 cut regression):
+# the check must fail, or the next release cannot be cut.
+repo="$(new_repo checkbad '# Changelog
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+out="$(bash "$COMPILE" --check "$repo" 2>&1)"; rc=$?
+assert_rc "check fails without an Unreleased section" 1 "$rc"
+assert_contains "failure names the missing section" "$out" "## [Unreleased]"
+
+# The check never writes: the changelog must be untouched.
+before="$(cat "$repo/CHANGELOG.md")"
+bash "$COMPILE" --check "$repo" >/dev/null 2>&1 || true
+after="$(cat "$repo/CHANGELOG.md")"
+if [ "$before" = "$after" ]; then
+    ok "check leaves the changelog untouched"
+else
+    bad "check leaves the changelog untouched"
+fi
+
+# --- scenario 8: a fragment entry that is already compiled is skipped ----------
+say ""
+say "changelog-compile: an entry already in the pending section is skipped"
+
+repo="$(new_repo dup '# Changelog
+
+## [Unreleased]
+
+- feat(d): already compiled
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+printf -- '- feat(d): already compiled\n' >"$repo/.changelog/unreleased/d-entry.md"
+
+out="$(bash "$COMPILE" "$repo" 2>&1)"; rc=$?
+assert_rc "compile succeeds with a duplicate entry" 0 "$rc"
+assert_contains "compile warns about the skipped entry" "$out" "skipped duplicate entry"
+
+changelog="$(cat "$repo/CHANGELOG.md")"
+count_d="$(printf '%s\n' "$changelog" | grep -c 'feat(d): already compiled')"
+if [ "$count_d" -eq 1 ]; then
+    ok "the duplicated entry stays in the changelog exactly once"
+else
+    bad "the duplicated entry stays in the changelog exactly once (count=$count_d)"
+fi
+assert_no_file "the duplicate fragment is deleted" "$repo/.changelog/unreleased/d-entry.md"
+
+# --- scenario 9: a fragment with a duplicate and a new entry --------------------
+say ""
+say "changelog-compile: only the new entries of a mixed fragment are compiled"
+
+repo="$(new_repo dupmix '# Changelog
+
+## [Unreleased]
+
+- feat(d): already compiled
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+printf -- '- feat(d): already compiled\n- feat(n): new entry\n' >"$repo/.changelog/unreleased/dn-entry.md"
+
+out="$(bash "$COMPILE" "$repo" 2>&1)"; rc=$?
+assert_rc "compile succeeds with a mixed fragment" 0 "$rc"
+assert_contains "compile warns about the skipped entry" "$out" "skipped duplicate entry"
+
+changelog="$(cat "$repo/CHANGELOG.md")"
+assert_contains "the new entry is compiled" "$changelog" "- feat(n): new entry"
+count_d="$(printf '%s\n' "$changelog" | grep -c 'feat(d): already compiled')"
+count_n="$(printf '%s\n' "$changelog" | grep -c 'feat(n): new entry')"
+if [ "$count_d" -eq 1 ] && [ "$count_n" -eq 1 ]; then
+    ok "each entry ends up in the changelog exactly once"
+else
+    bad "each entry ends up in the changelog exactly once (d=$count_d, n=$count_n)"
+fi
+
+# --- scenario 9b: a fragment repeating another fragment's entry -----------------
+say ""
+say "changelog-compile: a fragment repeating another fragment's entry is skipped"
+
+repo="$(new_repo dupfrag '# Changelog
+
+## [Unreleased]
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+printf -- '- feat(p): shared entry\n' >"$repo/.changelog/unreleased/p-first.md"
+printf -- '- feat(p): shared entry\n- feat(q): only entry\n' >"$repo/.changelog/unreleased/p-second.md"
+
+out="$(bash "$COMPILE" "$repo" 2>&1)"; rc=$?
+assert_rc "compile succeeds with a repeated fragment entry" 0 "$rc"
+assert_contains "compile warns about the repeated entry" "$out" "skipped duplicate entry"
+
+changelog="$(cat "$repo/CHANGELOG.md")"
+count_p="$(printf '%s\n' "$changelog" | grep -c 'feat(p): shared entry')"
+count_q="$(printf '%s\n' "$changelog" | grep -c 'feat(q): only entry')"
+if [ "$count_p" -eq 1 ] && [ "$count_q" -eq 1 ]; then
+    ok "the repeated entry is compiled once, the other one too"
+else
+    bad "the repeated entry is compiled once, the other one too (p=$count_p, q=$count_q)"
+fi
+
+# --- scenario 10: the lint flags a duplicated entry -----------------------------
+say ""
+say "changelog-lint: an entry twice in the same section is a violation"
+repo="$(new_repo lintdup '# Changelog
+
+## [Unreleased]
+
+- feat(x): same entry
+- feat(x): same entry
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+lintout="$(bash "$LINT" "$repo/CHANGELOG.md" 2>&1)"; rc=$?
+assert_rc "lint fails on a duplicated entry" 1 "$rc"
+assert_contains "lint names the duplicated entry" "$lintout" "duplicate entry"
+
+# A fragment is linted with the same rules: the same entry twice fails too.
+printf -- '- feat(y): twice\n- feat(y): twice\n' >"$repo/.changelog/unreleased/y-entry.md"
+lintout="$(bash "$LINT" "$repo/CHANGELOG.md" 2>&1)"; rc=$?
+assert_rc "lint fails on a duplicated fragment entry" 1 "$rc"
+assert_contains "lint names the duplicated fragment entry" "$lintout" "duplicate entry"
+
 # --- summary -------------------------------------------------------------------
 say ""
 say "changelog-compile tests: $PASS passed, $FAIL failed"

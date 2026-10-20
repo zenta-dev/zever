@@ -160,7 +160,11 @@ jobs:
   # Changelog tooling gate: the fragment compiler must fold the fragments in
   # .changelog/unreleased into the changelog's pending section (## [Unreleased],
   # or the top release section while its version carries no tag yet) and the
-  # lint must stay green. Local mirror: `make changelog-compile-test`.
+  # lint must stay green. The pending-section check guards the release-cut
+  # invariant: the cut renames ## [Unreleased] to the new release section but
+  # keeps an empty ## [Unreleased] above it, so the next release always has a
+  # pending section. Local mirror: `make changelog-compile-test` and
+  # `make changelog-compile-check`.
   changelog:
     name: changelog (compile + lint)
     timeout-minutes: 10
@@ -171,6 +175,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Changelog compiler tests
         run: bash tools/changelog-compile-test.sh
+      - name: Pending section exists
+        run: make changelog-compile-check
       - name: Lint the changelog
         run: make changelog-lint
 
@@ -238,6 +244,27 @@ jobs:
             **/go.sum
       - name: Check struct tags (AST)
         run: make check-tags
+
+  # Error-convention gate: every error message carries the "<package>: "
+  # prefix, wraps its cause with %w, and never panics outside the resolver
+  # invariants (see docs/errors.md and the errors rule in AGENTS.md). The
+  # scan is repo-wide and cheap; `make err-lint` is also part of `make check`.
+  err-lint:
+    name: err-lint
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Check the error conventions
+        run: make err-lint
 
   # Conformance gate: runs every in-kit conformance suite (core/<battery>)
   # plus every cross-adapter conformance suite (adapters/<battery>/<adapter>).
@@ -743,8 +770,9 @@ jobs:
   # orm) are diffed against their latest <dir>/vX.Y.Z tag with
   # golang.org/x/exp/apidiff (make apidiff). Incompatible changes fail
   # unless the changelog's pending-release section carries a **Breaking:**
-  # line: ## [Unreleased], or the top ## [vX.Y.Z] section while its version
-  # is not tagged yet (a cut but untagged release).
+  # line: ## [Unreleased], or the top ## [vX.Y.Z] section while it is the
+  # in-development version (cmd/zever/VERSION) and is not tagged yet (a cut
+  # but untagged release).
   # fetch-depth 0 is required: the default shallow checkout has no tags.
   apidiff:
     name: apidiff
@@ -827,6 +855,12 @@ jobs:
           key: ${{ runner.os }}-gobin-cyclonedx-gomod-v1.12.0
       - name: Install tools
         run: make setup-cyclonedx-gomod
+      # The SBOM resolution script resolves the module graph through the
+      # proxy, and falls back to the local intra-repo closure while the
+      # pinned siblings are unpublished. Offline: empty file:// proxy and a
+      # stubbed cyclonedx-gomod. Local mirror: `make sbom-test`.
+      - name: SBOM resolution script tests
+        run: make sbom-test
       - name: Generate SBOM (affected modules)
         run: make sbom
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -941,7 +975,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-24.04
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, changelog]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, err-lint, changelog]
     steps:
       - name: Aggregate results
         run: |

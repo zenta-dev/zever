@@ -181,8 +181,33 @@ func TestRunDBMigrateRequiresDSN(t *testing.T) {
 	dir := t.TempDir()
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
 
-	if err := runDBMigrate([]string{"--adapter=sqlite", schemaPath}); err == nil {
+	err := runDBMigrate([]string{"--adapter=sqlite", schemaPath})
+	if err == nil {
 		t.Fatalf("expected error when --dsn is missing, got nil")
+	}
+
+	// The next step is copy-pasteable: the exact command to re-run.
+	if !strings.Contains(err.Error(), "zever db migrate --adapter=sqlite --dsn=data/app.db") {
+		t.Fatalf("error = %q, want the copy-pasteable migrate command", err.Error())
+	}
+}
+
+// TestMigrateDSNHintOnlyForAMissingDSN pins the hint's scope: it appears
+// when the DSN is missing (and the adapter is one with an example), and
+// stays out of the way otherwise.
+func TestMigrateDSNHintOnlyForAMissingDSN(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "")
+
+	if got := migrateDSNHint("sqlite", ""); got == "" {
+		t.Fatal("migrateDSNHint(sqlite, \"\") = \"\", want the copy-pasteable command")
+	}
+
+	if got := migrateDSNHint("sqlite", "data/app.db"); got != "" {
+		t.Fatalf("migrateDSNHint with a DSN = %q, want \"\"", got)
+	}
+
+	if got := migrateDSNHint("mysql", ""); got != "" {
+		t.Fatalf("migrateDSNHint(mysql, \"\") = %q, want \"\"", got)
 	}
 }
 

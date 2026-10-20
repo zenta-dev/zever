@@ -1,0 +1,2 @@
+- fix(tools): `tools/gotidy.sh` now tidies every module offline. It injects temporary local replaces for the whole intra-repo closure, not only for the modules that commit no replaces, so `go mod tidy` never asks the module proxy for a sibling version whose tag does not exist yet.
+- fix(build): the stale intra-repo `go.sum` hashes are gone from `serve`, `examples/multidb`, `zevertest`, `docs/examples` and `examples/external-sms`. The committed `go.mod` files still require the published sibling versions, so consumers keep resolving them from the proxy.

@@ -657,6 +657,56 @@ func TestRunAddComposePostgres(t *testing.T) {
 	}
 }
 
+func TestRunAddArityErrorStaysShort(t *testing.T) {
+	withWorkingDir(t, t.TempDir())
+
+	err := runAdd(nil)
+	if err == nil {
+		t.Fatal("runAdd(nil): got nil error, want an arity error")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "expected exactly one <battery>[/<adapter>] or recipe") {
+		t.Fatalf("error = %q, want the arity complaint", msg)
+	}
+
+	if !strings.Contains(msg, "usage: zever add <battery>[/<adapter>]") {
+		t.Fatalf("error = %q, want the short usage line", msg)
+	}
+
+	if !strings.Contains(msg, "zever add -h") {
+		t.Fatalf("error = %q, want the pointer to the full reference", msg)
+	}
+
+	// The 40-line reference stays behind `zever add -h`; the error itself
+	// must stay readable in a terminal.
+	if lines := strings.Count(msg, "\n") + 1; lines > 5 {
+		t.Fatalf("arity error is %d lines, want at most 5:\n%s", lines, msg)
+	}
+}
+
+// TestRunAddArityErrorSilencesHints pins ZEVER_NO_HINT: the pointer to the
+// full reference is a hint, so silencing hints drops it and leaves the
+// usage shape.
+func TestRunAddArityErrorSilencesHints(t *testing.T) {
+	withWorkingDir(t, t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "1")
+
+	err := runAdd(nil)
+	if err == nil {
+		t.Fatal("runAdd(nil): got nil error, want an arity error")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "hint:") {
+		t.Fatalf("error carries a hint while ZEVER_NO_HINT is set:\n%s", msg)
+	}
+
+	if !strings.Contains(msg, "usage: zever add <battery>[/<adapter>]") {
+		t.Fatalf("error = %q, want the usage line", msg)
+	}
+}
+
 func TestRunAddErrors(t *testing.T) {
 	t.Run("arity", func(t *testing.T) {
 		withWorkingDir(t, t.TempDir())
