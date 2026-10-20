@@ -1,0 +1,15 @@
+# tag_allowlist.txt — allowlist for yaml:/toml: struct tags (tagcheck rule
+# forbidden-tag). The v0.8.0 env-only config migration removed yaml/toml
+# serialization deliberately, and the allowlist starts EMPTY: the current
+# tree has zero yaml:/toml: tags outside _test.go files.
+#
+# Format: one entry per line, either
+#   path/to/file.go          whole file
+#   path/to/file.go:123      specific field line (1-based)
+# Blank lines and # comments are ignored.
+#
+# To add an entry, the tag must be load-bearing — e.g. a third-party wire
+# contract that mandates yaml keys, or a decode target for a yaml document.
+# Justify the exception in a trailing comment on the entry and in the
+# commit message. An unjustified yaml:/toml: tag reintroduction is exactly
+# what this gate exists to catch.

@@ -90,6 +90,10 @@ lint-fix: ## Run golangci-lint with auto-fix
 err-lint: ## Scan for error-convention violations (unprefixed messages, bracket prefixes, double/missing %w, stray panics)
 	$(GO) -C tools/errscan run . "$(CURDIR)"
 
+.PHONY: check-tags
+check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags)
+	$(GO) -C tools/tagcheck run . "$(CURDIR)"
+
 .PHONY: apidiff
 apidiff: ## Check Core-tier public API against last release tags (fails on undocumented breaking changes)
 	$(GO) run ./tools/apidiff
@@ -202,7 +206,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all

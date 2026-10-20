@@ -1,0 +1,8 @@
+package pkg
+
+// wireStruct is in the golden list and keeps every json tag.
+type wireStruct struct {
+	Name   string `json:"name"`
+	Secret string `json:"secret"`
+	count  int
+}
