@@ -105,6 +105,17 @@ Run & ops, plus the additional commands).
 - `zever new --framework-version V`: depend on a published zever version
   instead of a local replace directive.
 - `zever new --force`: scaffold into a non-empty directory anyway.
+- **Local-checkout replace set**: when the scaffold resolves against a
+  framework checkout (`ZEVER_FRAMEWORK_PATH` or the auto-detected
+  checkout), the generated `go.mod` replaces every module of
+  the checkout's module graph — the batteries (`core/<battery>`), the
+  adapters (`adapters/<battery>/<adapter>`), the shared helpers and
+  everything they require inside the repository — not just the modules the
+  project imports. The set is derived from the checkout's own `go.mod`
+  files, so a module the framework adds later is covered without touching
+  the CLI, and the project's module graph never reaches the module proxy
+  for a sibling module (which cannot serve a version that is not published
+  yet).
 - For the full command list, see `zever --help`.
 
 ## `zever new` contributor tooling
