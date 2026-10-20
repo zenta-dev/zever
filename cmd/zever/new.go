@@ -2130,7 +2130,7 @@ func main() {
 	opts := []serve.Option{}
 
 	if port, err := serverPort(*addr); err != nil {
-		fmt.Fprintln(os.Stderr, "server:", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	} else if port != "" {
 		opts = append(opts, serve.WithPort(port))
@@ -2181,7 +2181,7 @@ func serverPort(addr string) (string, error) {
 
 	if _, port, err := net.SplitHostPort(addr); err == nil {
 		if port == "" {
-			return "", fmt.Errorf("-addr %q names no port", addr)
+			return "", fmt.Errorf("server: -addr %q names no port", addr)
 		}
 
 		return port, nil
@@ -2191,7 +2191,7 @@ func serverPort(addr string) (string, error) {
 		return addr, nil
 	}
 
-	return "", fmt.Errorf("-addr %q wants :port or host:port", addr)
+	return "", fmt.Errorf("server: -addr %q wants :port or host:port", addr)
 }
 `
 

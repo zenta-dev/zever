@@ -1,0 +1,1 @@
+- fix(cli): the scaffolded `cmd/server/main.go` reports a bad `-addr` value with the `server: ` prefix (`server: -addr "x" names no port`), like every other error the framework reports.

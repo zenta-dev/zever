@@ -245,6 +245,27 @@ jobs:
       - name: Check struct tags (AST)
         run: make check-tags
 
+  # Error-convention gate: every error message carries the "<package>: "
+  # prefix, wraps its cause with %w, and never panics outside the resolver
+  # invariants (see docs/errors.md and the errors rule in AGENTS.md). The
+  # scan is repo-wide and cheap; `make err-lint` is also part of `make check`.
+  err-lint:
+    name: err-lint
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            **/go.sum
+      - name: Check the error conventions
+        run: make err-lint
+
   # Conformance gate: runs every in-kit conformance suite (core/<battery>)
   # plus every cross-adapter conformance suite (adapters/<battery>/<adapter>).
   # All suites are hermetic (memory/local-backed, miniredis, sqlite, stubs;
@@ -894,7 +915,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-24.04
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, changelog]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, err-lint, changelog]
     steps:
       - name: Aggregate results
         run: |

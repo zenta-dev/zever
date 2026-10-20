@@ -226,7 +226,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test changelog-compile-check sbom-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all check-tags err-lint modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test changelog-compile-check sbom-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
