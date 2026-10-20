@@ -16,6 +16,11 @@
 __pycache__/
 *.pyc
 
+# Local env files hold per-project secrets (the .env.example next to them
+# is the committed template). Never commit a .env.
+.env
+.env.local
+
 .worktrees/
 .claude/
 docs/node_modules/
