@@ -1,0 +1,8 @@
+package pkg
+
+// wireStruct is a golden wire struct whose Error field was dropped from
+// the wire.
+type wireStruct struct {
+	Name  string `json:"name"`
+	Error string `json:"-"`
+}

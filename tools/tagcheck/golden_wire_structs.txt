@@ -30,11 +30,18 @@
 #   - cmd/zever/projectFile removed: config.Load and file discovery were
 #     deleted in the v0.8.0 env-only migration, so the struct is
 #     intentionally gone.
+#   - cmd/zever/wiringRow and serve/doctorBattery added: both are wire
+#     structs created after v0.7.2 (the CLI rewrite and the serve library),
+#     so they were not in the v0.7.2 derivation. They are registered here
+#     so the unregistered-wire rule can pin their keys too.
 #
 # How to extend: when a NEW struct becomes a wire type (JSON request or
 # response, MCP payload, doctor envelope, ...), add a line here and give
-# it json tags from birth. When a wire struct is removed, delete its line
-# and say why here or in the commit message.
+# it json tags from birth. A struct that mixes json-tagged fields with a
+# Go-API-only field cannot be registered: list it in
+# golden_wire_exceptions.txt with a justification instead. When a wire
+# struct is removed, delete its line and say why here or in the commit
+# message.
 adapters/ai/ollama	Options	adapters/ai/ollama/options.go
 adapters/ai/ollama	chatMessage	adapters/ai/ollama/ollama.go
 adapters/ai/ollama	chatOptions	adapters/ai/ollama/ollama.go
@@ -116,6 +123,7 @@ cmd/zever	serverDoctorBattery	cmd/zever/doctor_server.go
 cmd/zever	serverDoctorReport	cmd/zever/doctor_server.go
 cmd/zever	tinkerRequest	cmd/zever/tinker_protocol.go
 cmd/zever	tinkerResponse	cmd/zever/tinker_protocol.go
+cmd/zever	wiringRow	cmd/zever/explain.go
 cmd/zever	boolResult	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
 cmd/zever	cacheDeleteArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
 cmd/zever	cacheExistsArgs	cmd/zever/cmd/tinker-shim/main.go -> cmd/zever (generate_tinker.go, tinker_protocol.go)
@@ -271,6 +279,7 @@ examples/todo/internal/api	createNoteRequest	examples/todo/internal/api/notes.go
 examples/todo/internal/api	loginRequest	examples/todo/internal/api/users.go
 examples/todo/internal/api	registerRequest	examples/todo/internal/api/users.go
 examples/todo/internal/api	updateNoteRequest	examples/todo/internal/api/notes.go
+serve	doctorBattery	serve/doctor.go
 shared/mcpclient	inbound	shared/mcpclient/client.go
 shared/mcpclient	request	shared/mcpclient/client.go
 shared/mcpclient	rpcErrorWire	shared/mcpclient/client.go

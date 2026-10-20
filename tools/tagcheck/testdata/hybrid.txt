@@ -1,0 +1,11 @@
+package pkg
+
+// handle is a Go-API-only dependency with no wire representation.
+type handle struct{}
+
+// hybridStruct mixes a json-tagged wire field with a Go-API-only handle,
+// so it cannot be registered: the registry pins every exported field.
+type hybridStruct struct {
+	Name   string `json:"name"`
+	Handle handle
+}

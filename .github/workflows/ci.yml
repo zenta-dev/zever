@@ -227,7 +227,10 @@ jobs:
   # types keep their json/toml/yaml tags (see the serialization rule in
   # AGENTS.md). The `make check-tags` target lands via fix/restore-json-tags;
   # the job is wired here now so the gate turns green as soon as that branch
-  # merges.
+  # merges. The full history is required (fetch-depth 0): the pinned json
+  # wire keys are derived from the git history (the v0.7.2 baseline
+  # release), and `make tag-golden-check` verifies that the committed data
+  # still matches it.
   check-tags:
     name: check-tags
     timeout-minutes: 10
@@ -236,6 +239,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
@@ -244,6 +249,8 @@ jobs:
             **/go.sum
       - name: Check struct tags (AST)
         run: make check-tags
+      - name: Check the pinned json wire keys against the git history
+        run: make tag-golden-check
 
   # Error-convention gate: every error message carries the "<package>: "
   # prefix, wraps its cause with %w, and never panics outside the resolver
