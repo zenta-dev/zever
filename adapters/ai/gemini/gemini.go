@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -578,6 +579,16 @@ func mapAndRedact(err error, apiKey string) error {
 	return fmt.Errorf("gemini: %s", msg)
 }
 
+// mapError classifies a provider failure into the core/ai sentinel
+// taxonomy.
+//
+// Classification is by type first: a typed provider error (genai.APIError)
+// and a typed refusal (httpclient.ErrPrivateAddress) are matched by
+// identity. Only an error that carries no type at all falls back to
+// scanning the message for a status code -- and never a transport error:
+// net/http wraps dial and TLS failures in *url.Error, whose text embeds
+// the request URL, so an ephemeral port such as 42901 would read as a 429
+// rate limit.
 func mapError(err error) error {
 	if err == nil {
 		return nil
@@ -591,6 +602,20 @@ func mapError(err error) error {
 	var apiErrPtr *genai.APIError
 	if errors.As(err, &apiErrPtr) {
 		return mapAPIError(*apiErrPtr)
+	}
+
+	// The SSRF guard refuses a private address before the dial happens.
+	// Its text names the refused host, so classify it by the sentinel.
+	if errors.Is(err, httpclient.ErrPrivateAddress) {
+		return fmt.Errorf("gemini: %w", err)
+	}
+
+	// A transport failure is already typed and its message embeds the
+	// request URL (host and ephemeral port). Classify it by identity, so
+	// the port can never be mistaken for an HTTP status.
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("gemini: %w", err)
 	}
 
 	// Fallback string inspection for status codes embedded in message.
