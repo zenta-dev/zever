@@ -31,14 +31,13 @@ AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 ```go
 env, err := config.FromEnv()        // reads .env, .env.local, process env
 resolved, err := config.Resolve(env) // typed Config
+container.New(resolved, app.Providers()...)
 ```
 
-Or in one step: `config.LoadEnv()` (same as `FromEnv`).
-
-```go
-cfg, err := config.LoadEnv()
-container.New(cfg, app.Providers()...)
-```
+`config.LoadEnv(files...)` is the explicit-file variant of `FromEnv`: it
+parses the dotenv files you name (no `.env`/`.env.local` discovery, no
+process environment) and returns an `Env` map, so it feeds `config.Resolve`
+the same way.
 
 ## Map environment variables to keys
 
@@ -47,9 +46,14 @@ Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased.
 - Default instance: `SERVICE_FIELD` (e.g., `DB_ADAPTER=postgres`)
 - Named instance: `SERVICE__NAME__FIELD` (e.g., `DB__ANALYTICS__DSN=...`)
 
-Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries`. One nesting level splits at the first `_`: `AUTH_JWT_SECRET` sets `Options.JWT.Secret`.
+A named instance only reaches the container through a matching named Ref
+(`db.Ref("analytics")`) wired with `container.Provide`; the default instance
+reads the flat `SERVICE_FIELD` namespace.
 
-Durations accept `"5s"` strings in env only; files store `time.Duration` as integer nanoseconds.
+Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries` and
+`DB_MAX_CONNS` matches `DB_MAXCONNS`. One nesting level splits at the first `_`: `AUTH_JWT_SECRET` sets `Options.JWT.Secret`.
+
+Durations accept `"5s"` strings in env; there is no integer form.
 
 ## Default adapters (zero-infra)
 
@@ -67,7 +71,7 @@ Durations accept `"5s"` strings in env only; files store `time.Duration` as inte
 | v0.7 | v0.8 |
 |------|------|
 | `zever.yaml` | `.env` + `wiring.go` |
-| `config.Load("")` | `config.FromEnv()` / `config.LoadEnv()` |
+| `config.Load("")` | `config.FromEnv()` + `config.Resolve(env)` |
 | `ServiceConfig.Adapter` | wired in `wiring.go` via `container.Provide` |
 | `DB_MAXCONNS` | `DB_MAXCONNS` (same) |
 | `DB__ANALYTICS__DSN` | `DB__ANALYTICS__DSN` (same format) |
@@ -89,7 +93,7 @@ The file is **ignored entirely** — no values are read from it.
 
 ## Redact config before printing
 
-Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  adapter=<x>` header per service plus its masked options.
+Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  adapter=<x>` header per service plus its masked options, then a `<service>/<NAME>` section per named instance.
 
 ```go title="main.go"
 for name, sc := range cfg.RedactedServices() {
@@ -110,7 +114,7 @@ Defaults pick the zero-infra adapter per service (`db` sqlite, `cache`/`queue`/`
 <details>
 <summary>Unknown field error</summary>
 
-A pre-rename flat spelling. Rename it to snake_case (e.g., `maxconns` → `max_conns`).
+The variable's field name matches no option, so `config.Resolve` fails with a did-you-mean hint. Env matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`; a real typo such as `DB_MAXCONNX` is the failure case.
 </details>
 
 <details>
@@ -126,9 +130,9 @@ A resolved field failed to parse. Set an integer. Unset variables are ignored, b
 </details>
 
 <details>
-<summary>`AUTH_TOKEN` does nothing</summary>
+<summary>`AUTH_TOKEN` fails at startup</summary>
 
-Env is best-effort: `AUTH` is known but the remainder matches no field. Set `AUTH_JWT_SECRET`.
+`AUTH` is a wired service prefix, so every key under it must name a field. `AUTH_TOKEN` matches none and fails `config.Resolve` with a did-you-mean hint. Set `AUTH_JWT_SECRET` instead.
 </details>
 
 <Aside type="danger" title="Dev-only keys">

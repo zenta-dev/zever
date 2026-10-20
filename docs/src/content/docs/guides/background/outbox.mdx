@@ -110,7 +110,7 @@ OUTBOX_PUBLISHER=eventbus
 OUTBOX_POLL_INTERVAL=1s
 OUTBOX_BATCH_SIZE=100
 OUTBOX_MAX_ATTEMPTS=5
-OUTBOX_RETENTION=604800000000000
+OUTBOX_RETENTION=168h
 OUTBOX_LOCK_SECONDS=30
 OUTBOX_DEDICATED_POOL=false
 ```
@@ -118,10 +118,10 @@ OUTBOX_DEDICATED_POOL=false
 ```sh
 OUTBOX_ADAPTER=db
 OUTBOX_DSN=postgres://app:secret@db:5432/app
-OUTBOX_POLL_INTERVAL=1000000000
+OUTBOX_POLL_INTERVAL=1s
 ```
 
-Keys are strict snake_case with integer-nanosecond durations. Zero means the adapter default. `Validate` rejects negative intervals or budgets, unsafe table names, and a `publisher` outside `{eventbus, queue, ""}`. All keys: [outbox config reference](../../../reference/config/#outbox).
+Keys are strict snake_case and durations take Go strings (`"30s"`, `"168h"`). Zero means the adapter default. `Validate` rejects negative intervals or budgets, unsafe table names, and a `publisher` outside `{eventbus, queue, ""}`. All keys: [outbox config reference](../../../reference/config/#outbox).
 
 Core never imports `eventbus` or `queue`. Your wiring bridges a transport to the `Publisher` interface, and `Options.Publisher` only records which one.
 
