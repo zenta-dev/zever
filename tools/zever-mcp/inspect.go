@@ -59,16 +59,16 @@ func checkTool() toolDef {
 // routeEntry is one HTTP binding returned by zever_routes. The JSON shape
 // matches the `routes` array of `zever routes --json`.
 type routeEntry struct {
-	Method string ``
-	Path   string ``
+	Method string `json:"method"`
+	Path   string `json:"path"`
 	// Target is the "Module.Service.RPC" operation name.
-	Target string ``
+	Target string `json:"target"`
 }
 
 // routesResult is the zever_routes payload.
 type routesResult struct {
-	Routes []routeEntry ``
-	Count  int          ``
+	Routes []routeEntry `json:"routes"`
+	Count  int          `json:"count"`
 }
 
 // collectRoutes returns one entry per RPC that declares an HTTP binding, in

@@ -191,11 +191,11 @@ var now = time.Now
 // "must have a baseline tag" rule until Expires.
 type baselineEntry struct {
 	// Module is the module directory relative to the repo root.
-	Module string ``
+	Module string `json:"module"`
 	// Reason explains why no baseline tag exists yet.
-	Reason string ``
+	Reason string `json:"reason"`
 	// Expires is the last day (YYYY-MM-DD, UTC) the exemption holds.
-	Expires string ``
+	Expires string `json:"expires"`
 }
 
 // expired reports whether the exemption has lapsed at t.
@@ -219,7 +219,7 @@ func loadBaselineAllowlist(file string) (map[string]baselineEntry, error) {
 		return nil, fmt.Errorf("read allowlist: %w", err)
 	}
 	var doc struct {
-		Allowlist []baselineEntry ``
+		Allowlist []baselineEntry `json:"allowlist"`
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("parse allowlist %s: %w", file, err)
