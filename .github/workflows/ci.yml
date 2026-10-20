@@ -157,6 +157,23 @@ jobs:
       - name: Installer tests
         run: sh tools/installer-test.sh
 
+  # Changelog tooling gate: the fragment compiler must fold the fragments in
+  # .changelog/unreleased into the changelog's pending section (## [Unreleased],
+  # or the top release section while its version carries no tag yet) and the
+  # lint must stay green. Local mirror: `make changelog-compile-test`.
+  changelog:
+    name: changelog (compile + lint)
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Changelog compiler tests
+        run: bash tools/changelog-compile-test.sh
+      - name: Lint the changelog
+        run: make changelog-lint
+
   # Generated-code drift gate: examples/todo commits its generated/ tree,
   # so `zever compile --check` must report it up to date (also `make
   # compile-check`, wired into `make check`). Regenerate with `zever
@@ -865,7 +882,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-24.04
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, changelog]
     steps:
       - name: Aggregate results
         run: |
