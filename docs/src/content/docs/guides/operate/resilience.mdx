@@ -77,7 +77,7 @@ RESILIENCE_TIMEOUT=5s
 RESILIENCE_BREAKER_ENABLED=true
 ```
 
-`retry` is an untagged `retry.Policy`, so its env keys are the Go field names in snake_case, matched case-insensitively (`RESILIENCE_RETRY_BASEDELAY` and `RESILIENCE_RETRY_BASE_DELAY` both set `BaseDelay`); `Validate` rejects negative timeouts and bulkhead budgets, retry jitter outside [0,1], breaker ratios outside [0,1], and a bad Redis prefix. Template options apply to every guard a manager creates, so open one manager per dependency class when thresholds differ.
+`retry` is a `retry.Policy` with snake_case json tags, so its env keys are snake_case and matched case-insensitively (`RESILIENCE_RETRY_BASEDELAY` and `RESILIENCE_RETRY_BASE_DELAY` both set `BaseDelay`); `Validate` rejects negative timeouts and bulkhead budgets, retry jitter outside [0,1], breaker ratios outside [0,1], and a bad Redis prefix. Template options apply to every guard a manager creates, so open one manager per dependency class when thresholds differ.
 
 ## Share breaker state across replicas
 

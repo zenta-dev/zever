@@ -255,3 +255,139 @@ func mapField(t *testing.T, m map[string]any, key string) map[string]any {
 
 	return obj
 }
+
+// TestRunConfigShowJSONOptionKeysAreSnakeCase pins the wire keys of the
+// `zever config show --json` envelope: every option key is snake_case. A
+// struct field without a json tag is encoded under its Go field name, so a
+// missing tag silently renames a wire key: the retry policy used to render
+// "BaseDelay" and "MaxDelay" next to the snake_case keys of every other
+// option.
+func TestRunConfigShowJSONOptionKeysAreSnakeCase(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	jbuf := mustJSONMode(t)
+
+	if err := runConfigShowWith(ConfigConfig{JSON: true}); err != nil {
+		t.Fatalf("runConfigShowWith: %v", err)
+	}
+
+	env := mustDecodeEnvelope(t, jbuf)
+	if !env.OK || env.Command != "config show" {
+		t.Fatalf("envelope = %+v, want the config show success envelope", env)
+	}
+
+	services := mapField(t, envelopeData(t, env), "services")
+
+	for name := range services {
+		options := mapField(t, mapField(t, services, name), "options")
+		for key := range options {
+			if !isSnakeCaseOptionKey(key) {
+				t.Errorf("service %q: option key %q is not snake_case", name, key)
+			}
+		}
+	}
+}
+
+// TestRunConfigShowJSONRetryPolicyUsesSnakeCaseKeys pins the wire keys of
+// the retry policy nested in the outbox and resilience options, and the
+// values the env layer writes through them. The env key names the field the
+// same way the wire key does, so the two stay in step.
+func TestRunConfigShowJSONRetryPolicyUsesSnakeCaseKeys(t *testing.T) {
+	t.Setenv("OUTBOX_RETRY_BASE_DELAY", "1s")
+	t.Setenv("RESILIENCE_RETRY_MAX_ATTEMPTS", "7")
+	t.Chdir(t.TempDir())
+
+	jbuf := mustJSONMode(t)
+
+	if err := runConfigShowWith(ConfigConfig{JSON: true}); err != nil {
+		t.Fatalf("runConfigShowWith: %v", err)
+	}
+
+	env := mustDecodeEnvelope(t, jbuf)
+	services := mapField(t, envelopeData(t, env), "services")
+
+	tests := []struct {
+		service string
+		key     string
+		want    any
+	}{
+		{service: "outbox", key: "base_delay", want: "1s"},
+		{service: "outbox", key: "max_delay", want: "0s"},
+		{service: "outbox", key: "multiplier", want: float64(0)},
+		{service: "resilience", key: "max_attempts", want: float64(7)},
+		{service: "resilience", key: "jitter_mode", want: float64(0)},
+	}
+
+	for _, tt := range tests {
+		options := mapField(t, mapField(t, services, tt.service), "options")
+		policy := mapField(t, options, "retry")
+
+		got, ok := policy[tt.key]
+		if !ok {
+			t.Errorf("%s: retry policy key %q missing", tt.service, tt.key)
+
+			continue
+		}
+
+		if got != tt.want {
+			t.Errorf("%s: retry policy %s = %v (%T), want %v (%T)", tt.service, tt.key, got, got, tt.want, tt.want)
+		}
+	}
+}
+
+// TestRunConfigShowJSONGoAPIHandlesStayOffTheWire pins that the Go-API-only
+// handles of the payment and webhook options never reach the envelope: the
+// idempotency store handle and the logger handle are not wire values.
+func TestRunConfigShowJSONGoAPIHandlesStayOffTheWire(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	jbuf := mustJSONMode(t)
+
+	if err := runConfigShowWith(ConfigConfig{JSON: true}); err != nil {
+		t.Fatalf("runConfigShowWith: %v", err)
+	}
+
+	env := mustDecodeEnvelope(t, jbuf)
+	services := mapField(t, envelopeData(t, env), "services")
+
+	tests := []struct {
+		service string
+		key     string
+	}{
+		{service: "payment", key: "Idempotency"},
+		{service: "webhook", key: "Logger"},
+	}
+
+	for _, tt := range tests {
+		options := mapField(t, mapField(t, services, tt.service), "options")
+		if _, ok := options[tt.key]; ok {
+			t.Errorf("service %q: Go-API-only key %q leaked into the envelope", tt.service, tt.key)
+		}
+	}
+}
+
+// isSnakeCaseOptionKey reports whether key is a lower_snake_case JSON key: a
+// lower letter, then lower letters, digits or underscores.
+func isSnakeCaseOptionKey(key string) bool {
+	if key == "" {
+		return false
+	}
+
+	for i, r := range key {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+			if i == 0 {
+				return false
+			}
+		case r == '_':
+			if i == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	return true
+}

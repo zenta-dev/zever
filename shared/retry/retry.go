@@ -10,41 +10,47 @@ import (
 // Policy configures exponential (or linear) backoff with jitter. Both
 // NextDelay (a single delay computation, for a caller-owned retry or poll
 // loop) and Do (a full bounded retry loop) are built on it.
+//
+// The policy is a config option: the batteries that embed it (outbox,
+// resilience) render it in the `zever config show --json` envelope, so every
+// field carries a snake_case json tag. Without a tag encoding/json falls back
+// to the Go field name, and the envelope would show "BaseDelay" next to the
+// snake_case keys of every other option.
 type Policy struct {
 	// BaseDelay is the delay before the first retry (attempt 1). Non-positive
 	// values are treated as zero delay.
-	BaseDelay time.Duration
+	BaseDelay time.Duration `json:"base_delay"`
 	// MaxDelay caps the computed delay, before jitter is applied. Zero or
 	// negative means unbounded.
-	MaxDelay time.Duration
+	MaxDelay time.Duration `json:"max_delay"`
 	// Multiplier scales BaseDelay per attempt: delay = BaseDelay *
 	// Multiplier^(attempt-1). Values <= 1 disable growth (delay stays at
 	// BaseDelay every attempt, still capped by MaxDelay and still jittered).
 	// Ignored when Linear is true.
-	Multiplier float64
+	Multiplier float64 `json:"multiplier"`
 	// Linear switches NextDelay from exponential growth to linear growth:
 	// delay = BaseDelay * attempt, still capped at MaxDelay and still
 	// jittered. Multiplier is ignored when this is true. The zero value
 	// (false) is the existing exponential behavior.
-	Linear bool
+	Linear bool `json:"linear"`
 	// Jitter is the fraction of the computed delay to randomize, e.g. 0.2
 	// means up to 20% of the delay. How it is applied depends on JitterMode.
 	// Zero disables jitter. Values are clamped to [0, 1].
-	Jitter float64
+	Jitter float64 `json:"jitter"`
 	// JitterMode selects how Jitter is applied to the computed delay. The
 	// zero value is JitterSymmetric, the existing +/- behavior.
-	JitterMode JitterMode
+	JitterMode JitterMode `json:"jitter_mode"`
 	// JitterMax is the upper bound of a flat, delay-independent jitter
 	// draw, used only when JitterMode is JitterFlat. It is a plain duration,
 	// not a fraction: the returned delay is delay + rand[0, JitterMax]. Zero
 	// means no jitter is added.
-	JitterMax time.Duration
+	JitterMax time.Duration `json:"jitter_max"`
 	// MaxAttempts is the total number of attempts Do makes, including the
 	// first (not a retry count). Zero or negative means 1 (no retries). It
 	// is meaningless to NextDelay, which has no notion of exhaustion -- a
 	// caller that needs an unbounded poll-wait loop should call NextDelay
 	// directly and ignore MaxAttempts entirely.
-	MaxAttempts int
+	MaxAttempts int `json:"max_attempts"`
 	// OnRetry, if non-nil, is called before each inter-attempt sleep that Do
 	// performs, with the 1-based attempt number that just failed (matching
 	// Do's internal attempt numbering: the first call is attempt 1) and the

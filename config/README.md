@@ -210,6 +210,15 @@ Raw option maps may hold secrets in plain strings. Never log them directly.
 or debugging output. Error text names services and fields only — values are
 never echoed.
 
+The redacted option maps are the wire format of `zever config show --json`,
+so their keys are the options' serialized names (their `json` tag), always
+snake_case: `max_conns`, `base_delay`, `queue_opts`. An option struct whose
+field has no `json` tag is encoded under its Go field name instead, which
+would put a `BaseDelay` next to the `base_delay` of every other service —
+so every option struct that reaches the envelope carries a `json` tag, and
+the Go-API-only fields (a logger, a store handle) carry `json:"-"` to stay
+off the wire. The struct-tag guard (`make check-tags`) pins those keys.
+
 Redaction is key-name based (a denylist of secret-looking key names) plus
 type based: option fields tagged `zever:"secret"` in `core/*/options.go`,
 or typed `config.Secret`, are always redacted regardless of key name —

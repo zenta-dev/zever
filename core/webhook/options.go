@@ -32,7 +32,9 @@ type Options struct {
 	// DeadLetterTopic is the queue topic for deliveries that exhaust retries.
 	DeadLetterTopic string `json:"dead_letter_topic"`
 	// Logger emits background delivery warnings. Defaults to a no-op logger when nil.
-	Logger log.Logger
+	// It is a Go-API-only handle: the json tag keeps it out of the config
+	// envelope, so the logger is not serialized as a null key.
+	Logger log.Logger `json:"-"`
 	// ReplayTolerance bounds how far a signature's embedded timestamp may
 	// drift from the verifier's clock before verification rejects it as
 	// expired or replayed, on top of the HMAC check itself. Zero means the
