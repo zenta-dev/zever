@@ -230,9 +230,10 @@ in release notes.
 
 ## Configuration and wiring
 
-Configuration layers cleanly: built-in zero-infra defaults, then a config file,
-then environment variables, with strict parsing: no silent fallbacks on typos
-or unknown keys. The container resolves only explicitly registered adapters, without globals or init-time
+Configuration layers cleanly: built-in zero-infra defaults, then `.env`, then
+`.env.local`, then the process environment, with strict parsing: no silent
+fallbacks on typos or unknown keys. There are no service config files. The
+container resolves only explicitly registered adapters, without globals or init-time
 magic, and closes resolved adapters in correct dependency order on shutdown.
 
 ## Schema compiler
@@ -263,7 +264,7 @@ notes. See [CONTRIBUTING](.github/CONTRIBUTING.md) for versioning details.
 
 ## Requirements
 
-- Go 1.27 or newer (`go 1.27.0` in each module's `go.mod`; `go.work` wires local dev).
+- Go 1.27 or newer (`go 1.27.2` in each module's `go.mod`; `go.work` wires local dev).
   Generic methods (e.g. `orm`'s `Column[T, V].EqOuter[U any]`) require Go 1.27+;
   older toolchains fail to build. Only the latest toolchain is supported —
   see the Go version policy in [STABILITY.md](STABILITY.md#go-version-policy).
