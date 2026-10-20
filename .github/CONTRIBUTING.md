@@ -133,6 +133,7 @@ naming rules.
 Write idiomatic Go. When in doubt, follow [Effective Go](https://go.dev/doc/effective_go).
 
 - **Formatting.** Always run `make fmt-fix` before committing.
+- **Mass refactors.** Repo-wide edits to Go source must use AST-aware tooling (`gofmt -r`, `go/ast`, `gopls rename`) or a script run with a dry run and reviewed before/after diff. Never rewrite struct tags with regex — the `json`/`toml`/`yaml` tags are the wire contract and are guarded by `make check-tags` in CI.
 - **Static analysis.** Keep `make vet`, `make lint`, and `make vulncheck` clean.
 - **Error handling.** Handle errors explicitly. Return and propagate errors instead of swallowing them. Do not use `log.Fatal` in library code.
 - **Meaningful naming.** Prefer clear, descriptive names over short cryptic ones. The name of an exported identifier is part of its public API.
