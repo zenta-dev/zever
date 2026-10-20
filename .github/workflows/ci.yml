@@ -497,15 +497,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
-      - name: Pre-download modules (retry on transient proxy errors)
+      - name: Download dependencies (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          (cd tools/zever-lsp && go mod download) && exit 0
+            go mod download && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
-      - name: Download dependencies
-        run: go mod download
       - name: Verify go.mod is tidy
         run: go mod tidy -diff
       - name: go vet
@@ -535,15 +533,13 @@ jobs:
           cache-dependency-path: |
             go.work.sum
             **/go.sum
-      - name: Pre-download modules (retry on transient proxy errors)
+      - name: Download dependencies (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          (cd tools/zever-mcp && go mod download) && exit 0
+            go mod download && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
-      - name: Download dependencies
-        run: go mod download
       - name: Verify go.mod is tidy
         run: go mod tidy -diff
       - name: go vet
