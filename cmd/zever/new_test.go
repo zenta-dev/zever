@@ -521,7 +521,7 @@ func TestRunNewWritesEnvFiles(t *testing.T) {
 		"LOG_ADAPTER=slog",
 		"# --- router (adapter stdhttp) ---",
 		"ROUTER_ADAPTER=stdhttp",
-		"DB_MAXCONNS=",
+		"DB_MAX_CONNS=",
 	} {
 		if !strings.Contains(example, fragment) {
 			t.Errorf(".env.example lacks %q:\n%s", fragment, example)

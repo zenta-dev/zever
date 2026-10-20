@@ -69,6 +69,12 @@ then `config.ApplyEnv` overlays the process environment, then `WithOptions`
 appliers run. Explicit options win over env. A named instance reads
 `SERVICE__NAME__*` env keys, not `SERVICE_*`.
 
+The process environment is read once, on the first provider build: a
+container built without providers never reads it. The legacy-config
+warning (`zever.yaml found in working directory: ignored`) therefore prints
+when the environment is read, not at `New`; an app that resolves its own
+environment through `config.FromEnv` sees it there instead.
+
 Graph validation runs at `New`: duplicate refs, missing non-`Optional`
 dependencies, and dependency cycles are recorded per ref and surfaced by
 `Get`. The errors are `DuplicateRefError`, `NotWiredError`, and

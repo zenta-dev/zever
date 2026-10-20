@@ -117,7 +117,9 @@ type Container struct {
 	// provDefs holds one entry per Provide call, keyed by service/name. It
 	// is written once by New and read-only after, so resolution reads it
 	// without locking. Empty (nil) when New received no providers, in
-	// which case every accessor takes the legacy config path.
+	// which case every accessor takes the legacy config path — the
+	// accessors guard the provider lookup with a nil check, so that path
+	// stays a single predictable branch.
 	provDefs map[refKey]*provider
 	// provOrder is the declaration order of provDefs, the deterministic
 	// tiebreak for eager builds, Wired, and Close.
@@ -132,13 +134,17 @@ type Container struct {
 	// evicted, so the next resolution retries (same contract as lazy.go).
 	provVals map[refKey]*provEntry
 
-	// env is the process environment resolved once by New (see
-	// config.FromEnv). Every provider build seeds its Options from the
+	// env is the process environment, resolved once by resolveEnv on
+	// first use. Every provider build seeds its Options from the
 	// service defaults and overlays env before WithOptions appliers run.
 	// envErr records a failed resolution and fails every provider
 	// build; the legacy config path never consults it.
 	env    config.Env
 	envErr error
+	// envOnce guards the one-shot environment resolution: the process
+	// environment is read at most once per container, and only when a
+	// provider build actually needs it.
+	envOnce sync.Once
 
 	pluginsMu sync.Mutex
 	plugins   map[string]*pluginEntry
@@ -151,10 +157,12 @@ func (c *Container) sealed() {}
 // use, whether through a Provider (see Provide) or the legacy config path.
 // A nil cfg falls back to config.Default().
 //
-// The process environment resolves once here (see config.FromEnv) and
-// seeds every provided Ref: service defaults from DefaultOptions overlaid
-// by ApplyEnv, then WithOptions appliers. An unreadable environment fails
-// provider builds; legacy accessors never consult it.
+// The process environment resolves lazily, on the first provider build
+// (see resolveEnv), and seeds every provided Ref: service defaults from
+// DefaultOptions overlaid by ApplyEnv, then WithOptions appliers. An
+// unreadable environment fails provider builds; legacy accessors never
+// consult it, and a container without providers never reads the process
+// environment at all.
 //
 // The full provider graph is validated at construction (duplicate Refs,
 // missing non-Optional dependencies, dependency cycles); findings are
@@ -169,7 +177,6 @@ func New(cfg *config.Config, providers ...Provider) *Container {
 	root, cancel := context.WithCancel(context.WithoutCancel(context.Background()))
 
 	c := &Container{cfg: cfg, rootCtx: root, cancelRoot: cancel, pools: newPoolRegistry()}
-	c.env, c.envErr = config.FromEnv()
 
 	if len(providers) == 0 {
 		return c

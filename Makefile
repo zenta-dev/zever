@@ -17,13 +17,16 @@ SBOM ?= sbom.json
 # at root), so every *-all target loops per-module with fail-fast `set -e`.
 # examples/external-sms and docs/examples stay outside `go.work` by design
 # (third-party/consumer proofs); verify them standalone with: GOWORK=off go -C examples/external-sms test ./...
-# .claude/worktrees holds agent harness checkouts, not repo modules: without
-# the exclusion the list balloons past ARG_MAX, `printf` fails, and every
-# *-all loop silently tests nothing (false green).
+# The harness checkout dirs (.git, .worktrees, .claude) are skipped at ANY
+# depth, like tools/modgraph and tools/tag-release.sh do: a worktree nested
+# under a module dir holds a full checkout of the repo, so counting it made
+# the module list differ from the tag list. Without the exclusion the list
+# balloons past ARG_MAX, `printf` fails, and every *-all loop silently tests
+# nothing (false green).
 # Go's own tooling ignores testdata trees; compile-fail fixture modules
 # (container/testdata/compilefail/*) must fail `go build` by design, so
 # they are excluded here like the harness checkouts above.
-ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "*/.git/*" -not -path "*/.worktrees/*" -not -path "*/.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
 
 # The two modules that stay outside `go.work` by design (third-party and
 # consumer proofs). They are not workspace members, so the go command
@@ -126,6 +129,10 @@ changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** p
 changelog-compile: ## Compile .changelog/unreleased/*.md fragments into the changelog's pending section
 	bash tools/changelog-compile.sh
 
+.PHONY: changelog-compile-check
+changelog-compile-check: ## Assert the changelog keeps a pending ## [Unreleased] section (the release-cut invariant)
+	bash tools/changelog-compile.sh --check
+
 .PHONY: changelog-compile-test
 changelog-compile-test: ## Test the changelog fragment compiler (pending-section rule)
 	bash tools/changelog-compile-test.sh
@@ -222,7 +229,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test sbom-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all check-tags err-lint modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test changelog-compile-check sbom-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all

@@ -160,7 +160,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	raw = appendChangelogFragments(raw, filepath.Join(filepath.Dir(changelog), ".changelog", "unreleased"))
 	body := string(raw)
-	pending := pendingHeaders(body, func(version string) bool { return tagExists(ctx, root, version) })
+	// The in-development version names the release actually being prepared:
+	// only that untagged top section counts as pending, so an untagged
+	// section of any other version cannot absorb a new break.
+	currentVersion, err := versionFloor(filepath.Join(root, "cmd", "zever", "VERSION"))
+	if err != nil {
+		fmt.Fprintf(stdout, "apidiff: no cmd/zever/VERSION: only %s documents a pending break\n", unreleasedHeader)
+	}
+	pending := pendingHeaders(body, func(version string) bool { return tagExists(ctx, root, version) }, currentVersion)
 	label := pendingLabel(pending)
 	entries := breakingEntries(body, pending)
 	uncovered := 0
@@ -443,17 +450,29 @@ func sectionHeaders(body string) []string {
 // pendingHeaders returns the section headers whose entries document changes
 // that are not released yet, so a **Breaking:** entry there covers an
 // incompatible change. ## [Unreleased] always counts. The top-most released
-// section counts too when its version has no git tag yet: the release
-// checklist cuts ## [Unreleased] to ## [vX.Y.Z] - DATE before the tags are
-// created, and the API-diff baseline stays at the last existing tag, so a
-// break documented in that cut-but-untagged section must still satisfy the
-// gate. Only the top-most released section is considered, so an old untagged
-// section can never silently absorb a new break. tagged reports whether a
-// version (e.g. "0.8.0") already has a git tag; nil means "assume untagged".
-func pendingHeaders(body string, tagged func(version string) bool) []string {
+// section counts too when it is the release actually being prepared: its
+// version equals the in-development version (cmd/zever/VERSION) and it
+// carries no git tag yet. The release checklist cuts ## [Unreleased] to
+// ## [vX.Y.Z] - DATE before the tags are created, and the API-diff baseline
+// stays at the last existing tag, so a break documented in that
+// cut-but-untagged section must still satisfy the gate. Matching the
+// in-development version is what makes the rule precise: an untagged
+// section of some other version is a release that is not being prepared,
+// so it must not absorb a new break - the break belongs under
+// ## [Unreleased]. Only the top-most released section is considered, so an
+// old untagged section can never silently absorb a new break. tagged reports
+// whether a version (e.g. "0.8.0") already has a git tag; nil means "assume
+// untagged". currentVersion is the in-development version (cmd/zever/VERSION);
+// empty means no released section can be pending.
+func pendingHeaders(body string, tagged func(version string) bool, currentVersion string) []string {
 	var out []string
 	seenRelease := false
+	seen := make(map[string]bool)
 	for _, h := range sectionHeaders(body) {
+		if seen[h] {
+			continue // the same header twice (a fragment section) is one section
+		}
+		seen[h] = true
 		if h == unreleasedHeader {
 			out = append(out, h)
 			continue
@@ -463,11 +482,24 @@ func pendingHeaders(body string, tagged func(version string) bool) []string {
 			continue
 		}
 		seenRelease = true
-		if tagged == nil || !tagged(m[1]) {
-			out = append(out, h)
+		if tagged != nil && tagged(m[1]) {
+			continue
 		}
+		if !sameVersion(m[1], currentVersion) {
+			continue
+		}
+		out = append(out, h)
 	}
 	return out
+}
+
+// sameVersion reports whether two version strings name the same release
+// ("0.8.0" and "v0.8.0" are the same).
+func sameVersion(a, b string) bool {
+	norm := func(v string) string {
+		return strings.TrimPrefix(strings.TrimSpace(v), "v")
+	}
+	return norm(a) == norm(b)
 }
 
 // pendingLabel renders the pending section headers for a gate message,

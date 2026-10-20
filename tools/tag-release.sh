@@ -106,7 +106,7 @@ fi
 pass1=()
 pass2=()
 pass3=()
-for f in $(find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "*/node_modules/*" -not -path "*/testdata/*" | sort); do
+for f in $(find . -type f -name go.mod -not -path "*/.git/*" -not -path "*/.worktrees/*" -not -path "*/.claude/*" -not -path "*/node_modules/*" -not -path "*/testdata/*" | sort); do
   d=$(dirname "$f")
   # Strip leading ./ for pass matching; root "." falls through to the
   # tag step, which skips it (no root module).
