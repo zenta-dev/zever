@@ -8,6 +8,35 @@ import (
 	"github.com/zenta-dev/zever/config"
 )
 
+// TestEnvTypoHintPicksTheSameKeyEveryTime pins the determinism: the env is
+// a map, so the hint must walk its keys in sorted order, or two runs with
+// the same environment could name different keys.
+func TestEnvTypoHintPicksTheSameKeyEveryTime(t *testing.T) {
+	t.Parallel()
+
+	env := config.Env{
+		"DB_MAXCONN":            "5",
+		"DB__REPORTING_MAXCONN": "5",
+	}
+	err := &config.UnknownFieldError{Service: "db", Field: "MAXCONN"}
+
+	first := envTypoHint(env, err)
+	if first == "" {
+		t.Fatal("envTypoHint = \"\", want a hint")
+	}
+
+	for range 20 {
+		if got := envTypoHint(env, err); got != first {
+			t.Fatalf("envTypoHint = %q, want the stable %q", got, first)
+		}
+	}
+
+	// The default instance's key wins over a named instance's.
+	if !strings.Contains(first, `"DB_MAXCONN"`) {
+		t.Fatalf("hint %q does not name the default instance's key", first)
+	}
+}
+
 // TestEnvTypoHintStrictModeNamesTheRealKeys pins the strict-mode guidance
 // end to end: with ZEVER_CONFIG_STRICT=1 an unrelated variable fails
 // resolution again, and the hint says what to do with it instead of

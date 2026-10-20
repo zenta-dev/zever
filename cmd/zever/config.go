@@ -286,7 +286,10 @@ func envTypoHint(env config.Env, err error) string {
 	head := strings.ToUpper(unknown.Service) + "_"
 	field := strings.ToUpper(unknown.Field)
 
-	for k := range env {
+	// The env is a map: walk its keys in sorted order so the hint names
+	// the same key every time (and the default instance's key before a
+	// named instance's).
+	for _, k := range sortedEnvKeys(env) {
 		upper := strings.ToUpper(k)
 		if !strings.HasPrefix(upper, head) {
 			continue
@@ -317,6 +320,19 @@ func envTypoHint(env config.Env, err error) string {
 	}
 
 	return ""
+}
+
+// sortedEnvKeys returns the env's keys in sorted order, so a hint that
+// picks one of them names the same key on every run.
+func sortedEnvKeys(env config.Env) []string {
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	return keys
 }
 
 // envFieldSuggestion returns the field name to suggest for an unknown env
