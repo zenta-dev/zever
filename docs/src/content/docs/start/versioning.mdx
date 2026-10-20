@@ -7,9 +7,9 @@ Zever ships about 180 Go modules (one per battery interface, adapter, helper, an
 
 ## One version, per-module tags
 
-Every release tags each module as `<path>/vX.Y.Z` (for example `container/v0.8.0`, `adapters/db/sqlite/v0.8.0`), cut by `tools/tag-release.sh`. Releases are lockstep: all modules share the version, so a bump means moving every Zever require together. `make modgraph-check` enforces the rule behind the tags — each `go.mod` module path must equal `github.com/zenta-dev/zever/<reldir>` — with two deliberate exceptions for the out-of-tree consumer proofs (`docs/examples`, `examples/external-sms`), which keep their own module paths.
+Every release tags each module as `<path>/vX.Y.Z` (for example `container/v0.8.0`, `adapters/db/sqlite/v0.8.0`), cut by `tools/tag-release.sh`. Releases are lockstep: all modules share the version, so a bump means moving every Zever require together. `make modgraph-check` enforces the rule behind the tags: each `go.mod` module path must equal `github.com/zenta-dev/zever/<reldir>`, with two deliberate exceptions for the out-of-tree consumer proofs (`docs/examples`, `examples/external-sms`), which keep their own module paths.
 
-Pre-1.0, any `0.x` minor or patch may break; every break is listed in `CHANGELOG.md` with a `**Breaking:**` prefix. See [Upgrade](../guides/operate/upgrade/) for the bump procedure.
+Pre-1.0, any `0.x` minor or patch may break; every break is listed in `CHANGELOG.md` with a `**Breaking:**` prefix. See [Upgrade](../../guides/operate/upgrade/) for the bump procedure.
 
 ## Consume without replaces
 
@@ -23,7 +23,7 @@ go mod tidy
 Rules for a healthy consumer `go.mod`:
 
 - Keep every `github.com/zenta-dev/zever/*` require on the same version; mixed versions are untested and unsupported.
-- `go mod tidy` must succeed with no `replace` pointing at a local checkout (`zever new` writes plain requires against the published modules; local replaces appear only when scaffolding from inside a framework checkout — see [Installation](./installation/)).
+- `go mod tidy` must succeed with no `replace` pointing at a local checkout (`zever new` writes plain requires against the published modules; local replaces appear only when scaffolding from inside a framework checkout; see [Installation](../installation/)).
 - `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` works from v0.7.2 on (`cmd/zever/go.mod` commits no `replace` directives). Earlier tags, and the other modules (libraries meant for `go get`), cannot be installed this way; use the installer or a release binary for those.
 
-`zever new` scaffolds a project that already follows these rules. Bumps move every require together — see [Upgrade](../guides/operate/upgrade/).
+`zever new` scaffolds a project that already follows these rules. Bumps move every require together. See [Upgrade](../../guides/operate/upgrade/).

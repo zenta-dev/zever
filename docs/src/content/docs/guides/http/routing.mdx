@@ -7,7 +7,7 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 `router` is a thin facade over `fiber` and `stdhttp`; handlers stay plain `http.HandlerFunc` and `router.Param` reads path params identically on both. Use it for hand-written routes or to mirror `.zen` RPC bindings; `zever routes` prints the resolved table.
 
-`stdhttp` is the recommended default (and the `zever new` scaffold default): it serves directly on `net/http.ServeMux` with no conversion layer. `fiber` pays a `fasthttpadaptor` net/http conversion plus header/status/body merge-back on every request — currently ~46 allocs/op per request against ~17 for a `stdhttp` param route (see [Benchmarks](../../../reference/benchmarks/#router-re-measurement-2026-10-14-and-stdhttp-default)). Pick `fiber` only when you need its routing features (case-sensitive `:name` params, `{name}` accepted on both) rather than raw throughput.
+`stdhttp` is the recommended default (and the `zever new` scaffold default): it serves directly on `net/http.ServeMux` with no conversion layer. `fiber` pays a `fasthttpadaptor` net/http conversion plus header/status/body merge-back on every request: currently ~46 allocs/op per request against ~17 for a `stdhttp` param route (see [Benchmarks](../../../reference/benchmarks/#router-re-measurement-2026-10-14-and-stdhttp-default)). Pick `fiber` only when you need its routing features (case-sensitive `:name` params, `{name}` accepted on both) rather than raw throughput.
 
 ## Register a route
 

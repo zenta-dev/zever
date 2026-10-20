@@ -69,7 +69,7 @@ Example:
 +LOG_ADAPTER=slog
 ```
 
-Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes `<SERVICE>_<KEY>` uppercased; one nesting level flattens with a single underscore (`jwt.secret` under auth becomes `AUTH_JWT_SECRET`); durations are Go strings in env (`5s`, `1m`), not integer nanoseconds. Keys with no string form (maps, lists) cannot move to env. Full mapping and defaults: [Config reference](../../reference/config/).
+Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes `<SERVICE>_<KEY>` uppercased; one nesting level flattens with a single underscore (`jwt.secret` under auth becomes `AUTH_JWT_SECRET`); durations are Go strings in env (`5s`, `1m`), not integer nanoseconds. Keys with no string form (maps, lists) cannot move to env. Full mapping and defaults: [Config reference](../../../reference/config/).
 
 ## Wire adapters with Provide
 
@@ -116,7 +116,7 @@ var DB = db.DefaultRef()
  }
 ```
 
-Graph validation runs at `container.New`: duplicate `Ref`s, missing non-`Optional` dependencies, and cycles surface from `container.Get` with typed `DuplicateRefError`, `NotWiredError`, or `DependencyCycleError`. `zever explain` prints the wiring graph. See [Container](../../concepts/container/).
+Graph validation runs at `container.New`: duplicate `Ref`s, missing non-`Optional` dependencies, and cycles surface from `container.Get` with typed `DuplicateRefError`, `NotWiredError`, or `DependencyCycleError`. `zever explain` prints the wiring graph. See [Container](../../../concepts/container/).
 
 ## Scaffold flags
 
@@ -194,7 +194,7 @@ Project layout is defaults-only, overridable by six `ZEVER_*` variables (no file
 
 <CardGrid>
   <LinkCard title="Configuration" href="../configuration/" description="Env layering, precedence, and fail-closed rules." />
-  <LinkCard title="Container" href="../../concepts/container/" description="Typed Refs, Provide, and the wiring graph." />
-  <LinkCard title="Config reference" href="../../reference/config/" description="Every service, key, and default." />
-  <LinkCard title="Quickstart" href="../../start/quickstart/" description="Scaffold and serve a working endpoint." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Typed Refs, Provide, and the wiring graph." />
+  <LinkCard title="Config reference" href="../../../reference/config/" description="Every service, key, and default." />
+  <LinkCard title="Quickstart" href="../../../start/quickstart/" description="Scaffold and serve a working endpoint." />
 </CardGrid>

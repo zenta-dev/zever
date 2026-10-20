@@ -5,7 +5,7 @@ description: "Relay metrics, Prometheus alert rules, the DLQ runbook, and stalle
 
 ## Purpose
 
-Use this page after [Outbox](../../guides/background/outbox/) is wired. The relay is the
+Use this page after [Outbox](../outbox/) is wired. The relay is the
 component that eventually delivers your events, and it fails quietly:
 a broker outage shows up as messages piling up, not as a crash. This
 page covers the four things an on-call engineer needs: the metric
@@ -313,7 +313,7 @@ func relayHealthy() error {
 
 ## See also
 
-- [Outbox](../../guides/background/outbox/) - the battery itself: store, relay, `Inbox`
-- [Observability](../../guides/operate/observability/) - providers, attribute bounds, redaction
-- [Events & Event Bus](../../guides/background/events/) - the usual `Publisher` bridge target
-- [Resilience](../../guides/operate/resilience/) - shared circuit breakers for the relay's dependencies
+- [Outbox](../outbox/) - the battery itself: store, relay, `Inbox`
+- [Observability](../../operate/observability/) - providers, attribute bounds, redaction
+- [Events & Event Bus](../events/) - the usual `Publisher` bridge target
+- [Resilience](../../operate/resilience/) - shared circuit breakers for the relay's dependencies

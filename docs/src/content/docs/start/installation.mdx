@@ -50,9 +50,7 @@ Install the `zever` CLI with the one-line installer, then add the Zever modules 
    </TabItem>
    </Tabs>
 
-   <Aside type="tip" title="PATH">
    The installer puts both binaries in `~/.local/bin`. If `zever` is not found, add that directory to your `PATH`.
-   </Aside>
 
    <Aside type="caution" title="Windows execution policy">
    If PowerShell blocks the script, download it first, then run `Unblock-File install.ps1` or invoke it with `powershell -ExecutionPolicy Bypass -File install.ps1`.
@@ -62,9 +60,12 @@ Install the `zever` CLI with the one-line installer, then add the Zever modules 
 
 </Steps>
 
-<Aside type="note" title="Re-running the installer upgrades in place">
+<details>
+<summary>Re-running the installer upgrades in place</summary>
+
 If `zever` already exists, `install.sh` upgrades it in place: older installs ask for confirmation, re-running the same version skips, and downgrading from a newer install asks for confirmation. Non-interactive shells need `--yes`. Output is colourised on a terminal; pass `--quiet` (`-Quiet` on Windows) for errors only, or `--no-color` (`-NoColor`) / set `NO_COLOR` to disable colour. `zever-lsp` is always matched to the CLI version (it has no version flag).
-</Aside>
+
+</details>
 
 <Aside type="caution" title="Checksum verification is mandatory">
 Every binary is verified against the release's `SHA256SUMS.txt` before installation. If no SHA-256 tool (`sha256sum`/`shasum`) is available, or hashing fails, the installer aborts instead of installing unverified binaries. To proceed unverified (unsafe), pass `--insecure-skip-verify` (`-InsecureSkipVerify` on Windows) or set `ZEVER_INSTALL_INSECURE=1`. When `gh` is not installed, the installer prints the manual provenance check: `gh attestation verify <binary> --repo zenta-dev/zever`.
@@ -79,9 +80,12 @@ go mod init example.com/myapp
 go get github.com/zenta-dev/zever/config@v0.8.0 github.com/zenta-dev/zever/container@v0.8.0 github.com/zenta-dev/zever/adapters/db/sqlite@v0.8.0
 ```
 
-<Aside type="note" title="`go install` for the CLI">
+<details>
+<summary>`go install` for the CLI</summary>
+
 From v0.7.2 on, `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` builds the CLI from source. It does not work for v0.7.1 or earlier tags (their `cmd/zever/go.mod` commits `replace` directives), and it is only supported for the CLI module; the other modules are libraries you `go get`. Otherwise use the installer above or a prebuilt release binary.
-</Aside>
+
+</details>
 
 ## Verify with a smoke test
 

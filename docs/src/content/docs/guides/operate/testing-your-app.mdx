@@ -84,7 +84,7 @@ func TestCacheRoundTrip(t *testing.T) {
 ```
 
 <Aside type="caution">
-`config.Default()` embeds a deterministic dev crypto key for tests. Never ship defaults to production; see the [configuration guide](./configuration/).
+`config.Default()` embeds a deterministic dev crypto key for tests. Never ship defaults to production; see the [configuration guide](../configuration/).
 </Aside>
 
 ## Hit routes with httptest
@@ -265,6 +265,6 @@ The container's own leak tests live behind the `leak` tag (`go test -tags=leak .
 Writing tests for Zever itself? The contributor testing rules (determinism, process-global state, stdout capture, per-test DB files, `synctest`, fork/exec races, reproducing flakes) live in `.github/CONTRIBUTING-testing.md` in the repo root.
 
 <CardGrid>
-  <LinkCard title="Configuration" description="Defaults, files, env overrides, and secret handling." href="../operate/configuration/" />
-  <LinkCard title="Observability" description="Logs, traces, and metrics in tests and prod." href="../operate/observability/" />
+  <LinkCard title="Configuration" description="Defaults, files, env overrides, and secret handling." href="../configuration/" />
+  <LinkCard title="Observability" description="Logs, traces, and metrics in tests and prod." href="../observability/" />
 </CardGrid>

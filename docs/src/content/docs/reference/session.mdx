@@ -29,11 +29,11 @@ SESSION_REDIS_ADDR=localhost:6379
 SESSION_ADAPTER=redis
 ```
 
-Env rule: `SESSION_<FIELD>=value`, uppercase, no prefix (for example `SESSION_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](./config/).
+Env rule: `SESSION_<FIELD>=value`, uppercase, no prefix (for example `SESSION_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
 
 ## Options
 
-Authority for types and defaults: [Config reference](./config/#session).
+Authority for types and defaults: [Config reference](../config/#session).
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Authority for types and defaults: [Config reference](./config/#session).
 | `redis.prefix` | string | `""` | Key prefix for Redis session data |
 | `redis.url` | string | `""` | Reserved and currently ignored |
 
-Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](./config/#redis-connection-options).
+Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](../config/#redis-connection-options).
 
 Session IDs are 256-bit bearer secrets (64 hex characters). They must never be logged or echoed; `ValidateID` rejects malformed IDs without revealing them.
 
@@ -66,6 +66,6 @@ Every sentinel below is a package-level `ErrXxx` in `core/session` (see `errors.
 ## Related
 
 - [Sessions guide](../../guides/http/sessions/) for cookies, CSRF defense, and the store API.
-- [Config reference](./config/#session) for the full option table and layering rules.
-- [Adapters matrix](./adapters-matrix/) for every service, adapter module, and container accessor.
-- [Errors](./errors/) for the repo-wide message format, wrapping, and branching conventions.
+- [Config reference](../config/#session) for the full option table and layering rules.
+- [Adapters matrix](../adapters-matrix/) for every service, adapter module, and container accessor.
+- [Errors](../errors/) for the repo-wide message format, wrapping, and branching conventions.

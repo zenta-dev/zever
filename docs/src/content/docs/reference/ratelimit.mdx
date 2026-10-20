@@ -28,11 +28,11 @@ RATELIMIT_BURST=200
 RATELIMIT_ADAPTER=memory
 ```
 
-Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix (for example `RATELIMIT_ADAPTER`). A non-empty `options` block replaces the default options wholesale, so repeat `rate` and `burst`; env variables overlay one field at a time. Full layering rules: [Config reference](./config/).
+Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix (for example `RATELIMIT_ADAPTER`). A non-empty `options` block replaces the default options wholesale, so repeat `rate` and `burst`; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
 
 ## Options
 
-Authority for types and defaults: [Config reference](./config/#ratelimit).
+Authority for types and defaults: [Config reference](../config/#ratelimit).
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
@@ -45,7 +45,7 @@ Authority for types and defaults: [Config reference](./config/#ratelimit).
 | `redis.prefix` | string | `""` | Key prefix for Redis ratelimit data |
 | `redis.url` | string | `""` | Reserved and currently ignored |
 
-Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](./config/#redis-connection-options).
+Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](../config/#redis-connection-options).
 
 Keys are validated for shape and length (`ValidateKey`: 1..256 bytes, no control characters, `CR`/`LF`/`DEL` rejected). Key errors never echo the key itself, since keys may be IPs. Costs are validated with `ValidateCost`: tokens and burst must be > 0 and finite; a cost above burst is capped, not an error.
 
@@ -68,6 +68,6 @@ Every sentinel below is a package-level `ErrXxx` in `core/ratelimit` (see `error
 ## Related
 
 - [Ratelimit guide](../../guides/security/ratelimit/) for per-path limits and sharing across replicas.
-- [Config reference](./config/#ratelimit) for the full option table and layering rules.
-- [Adapters matrix](./adapters-matrix/) for every service, adapter module, and container accessor.
-- [Errors](./errors/) for the repo-wide message format, wrapping, and branching conventions.
+- [Config reference](../config/#ratelimit) for the full option table and layering rules.
+- [Adapters matrix](../adapters-matrix/) for every service, adapter module, and container accessor.
+- [Errors](../errors/) for the repo-wide message format, wrapping, and branching conventions.

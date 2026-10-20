@@ -1,5 +1,5 @@
 ---
-title: Customizing and leaving zever
+title: Customizing and leaving Zever
 description: Use orm and core batteries standalone, write a custom codegen backend, tell generated code from owned code, and leave the framework without rewriting your app.
 ---
 
@@ -13,7 +13,7 @@ Zever generates plumbing, never business logic. This page is the escape-hatch ma
 |---|---|---|
 | `schema/*.zen` | You | The single source of truth. Everything else derives from it. |
 | `generated/*` | Compiler (`zever compile`) | Never hand-edit. Regenerate, or gate drift (below). |
-| `internal/app/wiring.go`, `cmd/*`, `db/seed/*` | You after eject | Scaffolded once by `zever new`; thereafter yours. The server template resolves a fixed battery set — delete what you don't call. |
+| `internal/app/wiring.go`, `cmd/*`, `db/seed/*` | You after eject | Scaffolded once by `zever new`; thereafter yours. The server template resolves a fixed battery set. Delete what you don't call. |
 | `.env.example` | You | Batteries and adapters via env vars; strict keys only. |
 | `.github/workflows/ci.yml` | You after eject | Scaffolded once; regenerate step plus the `--check` drift gate. |
 
@@ -31,8 +31,8 @@ Every file under `generated/` starts with a provenance header naming the CLI rel
 Never edit `generated/`. Three supported patterns cover every extension point; there is deliberately no partial-file or edit-in-place mechanism, so regeneration stays a pure function of the schema:
 
 1. **Implement the generated interface.** Each service's `service.go` declares a Go interface (one method per RPC) and says so in its own header comment: implement it in your own package and pass it to `Register<Service>Routes` (HTTP) and `New<Service>GRPCServer` (gRPC). Hand-written middleware, decorators, and wrappers compose around that implementation, never inside generated files.
-2. **Start from a write-once stub.** `GenerateServiceStub` renders a compiling `<Service>Impl` (every method returning `Unimplemented`) meant to live outside the generated tree — typically `internal/app/<module>/<service_snake>.go`. It is written once and never regenerated, so filling it in is safe; regeneration only fails you forward when the interface gains methods (the `var _ gen.Service = (*Impl)(nil)` assertion stops compiling until you add them).
-3. **Embed and wrap generated types.** Generated request/response aliases and ORM models are plain Go values — embed them in your own structs or convert at the boundary. For wholly new output shapes, write a custom backend (below) instead of post-processing generated text.
+2. **Start from a write-once stub.** `GenerateServiceStub` renders a compiling `<Service>Impl` (every method returning `Unimplemented`) meant to live outside the generated tree, typically `internal/app/<module>/<service_snake>.go`. It is written once and never regenerated, so filling it in is safe; regeneration only fails you forward when the interface gains methods (the `var _ gen.Service = (*Impl)(nil)` assertion stops compiling until you add them).
+3. **Embed and wrap generated types.** Generated request/response aliases and ORM models are plain Go values. Embed them in your own structs or convert at the boundary. For wholly new output shapes, write a custom backend (below) instead of post-processing generated text.
 
 What is explicitly out: editing generated files between runs (the next compile overwrites them, and `--check` will flag the drift as yours to reconcile).
 
@@ -70,7 +70,7 @@ Each generated file carries a provenance stamp naming the CLI release and the sc
 Every scaffolded project's CI (`.github/workflows/ci.yml`) regenerates from the schema and then runs `--check`, proving the compile is deterministic; if you commit `generated/`, drop the regenerate step and `--check` alone fails the build on drift. The repo's own `make compile-check` (part of `make check`) runs the same gate over `examples/todo`.
 
 <Aside type="tip">
-The default scaffold gitignores `/generated/` and regenerates in CI. Commit it when you want DDL and API diffs reviewable in pull requests — then `--check` is your gate.
+The default scaffold gitignores `/generated/` and regenerates in CI. Commit it when you want DDL and API diffs reviewable in pull requests. Then `--check` is your gate.
 </Aside>
 
 ## Use `orm` standalone
@@ -90,7 +90,7 @@ type User struct {
 var users = orm.NewTable[User]("users", []string{"id", "email"})
 var colEmail = orm.NewColumn[User, string]("users", "email")
 
-// q selects id, email from users where email = ? — no raw SQL.
+// q selects id, email from users where email = ?; no raw SQL.
 q := orm.From(users).Select(colEmail).Where(colEmail.Eq("a@example.com"))
 ```
 
@@ -98,7 +98,7 @@ Dialect comes from the connection (`sqlite`/`postgres`); unsupported features fa
 
 ## Use `core/*` standalone
 
-Every battery is one small interface plus a `Register`/`Open` pair. The container is only the default resolver — open an adapter directly when you embed a battery in a non-zever program:
+Every battery is one small interface plus a `Register`/`Open` pair. The container is only the default resolver. Open an adapter directly when you embed a battery in a non-Zever program:
 
 ```go
 import (
@@ -146,9 +146,9 @@ func main() {
 }
 ```
 
-See [Write a plugin](./write-a-plugin/) for shipping a new *adapter*; backends are the codegen-side equivalent.
+See [Write a plugin](../write-a-plugin/) for shipping a new *adapter*; backends are the codegen-side equivalent.
 
-## Leaving zever
+## Leaving Zever
 
 <Steps>
 
@@ -160,4 +160,4 @@ See [Write a plugin](./write-a-plugin/) for shipping a new *adapter*; backends a
 
 </Steps>
 
-What stays portable by design: your handlers (plain `net/http`), your SQL (via `orm`, dialect-explicit), and your committed `generated/` tree — every file says which release and schema revision produced it, so a future reader can reproduce or replace it.
+What stays portable by design: your handlers (plain `net/http`), your SQL (via `orm`, dialect-explicit), and your committed `generated/` tree: every file says which release and schema revision produced it, so a future reader can reproduce or replace it.

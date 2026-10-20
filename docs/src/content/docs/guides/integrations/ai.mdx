@@ -81,7 +81,7 @@ For streaming, call `Stream` and range over the returned channel until the produ
 | `gemini` | `adapters/ai/gemini` | Needs `api_key`. |
 | `ollama` | `adapters/ai/ollama` | Self-hosted. `base_url` bridges to its `Addr`. |
 
-`ollama.New` takes `ollama.Options` with an `Addr` field. You only write env vars: with `AI_ADAPTER=ollama`, the container passes `AI_BASE_URL` through as `Addr` and carries over `AI_MODEL`, `AI_TIMEOUT`, `AI_ALLOW_INSECURE`, `AI_ALLOW_PRIVATE`, and `AI_INSECURE_SKIP_VERIFY`. Non-loopback endpoints must use https. Outbound requests dial only globally routable addresses and never follow redirects; a local Ollama sidecar (loopback `Addr`) needs `allow_private: true`, which logs a line at startup. TLS is always verified unless `insecure_skip_verify: true`, which logs a warning at startup — `allow_insecure` only permits the `http` scheme and never disables verification.
+`ollama.New` takes `ollama.Options` with an `Addr` field. You only write env vars: with `AI_ADAPTER=ollama`, the container passes `AI_BASE_URL` through as `Addr` and carries over `AI_MODEL`, `AI_TIMEOUT`, `AI_ALLOW_INSECURE`, `AI_ALLOW_PRIVATE`, and `AI_INSECURE_SKIP_VERIFY`. Non-loopback endpoints must use https. Outbound requests dial only globally routable addresses and never follow redirects; a local Ollama sidecar (loopback `Addr`) needs `allow_private: true`, which logs a line at startup. TLS is always verified unless `insecure_skip_verify: true`, which logs a warning at startup: `allow_insecure` only permits the `http` scheme and never disables verification.
 
 ## Run tool-calling agents and RAG
 
