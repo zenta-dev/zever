@@ -54,15 +54,7 @@ func runDB(args []string) error {
 	// peelInteractive strips every "-i/--interactive" before dispatch, so
 	// sub can never equal "-i" here; global -i still works via peel.
 	default:
-		printDBUsage()
-
-		if shouldShowHint() {
-			if s := closest(sub, allDB); s != "" {
-				_, _ = fmt.Fprintln(os.Stderr, formatHint(fmt.Sprintf("did you mean %q?", s)))
-			}
-		}
-
-		return fmt.Errorf("%w: %q", ErrUnknownSubcommand, sub)
+		return unknownSubcommandError("zever db", sub, allDB, "zever db -h")
 	}
 }
 

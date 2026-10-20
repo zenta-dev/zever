@@ -128,7 +128,7 @@ Every applied statement on postgres runs inside its own transaction, and `lock_t
 zever db migrate schema/app.zen --adapter=postgres --dsn='...' --lock-timeout=10s --statement-timeout=30s
 ```
 
-Unset flags fall back to `db.options` from the config file (`DB_LOCK_TIMEOUT` / `DB_STATEMENT_TIMEOUT` in the environment):
+Unset flags fall back to the `db` service options from the environment (`DB_LOCK_TIMEOUT` / `DB_STATEMENT_TIMEOUT`):
 
 ```sh
 DB_ADAPTER=postgres

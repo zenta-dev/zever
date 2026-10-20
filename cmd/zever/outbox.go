@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/outbox"
 )
 
@@ -125,6 +126,12 @@ type outboxTarget struct {
 func resolveOutboxTarget(dsn, table string) (outboxTarget, error) {
 	cfg, err := resolveServiceConfig("")
 	if err != nil {
+		// Re-read the env for the exact-key hint (best-effort: a hint
+		// failure keeps the wrapped error).
+		if env, eenv := config.FromEnv(); eenv == nil {
+			return outboxTarget{}, wrapEnvConfigError("zever outbox: resolve config from env", env, err)
+		}
+
 		return outboxTarget{}, fmt.Errorf("zever outbox: resolve config from env: %w", err)
 	}
 

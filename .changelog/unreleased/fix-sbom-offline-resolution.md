@@ -1,0 +1,1 @@
+- fix(ci): the `sbom` job now resolves a module's dependency graph through the local intra-repo closure while the pinned siblings are unpublished, so every module ships an SBOM instead of silently dropping the ones that failed to resolve; the published resolution stays the primary path, so the released SBOM is unchanged.

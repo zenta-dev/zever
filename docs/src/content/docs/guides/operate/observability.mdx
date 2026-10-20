@@ -77,7 +77,7 @@ Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValue
 ## Production checklist
 
 - Providers declare `Shutdown(ctx)`, not `Close`. `c.Close(ctx)` probes it so buffered spans flush. Always shut down with a timeout-bearing context.
-- Set `observability.adapter: otlp` in production; the default `stdout` keeps traces on the box.
+- Set `OBSERVABILITY_ADAPTER=otlp` in production; the default `stdout` keeps traces on the box.
 - Never log raw option maps. Use `cfg.RedactedServices()`.
 
 ## Troubleshooting

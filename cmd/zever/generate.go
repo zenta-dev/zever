@@ -194,15 +194,7 @@ func runGenerate(args []string) error { //nolint:gocyclo
 			return runGenerateFull(args)
 		}
 
-		printGenerateUsage()
-
-		if shouldShowHint() {
-			if s := closest(sub, allGenerate); s != "" {
-				_, _ = fmt.Fprintln(os.Stderr, formatHint(fmt.Sprintf("did you mean %q?", s)))
-			}
-		}
-
-		return fmt.Errorf("zever generate: unknown subcommand %q", sub)
+		return unknownSubcommandError("zever generate", sub, allGenerate, "zever generate -h")
 	}
 }
 
