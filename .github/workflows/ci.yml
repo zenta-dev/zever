@@ -21,7 +21,7 @@ jobs:
   detect:
     name: detect affected modules
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       groups: ${{ steps.affected.outputs.groups }}
       reason: ${{ steps.affected.outputs.reason }}
@@ -49,7 +49,7 @@ jobs:
   fmt:
     name: gofmt
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -70,7 +70,7 @@ jobs:
   lint:
     name: golangci-lint
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect]
     if: needs.detect.outputs.groups != '[]'
     permissions:
@@ -111,7 +111,7 @@ jobs:
   test:
     name: test (go 1.27)
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect]
     if: needs.detect.outputs.groups != '[]'
     permissions:
@@ -149,7 +149,7 @@ jobs:
   installer:
     name: installer (fail-closed)
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -164,7 +164,7 @@ jobs:
   drift:
     name: generated-code drift
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -186,7 +186,7 @@ jobs:
   module-graph:
     name: module-graph
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -207,7 +207,7 @@ jobs:
   conformance:
     name: conformance
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Same Chrome sandbox limitation as the test jobs: the document/local
       # render conformance suite needs --no-sandbox in the CI container.
@@ -347,7 +347,7 @@ jobs:
   external-sms:
     name: out-of-tree proof module
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -368,7 +368,7 @@ jobs:
   fuzz-smoke:
     name: fuzz smoke (dsl)
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -395,7 +395,7 @@ jobs:
   scaffold:
     name: scaffold builds, tests and lints
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -416,7 +416,7 @@ jobs:
   lsp:
     name: zever-lsp module
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     defaults:
@@ -447,7 +447,7 @@ jobs:
   mcp:
     name: zever-mcp module
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     defaults:
@@ -480,7 +480,7 @@ jobs:
     name: test (race + coverage)
     timeout-minutes: 40
     if: needs.detect.outputs.groups != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect]
     permissions:
       contents: read
@@ -549,7 +549,7 @@ jobs:
     timeout-minutes: 20
     if: github.event_name != 'pull_request' && needs.detect.outputs.groups != '[]'
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect]
     permissions:
       contents: read
@@ -613,7 +613,7 @@ jobs:
     name: coverage-floor
     timeout-minutes: 10
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -636,7 +636,7 @@ jobs:
     # Accepted risk lives in .github/govulncheck-allowlist.json with a
     # reason and an expiry date; expired entries fail closed. Unreachable
     # (import-only) findings are reported but never block.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -663,7 +663,7 @@ jobs:
   apidiff:
     name: apidiff
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -688,7 +688,7 @@ jobs:
   patch-break:
     name: patch-break
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -708,7 +708,7 @@ jobs:
     name: sbom
     timeout-minutes: 20
     if: needs.detect.outputs.groups != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect]
     permissions:
       contents: read
@@ -754,7 +754,7 @@ jobs:
   doc-snippets:
     name: doc-snippets
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -780,7 +780,7 @@ jobs:
   compilefail:
     name: compile-fail fixtures
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -804,7 +804,7 @@ jobs:
   env-fuzz-smoke:
     name: fuzz smoke (config)
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -825,7 +825,7 @@ jobs:
   #   generate-drift:
   #     name: generate --check drift
   #     timeout-minutes: 10
-  #     runs-on: ubuntu-latest
+  #     runs-on: ubuntu-24.04
   #     permissions:
   #       contents: read
   #     steps:
@@ -840,7 +840,7 @@ jobs:
     name: ci-gate
     timeout-minutes: 5
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold]
     steps:
       - name: Aggregate results

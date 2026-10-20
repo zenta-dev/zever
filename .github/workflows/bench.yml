@@ -31,7 +31,7 @@ permissions:
 jobs:
   bench-orm:
     name: bench-orm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,7 +49,7 @@ jobs:
 
   bench-container:
     name: bench-container
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,7 +67,7 @@ jobs:
 
   benchstat:
     name: benchstat
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [bench-orm, bench-container]
     continue-on-error: true
     steps:
