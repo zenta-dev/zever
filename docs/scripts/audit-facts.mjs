@@ -1,6 +1,6 @@
 // Cross-checks docs claims against the code. Usage: node scripts/audit-facts.mjs
-// Checks: YAML config keys vs JSON schema, c.<Accessor>() vs container, `zever <cmd>`/flags vs cmd/zever,
-// Go import paths, env var prefixes, GitHub blob links.
+// Checks: env config keys vs the Go Options structs, c.<Accessor>() vs container,
+// `zever <cmd>`/flags vs cmd/zever, Go import paths, env var prefixes, GitHub blob links.
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
@@ -12,18 +12,15 @@ const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e
 const pages = walk(root).filter((f) => /\.mdx?$/.test(f));
 const read = (p) => fs.readFileSync(p, 'utf8');
 
-// sources of truth
-const schema = JSON.parse(read(path.join(repo, 'config/schema/zever.schema.json')));
-const services = { ...schema.properties };
-for (const k of Object.keys(goTruth())) services[k] ??= { properties: {} };
-const defs = schema.$defs;
-const deref = (n) => (n?.$ref ? defs[n.$ref.split('/').pop()] : n);
+// sources of truth: the Go source only. Config is env-only, so there is no
+// generated config schema to read; the service list and the option keys
+// come from config/config.go plus the core/<svc> Options structs.
 const truth = goTruth();
-// Known option keys = Go structs (core + adapters) union the JSON schema (which may be stale).
+const services = Object.fromEntries(Object.keys(truth).map((k) => [k, { properties: {} }]));
+// Known option keys = Go structs (core + adapters).
 const optionKeys = (svc) => {
-  const o = deref(services[svc]?.properties?.options);
-  const keys = new Set([...(truth[svc]?.keys ?? []), ...(o?.properties ? Object.keys(o.properties) : [])]);
-  return keys.size ? keys : null;
+  const keys = truth[svc]?.keys ?? [];
+  return keys.length ? new Set(keys) : null;
 };
 const accessors = new Set();
 for (const f of fs.readdirSync(path.join(repo, 'container')).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go')))
@@ -66,6 +63,8 @@ for (const file of pages) {
 
   for (const m of text.matchAll(/(?:^|[\s`$(])zever ([a-z][a-z:-]*)((?:[ \t]+(?:--?[a-z][a-z0-9-]*(?:=\S+)?|[a-z:-]+))*)/gm)) {
     const sub = m[1];
+    // A token ending in ':' is an output prefix ("zever compile: ..."), not a command.
+    if (sub.endsWith(':')) continue;
     if (!commands.has(sub) && !['is', 'in', 'to', 'and', 'or', 'for', 'with', 'on', 'the', 'a', 'can', 'will', 'never', 'does', 'not', 'resolves', 'compiles', 'generates', 'ships', 'uses', 'runs', 'requires', 'has', 'lets', 'skips', 'wires', 'keeps', 'treats', 'reads', 'loads', 'looks', 'checks', 'writes', 'prints', 'docs', 'as', 'from', 'that', 'by', 'at', 'if', 'it', 'so', 'now', 'only', 'stays', 'also', 'always', 'first', 'then', 'builds', 'after', 'before', 'when', 'but', 'new', 'config'].includes(sub)) bad(file, `command "zever ${sub}" not in cmd/zever`);
     for (const f of m[2].matchAll(/--?([a-z][a-z0-9-]*)/g)) if (!flags.has(f[1])) bad(file, `flag --${f[1]} (after "zever ${sub}") not found in cmd/zever`);
   }
@@ -86,7 +85,7 @@ for (const file of pages) {
   for (const b of blocks.filter((b) => ['sh', 'bash', 'shell', 'env', 'text'].includes(b.lang)))
     for (const m of b.code.matchAll(/^\s*([A-Z][A-Z0-9]*)_([A-Z][A-Z0-9_]*)=/gm)) {
       const svc = m[1].toLowerCase();
-      if (!(svc in services) && !['go', 'cgo', 'postgres', 'redis', 'zever', 'pg', 'http', 'smtp'].includes(svc)) bad(file, `env ${m[1]}_${m[2]}: "${svc}" is not a config service`);
+      if (!(svc in services) && !['go', 'cgo', 'postgres', 'redis', 'zever', 'pg', 'http', 'smtp', 'pprof'].includes(svc)) bad(file, `env ${m[1]}_${m[2]}: "${svc}" is not a config service`);
     }
 
   for (const m of text.matchAll(/github\.com\/zenta-dev\/zever\/(?:blob|tree)\/main\/([^)\s"#]+)/g)) {
@@ -97,7 +96,14 @@ for (const file of pages) {
 console.log(`${pages.length} pages, ${yamlBlocks} yaml blocks (${yamlSkipped} unparsable, skipped)`);
 console.log(`known: ${Object.keys(services).length} services, ${accessors.size} accessors, ${commands.size} commands, ${flags.size} flags`);
 // Known false positives: prose that looks like a command/flag/env, and app-specific env names.
-const ignore = [/flag --old \(after "zever breaking"\)/, /BOOKINGS_WEBHOOK_/, /accessor c\.Codec\(\)/, /command "zever (command|v|dev:)"/];
+const ignore = [
+  /flag --old \(after "zever breaking"\)/,
+  /BOOKINGS_WEBHOOK_/,
+  /accessor c\.Codec\(\)/,
+  /command "zever (command|v|dev:)"/,
+  // The v0.7 -> v0.8 migration table names the removed --config flag on purpose.
+  /flag --config \(after "zever doctor"\)/,
+];
 const real = problems.filter((p) => !ignore.some((re) => re.test(p)));
 for (const p of real) console.log(p);
 console.log(`${real.length} problems (${problems.length - real.length} known false positives ignored)`);

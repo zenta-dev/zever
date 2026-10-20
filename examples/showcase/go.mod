@@ -78,8 +78,8 @@ replace (
 	github.com/zenta-dev/zever/adapters/media/local => ../../adapters/media/local
 	github.com/zenta-dev/zever/adapters/password/argon2 => ../../adapters/password/argon2
 	github.com/zenta-dev/zever/adapters/permission/rbac => ../../adapters/permission/rbac
-	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
+	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/scheduler/embedded => ../../adapters/scheduler/embedded
 	github.com/zenta-dev/zever/adapters/search/db => ../../adapters/search/db
 	github.com/zenta-dev/zever/adapters/vectorstore/db => ../../adapters/vectorstore/db

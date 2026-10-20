@@ -64,19 +64,19 @@ Start the generated server with `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`);
 <details>
 <summary>Startup fails with "unknown field" or "unknown service"</summary>
 
-`config.Load` decodes strictly, so a typo or a removed key fails fast instead of being ignored. Check spelling (file keys are snake_case, such as `max_conns`) against the [config reference](../../../reference/config/) and `zever config show`.
+The env key is close to a known field, so it is a typo and fails fast with a did-you-mean hint (`config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`). Check the spelling against the [config reference](../../../reference/config/) and `zever config show`.
 </details>
 
 <details>
 <summary>An environment variable has no effect</summary>
 
-Env matching is best-effort by design: a variable that does not match a resolved field is silently ignored, so a noisy environment cannot break startup. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. A value that does match but cannot be parsed is an error. Layering is `defaults < file < env`.
+Env matching is ambient-safe by design: a variable that matches no field of its service is ignored, so a noisy environment cannot break startup. A key close to a known field still fails with a did-you-mean hint (a typo), and a value that matches but cannot be parsed is an error. Unknown service heads (`PATH`, `FOO_BAR`) and bare names (`DB`) are ignored. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired service prefix. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. Layering is `defaults < .env < .env.local < process env`.
 </details>
 
 <details>
 <summary>It connects to sqlite even though I configured postgres</summary>
 
-The file was not found. In production, load an explicit path.
+The variable never reached the service. Env names are uppercase and unprefixed: `DB_ADAPTER=postgres` selects the adapter and `DB_DSN=...` sets the connection string. A named instance (`DB__REPORTING__DSN`) only applies to a matching named Ref, not to the default `db` service.
 </details>
 
 <details>

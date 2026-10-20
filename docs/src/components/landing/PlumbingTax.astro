@@ -60,7 +60,8 @@ func main() {
 }
 `;
 
-const zever = `cfg, _ := config.Load("")
+const zever = `env, _ := config.FromEnv()
+cfg, _ := config.Resolve(env)
 c := container.New(cfg)
 defer c.Close(ctx)
 

@@ -22,7 +22,10 @@ an entry prefix, even-space continuation indent, no truncated duplicates.
 - `make changelog-lint` lints every fragment alongside `CHANGELOG.md`.
 - `make apidiff` counts fragment `**Breaking:**` entries as `## [Unreleased]`
   entries, so breaking changes stay covered while unmerged.
-- Fragments are compiled into `CHANGELOG.md` `## [Unreleased]` (and deleted)
+- Fragments are compiled into `CHANGELOG.md`'s pending section (and deleted)
   by `make changelog-compile`, run at PR-merge time and by
-  `make release-prep`. Never edit `CHANGELOG.md` and a fragment for the same
-  change; the compile step would duplicate the entry.
+  `make release-prep`. The pending section is `## [Unreleased]`, or — between
+  the release cut and the tag push — the top `## [vX.Y.Z] - YYYY-MM-DD`
+  section whose version has no git tag yet (the same rule `make apidiff`
+  uses). Never edit `CHANGELOG.md` and a fragment for the same change; the
+  compile step would duplicate the entry.

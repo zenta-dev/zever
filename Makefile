@@ -115,8 +115,12 @@ changelog-lint: ## Lint CHANGELOG.md structure (unique headings, **Breaking:** p
 	bash tools/changelog-lint.sh
 
 .PHONY: changelog-compile
-changelog-compile: ## Compile .changelog/unreleased/*.md fragments into CHANGELOG.md ## [Unreleased]
+changelog-compile: ## Compile .changelog/unreleased/*.md fragments into the changelog's pending section
 	bash tools/changelog-compile.sh
+
+.PHONY: changelog-compile-test
+changelog-compile-test: ## Test the changelog fragment compiler (pending-section rule)
+	bash tools/changelog-compile-test.sh
 
 .PHONY: compile-check
 compile-check: ## Verify committed generated code matches the schema (zever compile --check over every example)
@@ -206,7 +210,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all

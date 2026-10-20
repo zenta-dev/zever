@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -129,10 +130,35 @@ type modEditJSON struct {
 	} `json:"Module"`
 }
 
+// skipModuleDir reports whether the walk must not descend into the
+// directory at repo-relative slash path rel. The excluded set is the one
+// tools/tag-release.sh filters out of its `find`: the git metadata dir,
+// nested worktrees and the agent harness checkout dir at the repo root, plus
+// any vendored node_modules copy. A nested worktree is a full checkout of
+// the repo, so its modules are duplicates of the repo's own: counting them
+// made the module graph see a module that does not exist in the tagged tree
+// (tag path rule) and made the pin gate read a worktree's go.mod. Keeping
+// both tools on the same exclusion set keeps the tag list and the module
+// list in agreement. testdata modules are NOT excluded: they are real
+// modules of the tree and their pins are checked like every other one (the
+// tagger does not publish them).
+func skipModuleDir(rel string) bool {
+	if rel == "." {
+		return false
+	}
+	switch path.Base(rel) {
+	case ".git", ".worktrees", ".claude":
+		return !strings.Contains(rel, "/")
+	case "node_modules":
+		return true
+	}
+	return false
+}
+
 // findModules returns import path -> repo-relative slash dir for every
 // directory under root holding a go.mod. Discovery runs `go mod edit -json`
-// per dir like the Python find_modules. .git and node_modules subtrees are
-// skipped.
+// per dir like the Python find_modules. Nested worktrees, harness checkouts
+// and vendored copies are skipped (see skipModuleDir).
 func findModules(ctx context.Context, root string) (map[string]string, error) {
 	mods := make(map[string]string)
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -145,8 +171,7 @@ func findModules(ctx context.Context, root string) (map[string]string, error) {
 		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel == ".git" || strings.HasPrefix(rel, ".git/") ||
-				rel == "node_modules" || strings.HasPrefix(rel, "node_modules/") {
+			if skipModuleDir(rel) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -184,7 +209,8 @@ func hasGoMod(dir string) bool {
 }
 
 // localImports returns all intra-repo import paths in .go files under
-// moddir, excluding nested-module subtrees.
+// moddir, excluding nested-module subtrees and the skipped directories
+// (nested worktrees, harness checkouts, vendored copies).
 func localImports(root, moddir string) (map[string]bool, error) {
 	base := filepath.Join(root, filepath.FromSlash(moddir))
 	found := make(map[string]bool)
@@ -198,6 +224,9 @@ func localImports(root, moddir string) (map[string]bool, error) {
 		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
+			if skipModuleDir(rel) {
+				return filepath.SkipDir
+			}
 			if rel != moddir && hasGoMod(p) {
 				return filepath.SkipDir
 			}

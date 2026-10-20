@@ -21,6 +21,33 @@ type Env map[string]string
 // into its field. Only the field name is reported: values may be secrets.
 var ErrInvalidValue = errors.New("config: invalid value")
 
+// StrictEnvKey is the environment variable that turns strict unknown-key
+// rejection back on. With it set to a true value ("1", "true"), every
+// unknown key under a wired service prefix fails resolution again, the
+// v0.8 behavior. Without it, only near-miss typos fail: an unknown key that
+// is close to no known field is an unrelated ambient variable and is
+// ignored.
+//
+// The switch is read from the same env map ApplyEnv is given, so enabling
+// it needs no CLI flag and no call-site change.
+const StrictEnvKey = "ZEVER_CONFIG_STRICT"
+
+// strictEnv reports whether env opts into strict unknown-key rejection.
+// Any case spelling of StrictEnvKey with a true value enables it; a false
+// or unparsable value leaves strict mode off, like every other env read.
+func strictEnv(env Env) bool {
+	for key, value := range env {
+		if !strings.EqualFold(key, StrictEnvKey) {
+			continue
+		}
+		on, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err == nil && on {
+			return true
+		}
+	}
+	return false
+}
+
 // durationType identifies time.Duration fields, which stay strings on the
 // wire ("5s" style) and parse via time.ParseDuration instead of integer
 // coercion.
@@ -29,8 +56,11 @@ var durationType = reflect.TypeOf(time.Duration(0))
 // Resolve builds a Config from env: service defaults, overlaid by the
 // default instance of every service (`SERVICE_FIELD`, `SERVICE_ADAPTER`),
 // then validated fail-closed. Unknown service heads and bare names are
-// ignored so ambient process environment never breaks startup; unknown keys
-// under a wired service prefix fail with a did-you-mean hint. Named
+// ignored so ambient process environment never breaks startup. Under a
+// wired service prefix an unknown key fails only when it is close to a
+// known field (a typo, reported with a did-you-mean hint); a key that is
+// close to no known field is an unrelated ambient variable and is ignored.
+// Set StrictEnvKey in env to reject every unknown key instead. Named
 // instances (`SERVICE__NAME__*`) are left for the caller: enumerate them
 // with InstanceNames and apply each with ApplyEnv.
 //
@@ -119,10 +149,13 @@ func sortedEnvKeys(env Env) []string {
 // Field matching reuses the zero-alloc ASCII-fold: case-insensitive with
 // "_" ignored, so MAX_RETRIES matches MaxRetries. One nesting level is
 // supported (AUTH_JWT_SECRET sets JWT.Secret). A key matching both a flat
-// field and a nested path is a collision and fails. Unknown keys under the
-// wired prefix fail with an UnknownFieldError carrying a did-you-mean
-// suggestion. Durations parse via time.ParseDuration ("5s" style). Errors
-// name fields only — values are never echoed.
+// field and a nested path is a collision and fails. An unknown key under the
+// wired prefix fails with an UnknownFieldError carrying a did-you-mean
+// suggestion when it is close to a known field (a typo); a key close to no
+// known field is an unrelated ambient variable and is ignored, unless
+// StrictEnvKey is set in env, which rejects every unknown key. Durations
+// parse via time.ParseDuration ("5s" style). Errors name fields only —
+// values are never echoed.
 func ApplyEnv(env Env, service, name string, dst any) error {
 	svc, ok := matchService(service)
 	if !ok {
@@ -177,40 +210,82 @@ func ApplyEnv(env Env, service, name string, dst any) error {
 			}
 			continue
 		}
-		flat, flatOK := findField(target, rest)
-		outerName, innerName, hasNesting := cutEnvNesting(rest)
-		var outerStruct reflect.Value
-		var inner reflect.Value
-		nestedOK := false
-		if hasNesting {
-			if outer, ok := findField(target, outerName); ok {
-				if indir := reflect.Indirect(outer); indir.IsValid() && indir.Kind() == reflect.Struct {
-					outerStruct = indir
-					if in, ok := findField(indir, innerName); ok {
-						inner = in
-						nestedOK = true
-					}
+		match := matchEnvField(target, rest)
+		if match.Ambiguous {
+			return &InvalidOptionsError{Service: svc, Reason: fmt.Sprintf("ambiguous env %s: matches fields %q and %q", key, strings.ToLower(rest), strings.ToLower(match.OuterName)+"."+strings.ToLower(match.InnerName))}
+		}
+		if match.Path != nil {
+			if err := setOptionField(svc, setDst, match.Path, env[key], key); err != nil {
+				return wrapApplyError(svc, err)
+			}
+			continue
+		}
+		unknown := unknownEnvFieldError(svc, rest, match.InnerName, match.HasNesting, match.OuterStruct, candidates)
+		if unknown.Suggestion != "" || strictEnv(env) {
+			return unknown
+		}
+		// Close to no known field: an unrelated ambient variable, not a
+		// typo. Ignore it; it must not land on any field.
+	}
+	return nil
+}
+
+// envFieldMatch reports where one env field remainder lands inside an
+// options struct.
+type envFieldMatch struct {
+	// Path holds the field path to set: one segment for a flat field, two
+	// for a nested one. Nil when the remainder resolved to no settable
+	// field.
+	Path []string
+	// OuterStruct is the nested struct the outer segment resolved to, if
+	// any. It drives the suggestion for a nested remainder.
+	OuterStruct reflect.Value
+	// OuterName is the outer path segment of a nested remainder.
+	OuterName string
+	// InnerName is the inner path segment of a nested remainder.
+	InnerName string
+	// HasNesting reports that the remainder had a usable nesting split.
+	HasNesting bool
+	// Ambiguous reports that the remainder matched both a flat field and a
+	// nested path: the key is a collision and always fails.
+	Ambiguous bool
+}
+
+// matchEnvField matches a field remainder against the options struct
+// target. A field that exists but holds no scalar value (a map, a slice, an
+// interface) does not resolve: env values are strings, so such a field can
+// never be set from the environment.
+func matchEnvField(target reflect.Value, rest string) envFieldMatch {
+	var m envFieldMatch
+	flat, flatOK := findField(target, rest)
+	outerName, innerName, hasNesting := cutEnvNesting(rest)
+	var outerStruct reflect.Value
+	var inner reflect.Value
+	nestedOK := false
+	if hasNesting {
+		if outer, ok := findField(target, outerName); ok {
+			if indir := reflect.Indirect(outer); indir.IsValid() && indir.Kind() == reflect.Struct {
+				outerStruct = indir
+				if in, ok := findField(indir, innerName); ok {
+					inner = in
+					nestedOK = true
 				}
 			}
 		}
-		if flatOK && isScalarField(flat) && nestedOK && isScalarField(inner) {
-			return &InvalidOptionsError{Service: svc, Reason: fmt.Sprintf("ambiguous env %s: matches fields %q and %q", key, strings.ToLower(rest), strings.ToLower(outerName)+"."+strings.ToLower(innerName))}
-		}
-		if flatOK && isScalarField(flat) {
-			if err := setOptionField(svc, setDst, []string{rest}, env[key], key); err != nil {
-				return wrapApplyError(svc, err)
-			}
-			continue
-		}
-		if nestedOK {
-			if err := setOptionField(svc, setDst, []string{outerName, innerName}, env[key], key); err != nil {
-				return wrapApplyError(svc, err)
-			}
-			continue
-		}
-		return unknownEnvFieldError(svc, rest, innerName, hasNesting, outerStruct, candidates)
 	}
-	return nil
+	m.OuterStruct = outerStruct
+	m.OuterName = outerName
+	m.InnerName = innerName
+	m.HasNesting = hasNesting
+	switch {
+	case flatOK && isScalarField(flat) && nestedOK && isScalarField(inner):
+		m.Ambiguous = true
+	case flatOK && isScalarField(flat):
+		m.Path = []string{rest}
+	case nestedOK:
+		m.Path = []string{outerName, innerName}
+	}
+	return m
 }
 
 // applyPrefixKey reports the field remainder of an env key under the wired
@@ -283,8 +358,9 @@ func wrapApplyError(svc string, err error) error {
 
 // unknownEnvFieldError builds the UnknownFieldError for a remainder that
 // resolved to no settable field, preferring the inner struct's candidates
-// for the suggestion when the outer segment resolved.
-func unknownEnvFieldError(svc, rest, innerName string, hasNesting bool, outerStruct reflect.Value, candidates []string) error {
+// for the suggestion when the outer segment resolved. An empty Suggestion
+// means nothing is close: the key is an ambient variable, not a typo.
+func unknownEnvFieldError(svc, rest, innerName string, hasNesting bool, outerStruct reflect.Value, candidates []string) *UnknownFieldError {
 	if hasNesting && outerStruct.IsValid() {
 		if innerCands := fieldCandidates(outerStruct); len(innerCands) > 0 {
 			return &UnknownFieldError{Service: svc, Field: rest, Suggestion: closest(innerName, innerCands)}

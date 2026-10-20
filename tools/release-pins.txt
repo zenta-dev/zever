@@ -10,6 +10,7 @@ install.sh	(--version |ZEVER_VERSION=|ZEVER_VERSION_DEFAULT=")v
 install.ps1	(-Version |Version = "|default: )v
 docs/src/data/landing.ts	VERSION = 'v
 tools/zever-lsp/server.go	serverVersion = "
+tools/zever-lsp/README.md	The version \(`
 tools/zever-mcp/server.go	serverVersion +[=] +"
 editors/vscode/package.json	^  "version": "
 docs/src/content/docs/start/installation.mdx	@v
