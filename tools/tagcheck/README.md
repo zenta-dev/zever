@@ -46,7 +46,14 @@ so regenerating the file can never absorb an unintended rename:
 * a struct that existed at the baseline release (`v0.7.2`, the last release
   before the tags were stripped) is pinned at that tag;
 * a struct created after the baseline release is pinned at the commit that
-  introduced it.
+  introduced it;
+* a struct that only became a wire type after the baseline release is
+  pinned at the commit that established its wire contract. Such a struct
+  existed at the baseline with untagged fields (or with none at all), and
+  the commit that gave it its `json` tags never touches its `type X` line
+  again — so the generator also looks for the commits that changed the
+  struct's field lines, and pins the earliest one where every exported
+  field carries a tag.
 
 Regenerate with:
 

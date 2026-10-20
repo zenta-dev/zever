@@ -10,7 +10,11 @@
 //     release before the v0.8.0 env-only migration stripped the json tags)
 //     is pinned at that tag;
 //   - a struct created after the baseline release is pinned at the commit
-//     that introduced it.
+//     that introduced it;
+//   - a struct that only became a wire type after the baseline release
+//     (it existed there with untagged fields, and a later commit gave it
+//     its json tags) is pinned at the commit that established its wire
+//     contract.
 //
 // The base revision of every struct is recorded in the generated file, so
 // the derivation stays auditable.
@@ -346,7 +350,7 @@ func (r *repo) resolve(ctx context.Context, dir, name, release string) ([]wire.F
 		return fields, release, nil
 	}
 
-	commits, err := r.candidates(ctx, dir, name)
+	commits, err := r.candidates(ctx, dir, name, release)
 	if err != nil {
 		return nil, "", err
 	}
@@ -374,8 +378,30 @@ func (r *repo) resolve(ctx context.Context, dir, name, release string) ([]wire.F
 
 // candidates returns the commits that touched the declaration of a struct,
 // oldest first.
-func (r *repo) candidates(ctx context.Context, dir, name string) ([]string, error) {
-	out, err := r.run(ctx, "log", "--reverse", "--format=%H", "-G", "^type "+name, "--", dir)
+//
+// A commit is a candidate when it added or removed the struct's "type X"
+// line -- the struct was created or moved -- or when it changed one of the
+// struct's field lines -- the struct gained or lost a json tag. The second
+// case is what a struct that only becomes a wire type later needs: it
+// existed at the baseline release with untagged fields, and the commit that
+// gave it its json tags never touches its "type X" line again.
+//
+// The field names come from the baseline release, where such a struct
+// already exists. A struct created after the baseline release is found by
+// its "type X" line alone.
+func (r *repo) candidates(ctx context.Context, dir, name, release string) ([]string, error) {
+	pattern := "^type " + name
+
+	fields, ok, err := r.structFieldsAt(ctx, release, dir, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		pattern = pattern + "|" + fieldPattern(fields)
+	}
+
+	out, err := r.run(ctx, "log", "--reverse", "--format=%H", "-G", pattern, "--", dir)
 	if err != nil {
 		return nil, err
 	}
@@ -394,6 +420,17 @@ func (r *repo) candidates(ctx context.Context, dir, name string) ([]string, erro
 	return commits, nil
 }
 
+// fieldPattern returns a git regex matching any of the struct's field
+// names. The names are Go identifiers, so they need no escaping.
+func fieldPattern(fields []wire.Field) string {
+	names := make([]string, 0, len(fields))
+	for _, f := range fields {
+		names = append(names, f.Name)
+	}
+
+	return strings.Join(names, "|")
+}
+
 // short returns the abbreviated commit id of a revision.
 func (r *repo) short(ctx context.Context, rev string) (string, error) {
 	out, err := r.run(ctx, "rev-parse", "--short=12", rev)
@@ -409,6 +446,24 @@ func (r *repo) short(ctx context.Context, rev string) (string, error) {
 // exported fields carries no json tag: only fully tagged structs are wire
 // contracts and can be pinned.
 func (r *repo) fieldsAt(ctx context.Context, rev, dir, name string) ([]wire.Field, bool, error) {
+	fields, ok, err := r.structFieldsAt(ctx, rev, dir, name)
+	if err != nil || !ok {
+		return nil, false, err
+	}
+
+	for _, field := range fields {
+		if field.State() == wire.StateMissing {
+			return nil, false, nil
+		}
+	}
+
+	return fields, true, nil
+}
+
+// structFieldsAt returns the exported fields of a struct at a revision,
+// whether or not they carry a json tag. It reports false when the struct
+// does not exist there.
+func (r *repo) structFieldsAt(ctx context.Context, rev, dir, name string) ([]wire.Field, bool, error) {
 	files, err := r.filesAt(ctx, rev, dir)
 	if err != nil {
 		return nil, false, err
@@ -430,12 +485,6 @@ func (r *repo) fieldsAt(ctx context.Context, rev, dir, name string) ([]wire.Fiel
 		fields, ok := wire.Fields(f, name)
 		if !ok {
 			continue
-		}
-
-		for _, field := range fields {
-			if field.State() == wire.StateMissing {
-				return nil, false, nil
-			}
 		}
 
 		return fields, true, nil

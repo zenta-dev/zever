@@ -107,6 +107,49 @@ func TestGeneratePinsKeysFromHistory(t *testing.T) {
 	}
 }
 
+// TestGeneratePinsStructThatGainsItsTagsLater covers the case the v0.8.0
+// env-only migration created: a struct that existed at the baseline release
+// with untagged fields and only became a wire type later. The commit that
+// gave it its json tags never touches the struct's "type X" line, so the
+// generator has to look at the field lines too, and it pins the struct at
+// the commit that established its wire contract.
+func TestGeneratePinsStructThatGainsItsTagsLater(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	gitInit(t, root)
+
+	writeSource(t, root, "pkg/wire.go",
+		"package pkg\n\ntype wireStruct struct {\n\tName string\n}\n",
+		"add untagged wire struct")
+
+	runGit(t, root, "tag", "v0.7.2")
+
+	writeSource(t, root, "pkg/wire.go",
+		"package pkg\n\ntype wireStruct struct {\n\tName string `json:\"name\"`\n}\n",
+		"give the wire struct its json tag")
+
+	tagged := strings.TrimSpace(runGit(t, root, "rev-parse", "--short=12", "HEAD"))
+
+	registry := "pkg\twireStruct\tpkg/wire.go\n"
+	writeFile(t, filepath.Join(root, "tools", "tagcheck", "golden_wire_structs.txt"), registry)
+
+	entries, err := loadRegistry(filepath.Join(root, "tools", "tagcheck", "golden_wire_structs.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := generate(context.Background(), &repo{dir: root}, entries, "v0.7.2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "pkg\twireStruct\tName\tname\t" + tagged + "\n"
+	if !strings.Contains(string(data), want) {
+		t.Errorf("generated data does not contain %q:\n%s", want, data)
+	}
+}
+
 func TestGenerateFailsWithoutJsonTags(t *testing.T) {
 	t.Parallel()
 
