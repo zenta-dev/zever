@@ -200,6 +200,72 @@ else
     bad "changelog untouched without fragments"
 fi
 
+# --- scenario 6: the pending section is ## [Unreleased] ------------------------
+say ""
+say "changelog-compile: ## [Unreleased] stays the pending section after the cut"
+
+# The release cut renames the pending section and leaves an empty
+# ## [Unreleased] above it: the next release always has a pending section,
+# tagged or not.
+repo="$(new_repo cut '# Changelog
+
+## [Unreleased]
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+git -C "$repo" tag v0.8.0
+printf -- '- feat(c): after the cut\n' >"$repo/.changelog/unreleased/c-entry.md"
+
+out="$(bash "$COMPILE" "$repo" 2>&1)"; rc=$?
+assert_rc "compile succeeds on a tagged release with an Unreleased section" 0 "$rc"
+assert_contains "compile targets the Unreleased section" "$out" "## [Unreleased]"
+
+changelog="$(cat "$repo/CHANGELOG.md")"
+assert_contains "entry compiled into the Unreleased section" "$changelog" "- feat(c): after the cut"
+unreleased_body="$(printf '%s\n' "$changelog" | sed -n '/^## \[Unreleased\]/,/^## \[v/p')"
+case "$unreleased_body" in
+    *"- feat(c): after the cut"*) ok "entry landed in the Unreleased section" ;;
+    *) bad "entry landed in the Unreleased section" ;;
+esac
+assert_contains "the released section is untouched" "$changelog" "## [v0.8.0] - 2026-10-18"
+
+# --- scenario 7: --check asserts the pending section ----------------------------
+say ""
+say "changelog-compile: --check asserts the pending section"
+
+repo="$(new_repo checkok '# Changelog
+
+## [Unreleased]
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+out="$(bash "$COMPILE" --check "$repo" 2>&1)"; rc=$?
+assert_rc "check passes with an Unreleased section" 0 "$rc"
+assert_contains "check names the pending section" "$out" "## [Unreleased]"
+
+# A changelog whose top section is a release (the v0.8.0 cut regression):
+# the check must fail, or the next release cannot be cut.
+repo="$(new_repo checkbad '# Changelog
+
+## [v0.8.0] - 2026-10-18
+- old entry
+')"
+out="$(bash "$COMPILE" --check "$repo" 2>&1)"; rc=$?
+assert_rc "check fails without an Unreleased section" 1 "$rc"
+assert_contains "failure names the missing section" "$out" "## [Unreleased]"
+
+# The check never writes: the changelog must be untouched.
+before="$(cat "$repo/CHANGELOG.md")"
+bash "$COMPILE" --check "$repo" >/dev/null 2>&1 || true
+after="$(cat "$repo/CHANGELOG.md")"
+if [ "$before" = "$after" ]; then
+    ok "check leaves the changelog untouched"
+else
+    bad "check leaves the changelog untouched"
+fi
+
 # --- summary -------------------------------------------------------------------
 say ""
 say "changelog-compile tests: $PASS passed, $FAIL failed"

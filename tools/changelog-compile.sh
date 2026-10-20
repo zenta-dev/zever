@@ -12,8 +12,22 @@
 # Entries are inserted in fragment order (sorted by file name), every fragment
 # exactly once. The compiled fragments are deleted; README.md is left alone.
 # Idempotent: with no fragments it changes nothing.
-# Usage: tools/changelog-compile.sh [repo-root]
+#
+# With --check, nothing is written: the changelog must carry a pending
+# section, and the top section must be `## [Unreleased]`. The release cut
+# RENAMES that section (it keeps an empty `## [Unreleased]` above the new
+# release section); deleting it strands the next release: the fragments can
+# no longer be compiled and the apidiff gate asks for a **Breaking:** entry
+# in a section that does not exist. This check is the regression guard.
+#
+# Usage: tools/changelog-compile.sh [--check] [repo-root]
 set -euo pipefail
+
+check_only=0
+if [ "${1:-}" = "--check" ]; then
+  check_only=1
+  shift
+fi
 
 root="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 changelog="$root/CHANGELOG.md"
@@ -22,20 +36,6 @@ fragdir="$root/.changelog/unreleased"
 if [ ! -f "$changelog" ]; then
   echo "changelog-compile: $changelog not found" >&2
   exit 1
-fi
-
-shopt -s nullglob
-frags=()
-for f in "$fragdir"/*.md; do
-  case "$(basename "$f")" in
-    README.md) continue ;;
-    *) frags+=("$f") ;;
-  esac
-done
-
-if [ "${#frags[@]}" -eq 0 ]; then
-  echo "changelog-compile: no fragments"
-  exit 0
 fi
 
 # pending_header prints the header line of the section the fragments belong
@@ -62,6 +62,49 @@ pending_header() {
   fi
   printf '%s\n' "$header"
 }
+
+# check_pending_section asserts the invariant the release cut must keep: the
+# changelog's top section is `## [Unreleased]`, so the next release has a
+# pending section to cut and the fragments always have a home.
+check_pending_section() {
+  local first
+  first="$(awk '/^## \[/ { gsub(/^[ \t]+|[ \t]+$/, "", $0); print; exit }' "$changelog")"
+  if [ -z "$first" ]; then
+    echo "changelog-compile: $changelog has no release section; add a ## [Unreleased] section at the top" >&2
+    return 1
+  fi
+  case "$first" in
+    "## [Unreleased]"*) ;;
+    *)
+      echo "changelog-compile: $changelog starts with '$first', not '## [Unreleased]'; the release cut must keep an empty ## [Unreleased] section above the new release section (see .github/CONTRIBUTING.md)" >&2
+      return 1
+      ;;
+  esac
+  if [ -z "$(pending_header)" ]; then
+    echo "changelog-compile: no pending section in $changelog" >&2
+    return 1
+  fi
+  echo "changelog-compile: pending section '## [Unreleased]' is present"
+}
+
+if [ "$check_only" -eq 1 ]; then
+  check_pending_section
+  exit 0
+fi
+
+shopt -s nullglob
+frags=()
+for f in "$fragdir"/*.md; do
+  case "$(basename "$f")" in
+    README.md) continue ;;
+    *) frags+=("$f") ;;
+  esac
+done
+
+if [ "${#frags[@]}" -eq 0 ]; then
+  echo "changelog-compile: no fragments"
+  exit 0
+fi
 
 target="$(pending_header)"
 if [ -z "$target" ]; then

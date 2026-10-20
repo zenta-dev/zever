@@ -220,7 +220,7 @@ Every release ships one number across all modules via `tools/tag-release.sh` (fi
 release-version constant (schema `v1`/`v2` segments are API versions, not
 releases) — everything else moves together:
 
-- `CHANGELOG.md`: cut `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD`. Until `tools/tag-release.sh` creates the tags, `make apidiff` treats that top section as the pending release, so a break documented there still satisfies the gate (see [Versioning](#versioning)).
+- `CHANGELOG.md`: cut the section, keep `## [Unreleased]` above it. The cut renames the pending `## [Unreleased]` section to `## [vX.Y.Z] - YYYY-MM-DD` and leaves a fresh, empty `## [Unreleased]` section at the top: the next release then has a pending section to cut, the pending fragments always have a home, and the `apidiff` gate can ask for a `**Breaking:**` entry in a section that exists. Deleting the section instead of renaming it strands the next release (the fragments can no longer be compiled and the gate is unsatisfiable); `make changelog-compile-check` (CI: the `changelog` job) fails when the top section is not `## [Unreleased]`. Until `tools/tag-release.sh` creates the tags, `make apidiff` also treats the cut top section as the pending release when its version is the in-development one (`cmd/zever/VERSION`), so a break documented there still satisfies the gate (see [Versioning](#versioning)).
 - Installers: `install.sh` (`ZEVER_VERSION_DEFAULT`, header and usage text) and
   `install.ps1` (`$Version` default and help text).
 - Root pins: `README.md` (installer URLs), `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)
