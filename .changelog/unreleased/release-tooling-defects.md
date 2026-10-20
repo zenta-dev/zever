@@ -1,0 +1,4 @@
+- fix(release): `tools/tag-release.sh` now creates the bare `vX.Y.Z` release tag — the tag `.github/workflows/release.yml` fires on — and publishes it in the same atomic push as the per-module tags, so a release ships its binaries, SBOMs and attestation instead of nothing.
+- fix(changelog): `make changelog-compile` now folds the pending fragments into the changelog's pending section (`## [Unreleased]`, or the top `## [vX.Y.Z]` release section while its version carries no git tag yet) instead of failing with "no ## [Unreleased] section in CHANGELOG.md".
+- fix(modgraph): `tools/modgraph` no longer counts a module living in a nested git worktree as a repo module, so the module-graph and version-pin gates stay green with worktrees present.
+- fix(docs): the zever-lsp README carries the current release version again, and the version-pin gate checks that file from now on.

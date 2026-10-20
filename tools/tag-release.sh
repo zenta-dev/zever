@@ -4,8 +4,11 @@
 # Creates one tag per tracked go.mod found via find, excluding nested
 # worktrees, harness checkouts, and vendored copies: every module is tagged
 # `<reldir>/<version>` where <reldir> is the module dir relative to the
-# repo root (e.g. adapters/cache/redis/v0.5.0). There is no root module anymore,
-# so no bare `<version>` tag is created.
+# repo root (e.g. adapters/cache/redis/v0.5.0), plus the bare `<version>`
+# release tag on the same commit. The bare tag is what
+# .github/workflows/release.yml fires on (it triggers on `push: tags: ["v*"]`,
+# which matches a bare tag only), so a release without it ships no binaries,
+# no SBOMs and no attestation.
 # Tags are emitted in dependency order over three passes so leaf tags exist
 # before dependents: (1) shared/*, (2) core/* plus config, container, orm,
 # dsl and cmd/*, (3) adapters/* and everything else (examples, tools, docs).
@@ -13,19 +16,23 @@
 # With --dry-run (alias --check), list tags in order without creating them.
 # With --verify, create nothing: confirm every module's tag exists locally or
 # on origin (remote tag listing; skipped when no origin is configured) and
-# exit 1 listing the missing ones. Used by the release docs.
+# exit 1 listing the missing ones. The bare release tag is checked too: it
+# is part of the release. Used by the release docs.
 # Before any mode runs, tools/check-version.sh must pass: every version pin and
 # every intra-repo go.mod require equals cmd/zever/VERSION (== <version>).
 # With --push, create the tags and publish them to origin in ONE
 # `git push --atomic`, so a rejected ref (hook, protection rule, network) leaves
 # the remote with none of the lockstep tags rather than a half-released set
-# that the module proxy would cache forever. Without --push the script never
-# pushes and prints the equivalent command.
+# that the module proxy would cache forever. The bare `<version>` tag rides
+# along in that same atomic push: the release workflow must not start before
+# every module tag is on origin, and a half-pushed release must not exist.
+# Without --push the script never pushes and prints the equivalent command.
 # With --verify-proxy, create nothing: ask the module proxy (GOPROXY, default
 # proxy.golang.org) to resolve `<module>@<version>` for every tagged module,
 # retrying while the proxy catches up (ATTEMPTS=10, DELAY=30 seconds). Run it
 # after the push (the release workflow does) to catch tags the proxy cannot
-# serve before users hit them.
+# serve before users hit them. The bare tag is not a module, so the proxy
+# check ignores it.
 set -euo pipefail
 
 usage="usage: $0 [--dry-run|--check|--verify|--push|--verify-proxy] <version>  (e.g. $0 v0.5.0)"
@@ -189,6 +196,39 @@ for f in "${pass3[@]}"; do
   tag_one "$f"
 done
 
+# The bare release tag: the release workflow (.github/workflows/release.yml)
+# triggers on `push: tags: ["v*"]`, which matches a bare tag only, so the
+# per-module tags alone would ship no artifacts. It is created on the same
+# commit as the module tags and pushed in the same atomic push, so the
+# workflow cannot start before every module tag is on origin.
+tag_root() {
+  all_tags+=("$ver")
+  if [ "$proxy" -eq 1 ]; then
+    return # the bare tag is not a module: the proxy has nothing to resolve
+  elif [ "$verify" -eq 1 ]; then
+    if git rev-parse -q --verify "refs/tags/$ver" >/dev/null 2>&1; then
+      skipped=$((skipped + 1))
+    elif printf '%s\n' "$remote_tags" | grep -qxF "$ver"; then
+      skipped=$((skipped + 1))
+    else
+      echo "missing tag: $ver"
+      missing=$((missing + 1))
+    fi
+  elif git rev-parse "$ver" >/dev/null 2>&1; then
+    echo "exists, skipping: $ver"
+    skipped=$((skipped + 1))
+  elif [ "$dry_run" -eq 1 ]; then
+    echo "would tag: $ver"
+    created=$((created + 1))
+  else
+    git tag "$ver"
+    echo "tagged: $ver"
+    created=$((created + 1))
+  fi
+}
+
+tag_root
+
 if [ "$proxy" -eq 1 ]; then
   if [ "$proxy_bad" -gt 0 ]; then
     echo "verify-proxy failed: the module proxy cannot resolve $proxy_bad module(s) at $ver ($created resolved, $skipped skipped)." >&2
@@ -200,10 +240,10 @@ fi
 
 if [ "$verify" -eq 1 ]; then
   if [ "$missing" -gt 0 ]; then
-    echo "verify failed: $missing module tag(s) missing for $ver ($skipped present)." >&2
+    echo "verify failed: $missing tag(s) missing for $ver ($skipped present)." >&2
     exit 1
   fi
-  echo "verify ok: all $skipped module tag(s) for $ver exist."
+  echo "verify ok: all $skipped tag(s) for $ver exist."
   exit 0
 fi
 
