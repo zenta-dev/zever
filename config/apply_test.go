@@ -187,10 +187,28 @@ func TestApplyEnvNamedInstanceCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestApplyEnvNamedUnknownKeyErrors(t *testing.T) {
+// TestApplyEnvNamedUnknownKeyIgnored pins the ambient rule for named
+// instances: a key under a named instance prefix that resolves to no field
+// and is close to no known field is ignored, exactly like a default-instance
+// ambient variable.
+func TestApplyEnvNamedUnknownKeyIgnored(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{"DB__REPORTING__BOGUS": "1"}
+	if err := ApplyEnv(env, "db", "reporting", &cfg.DB); err != nil {
+		t.Fatalf("want ignored, got %v", err)
+	}
+	if cfg.DB.Options.DSN != "" {
+		t.Fatalf("ignored key leaked into db: %q", cfg.DB.Options.DSN)
+	}
+}
+
+// TestApplyEnvNamedNearMissKeyFails pins that a typo in a named instance
+// still fails with a did-you-mean hint.
+func TestApplyEnvNamedNearMissKeyFails(t *testing.T) {
+	t.Parallel()
+	cfg := Default()
+	env := Env{"DB__REPORTING__MAXCONBNS": "1"}
 	err := ApplyEnv(env, "db", "reporting", &cfg.DB)
 	if err == nil {
 		t.Fatal("want error")
@@ -198,6 +216,9 @@ func TestApplyEnvNamedUnknownKeyErrors(t *testing.T) {
 	var unknown *UnknownFieldError
 	if !errors.As(err, &unknown) {
 		t.Fatalf("want UnknownFieldError, got %T: %v", err, err)
+	}
+	if unknown.Suggestion != "max_conns" {
+		t.Fatalf("suggestion = %q, want max_conns", unknown.Suggestion)
 	}
 }
 
@@ -314,7 +335,7 @@ func TestResolveValidatesFailClosed(t *testing.T) {
 
 func TestResolveUnknownFieldFails(t *testing.T) {
 	t.Parallel()
-	env := Env{"DB_BOGUS_FIELD_XYZ": "1"}
+	env := Env{"DB_DSNX": "1"}
 	_, err := Resolve(env)
 	if err == nil {
 		t.Fatal("want error for unknown field under wired prefix")

@@ -775,6 +775,12 @@ jobs:
           key: ${{ runner.os }}-gobin-cyclonedx-gomod-v1.12.0
       - name: Install tools
         run: make setup-cyclonedx-gomod
+      # The SBOM resolution script resolves the module graph through the
+      # proxy, and falls back to the local intra-repo closure while the
+      # pinned siblings are unpublished. Offline: empty file:// proxy and a
+      # stubbed cyclonedx-gomod. Local mirror: `make sbom-test`.
+      - name: SBOM resolution script tests
+        run: make sbom-test
       - name: Generate SBOM (affected modules)
         run: make sbom
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

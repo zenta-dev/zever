@@ -21,7 +21,7 @@ SCHEDULER_ADAPTER=embedded
 SCHEDULER_CLOSE_TIMEOUT=5s
 ```
 
-Only `dsn`, `dedicated_pool`, and `close_timeout` are file-settable; `Dispatcher`, `Locker`, and `Logger` are code-wired (`yaml:"-"`) and injected by the container. Dispatch rides the [queue](../queue/), so its options matter too. All keys: [scheduler config reference](../../../reference/config/#scheduler).
+Only `dsn`, `dedicated_pool`, and `close_timeout` are env-settable; `Dispatcher`, `Locker`, and `Logger` are code-wired (`json:"-"`) and injected by the container. Dispatch rides the [queue](../queue/), so its options matter too. All keys: [scheduler config reference](../../../reference/config/#scheduler).
 
 ## Dispatch and schedule a job
 

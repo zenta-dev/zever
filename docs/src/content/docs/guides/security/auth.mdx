@@ -34,7 +34,7 @@ if err != nil {
 }
 ```
 
-`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Keys: `jwt.issuer`, `jwt.audience`, `jwt.max_ttl`, `jwt.leeway`, `jwt.keys`, `jwt.active_kid`, `oidc.issuer`, `oidc.client_id`, `oidc.timeout`, `oidc.allow_insecure`. See the [auth config reference](../../../reference/config/#auth).
+`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Keys: `AUTH_JWT_ISSUER`, `AUTH_JWT_AUDIENCE`, `AUTH_JWT_MAX_TTL`, `AUTH_JWT_LEEWAY`, `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_TIMEOUT`, `AUTH_OIDC_ALLOW_INSECURE`. See the [auth config reference](../../../reference/config/#auth).
 
 ## Key rotation
 
@@ -43,11 +43,10 @@ List every accepted key with a `kid` and point `active_kid` at the signer. New t
 ```sh
 AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=previous-secret-at-least-32-bytes-long
-AUTH_JWT_KEYS_- KID=2026-09
-AUTH_JWT_KEYS_SECRET=previous-secret-at-least-32-bytes-long
-AUTH_JWT_ACTIVE_KID=2026-10
 AUTH_JWT_LEEWAY=30s
 ```
+
+The key set itself (`jwt.keys`) is a list, which has no string form, so it is wired in Go through `auth.Options.JWT.Keys` (or `container.WithOptions`). `AUTH_JWT_ACTIVE_KID` then points at the signer, and it is rejected when no keys are configured.
 
 Tokens carrying a future `nbf` (not-before) claim are rejected; `exp` is always required. Both honor `leeway`, which defaults to `0` (strict).
 

@@ -149,6 +149,7 @@ replace github.com/zenta-dev/zever/adapters/password/argon2 => ../adapters/passw
 replace github.com/zenta-dev/zever/adapters/permission/noop => ../adapters/permission/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/db => ../adapters/queue/db
+
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../adapters/queue/memory
 
 replace github.com/zenta-dev/zever/adapters/ratelimit/memory => ../adapters/ratelimit/memory
@@ -218,6 +219,7 @@ replace github.com/zenta-dev/zever/core/lock => ../core/lock
 replace github.com/zenta-dev/zever/core/log => ../core/log
 
 replace github.com/zenta-dev/zever/core/mailer => ../core/mailer
+
 replace github.com/zenta-dev/zever/core/middleware => ../core/middleware
 
 replace github.com/zenta-dev/zever/core/media => ../core/media

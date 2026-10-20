@@ -23,6 +23,7 @@ VECTORSTORE_DSN=:memory:
 ```sh
 VECTORSTORE_ADAPTER=qdrant
 VECTORSTORE_URL=http://localhost:6333
+VECTORSTORE_ALLOW_INSECURE=true
 VECTORSTORE_API_KEY=dev-only-key
 ```
   </TabItem>
@@ -105,7 +106,7 @@ Cause: you loop `Upsert`. Fix: use `UpsertBatch`.
 <details>
 <summary>`qdrant` fails to resolve</summary>
 
-Cause: `url` lacks a scheme or host. Fix: check `VECTORSTORE_URL` for a missing `http://`.
+Cause: `url` lacks a scheme or host, or is not https. Fix: check `VECTORSTORE_URL` for a missing scheme, and set `VECTORSTORE_ALLOW_INSECURE=true` for a plain-http local server.
 </details>
 
 ## Related

@@ -1,0 +1,1 @@
+- fix(cli): `zever new` now derives the local-checkout replace block from the framework's own module graph, so a scaffolded project replaces every sibling module the graph reaches (`core/agent`, `core/authz`, `core/eval`, `core/job`, `core/middleware`, `core/rag` and the `dsl` compiler module were missing) and resolves them against the checkout instead of the module proxy.

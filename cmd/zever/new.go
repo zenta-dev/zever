@@ -25,7 +25,7 @@ Scaffolds a brand new, buildable zever application from scratch: a fresh
 go.mod, a starter schema/app.zen, cmd/server/main.go,
 internal/app/wiring.go and internal/service/hello, at exactly the default
 locations project.go's ProjectConfig assumes -- so every other zever
-subcommand (serve, dev, queue:work, db migrate/seed, tinker) works against
+subcommand (serve, dev, worker, db migrate/seed, tinker) works against
 the new project with no zever.yaml/.json needed.
 
 By default the new project depends on the published zever module
@@ -1488,10 +1488,11 @@ func adapterModulePath(s batterySelection) string {
 // adapters/<battery>/<adapter> module per selection (see adapterBinding),
 // all at cfg.FrameworkVersion, so `go mod tidy` resolves exactly the
 // chosen adapters (transitives need no pins). When FrameworkDir is set
-// (explicit --framework-path or auto-detected checkout) each require gets
+// (ZEVER_FRAMEWORK_PATH or an auto-detected checkout) each require gets
 // a local replace directive pointing into the checkout instead, plus
-// version-less replaces for every other adapter and core module so
-// module-graph commands (`go list -m all`) resolve offline without adding
+// version-less replaces for every other framework module the checkout's
+// module graph reaches, so module-graph commands (`go list -m all`) and a
+// later `zever add` resolve offline against the checkout without adding
 // requirements for adapters the project did not choose.
 func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 	var b strings.Builder
@@ -1534,9 +1535,15 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 	direct = append(direct, corePaths...)
 	direct = append(direct, adapterPaths...)
 
+	// Every directly required module is replaced on its own below, so it
+	// must not also show up in the module-graph replace block.
+	for _, path := range direct {
+		seen[path] = true
+	}
+
 	if cfg.FrameworkDir != "" {
-		_, _ = fmt.Fprintf(&b, "// Local zever checkout via replace directives (from --framework-path or\n"+
-			"// auto-detected framework checkout); remove to depend on the published\n// modules instead.\n")
+		_, _ = fmt.Fprintf(&b, "// Local zever checkout via replace directives (from ZEVER_FRAMEWORK_PATH\n"+
+			"// or an auto-detected framework checkout); remove to depend on the\n// published modules instead.\n")
 
 		for _, path := range direct {
 			rel, err := relativeTo(cfg.OutDir, filepath.Join(cfg.FrameworkDir, strings.TrimPrefix(path, frameworkModulePath+"/")))
@@ -1549,34 +1556,36 @@ func renderNewGoMod(tag string, cfg NewConfig) ([]byte, error) {
 
 		_, _ = fmt.Fprint(&b, "\n")
 
-		// Graph-only replaces for framework modules outside the selection:
-		// `go mod tidy` never needs them, but `go list -m` traverses the
-		// full module graph (container requires every core module for its
-		// wiring). Version-less replaces keep those commands offline
-		// without widening the project's requirements.
-		rest := make([]string, 0, len(nestedModuleDirs)+len(sharedModuleDirs)+1)
-		for _, dir := range nestedModuleDirs {
-			if path := frameworkModulePath + "/" + dir; !seen[path] {
+		// Graph-only replaces for the framework modules outside the
+		// selection: the project's module graph reaches every battery,
+		// adapter and shared helper (container requires them all for its
+		// wiring), and `zever add` may pull any of them in later.
+		// Version-less replaces keep those commands offline against the
+		// local checkout instead of the module proxy, without widening
+		// the project's requirements.
+		//
+		// The set is the checkout's own module graph (see
+		// frameworkRuntimeModules), not a list of module names: a module
+		// the framework adds later is covered as soon as the checkout
+		// ships it.
+		runtime, err := frameworkRuntimeModules(cfg.FrameworkDir, direct)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", tag, err)
+		}
+
+		rest := make([]string, 0, len(runtime))
+
+		for _, path := range runtime {
+			if !seen[path] {
 				rest = append(rest, path)
 			}
 		}
-
-		for _, dir := range sharedModuleDirs {
-			rest = append(rest, frameworkModulePath+"/"+dir)
-		}
-
-		for battery := range allServiceAdapters {
-			if path := coreModulePath(battery); !seen[path] {
-				rest = append(rest, path)
-			}
-		}
-
-		sort.Strings(rest)
 
 		if len(rest) > 0 {
 			_, _ = fmt.Fprintf(&b, "// Module-graph replaces for the remaining framework\n"+
-				"// modules (not required by this project; present so `go list -m`\n"+
-				"// and friends resolve offline against the local checkout).\n")
+				"// modules (not directly required by this project; present so\n"+
+				"// `go list -m` and friends resolve offline against the local\n"+
+				"// checkout instead of the module proxy).\n")
 		}
 
 		for _, path := range rest {

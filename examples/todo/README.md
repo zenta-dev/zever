@@ -5,7 +5,7 @@ Fully working todo/note CRUD app skeleton with server and tests.
 ## Prereqs
 
 - Go 1.27
-- JWT secret in the environment only (never in `zever.yaml`):
+- JWT secret in the environment only (never in a file):
   `export AUTH_JWT_SECRET='<at-least-32-bytes>'`
 - `zever doctor` reports auth FAIL until the secret is set; that is expected by default.
 
