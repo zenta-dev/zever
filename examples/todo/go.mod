@@ -116,6 +116,7 @@ replace github.com/zenta-dev/zever/adapters/payment/stub => ../../adapters/payme
 replace github.com/zenta-dev/zever/adapters/permission/noop => ../../adapters/permission/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
+
 replace github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
 
 replace github.com/zenta-dev/zever/adapters/ratelimit/memory => ../../adapters/ratelimit/memory

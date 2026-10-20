@@ -54,7 +54,7 @@ Output: `popped and acked <id>`. `Ack` on success; on failure call `Nack(ctx, ms
 | `redis` | `adapters/queue/redis` | More than one worker process, or split web and worker tiers. Keyed by `prefix`. |
 | `db` | `adapters/queue/db` | Shared queue without Redis, on a postgres or sqlite table you already run. |
 
-Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `Pop` polls every `poll_interval` (10ms by default, adapter-code only, not a file key), claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic; use a separate queue database, 3 to 5 connections per worker, and `dedicated_pool: true` under load. The queue is not an event log or pub/sub bus (per-topic pop with ack, no broadcast replay); for live fan-out use the [event bus](../events/).
+Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `Pop` polls every `poll_interval` (10ms by default, adapter-code only, not an env key), claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic; use a separate queue database, 3 to 5 connections per worker, and `dedicated_pool: true` under load. The queue is not an event log or pub/sub bus (per-topic pop with ack, no broadcast replay); for live fan-out use the [event bus](../events/).
 
 ## Share a queue across instances
 
@@ -80,7 +80,7 @@ QUEUE_TABLE=queue_messages
 QUEUE_ADAPTER=redis QUEUE_ADDR=localhost:6379 QUEUE_VISIBILITY_TIMEOUT=30s
 ```
 
-File keys are strict snake_case with integer-nanosecond durations; env accepts `"30s"`. An empty `dsn` selects a private in-memory-style database. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. The container shares one pool per exact DSN across db-backed batteries (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
+Env keys are strict snake_case and durations take Go strings (`"30s"`). An empty `dsn` selects a private in-memory-style database. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. The container shares one pool per exact DSN across db-backed batteries (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
 
 ## Resolve the queue from the container
 

@@ -1,0 +1,13 @@
+package pkg
+
+// wireStruct is a golden wire struct with proper tags.
+type wire struct {
+	Name string `json:"name"`
+	Kind int    `json:"kind,omitempty"`
+}
+
+// apiOnly is a Go-API-only struct; untagged fields are legal here.
+type apiOnly struct {
+	Name string
+	size int
+}

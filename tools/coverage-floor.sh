@@ -84,7 +84,8 @@ SCOPED=(
   "core/password/"
   "core/authz/"
   "core/payment/"
-  "adapters/payment/stub/"
+  "adapters/payment/stripe/"
+  "adapters/payment/paddle/"
 )
 
 shopt -s nullglob

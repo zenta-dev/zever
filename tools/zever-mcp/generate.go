@@ -18,10 +18,10 @@ var generateSubcommands = map[string]bool{
 // dry-run plan; with confirm it asks the human first via elicitation and
 // only applies on accept.
 type generateInput struct {
-	Dir        string   ``
-	Subcommand string   ``
-	Args       []string ``
-	Confirm    bool     ``
+	Dir        string   `json:"dir"`
+	Subcommand string   `json:"subcommand"`
+	Args       []string `json:"args"`
+	Confirm    bool     `json:"confirm"`
 }
 
 // generateTool scaffolds through the installed CLI. Planning is always safe

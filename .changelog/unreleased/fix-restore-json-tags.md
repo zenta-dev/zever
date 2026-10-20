@@ -1,0 +1,2 @@
+- fix(config): restore the JSON struct tags dropped by the v0.8.0 env-only migration; wire keys in `adapters/ai/ollama`, `adapters/auth/oidc`, `config`, `core/*` and `tools/zever-mcp` keep their pre-migration spellings again.
+- ci: add `make check-tags`, an AST guard that fails on empty struct tags, on `yaml:`/`toml:` tags, and on JSON wire structs whose exported fields lack a `json` tag.

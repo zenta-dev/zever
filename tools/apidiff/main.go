@@ -4,8 +4,10 @@
 // For every module in the Core tier it exports the package API at the
 // module's latest <dir>/vX.Y.Z tag (via git archive) and at the working
 // tree, compares the two with golang.org/x/exp/apidiff, and fails when an
-// incompatible change is not documented by a **Breaking:** line under
-// ## [Unreleased] in CHANGELOG.md.
+// incompatible change is not documented by a **Breaking:** line under the
+// pending-release section of CHANGELOG.md: ## [Unreleased], or the top
+// released section while its version tag does not exist yet (a cut but
+// untagged release).
 //
 // Usage: apidiff [--root DIR] [--modules a,b,c] [--changelog FILE]
 // apidiff --check-patch [--changelog FILE] [--floor vX.Y.Z] fails when a

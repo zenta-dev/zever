@@ -9,7 +9,7 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 ## Wire CORS first
 
-Zever owns no `cors` config section. Decode your app's block into `middleware.Options` (snake_case tags) and wire it outermost with `r.Use` before any `Handle`:
+Zever owns no `cors` config section. Decode your app's own block into `middleware.Options` (snake_case `json` tags) and wire it outermost with `r.Use` before any `Handle`:
 
 ```yaml
 cors:

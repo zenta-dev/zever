@@ -5,7 +5,7 @@ description: "Find any Zever package fast: core interfaces, adapter modules, sha
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever is a Go multi-module monorepo (`go 1.27.0`). Your application imports `core` interfaces, the adapter modules you choose, and `container/`. It never imports `dsl/`.
+Zever is a Go multi-module monorepo (`go 1.27.2`). Your application imports `core` interfaces, the adapter modules you choose, and `container/`. It never imports `dsl/`.
 
 ## The four roles
 
@@ -18,16 +18,16 @@ language          dsl/                  .zen compiler frontend (compile time onl
 surface           orm/ cmd/zever/       typed queries, CLI
 ```
 
-- `go.work` at the repo root resolves every workspace module locally (176 `use` entries; `examples/external-sms` and `docs/examples` stay outside by design), so `go build/test ./...` from the root works. CI runs per-module commands with `GOWORK=off`.
+- `go.work` at the repo root resolves every workspace module locally (181 `use` entries; `examples/external-sms` and `docs/examples` stay outside by design), so `go build/test ./...` from the root works. CI runs per-module commands with `GOWORK=off`.
 - Releases are lockstep: one version, with per-module tags `<path>/vX.Y.Z` made by `tools/tag-release.sh`.
-- `config/` owns decoding (`defaults < file < env`, strict snake_case keys, `RedactedServices`); `container/` owns construction, caching, retry, and close. Load errors belong to `config/`, resolution errors to `container/`.
+- `config/` owns env resolution (`defaults < .env < .env.local < process env`, strict keys under a wired service prefix, `RedactedServices`); `container/` owns construction, caching, retry, and close. Load errors belong to `config/`, resolution errors to `container/`.
 
 
 ## Package map
 
 | Path | Role | Runtime? |
 |---|---|---|
-| `config/` | `Default()` zero-infra, strict `Load(path)`, best-effort env, `RedactedServices` | yes |
+| `config/` | `Default()` zero-infra, `FromEnv()` + `Resolve(env)`, strict keys under a wired service prefix, `RedactedServices` | yes |
 | `container/` | `New(cfg)` (nil valid), lazy accessors, retry on error, `Close(ctx)` in dependency order | yes |
 | `core/<b>` | Battery interface plus `Register`/`Open` registry (for example `core/cache`, `core/db`) | yes (interfaces) |
 | `adapters/<b>/<a>` | One module per adapter (for example `adapters/cache/redis`) | yes (picked ones) |
@@ -83,7 +83,7 @@ The dialect comes per call from `conn.Dialect()`, so the same query code prints 
 - Exported identifiers need a doc comment starting with the name. `goimports` local prefix is `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
 - Do not add methods to a public service interface: it breaks every implementer. Add a new interface instead.
 - New service shape: interface plus `Register`/`Open` registry in `core/<b>`, one module per adapter in `adapters/<b>/<a>` with a `Register()` call, shared SDK-free code in `shared/*`, and a `README.md` with an adapter table.
-- Timeouts and intervals are `time.Duration` (cookie `MaxAge` int seconds excepted); pool options use the `MaxConn*` prefix order. File-decoded Options need snake_case `json`/`toml`/`yaml` tags.
+- Timeouts and intervals are `time.Duration` (cookie `MaxAge` int seconds excepted); pool options use the `MaxConn*` prefix order. Options that are JSON-serialized (wire types, and the option maps `config` redacts) need snake_case `json` tags.
 - Tests stay deterministic: no `time.Sleep` sync, no network, no unseeded randomness. File suffixes (`cover`, `live`, `bench`, `internal`, `race`, `closure`) encode purpose; helpers use `stub*`, `must*`, `freshAdapter`.
 - Shutdown is a deploy contract: one container per process, closed in dependency order with a timeout parent (see [Lifecycle](../../concepts/lifecycle/)).
 

@@ -106,14 +106,25 @@ func TestRunDBInteractiveFlag(t *testing.T) {
 	}
 }
 
-// TestRunDBSuggestsClosest pins the did-you-mean hint on typos.
+// TestRunDBSuggestsClosest pins the did-you-mean hint on typos. The hint
+// rides in the returned error (main prints it to stderr), so the error
+// comes first and the usage block no longer precedes it.
 func TestRunDBSuggestsClosest(t *testing.T) {
-	output := captureZeverStderr(t, func() {
-		_ = runDB([]string{"migrat"})
-	})
+	var err error
 
-	if !strings.Contains(output, `"migrate"`) {
-		t.Fatalf("expected a did-you-mean hint, got:\n%s", output)
+	output := captureZeverStderr(t, func() {
+		err = runDB([]string{"migrat"})
+	})
+	if err == nil {
+		t.Fatal("runDB(migrat): got nil error")
+	}
+
+	if !strings.Contains(err.Error(), `"migrate"`) {
+		t.Fatalf("expected a did-you-mean hint, got:\n%s", err.Error())
+	}
+
+	if strings.Contains(output, "Usage:") {
+		t.Fatalf("stderr carries a usage dump before the error:\n%s", output)
 	}
 }
 

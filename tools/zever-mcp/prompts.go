@@ -23,8 +23,8 @@ type promptDef struct {
 
 // promptMessage is one rendered prompt message.
 type promptMessage struct {
-	Role    string ``
-	Content any    ``
+	Role    string `json:"role"`
+	Content any    `json:"content"`
 }
 
 // prompts lists every prompt template in stable order.
@@ -125,8 +125,8 @@ func promptList() []map[string]any {
 
 // promptGetParams is the prompts/get request payload.
 type promptGetParams struct {
-	Name      string            ``
-	Arguments map[string]string ``
+	Name      string            `json:"name"`
+	Arguments map[string]string `json:"arguments"`
 }
 
 // getPrompt renders one prompt template.

@@ -46,7 +46,7 @@ RATELIMIT_ADAPTER=redis
 RATELIMIT_RATE=100
 RATELIMIT_BURST=200
 RATELIMIT_REDIS_ADDR=127.0.0.1:6379
-RATELIMIT_REDIS_PREFIX=rl:
+RATELIMIT_REDIS_PREFIX=rl
 ```
 
 ```sh
@@ -55,7 +55,7 @@ RATELIMIT_RATE=100
 RATELIMIT_BURST=200
 ```
 
-Use a distinct `redis.prefix` per environment. File durations are integer nanoseconds (`idle_ttl` default 10m, `sweep_interval` 1m); env accepts `"5s"`. `Validate` rejects non-positive `rate`/`burst`, negative `idle_ttl`/`sweep_interval`, and bad Redis `addr`/`prefix`. Adapters: `ratelimit/memory` (default) and `ratelimit/redis`. Keys: [reference](../../../reference/config/#ratelimit).
+Use a distinct `redis.prefix` per environment. Durations take Go strings (`idle_ttl` default 10m, `sweep_interval` 1m), for example `"5s"`. `Validate` rejects non-positive `rate`/`burst`, negative `idle_ttl`/`sweep_interval`, and bad Redis `addr`/`prefix`. Adapters: `ratelimit/memory` (default) and `ratelimit/redis`. Keys: [reference](../../../reference/config/#ratelimit).
 
 ## Production checklist
 

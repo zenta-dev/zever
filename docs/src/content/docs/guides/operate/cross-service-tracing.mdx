@@ -183,17 +183,15 @@ fall back to `Start`, so instrumentation never breaks an adapter.
 Propagation only matters once spans actually leave the process. In
 production:
 
-```yaml
-observability:
-  adapter: otlp
-  options:
-    service_name: bookings      # keys every dashboard and alert
-    endpoint: collector:4317    # host:port, no scheme or path
-    sample_ratio: 0.1
+```sh
+OBSERVABILITY_ADAPTER=otlp
+OBSERVABILITY_SERVICE_NAME=bookings      # keys every dashboard and alert
+OBSERVABILITY_ENDPOINT=collector:4317    # host:port, no scheme or path
+OBSERVABILITY_SAMPLE_RATIO=0.1
 ```
 
-Give each service a distinct `service_name`: that is how the collector
-draws the boundaries between spans in one trace. Keep `service_name`
+Give each service a distinct `OBSERVABILITY_SERVICE_NAME`: that is how the collector
+draws the boundaries between spans in one trace. Keep `OBSERVABILITY_SERVICE_NAME`
 stable across deploys; renaming it splits a service's history in two.
 
 Verify propagation end to end, in this order:

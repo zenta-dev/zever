@@ -68,7 +68,7 @@ WORKFLOW_HOSTPORT=127.0.0.1:7233
 WORKFLOW_DSN=postgres://app:secret@db:5432/app
 ```
 
-`namespace` scopes runs; `host_port` names a workflow server address when the backend needs one. Durable keys are `dsn`, `table` (default `workflow_runs`), and `dedicated_pool`. All are optional for `memory`. `Validate` only rejects a malformed `host_port` (it must split as host:port when set); everything else passes to the adapter. A durable workflow shares the container pool for its DSN with every other battery on that DSN (first opener's `max_conns` wins); set `dedicated_pool: true` with a separate workflow database under load. All keys: [workflow config reference](../../../reference/config/#workflow).
+`namespace` scopes runs; `host_port` names a workflow server address when the backend needs one. Durable keys are `dsn`, `table` (default `workflow_runs`), and `dedicated_pool`. All are optional for `memory`. `Validate` only rejects a malformed `host_port` (it must split as host:port when set); everything else passes to the adapter. A durable workflow shares the container pool for its DSN with every other battery on that DSN (first opener's `max_conns` wins); set `WORKFLOW_DEDICATED_POOL=true` with a separate workflow database under load. All keys: [workflow config reference](../../../reference/config/#workflow).
 
 ## Production checklist
 
