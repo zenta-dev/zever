@@ -335,7 +335,14 @@ func (r *rowsAdapter) Columns() ([]string, error) {
 // on a battery to restore a private pool.
 func New(opts db.Options) (db.DB, error) {
 	if strings.TrimSpace(opts.DSN) == "" {
-		return nil, fmt.Errorf("postgres: option %q is required", "dsn")
+		// The remedy is the service's own env key: the config layer names a
+		// service option <SERVICE>_<FIELD> (the db service's default
+		// instance is DB_DSN). The example shows the DSN shape so the
+		// developer does not have to look one up.
+		return nil, fmt.Errorf(
+			"postgres: option %q is required: set <SERVICE>_DSN to a postgres:// URL (for the db service: DB_DSN=postgres://user:pass@host:5432/db?sslmode=disable)",
+			"dsn",
+		)
 	}
 
 	config, err := pgxpool.ParseConfig(opts.DSN)
