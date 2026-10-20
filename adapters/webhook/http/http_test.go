@@ -338,7 +338,7 @@ func TestDeliver_exhausted(t *testing.T) {
 	}
 
 	// Shrink backoff sleeps by... backoff fixed ~500ms; use maxRetries 1? No,
-	// spec demands "delivery failed after 3 attempts". Keep 3; test takes ~1s.
+	// spec demands "failed after 3 attempts". Keep 3; test takes ~1s.
 	ctx := t.Context()
 
 	if regErr := w.Register(ctx, "e", srv.URL, "s"); regErr != nil {
@@ -350,8 +350,8 @@ func TestDeliver_exhausted(t *testing.T) {
 		t.Fatal("Deliver expected error, got nil")
 	}
 
-	if !strings.Contains(err.Error(), "delivery failed after 3 attempts") {
-		t.Errorf("Deliver err = %q, want substring %q", err, "delivery failed after 3 attempts")
+	if !strings.Contains(err.Error(), "failed after 3 attempts") {
+		t.Errorf("Deliver err = %q, want substring %q", err, "failed after 3 attempts")
 	}
 }
 

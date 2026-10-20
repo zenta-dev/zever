@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -76,7 +77,7 @@ func (a *adapter) Register(_ context.Context, event string, target string, secre
 	}
 
 	if err != nil {
-		return fmt.Errorf("http: reject target %q: %w", target, err)
+		return fmt.Errorf("http: reject target %q: %w", redactTarget(target), err)
 	}
 
 	a.mu.Lock()
@@ -132,7 +133,7 @@ func (a *adapter) Deliver(ctx context.Context, event string, payload []byte) err
 	var errs []error
 
 	for _, r := range copyRegs {
-		if err := a.deliverOne(ctx, r, payload); err != nil {
+		if err := a.deliverOne(ctx, event, r, payload); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -140,7 +141,7 @@ func (a *adapter) Deliver(ctx context.Context, event string, payload []byte) err
 	return errors.Join(errs...)
 }
 
-func (a *adapter) deliverOne(ctx context.Context, r registration, payload []byte) error {
+func (a *adapter) deliverOne(ctx context.Context, event string, r registration, payload []byte) error {
 	if err := a.validateIfNeeded(ctx, r.target); err != nil {
 		return err
 	}
@@ -162,7 +163,14 @@ func (a *adapter) deliverOne(ctx context.Context, r registration, payload []byte
 		}
 	}
 
-	return fmt.Errorf("http: delivery failed after %d attempts: %w", a.maxRetries, errors.Join(lastErr, ErrDeliveryFailed))
+	// Name the event and the target: one event can be registered against
+	// several targets, and a bare attempt count says which neither.
+	return &deliveryError{
+		Event:    event,
+		Target:   r.target,
+		Attempts: a.maxRetries,
+		Err:      lastErr,
+	}
 }
 
 func (a *adapter) validateIfNeeded(ctx context.Context, target string) error {
@@ -171,7 +179,7 @@ func (a *adapter) validateIfNeeded(ctx context.Context, target string) error {
 	}
 
 	if err := webhook.ValidateTargetContext(ctx, target); err != nil {
-		return fmt.Errorf("http: blocked private target %q: %w", target, err)
+		return fmt.Errorf("http: blocked private target %q: %w", redactTarget(target), err)
 	}
 
 	return nil
@@ -199,10 +207,10 @@ func (a *adapter) singleAttempt(ctx context.Context, r registration, payload []b
 	body := a.drainForError(resp)
 
 	if len(body) == 0 {
-		return fmt.Errorf("http: target returned status %d: %w", resp.StatusCode, ErrUnexpectedStatus)
+		return fmt.Errorf("http: target %q returned status %d: %w", redactTarget(r.target), resp.StatusCode, ErrUnexpectedStatus)
 	}
 
-	return fmt.Errorf("http: target returned status %d: %s: %w", resp.StatusCode, body, ErrUnexpectedStatus)
+	return fmt.Errorf("http: target %q returned status %d: %s: %w", redactTarget(r.target), resp.StatusCode, body, ErrUnexpectedStatus)
 }
 
 func (a *adapter) buildRequest(
@@ -212,7 +220,7 @@ func (a *adapter) buildRequest(
 ) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.target, bytes.NewReader(payload))
 	if err != nil {
-		return nil, fmt.Errorf("http: create request: %w", err)
+		return nil, fmt.Errorf("http: create request for %q: %w", redactTarget(r.target), err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -300,6 +308,21 @@ func signAt(secret string, payload []byte, ts int64) string {
 	mac.Write(payload)
 
 	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
+}
+
+// redactTarget masks any userinfo credentials in a webhook target URL so an
+// error message can name the target without echoing a secret. The scheme,
+// host, path, and query stay visible: they identify which registration
+// failed, and the signing secret is never part of the target.
+func redactTarget(target string) string {
+	u, err := url.Parse(target)
+	if err != nil || u.User == nil {
+		return target
+	}
+
+	u.User = url.UserPassword(u.User.Username(), "xxxxx")
+
+	return u.String()
 }
 
 func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
