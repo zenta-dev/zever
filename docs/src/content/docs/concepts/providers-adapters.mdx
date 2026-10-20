@@ -14,7 +14,7 @@ Every backend concern is one small interface with several adapters, resolved onl
 | Interface | Stays small. Never add methods (it breaks implementers); add a new interface instead. |
 | Adapter | Self-registers; one subdirectory per backend. |
 | Container | Sole resolver; owns construction, caching, retry, and close. |
-| Config | Selects the adapter (`DB__PRIMARY__ADAPTER=postgres`) plus options. |
+| Config | Selects the adapter (`DB_ADAPTER=postgres`) plus options. |
 
 Application code speaks the interface; the container speaks the registry:
 
@@ -44,21 +44,21 @@ func Register() { _ = db.Register(db.SQLite, New) }
 Development uses zero infrastructure; production changes names only:
 
 ```sh
-DB__PRIMARY__ADAPTER=sqlite
-DB__PRIMARY__PATH=data/app.db
-CACHE__DEFAULT__ADAPTER=memory
-QUEUE__DEFAULT__ADAPTER=memory
+DB_ADAPTER=sqlite
+DB_PATH=data/app.db
+CACHE_ADAPTER=memory
+QUEUE_ADAPTER=memory
 ```
 
 ```sh
-DB__PRIMARY__ADAPTER=postgres
-DB__PRIMARY__DSN=postgres://app:secret@db:5432/app
-DB__PRIMARY__MAX_CONNS=20
-CACHE__DEFAULT__ADAPTER=redis
-CACHE__DEFAULT__ADDR=redis:6379
+DB_ADAPTER=postgres
+DB_DSN=postgres://app:secret@db:5432/app
+DB_MAX_CONNS=20
+CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
 ```
 
-Env equivalents use `<SERVICE>__<NAME>__<FIELD>` with no prefix: `DB__PRIMARY__ADAPTER=postgres`, `DB__PRIMARY__MAXCONNS=20`, `CACHE__DEFAULT__ADAPTER=redis`. Handlers keep calling `c.DB()` and `c.Cache()`; register the adapter module for the name you choose. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
+Env equivalents carry no prefix: the default instance reads `<SERVICE>_<FIELD>` (`DB_ADAPTER=postgres`, `CACHE_ADAPTER=redis`), and a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAXCONNS=20`) but only reaches the container through a matching named Ref such as `db.Ref("primary")`. Handlers keep calling `c.DB()` and `c.Cache()`; register the adapter module for the name you choose. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
 
 Most swaps are invisible to handlers: placeholders stay `?` on both `db` drivers (postgres rewrites to `$n` before pgx) and route params read through `router.Param`. Where backends differ, the adapter fails fast or documents the gap. Two known gaps:
 
@@ -104,7 +104,7 @@ Unexported adapter structs are named `driver` with receiver `d`; timeouts are `t
 <details>
 <summary>The swap changes nothing at runtime</summary>
 
-Cause: an env override (`CACHE__DEFAULT__ADAPTER`) beats the file. Fix: unset or correct the env variable.
+Cause: an env override (`CACHE_ADAPTER`) beats the default. Fix: unset or correct the env variable.
 </details>
 
 <details>
