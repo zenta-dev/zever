@@ -817,6 +817,35 @@ jobs:
       - name: Tested doc samples (docs/examples, outside go.work)
         run: GOWORK=off go -C docs/examples test -count=1 ./...
 
+  # Docs facts gate: the published pages must agree with the Go source
+  # (env keys and their instance namespace, adapter names, container
+  # accessors, CLI commands/flags, import paths). The audit reads the Go
+  # source as its only truth, so it runs on every PR: a code change that
+  # invalidates a page fails here even when no page was touched.
+  # Local mirror: `make docs-audit`.
+  docs-audit:
+    name: docs-audit
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - name: Install docs dependencies
+        run: npm ci
+        working-directory: docs
+      - name: Audit docs claims against the code
+        run: npm run audit
+        working-directory: docs
+      - name: Prove the docs audit rejects the mistakes it guards against
+        run: npm run audit:self-test
+        working-directory: docs
+
   # Compile-fail gate (stream G): every misuse fixture under
   # container/testdata/compilefail/* is an own tiny module (excluded from
   # go.work, ignored via testdata) that MUST fail `go build`, proving
@@ -888,7 +917,7 @@ jobs:
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-24.04
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, changelog]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, docs-audit, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, changelog]
     steps:
       - name: Aggregate results
         run: |

@@ -1,9 +1,16 @@
 // Verifies every internal link and asset reference in dist/ resolves to a built file.
-// Usage: node scripts/check-links.mjs [distDir]  (exit 1 on broken links)
+// Usage: node docs/scripts/check-links.mjs [distDir]  (exit 1 on broken links)
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const dist = path.resolve(process.argv[2] ?? 'dist');
+// The script resolves its own paths, so it runs from the repo root
+// (node docs/scripts/check-links.mjs) and from docs/ alike. An explicit
+// distDir argument wins; a relative one is taken from the docs directory.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const docs = path.resolve(here, '..');
+const arg = process.argv[2];
+const dist = arg ? (path.isAbsolute(arg) ? arg : path.resolve(docs, arg)) : path.join(docs, 'dist');
 const BASE = '/zever/';
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
 const htmlFiles = walk(dist).filter((f) => f.endsWith('.html'));

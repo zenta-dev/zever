@@ -2,8 +2,12 @@
 // Usage: node scripts/go-truth.mjs > truth.json   (imported by audit-facts.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repo = path.resolve('..');
+// The script resolves its own paths, so it runs from the repo root
+// (node docs/scripts/go-truth.mjs) and from docs/ alike.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(here, '..', '..');
 const read = (p) => fs.readFileSync(p, 'utf8');
 
 // camelToSnake mirrors config.camelToSnake (config/env.go): the runtime
@@ -35,7 +39,7 @@ export function goTruth() {
   // The Plugins field is a map, so it does not match this shape.
   for (const m of cfg.matchAll(/^\t(\w+)\s+Service\[(\w+)\.Options\]\s*(?:`([^`]*)`)?/gm)) {
     const tagged = m[3] && /json:"([a-z0-9_]+)/.exec(m[3]);
-    services[tagged ? tagged[1] : m[1].toLowerCase()] = { pkg: m[2], keys: new Set() };
+    services[tagged ? tagged[1] : m[1].toLowerCase()] = { pkg: m[2], keys: new Set(), adapters: new Set() };
   }
   const structs = (pkg) => {
     const dir = path.join(repo, 'core', pkg);
@@ -81,9 +85,26 @@ export function goTruth() {
     };
     scan(base);
   }
+  // Adapter names: the canonical consts in core/<svc>/adapter.go plus the
+  // per-adapter consts in adapters/<svc>/<adapter>/register.go (an adapter
+  // that ships its own name, such as the postgres scheduler, declares no
+  // const in core).
+  for (const [svc, v] of Object.entries(services)) {
+    const core = path.join(repo, 'core', v.pkg, 'adapter.go');
+    if (fs.existsSync(core))
+      for (const m of read(core).matchAll(/^\s*\w+\s+Adapter\s*=\s*"([^"]+)"/gm)) v.adapters.add(m[1]);
+    const base = path.join(repo, 'adapters', v.pkg);
+    if (!fs.existsSync(base)) continue;
+    for (const e of fs.readdirSync(base, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      const f = path.join(base, e.name, 'register.go');
+      if (!fs.existsSync(f)) continue;
+      for (const m of read(f).matchAll(/const\s+Adapter\s+\w+\.Adapter\s*=\s*"([^"]+)"/g)) v.adapters.add(m[1]);
+    }
+  }
   return services;
 }
-if (process.argv[1].endsWith('go-truth.mjs')) {
+if (process.argv[1] && process.argv[1].endsWith('go-truth.mjs')) {
   const t = goTruth();
-  console.log(JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, { pkg: v.pkg, keys: [...v.keys] }])), null, 1));
+  console.log(JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, { pkg: v.pkg, keys: [...v.keys], adapters: [...v.adapters] }])), null, 1));
 }

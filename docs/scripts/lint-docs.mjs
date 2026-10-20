@@ -1,10 +1,14 @@
-// Docs style lint. Usage: node scripts/lint-docs.mjs [--words]
+// Docs style lint. Usage: node docs/scripts/lint-docs.mjs [--words]
 // Errors (exit 1): em/en dashes in prose, lowercase "zever" in prose, missing/long description, > 2 Asides.
 // Warnings: headings that look title-cased.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve('src/content/docs');
+// The script resolves its own paths, so it runs from the repo root
+// (node docs/scripts/lint-docs.mjs) and from docs/ alike.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(here, '..', 'src', 'content', 'docs');
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
 const files = walk(root).filter((f) => /\.mdx?$/.test(f));
 let errors = 0, warns = 0, words = 0;
