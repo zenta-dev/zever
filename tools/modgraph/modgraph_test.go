@@ -226,7 +226,8 @@ func TestNestedModuleSubtreeSkipped(t *testing.T) {
 // repo modules: a worktree is a full checkout of the repo, so its modules
 // duplicate the repo's own and made the module graph see a module that does
 // not exist in the tagged tree (tag path rule) and made the pin gate read a
-// worktree's go.mod.
+// worktree's go.mod. The exclusion applies at any depth: a worktree nested
+// under a module dir is a checkout too.
 func TestFindModulesSkipsWorktreeAndHarnessDirs(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "libs", "leaf", "go.mod"),
@@ -240,6 +241,11 @@ func TestFindModulesSkipsWorktreeAndHarnessDirs(t *testing.T) {
 		"module github.com/zenta-dev/zever/harness\n\ngo 1.27.0\n")
 	mustWriteFile(t, filepath.Join(root, "docs", "node_modules", "pkg", "go.mod"),
 		"module github.com/zenta-dev/zever/vendored\n\ngo 1.27.0\n")
+	// A worktree nested under a module dir: same checkout, deeper path.
+	mustWriteFile(t, filepath.Join(root, "libs", "leaf", ".worktrees", "wt", "nested", "go.mod"),
+		"module github.com/zenta-dev/zever/libs/leaf/nested\n\ngo 1.27.0\n")
+	mustWriteFile(t, filepath.Join(root, "tools", ".claude", "worktrees", "wt", "go.mod"),
+		"module github.com/zenta-dev/zever/tools/nestedharness\n\ngo 1.27.0\n")
 
 	mods, err := findModules(t.Context(), root)
 	if err != nil {
@@ -252,8 +258,9 @@ func TestFindModulesSkipsWorktreeAndHarnessDirs(t *testing.T) {
 }
 
 // TestSkipModuleDir pins the exclusion set shared with tools/tag-release.sh:
-// the git metadata dir, nested worktrees and the harness checkout dir at the
-// repo root, plus any node_modules copy. A real module dir is never skipped.
+// the git metadata dir, nested worktrees and the harness checkout dir, plus
+// any node_modules copy. The excluded names match at any depth. A real
+// module dir is never skipped.
 func TestSkipModuleDir(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -267,9 +274,14 @@ func TestSkipModuleDir(t *testing.T) {
 		{"harness", ".claude", true},
 		{"node_modules at root", "node_modules", true},
 		{"node_modules nested", "docs/node_modules", true},
+		{"nested worktree", "tools/.worktrees/wt/realmod", true},
+		{"nested worktree under a module", "libs/leaf/.worktrees/wt", true},
+		{"nested harness checkout", "tools/.claude/worktrees/wt", true},
+		{"nested git dir", "libs/leaf/.git", true},
 		{"module dir", "libs/leaf", false},
 		{"testdata module dir", "container/testdata/compilefail/sealed", false},
 		{"github dir", ".github", false},
+		{"hidden module dir", "libs/.hidden", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
