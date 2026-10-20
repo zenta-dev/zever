@@ -96,7 +96,9 @@ func TestStallReadinessIsOptIn(t *testing.T) {
 		t.Fatal("Options has no StallReadiness field")
 	}
 
-	for _, tag := range []string{"json", "toml", "yaml"} {
+	// v0.8.0 config is env-only: commit 64426337 removed the toml/yaml tags
+	// repo-wide, so only the json key is pinned here.
+	for _, tag := range []string{"json"} {
 		if want := "stall_readiness"; field.Tag.Get(tag) != want {
 			t.Errorf("StallReadiness %s tag = %q, want %q", tag, field.Tag.Get(tag), want)
 		}
