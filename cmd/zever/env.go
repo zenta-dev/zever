@@ -47,6 +47,18 @@ func resolveServiceConfig(configPath string) (*config.Config, error) {
 	return config.Resolve(env)
 }
 
+// wrapEnvConfigError wraps a config resolution failure with the exact-key
+// hint when the failure names an unknown env field, so every command that
+// resolves service config from the environment points at the offending key
+// the same way (see envTypoHint).
+func wrapEnvConfigError(tag string, env config.Env, err error) error {
+	if hint := envTypoHint(env, err); hint != "" {
+		return fmt.Errorf("%s: %w\n%s", tag, err, hint)
+	}
+
+	return fmt.Errorf("%s: %w", tag, err)
+}
+
 // processKeySet snapshots the process environment's uppercased keys so
 // explicit dotenv files never override a real process variable.
 func processKeySet() map[string]bool {

@@ -123,11 +123,7 @@ func runConfigShowWith(cfg ConfigConfig) error {
 
 	resolved, err := config.Resolve(env)
 	if err != nil {
-		if hint := envTypoHint(env, err); hint != "" {
-			return fmt.Errorf("zever config show: resolve config from env: %w\n%s", err, hint)
-		}
-
-		return fmt.Errorf("zever config show: resolve config from env: %w", err)
+		return wrapEnvConfigError("zever config show: resolve config from env", env, err)
 	}
 
 	services := resolved.RedactedServices()
@@ -276,7 +272,10 @@ func optionsToMap(opts any) map[string]any {
 // envTypoHint turns an UnknownFieldError from Resolve into an exact-key
 // hint: it locates the offending env variable (SERVICE_FIELD or
 // SERVICE__NAME__FIELD, matched case-insensitively) and names it alongside
-// the corrected key, so the operator knows exactly what to rename.
+// the corrected key, so the operator knows exactly what to rename. When no
+// key is close enough to suggest, it names the service's real keys instead,
+// so a stray variable (DB_HOST from a shell, say) reads as "unset it, or
+// pick one of these" rather than a dead end.
 // It returns "" when err is not an unknown-field failure or no set key
 // matches, leaving the wrapped error to speak for itself.
 func envTypoHint(env config.Env, err error) string {
@@ -295,20 +294,81 @@ func envTypoHint(env config.Env, err error) string {
 		}
 
 		rest := upper[len(head):]
-		if rest == field || strings.HasSuffix(rest, "__"+field) {
-			if unknown.Suggestion != "" {
-				want := strings.ToUpper(unknown.Service) + "_" + strings.ToUpper(unknown.Suggestion)
-				if strings.Contains(rest, "__") {
-					inst, _, _ := strings.Cut(rest, "__")
-					want = strings.ToUpper(unknown.Service) + "__" + inst + "__" + strings.ToUpper(unknown.Suggestion)
-				}
+		instance, name := splitEnvInstance(rest)
+		if name != field {
+			continue
+		}
 
-				return formatHint(fmt.Sprintf("check env key %q (did you mean %q?)", k, want))
+		if s := envFieldSuggestion(unknown.Service, field, unknown.Suggestion); s != "" {
+			want := strings.ToUpper(unknown.Service) + "_" + strings.ToUpper(s)
+			if instance != "" {
+				want = strings.ToUpper(unknown.Service) + "__" + instance + "__" + strings.ToUpper(s)
 			}
 
-			return formatHint(fmt.Sprintf("check env key %q", k))
+			return formatHint(fmt.Sprintf("check env key %q (did you mean %q?)", k, want))
 		}
+
+		choices := envKeyChoices(unknown.Service, instance)
+		if len(choices) == 0 {
+			return formatHint(fmt.Sprintf("%q is not a %s option — unset it", k, unknown.Service))
+		}
+
+		return formatHint(fmt.Sprintf("%q is not a %s option — unset it, or use one of: %s",
+			k, unknown.Service, strings.Join(choices, ", ")))
 	}
 
 	return ""
+}
+
+// envFieldSuggestion returns the field name to suggest for an unknown env
+// field: the config layer's own suggestion first, then the closest field
+// the service really accepts. The fallback covers the ADAPTER selector,
+// which the config layer cannot suggest (it resolves adapter selection
+// before the overlay sees the key).
+func envFieldSuggestion(service, field, configSuggestion string) string {
+	if configSuggestion != "" {
+		return configSuggestion
+	}
+
+	return closest(field, serviceEnvFields(service))
+}
+
+// splitEnvInstance splits an env key remainder into its named-instance part
+// and its field name: "REPORTING_HOST" (after the service prefix) yields
+// ("REPORTING", "HOST"), while the default instance's "HOST" yields
+// ("", "HOST").
+func splitEnvInstance(rest string) (instance, name string) {
+	trimmed := strings.TrimPrefix(rest, "_")
+	if trimmed == rest {
+		return "", rest
+	}
+
+	i := strings.LastIndex(trimmed, "_")
+	if i < 0 {
+		return "", rest
+	}
+
+	return trimmed[:i], trimmed[i+1:]
+}
+
+// maxEnvKeyChoices caps how many service keys a hint lists, so the line
+// stays readable in a terminal.
+const maxEnvKeyChoices = 8
+
+// envKeyChoices lists the env keys a service accepts, for the hint that
+// names them when a stray variable matches no option: the default
+// instance's keys, or the named instance's when the stray variable used
+// one.
+func envKeyChoices(service, instance string) []string {
+	prefix := strings.ToUpper(service)
+	if instance != "" {
+		prefix += "__" + instance
+	}
+
+	out := serviceEnvKeys(prefix, service)
+	if len(out) > maxEnvKeyChoices {
+		out = append(out[:maxEnvKeyChoices:maxEnvKeyChoices], "…")
+	}
+
+	return out
 }

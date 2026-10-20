@@ -327,7 +327,7 @@ func runExplainWiringWith(cfg ExplainWiringConfig) error {
 
 	resolved, err := config.Resolve(env)
 	if err != nil {
-		return fmt.Errorf("zever explain: resolve config from env: %w", err)
+		return wrapEnvConfigError("zever explain: resolve config from env", env, err)
 	}
 
 	services := resolved.RedactedServices()
