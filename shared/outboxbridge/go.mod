@@ -43,6 +43,7 @@ replace github.com/zenta-dev/zever/adapters/eventbus/memory => ../../adapters/ev
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
 
 replace github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
+
 replace github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
 
 replace github.com/zenta-dev/zever/shared/msgspan => ../msgspan

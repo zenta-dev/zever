@@ -25,6 +25,14 @@ SBOM ?= sbom.json
 # they are excluded here like the harness checkouts above.
 ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
 
+# The two modules that stay outside `go.work` by design (third-party and
+# consumer proofs). They are not workspace members, so the go command
+# refuses to build them with the workspace loaded: every go invocation
+# below runs with GOWORK=off. They are tidied with the same offline
+# machinery as the workspace modules (tools/gotidy.sh), so a sibling that
+# has no proxy release yet resolves from disk instead of the proxy.
+OUTSIDE_MODULES := docs/examples examples/external-sms
+
 # Matrix sharding: stable round-robin slice of ALL_MODULES. Defaults
 # (TOTAL=1) expand to exactly ALL_MODULES.
 SHARD_TOTAL ?= 1
@@ -220,6 +228,7 @@ download-all: ## Download dependencies of every module (override list via MODULE
 .PHONY: check-all build-all test-all test-race-all test-race-fast test-race-pr vet-all tidy-all tidy-check-all lint-all vulncheck-all
 check-all: ## Run vet + tidy-check + test (-vet=off, cached) + build across all modules (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) vet ./... && $(CURDIR)/tools/gotidy.sh -diff && $(GO) test -vet=off ./... && $(GO) build ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+	failed=""; for d in $(OUTSIDE_MODULES); do echo "== $$d =="; if ! (cd $$d && GOWORK=off $(CURDIR)/tools/gotidy.sh -diff); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
 test-race-all: ## Run tests with the race detector across all modules (per-module coverage under .coverage/, shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	mkdir -p .coverage; root="$$PWD"; failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); if ! (cd $$d && $(GO) test -race -count=1 -covermode=atomic -coverprofile="$$root/.coverage/$$slug.out" ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
@@ -250,14 +259,14 @@ vet-all: ## Run go vet in every module (override list via MODULES)
 
 tidy-all: ## Run go mod tidy in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(CURDIR)/tools/gotidy.sh); done
+	set -e; for d in $(OUTSIDE_MODULES); do echo "== $$d =="; (cd $$d && GOWORK=off $(CURDIR)/tools/gotidy.sh); done
 
 tidy-check-all: ## Verify go.mod/go.sum are tidy in every module (override list via MODULES)
 	set -e; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; (cd $$d && $(CURDIR)/tools/gotidy.sh -diff); done
+	set -e; for d in $(OUTSIDE_MODULES); do echo "== $$d =="; (cd $$d && GOWORK=off $(CURDIR)/tools/gotidy.sh -diff); done
 
 deps-sync: ## Reconcile dependency versions across all modules after a bump
 	$(MAKE) tidy-all
-	GOWORK=off go -C docs/examples mod tidy
-	GOWORK=off go -C examples/external-sms mod tidy
 
 .PHONY: release-prep
 release-prep: ## Pin the repo for a release: VERSION=vX.Y.Z rewrites cmd/zever/VERSION, installers, docs pins and every intra-repo go.mod require, then tidies
@@ -266,8 +275,6 @@ release-prep: ## Pin the repo for a release: VERSION=vX.Y.Z rewrites cmd/zever/V
 
 deps-sync-check: ## Verify no dependency drift remains after a bump
 	$(MAKE) tidy-check-all
-	GOWORK=off go -C docs/examples mod tidy -diff
-	GOWORK=off go -C examples/external-sms mod tidy -diff
 
 .PHONY: dependabot-check
 dependabot-check: ## Verify .github/dependabot.yml lists every module (regenerate: bash tools/gen-dependabot.sh)
