@@ -120,7 +120,7 @@ The variable's field name matches no option, so `config.Resolve` fails with a di
 <details>
 <summary>Unknown field under a wired service prefix</summary>
 
-`config.Resolve` fails with a did-you-mean hint. Check the service's options struct.
+`config.Resolve` fails when the key is close to a known field: it is a typo, and the error carries a did-you-mean hint (`DB_MAXCONN` → `did you mean "max_conns"?`). Check the service's options struct.
 </details>
 
 <details>
@@ -132,7 +132,7 @@ A resolved field failed to parse. Set an integer. Unset variables are ignored, b
 <details>
 <summary>`AUTH_TOKEN` fails at startup</summary>
 
-`AUTH` is a wired service prefix, so every key under it must name a field. `AUTH_TOKEN` matches none and fails `config.Resolve` with a did-you-mean hint. Set `AUTH_JWT_SECRET` instead.
+`AUTH_TOKEN` names no field of the `auth` service, and it is close to none of them, so it is treated as an unrelated ambient variable and ignored — which is usually a mistake. Set the real key: `AUTH_JWT_SECRET` (or `AUTH_OIDC_ISSUER`, `AUTH_SESSION_SECRET`). To make such keys fail loudly instead, run with `ZEVER_CONFIG_STRICT=1`, or use a near-miss spelling such as `AUTH_JWT_SECRT`, which is reported as a typo with a did-you-mean hint.
 </details>
 
 <Aside type="danger" title="Dev-only keys">
