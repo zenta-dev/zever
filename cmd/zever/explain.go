@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -167,7 +168,7 @@ func findOperation(
 // explainNotFoundError builds a clear "not found" error, adding a
 // suggestion via the repo's existing closest-match helper against every
 // operation's fully-qualified name in the compiled schema when one is
-// close enough.
+// close enough, plus the command that lists the real names.
 func explainNotFoundError(path string, modules []*ir.Module) error {
 	var known []string
 
@@ -182,11 +183,15 @@ func explainNotFoundError(path string, modules []*ir.Module) error {
 		}
 	}
 
+	msg := fmt.Sprintf("zever explain: no operation matches %q", path)
+
 	if s := closest(path, known); s != "" {
-		return fmt.Errorf("zever explain: no operation matches %q (did you mean %q?)", path, s)
+		msg += fmt.Sprintf(" (did you mean %q?)", s)
 	}
 
-	return fmt.Errorf("zever explain: no operation matches %q", path)
+	msg += "\n" + formatHint("use Service.Operation or Module.Service.Operation ('zever routes' lists every HTTP route)")
+
+	return errors.New(msg)
 }
 
 // printExplain prints op's declaration file:line plus a compact summary:
@@ -439,7 +444,7 @@ func filterWiringRows(rows []wiringRow, ref string) []wiringRow {
 }
 
 // wiringNotFoundError builds the unknown-ref error with a did-you-mean hint
-// against every known service label.
+// against every known service label, plus the command that lists them all.
 func wiringNotFoundError(ref string, services map[string]config.ServiceConfig) error {
 	known := make([]string, 0, len(services))
 
@@ -449,11 +454,15 @@ func wiringNotFoundError(ref string, services map[string]config.ServiceConfig) e
 
 	sort.Strings(known)
 
+	msg := fmt.Sprintf("zever explain: no service matches %q", ref)
+
 	if s := closest(ref, known); s != "" {
-		return fmt.Errorf("zever explain: no service matches %q (did you mean %q?)", ref, s)
+		msg += fmt.Sprintf(" (did you mean %q?)", s)
 	}
 
-	return fmt.Errorf("zever explain: no service matches %q", ref)
+	msg += "\n" + formatHint("run 'zever explain' with no arguments to list every wired service")
+
+	return errors.New(msg)
 }
 
 // printWiring prints rows in ref order: driver, registered drivers, typed

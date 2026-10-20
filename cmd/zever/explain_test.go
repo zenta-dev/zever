@@ -104,6 +104,37 @@ func TestRunExplainUnknownOperation(t *testing.T) {
 	if !strings.Contains(err.Error(), "no operation matches") {
 		t.Fatalf("error = %q, want it to mention 'no operation matches'", err.Error())
 	}
+
+	// The next step names the path shape and the command that lists the
+	// real operations, so a wrong path is not a dead end.
+	if !strings.Contains(err.Error(), "Service.Operation") {
+		t.Fatalf("error = %q, want it to name the path shape", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "zever routes") {
+		t.Fatalf("error = %q, want it to point at 'zever routes'", err.Error())
+	}
+}
+
+// TestRunExplainUnknownServiceNamesTheListCommand pins the wiring-graph
+// not-found guidance: the error says how to see every wired service.
+func TestRunExplainUnknownServiceNamesTheListCommand(t *testing.T) {
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	t.Chdir(dir)
+
+	err := runExplain([]string{"nosuchservice"})
+	if err == nil {
+		t.Fatal("expected error for unknown service, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "no service matches") {
+		t.Fatalf("error = %q, want it to mention 'no service matches'", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "zever explain") {
+		t.Fatalf("error = %q, want it to point at the wiring graph", err.Error())
+	}
 }
 
 func TestRunExplainSuggestsClosestMatch(t *testing.T) {
