@@ -83,7 +83,7 @@ For the multi-module import changes see [Migrate to the multi-module layout](../
 
 ## Release process (maintainers)
 
-Releases bump every version pin together (the file list is in the `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` creates one `<module-path>/vX.Y.Z` tag per module in dependency order (there is no root `go.mod`, so no bare tag). `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
+Releases bump every version pin together (the file list is in the `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` creates one `<module-path>/vX.Y.Z` tag per module in dependency order, plus the bare `vX.Y.Z` release tag the release workflow fires on. Both are published in one atomic push, so the workflow starts only once every module tag is on origin. `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
 
 ## Related
 

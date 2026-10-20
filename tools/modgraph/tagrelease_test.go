@@ -10,7 +10,8 @@ import (
 )
 
 // TestTagReleaseVerify pins tools/tag-release.sh --verify: it fails naming the
-// untagged module, passes once the tag exists, and never creates tags.
+// untagged module and the missing bare release tag, passes once both exist,
+// and never creates tags.
 func TestTagReleaseVerify(t *testing.T) {
 	for _, bin := range []string{"bash", "git"} {
 		if _, err := exec.LookPath(bin); err != nil {
@@ -40,6 +41,9 @@ func TestTagReleaseVerify(t *testing.T) {
 	if err == nil || !strings.Contains(out, "missing tag: libs/ok/v1.2.3") {
 		t.Fatalf("verify without tag: err=%v out=%q, want failure naming libs/ok/v1.2.3", err, out)
 	}
+	if !strings.Contains(out, "missing tag: v1.2.3") {
+		t.Fatalf("verify without tag: out=%q, want failure naming the bare release tag v1.2.3", out)
+	}
 	if tags, _ := run("git", "tag", "--list"); strings.TrimSpace(tags) != "" {
 		t.Fatalf("--verify created tags: %q", tags)
 	}
@@ -48,6 +52,13 @@ func TestTagReleaseVerify(t *testing.T) {
 		t.Fatalf("commit: %v\n%s", err, out)
 	}
 	if out, err := run("git", "tag", "libs/ok/v1.2.3"); err != nil {
+		t.Fatalf("tag: %v\n%s", err, out)
+	}
+	// The module tag alone is not the release: the bare tag is missing too.
+	if out, err := run("bash", script, "--verify", "v1.2.3"); err == nil || !strings.Contains(out, "missing tag: v1.2.3") {
+		t.Fatalf("verify without the bare tag: err=%v out=%q, want failure naming v1.2.3", err, out)
+	}
+	if out, err := run("git", "tag", "v1.2.3"); err != nil {
 		t.Fatalf("tag: %v\n%s", err, out)
 	}
 	if out, err := run("bash", script, "--verify", "v1.2.3"); err != nil || !strings.Contains(out, "verify ok") {
@@ -164,8 +175,8 @@ func TestTagReleasePushIsAtomic(t *testing.T) {
 	}
 	tags := strings.Fields(gitRun(t, remote, "tag", "--list"))
 	sort.Strings(tags)
-	if len(tags) != 2 || tags[0] != "libs/a/v1.2.3" || tags[1] != "libs/b/v1.2.3" {
-		t.Fatalf("remote tags = %v, want libs/a and libs/b at v1.2.3", tags)
+	if len(tags) != 3 || tags[0] != "libs/a/v1.2.3" || tags[1] != "libs/b/v1.2.3" || tags[2] != "v1.2.3" {
+		t.Fatalf("remote tags = %v, want libs/a, libs/b and the bare release tag at v1.2.3", tags)
 	}
 }
 
