@@ -82,6 +82,46 @@ func TestDoctorReportHealthy(t *testing.T) {
 	}
 }
 
+// TestDoctorReportCoversTheWiredBatteries proves the report covers the
+// batteries the project wires and nothing else: an unwired battery's
+// adapter package is not imported by the server binary, so resolving it
+// would report "unknown adapter" -- a fact about the project, not a
+// defect of the battery.
+func TestDoctorReportCoversTheWiredBatteries(t *testing.T) {
+	var buf bytes.Buffer
+	if err := runDoctorReport(&buf, mustProviders(t, nil), WithEnvOverride(config.Env{})); err != nil {
+		t.Fatalf("runDoctorReport: %v", err)
+	}
+
+	var doc struct {
+		Batteries []struct {
+			Name string `json:"name"`
+		} `json:"batteries"`
+	}
+
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("decode report: %v\n%s", err, buf.String())
+	}
+
+	rows := make(map[string]bool, len(doc.Batteries))
+	for _, row := range doc.Batteries {
+		rows[row.Name] = true
+	}
+
+	for _, want := range []string{"config", "db", "log", "observability", "router"} {
+		if !rows[want] {
+			t.Errorf("report lacks the wired %q row: %v", want, rows)
+		}
+	}
+
+	// queue, auth, permission and scheduler are not wired here.
+	for _, unwanted := range []string{"queue", "auth", "permission", "scheduler"} {
+		if rows[unwanted] {
+			t.Errorf("report covers the unwired %q battery: %v", unwanted, rows)
+		}
+	}
+}
+
 // TestDoctorReportFailing proves one failing battery flips the report and
 // returns ErrDoctorFailed, with the migrate hint on missing tables.
 func TestDoctorReportFailing(t *testing.T) {
