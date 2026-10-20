@@ -725,8 +725,9 @@ jobs:
   # orm) are diffed against their latest <dir>/vX.Y.Z tag with
   # golang.org/x/exp/apidiff (make apidiff). Incompatible changes fail
   # unless the changelog's pending-release section carries a **Breaking:**
-  # line: ## [Unreleased], or the top ## [vX.Y.Z] section while its version
-  # is not tagged yet (a cut but untagged release).
+  # line: ## [Unreleased], or the top ## [vX.Y.Z] section while it is the
+  # in-development version (cmd/zever/VERSION) and is not tagged yet (a cut
+  # but untagged release).
   # fetch-depth 0 is required: the default shallow checkout has no tags.
   apidiff:
     name: apidiff
