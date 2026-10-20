@@ -31,10 +31,12 @@ export function goTruth() {
   const cfg = read(path.join(repo, 'config/config.go'));
   const services = {};
   // The Config struct lists one `Service[<pkg>.Options]` field per service.
-  // The field name is the service key (lowercased); the fields carry no
-  // struct tags, so there is no json name to read. The Plugins field is a
-  // map, so it does not match this shape.
-  for (const m of cfg.matchAll(/^\t(\w+)\s+Service\[(\w+)\.Options\]/gm)) services[m[1].toLowerCase()] = { pkg: m[2], keys: new Set() };
+  // The json tag names the service key; the Go field name is the fallback.
+  // The Plugins field is a map, so it does not match this shape.
+  for (const m of cfg.matchAll(/^\t(\w+)\s+Service\[(\w+)\.Options\]\s*(?:`([^`]*)`)?/gm)) {
+    const tagged = m[3] && /json:"([a-z0-9_]+)/.exec(m[3]);
+    services[tagged ? tagged[1] : m[1].toLowerCase()] = { pkg: m[2], keys: new Set() };
+  }
   const structs = (pkg) => {
     const dir = path.join(repo, 'core', pkg);
     const out = {};
