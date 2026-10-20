@@ -12,13 +12,35 @@ import (
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+	// Open the directory as a root so the file name can never escape it.
+	root, err := os.OpenRoot(dir)
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = root.Close() }()
+
+	if err := root.WriteFile(filepath.Base(path), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// mustOpen opens path for reading, failing the test when it cannot.
+func mustOpen(t *testing.T, path string) *os.File {
+	t.Helper()
+
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() { _ = f.Close() })
+
+	return f
 }
 
 // writeGo copies a testdata/*.txt fixture to a .go file under root.
@@ -56,12 +78,12 @@ func scanFixture(t *testing.T, files map[string]string, golden, allowlist string
 	writeFile(t, filepath.Join(root, "tools", "tagcheck", "golden_wire_structs.txt"), golden)
 	writeFile(t, filepath.Join(root, "tools", "tagcheck", "tag_allowlist.txt"), allowlist)
 
-	g, err := loadGolden(filepath.Join(root, "tools", "tagcheck", "golden_wire_structs.txt"))
+	g, err := loadGolden(filepath.Join(root, "tools", "tagcheck"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	a, err := loadAllowlist(filepath.Join(root, "tools", "tagcheck", "tag_allowlist.txt"))
+	a, err := loadAllowlist(filepath.Join(root, "tools", "tagcheck"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,16 +94,6 @@ func scanFixture(t *testing.T, files map[string]string, golden, allowlist string
 	}
 
 	return vs
-}
-
-// rules returns the set of rule names in vs.
-func rules(vs []violation) []string {
-	out := make([]string, 0, len(vs))
-	for _, v := range vs {
-		out = append(out, v.rule)
-	}
-
-	return out
 }
 
 func TestScanCleanFile(t *testing.T) {
@@ -213,7 +225,7 @@ func TestLoadGoldenMalformedLine(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "golden_wire_structs.txt"), "# header\nonly-one-column\n")
 
-	if _, err := loadGolden(filepath.Join(root, "golden_wire_structs.txt")); err == nil {
+	if _, err := loadGolden(root); err == nil {
 		t.Fatal("malformed golden line accepted")
 	}
 }
@@ -227,7 +239,7 @@ func TestEachDataLineCommentsAndBlanks(t *testing.T) {
 	path := filepath.Join(root, "data.txt")
 	writeFile(t, path, "# comment\n\npkg\tName\tpkg/x.go\n   \n")
 
-	if err := eachDataLine(path, func(line string) error {
+	if err := eachDataLine(mustOpen(t, path), path, func(line string) error {
 		lines = append(lines, line)
 		return nil
 	}); err != nil {

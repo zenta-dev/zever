@@ -117,8 +117,8 @@ func TestVerify_ClaimKeysAreExact(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		if err := a.Close(); err != nil {
-			t.Errorf("Close: %s", err)
+		if closeErr := a.Close(); closeErr != nil {
+			t.Errorf("Close: %s", closeErr)
 		}
 	})
 
@@ -171,8 +171,8 @@ func TestDiscoveryAndJWKSPayloadShape(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		if err := a.Close(); err != nil {
-			t.Errorf("Close: %s", err)
+		if closeErr := a.Close(); closeErr != nil {
+			t.Errorf("Close: %s", closeErr)
 		}
 	})
 

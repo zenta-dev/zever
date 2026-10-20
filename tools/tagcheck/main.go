@@ -74,13 +74,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	toolDir := filepath.Join(root, "tools", "tagcheck")
 
-	golden, err := loadGolden(filepath.Join(toolDir, "golden_wire_structs.txt"))
+	golden, err := loadGolden(toolDir)
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: load golden list: %v\n", err)
 		return 2
 	}
 
-	allowed, err := loadAllowlist(filepath.Join(toolDir, "tag_allowlist.txt"))
+	allowed, err := loadAllowlist(toolDir)
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: load tag allowlist: %v\n", err)
 		return 2
@@ -120,19 +120,39 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// loadGolden parses golden_wire_structs.txt: tab-separated package dir,
-// struct name, v0.7.2 source file. Blank lines and # comments are
+// openContained opens name inside dir. The directory is opened as an
+// os.Root, so name can never escape it, whatever it contains.
+func openContained(dir, name string) (*os.File, func(), error) {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, func() {}, err
+	}
+
+	f, err := root.Open(name)
+	if err != nil {
+		_ = root.Close()
+		return nil, func() {}, err
+	}
+
+	return f, func() {
+		_ = f.Close()
+		_ = root.Close()
+	}, nil
+}
+
+// loadGolden parses golden_wire_structs.txt in dir: tab-separated package
+// dir, struct name, v0.7.2 source file. Blank lines and # comments are
 // ignored.
-func loadGolden(path string) (goldenStructs, error) {
-	f, err := os.Open(path)
+func loadGolden(dir string) (goldenStructs, error) {
+	f, closeFile, err := openContained(dir, "golden_wire_structs.txt")
 	if err != nil {
 		return nil, fmt.Errorf("tagcheck: open golden list: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer closeFile()
 
 	g := goldenStructs{}
 
-	parseErr := eachDataLine(path, func(line string) error {
+	parseErr := eachDataLine(f, "golden_wire_structs.txt", func(line string) error {
 		parts := strings.Split(line, "\t")
 		if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
 			return fmt.Errorf("tagcheck: malformed golden list line %q", line)
@@ -159,19 +179,19 @@ func loadGolden(path string) (goldenStructs, error) {
 	return g, nil
 }
 
-// loadAllowlist parses tag_allowlist.txt: one entry per line, either a
-// bare repo-relative path or path:line (1-based field line). Blank lines
-// and # comments are ignored.
-func loadAllowlist(path string) (allowlist, error) {
-	f, err := os.Open(path)
+// loadAllowlist parses tag_allowlist.txt in dir: one entry per line,
+// either a bare repo-relative path or path:line (1-based field line).
+// Blank lines and # comments are ignored.
+func loadAllowlist(dir string) (allowlist, error) {
+	f, closeFile, err := openContained(dir, "tag_allowlist.txt")
 	if err != nil {
 		return nil, fmt.Errorf("tagcheck: open tag allowlist: %w", err)
 	}
-	defer func() { _ = f.Close() }()
+	defer closeFile()
 
 	a := allowlist{}
 
-	parseErr := eachDataLine(path, func(line string) error {
+	parseErr := eachDataLine(f, "tag_allowlist.txt", func(line string) error {
 		a[strings.TrimSpace(line)] = true
 		return nil
 	})
@@ -182,16 +202,11 @@ func loadAllowlist(path string) (allowlist, error) {
 	return a, nil
 }
 
-// eachDataLine scans path, invoking fn on every non-blank, non-comment
-// line; a non-nil fn error aborts the scan.
-func eachDataLine(path string, fn func(string) error) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-
-	sc := bufio.NewScanner(f)
+// eachDataLine scans r, invoking fn on every non-blank, non-comment line;
+// a non-nil fn error aborts the scan. The origin label is used to report
+// the offending line.
+func eachDataLine(r io.Reader, origin string, fn func(string) error) error {
+	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 
 	for line := 0; sc.Scan(); line++ {
@@ -201,7 +216,7 @@ func eachDataLine(path string, fn func(string) error) error {
 		}
 
 		if err := fn(text); err != nil {
-			return fmt.Errorf("%s:%d: %w", path, line+1, err)
+			return fmt.Errorf("%s:%d: %w", origin, line+1, err)
 		}
 	}
 
