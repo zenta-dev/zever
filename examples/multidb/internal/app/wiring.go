@@ -12,15 +12,18 @@ package app
 import (
 	"net/http"
 
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	logslog "github.com/zenta-dev/zever/adapters/log/slog"
+	observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
+	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
+	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/serve"
-
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	logslog "github.com/zenta-dev/zever/adapters/log/slog"
-	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 )
 
 // DB names the primary (default) sqlite instance.
@@ -39,6 +42,12 @@ var Log = log.DefaultRef()
 
 // Router names the default stdhttp router instance.
 var Router = router.DefaultRef()
+
+// Observability names the default observability instance (stdout adapter).
+var Observability = observability.DefaultRef()
+
+// RateLimit names the default ratelimit instance (memory adapter).
+var RateLimit = ratelimit.DefaultRef()
 
 // Providers returns every wired service instance, in declaration order.
 // The container validates the graph (duplicate refs, missing deps, cycles)
@@ -68,6 +77,8 @@ func Providers() []container.Provider {
 		}),
 		container.Provide(Log, container.WrapNoErr(logslog.New)),
 		container.Provide(Router, routerstdhttp.New),
+		container.Provide(Observability, observabilitystdout.New),
+		container.Provide(RateLimit, ratelimitmemory.New),
 	}
 }
 
