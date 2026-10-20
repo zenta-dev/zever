@@ -5,10 +5,14 @@ go 1.27.2
 require (
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.8.0
 	github.com/zenta-dev/zever/adapters/log/slog v0.8.0
+	github.com/zenta-dev/zever/adapters/observability/stdout v0.8.0
+	github.com/zenta-dev/zever/adapters/ratelimit/memory v0.8.0
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.8.0
 	github.com/zenta-dev/zever/container v0.8.0
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/log v0.8.0
+	github.com/zenta-dev/zever/core/observability v0.8.0
+	github.com/zenta-dev/zever/core/ratelimit v0.8.0
 	github.com/zenta-dev/zever/core/router v0.8.0
 	github.com/zenta-dev/zever/serve v0.8.0
 )
@@ -46,14 +50,12 @@ require (
 	github.com/zenta-dev/zever/core/media v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/middleware v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/notification v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/observability v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/outbox v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/password v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/payment v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/permission v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/queue v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/ratelimit v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/scheduler v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/search v0.8.0 // indirect
@@ -99,11 +101,15 @@ require (
 replace (
 	github.com/zenta-dev/zever/adapters/db/sqlite => ../../adapters/db/sqlite
 	github.com/zenta-dev/zever/adapters/log/slog => ../../adapters/log/slog
+	github.com/zenta-dev/zever/adapters/observability/stdout => ../../adapters/observability/stdout
+	github.com/zenta-dev/zever/adapters/ratelimit/memory => ../../adapters/ratelimit/memory
 	github.com/zenta-dev/zever/adapters/router/stdhttp => ../../adapters/router/stdhttp
 	github.com/zenta-dev/zever/config => ../../config
 	github.com/zenta-dev/zever/container => ../../container
 	github.com/zenta-dev/zever/core/db => ../../core/db
 	github.com/zenta-dev/zever/core/log => ../../core/log
+	github.com/zenta-dev/zever/core/observability => ../../core/observability
+	github.com/zenta-dev/zever/core/ratelimit => ../../core/ratelimit
 	github.com/zenta-dev/zever/core/router => ../../core/router
 	github.com/zenta-dev/zever/serve => ../../serve
 	github.com/zenta-dev/zever/shared/ref => ../../shared/ref

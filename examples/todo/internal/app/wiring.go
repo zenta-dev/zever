@@ -8,6 +8,16 @@
 package app
 
 import (
+	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	logslog "github.com/zenta-dev/zever/adapters/log/slog"
+	observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
+	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
+	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
+	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/cache"
@@ -16,20 +26,11 @@ import (
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/ratelimit"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/scheduler"
 	"github.com/zenta-dev/zever/examples/todo/internal/api"
 	"github.com/zenta-dev/zever/serve"
-
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	logslog "github.com/zenta-dev/zever/adapters/log/slog"
-	observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
-	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
-	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 )
 
 // DB names the default sqlite instance (data/app.db unless DB_PATH overrides).
@@ -59,6 +60,9 @@ var Queue = queue.DefaultRef()
 // Scheduler names the default embedded scheduler instance.
 var Scheduler = scheduler.DefaultRef()
 
+// RateLimit names the default ratelimit instance (memory adapter).
+var RateLimit = ratelimit.DefaultRef()
+
 // Providers returns every wired service instance, in declaration order.
 // The container validates the graph (duplicate refs, missing deps, cycles)
 // and resolves each instance lazily on first use. Runtime defaults apply
@@ -80,6 +84,7 @@ func Providers() []container.Provider {
 		container.Provide(Password, passwordargon2.New),
 		container.Provide(Queue, queuememory.New),
 		container.Provide(Scheduler, schedulerembedded.New),
+		container.Provide(RateLimit, ratelimitmemory.New),
 	}
 }
 

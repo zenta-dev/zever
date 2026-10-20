@@ -99,12 +99,27 @@ join table has no DDL — the atlas backend materializes entity tables only.
 ## Runbook
 
 Run from `examples/showcase/` so `data/` resolves.
-`AUTH_JWT_SECRET` (≥32 bytes) is required by every entrypoint.
+
+Two secrets are required by every entrypoint, and the gRPC listener needs
+its address:
+
+```sh
+cp .env.example .env
+printf 'AUTH_JWT_SECRET=%s\nCRYPTO_KEY=%s\n' \
+  "$(head -c 32 /dev/urandom | base64)" "$(head -c 32 /dev/urandom | base64)" >> .env
+export GRPC_ADDR=:9090
+```
+
+`.env` holds local secrets only -- never commit it. `GRPC_ADDR` is read
+from the process environment, not from `.env`.
 
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen`
 2. Seed (idempotent): `go run ./db/seed`
 3. Serve (HTTP `:8080` + gRPC `:9090`): `go run ./cmd/server`
 4. Worker (jobs + embedded scheduler): `go run ./cmd/worker`
+
+The DSN in step 1 is the file `DB_PATH` points at in `.env`, so the
+migrated tables are the ones the server opens.
 
 ## CLI tour (all read-only except compile)
 
@@ -115,6 +130,7 @@ Run from `examples/showcase/` so `data/` resolves.
 - `zever explain ShopService.Checkout schema/shop/shop.zen`
 - `zever check-boundaries schema/shop/shop.zen`
 - `zever breaking --help` (needs two schema revisions)
-- `zever doctor` (needs `AUTH_JWT_SECRET` set): 32 OK,
-  2 FAIL — `ai` (no API key) and `i18n` (embed FS comes from code, like
-  bookings). Both are expected zero-infra defaults, not bugs.
+- `zever doctor` (with `AUTH_JWT_SECRET` and `CRYPTO_KEY` set): 32 OK,
+  3 FAIL — `ai` (no API key), `geo` (no cities.json) and `i18n` (embed FS
+  comes from code, like bookings). All three are batteries this app does
+  not wire: expected zero-infra defaults, not bugs.

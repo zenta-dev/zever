@@ -52,6 +52,7 @@ require (
 	github.com/zenta-dev/zever/core/password v0.8.0
 	github.com/zenta-dev/zever/core/permission v0.8.0
 	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/core/ratelimit v0.8.0
 	github.com/zenta-dev/zever/core/router v0.8.0
 	github.com/zenta-dev/zever/core/scheduler v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
@@ -298,7 +299,6 @@ require (
 	github.com/zenta-dev/zever/core/outbox v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/payment v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/ratelimit v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/search v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/secrets v0.8.0 // indirect

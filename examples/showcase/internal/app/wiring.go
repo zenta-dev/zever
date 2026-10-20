@@ -99,7 +99,7 @@ func Providers() []container.Provider {
 		container.Provide(Crypto, cryptolocal.New),
 		container.Provide(Flag, flagstatic.New),
 		container.Provide(Geo, geostatic.New),
-		container.Provide(I18n, i18nembed.New),
+		container.Provide(I18n, i18nWithLocales),
 		container.Provide(Log, container.WrapNoErr(logslog.New)),
 		container.Provide(Observability, observabilitystdout.New),
 		container.Provide(Password, passwordargon2.New),
@@ -108,6 +108,18 @@ func Providers() []container.Provider {
 		container.Provide(RateLimit, ratelimitmemory.New),
 		container.Provide(Router, routerstdhttp.New),
 	}
+}
+
+// i18nWithLocales opens the embed i18n adapter on the catalogs this
+// project embeds. The catalogs live in the binary (an fs.FS cannot come
+// from the environment), so the wiring -- the one place that selects the
+// adapters -- hands the adapter its FS.
+func i18nWithLocales(o i18n.Options) (i18n.I18n, error) {
+	if o.Embed.FS == nil {
+		o.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}
+	}
+
+	return i18nembed.New(o)
 }
 
 // Modules returns the serve modules mounted at boot, after the shared gRPC

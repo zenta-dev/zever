@@ -1050,6 +1050,23 @@ import (
 )
 
 func main() {
+	modules := func({{if .Modules}}c{{else}}_{{end}} *container.Container) []serve.Module {
+		return []serve.Module{
+{{range .Modules}}			app.New{{.TypeName}}(c),
+{{end}}		}
+	}
+
+	// Doctor mode: serve.Main prints the resolve-all report itself and
+	// returns, so no flag is parsed here (--doctor is not one of ours).
+	if doctorMode(os.Args[1:]) {
+		if err := serve.Main(app.Providers(), modules); err != nil {
+			fmt.Fprintln(os.Stderr, "server:", err)
+			os.Exit(1)
+		}
+
+		return
+	}
+
 	addr := flag.String("addr", "", "HTTP listen address (:port or host:port; empty uses PORT, default :8080)")
 	grpcAddr := flag.String("grpc-addr", "", "gRPC listen address (needs auth+permission wired; empty disables)")
 	flag.Parse()
@@ -1071,16 +1088,23 @@ func main() {
 		}
 	}
 
-	modules := func({{if .Modules}}c{{else}}_{{end}} *container.Container) []serve.Module {
-		return []serve.Module{
-{{range .Modules}}			app.New{{.TypeName}}(c),
-{{end}}		}
-	}
-
 	if err := serve.Main(app.Providers(), modules, opts...); err != nil {
 		fmt.Fprintln(os.Stderr, "server:", err)
 		os.Exit(1)
 	}
+}
+
+// doctorMode reports whether the process was asked for the doctor report
+// ("doctor" or "--doctor"), the form the zever doctor command runs the
+// server in. serve.Main dispatches that mode itself.
+func doctorMode(args []string) bool {
+	for _, arg := range args {
+		if arg == "doctor" || arg == "--doctor" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // grpcWired reports whether the project's Providers wire the auth and

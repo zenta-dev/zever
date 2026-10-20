@@ -474,7 +474,7 @@ func runServe(ctx context.Context, providers []container.Provider, modulesFn fun
 	if tlsCfg == nil {
 		for _, a := range []string{httpAddr, grpcAddr} {
 			if a != "" && !isLoopbackAddr(a) {
-				logger.Warn().Str("addr", a).Msg("serving plaintext without TLS on a non-loopback address; set router tls_cert and tls_key")
+				logger.Warn().Str("addr", a).Msg("serving plaintext without TLS on a non-loopback address; set ROUTER_TLS_CERT and ROUTER_TLS_KEY")
 			}
 		}
 	}

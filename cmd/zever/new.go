@@ -1377,7 +1377,7 @@ func writeNewProject(tag string, cfg NewConfig) ([]string, error) {
 		return nil, writeErr
 	}
 
-	if writeErr := write("README.md", []byte(renderNewReadme(cfg.Name))); writeErr != nil {
+	if writeErr := write("README.md", []byte(renderNewReadme(cfg.Name, selections))); writeErr != nil {
 		return nil, writeErr
 	}
 
@@ -1711,10 +1711,12 @@ const newGitignore = `# Local dev secrets. Generated per project by ` + "`zever 
 /generated/
 `
 
-// renderNewReadme is a genuine quickstart, not filler: exactly four
-// commands, each one a freshly scaffolded project can actually run, in
-// order.
-func renderNewReadme(name string) string {
+// renderNewReadme is a genuine quickstart, not filler: the exact commands
+// a freshly scaffolded project can run, in order, plus the env keys the
+// project actually reads (the adapter selectors and the secrets its .env
+// carries). The README must not drift from the scaffold: it names the same
+// DSN the schema comment and the CLI hint name.
+func renderNewReadme(name string, selections []batterySelection) string {
 	const backtick = "`"
 
 	tmpl := `# %[1]s
@@ -1733,12 +1735,33 @@ everything else is resolved from a ` + backtick + `container.Container` + backti
 zever compile --backend=zenorm,proto,atlas schema/app.zen
 
 # create the sqlite database from the schema (safe to re-run)
-zever db migrate --adapter=sqlite --dsn=app.db schema/app.zen
+zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen
+
+# check that every wired battery resolves
+zever doctor
 
 # run the HTTP API, then try the sample endpoint
 zever serve
 curl localhost:8080/hello
 ` + "```" + `
+
+## Configuration
+
+Config is env-only: every service reads its values from the
+environment -- the ` + backtick + `.env` + backtick + ` file in the project root first, then the
+process environment. ` + backtick + `zever new` + backtick + ` wrote a ` + backtick + `.env` + backtick + ` with per-project
+dev secrets into it; keep that file, and never commit it.
+` + backtick + `.env.example` + backtick + ` lists every key with the value this project runs
+with -- copy it over ` + backtick + `.env` + backtick + ` only when the project has none.
+
+The batteries this project wires, and the env key that selects each
+backend:
+
+%[2]s
+Secrets live in ` + backtick + `.env` + backtick + `: %[3]s.
+
+` + backtick + `zever config show` + backtick + ` prints every resolved value (secrets redacted) and
+` + backtick + `zever doctor` + backtick + ` names the key a battery needs when one cannot resolve.
 
 ## What's here, and what's not
 
@@ -1763,7 +1786,45 @@ templates when you need them -- the default scaffold stays minimal on
 purpose.
 `
 
-	return fmt.Sprintf(tmpl, name)
+	return fmt.Sprintf(tmpl, name, readmeBatteryList(selections), readmeSecretList(selections))
+}
+
+// readmeBatteryList renders the README's battery list: one line per wired
+// battery, naming the env key that selects its backend and the value the
+// scaffold wrote for it.
+func readmeBatteryList(selections []batterySelection) string {
+	sorted := append([]batterySelection(nil), selections...)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Battery < sorted[j].Battery
+	})
+
+	var b strings.Builder
+
+	for _, s := range sorted {
+		fmt.Fprintf(&b, "- %s_ADAPTER=%s", strings.ToUpper(s.Battery), s.Adapter)
+
+		if defaults := scaffoldEnvDefaults(s.Battery, ""); len(defaults) > 0 {
+			for _, key := range sortedEnvDefaultKeys(defaults) {
+				fmt.Fprintf(&b, ", %s=%s", key, defaults[key])
+			}
+		}
+
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// readmeSecretList renders the README's secret list: the env keys the
+// generated .env carries a secret for, in the order the file lists them.
+func readmeSecretList(selections []batterySelection) string {
+	keys := devSecretKeys(selections)
+
+	if len(keys) == 0 {
+		return "none yet"
+	}
+
+	return "`" + strings.Join(keys, "`, `") + "`"
 }
 
 // printNewDryRun prints the scaffold plan without writing anything.
@@ -1792,11 +1853,16 @@ func printNewSummary(cfg NewConfig, written []string) {
 		_, _ = fmt.Fprintln(os.Stdout, "  "+dim("wrote ")+cyan(path))
 	}
 
+	// The next steps mirror the quickstart in the generated README (and
+	// the hint below): the schema has to be compiled and the database
+	// created before the server has anything to serve.
 	next := joinLines(
 		bold("Next steps:"),
 		"  "+dim("1.")+"  "+cmd("cd "+cfg.OutDir),
-		"  "+dim("2.")+"  "+cmd("zever serve"),
-		"  "+dim("3.")+"  "+cmd("curl localhost:8080/hello"),
+		"  "+dim("2.")+"  "+cmd("zever compile --backend=zenorm,proto,atlas schema/app.zen"),
+		"  "+dim("3.")+"  "+cmd("zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen"),
+		"  "+dim("4.")+"  "+cmd("zever serve"),
+		"  "+dim("5.")+"  "+cmd("curl localhost:8080/hello"),
 	)
 
 	_, _ = fmt.Fprintln(os.Stdout, "")
@@ -2102,6 +2168,10 @@ func renderWiringContent(tag, modulePath string, selections []batterySelection) 
 // enables gRPC only when auth+permission are wired (see grpcWired):
 // otherwise a one-line notice explains the skip, so `zever dev -grpc-addr
 // ...` stays green on scaffolds that never wired them.
+//
+// `zever doctor` runs this binary with --doctor and expects serve.Main's
+// JSON report, so the flags below must not swallow that argument: flag
+// parsing is skipped in doctor mode (see doctorMode).
 const newServerMainTemplate = `// Command server runs this project's HTTP API.
 //
 // Scaffolded by ` + "`zever new`" + `. It is deliberately thin: serve.Main owns
@@ -2123,6 +2193,17 @@ import (
 )
 
 func main() {
+	// Doctor mode: serve.Main prints the resolve-all report itself and
+	// returns, so no flag is parsed here (--doctor is not one of ours).
+	if doctorMode(os.Args[1:]) {
+		if err := serve.Main(app.Providers(), app.Modules()); err != nil {
+			fmt.Fprintln(os.Stderr, "server:", err)
+			os.Exit(1)
+		}
+
+		return
+	}
+
 	addr := flag.String("addr", "", "HTTP listen address (:port or host:port; empty uses PORT, default :8080)")
 	grpcAddr := flag.String("grpc-addr", "", "gRPC listen address (needs auth+permission wired; empty disables)")
 	flag.Parse()
@@ -2148,6 +2229,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, "server:", err)
 		os.Exit(1)
 	}
+}
+
+// doctorMode reports whether the process was asked for the doctor report
+// ("doctor" or "--doctor"), the form the zever doctor command runs the
+// server in. serve.Main dispatches that mode itself.
+func doctorMode(args []string) bool {
+	for _, arg := range args {
+		if arg == "doctor" || arg == "--doctor" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // grpcWired reports whether the project's Providers wire the auth and
@@ -2341,23 +2435,74 @@ func addressableCopy(opts any) reflect.Value {
 	return cp.Elem()
 }
 
+// scaffoldEnvDefaults returns the env values the scaffold writes instead of
+// the bare option default, for one battery instance: the env key -> value
+// map the generator overrides.
+//
+// The sqlite database is the one value a scaffolded project cannot leave to
+// the adapter's own default: the CLI (`zever db migrate --dsn=data/app.db`),
+// the server and the README must all open the SAME file, or the project
+// migrates one database and serves another (every query then fails on a
+// missing table). The path lives in data/, next to the .gitkeep the
+// scaffold writes, so the local database stays out of the project root.
+//
+// A named instance gets its own file (data/<name>.db) for the same reason:
+// two instances sharing one file would write each other's tables.
+func scaffoldEnvDefaults(battery, instance string) map[string]string {
+	if battery != "db" {
+		return nil
+	}
+
+	if instance == "" || instance == "default" {
+		return map[string]string{"DB_PATH": "data/app.db"}
+	}
+
+	return map[string]string{"DB__" + strings.ToUpper(instance) + "__PATH": "data/" + strings.ToLower(instance) + ".db"}
+}
+
 // appendEnvKeys walks one Options struct value into out as KEY=DEFAULT
 // lines under prefix+sep: flat scalars directly, one nesting level as
 // PREFIX_OUTER_INNER (mirroring ApplyEnv), skipping json:"-" fields and
 // types with no env string form. sep is "_" for default instances and "__"
 // for named ones (SERVICE__NAME__FIELD).
 //
+// defaults overrides the value written for a key (see scaffoldEnvDefaults);
+// a key it does not name keeps the option's own default.
+//
 // The Options-level adapter field is skipped: the adapter is selected by
 // the <SERVICE>_ADAPTER key the caller writes, and a second ADAPTER key
 // would override it with the field's empty default.
-func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
-	appendEnvFields(out, prefix, sep, opts, true)
+func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any, defaults map[string]string) {
+	appendEnvFields(out, prefix, sep, opts, true, defaults)
+}
+
+// writeEnvLine writes one KEY=VALUE line, using the scaffold's own value
+// for the key when it has one (see scaffoldEnvDefaults).
+func writeEnvLine(out *strings.Builder, key, val string, defaults map[string]string) {
+	if v, ok := defaults[key]; ok {
+		val = v
+	}
+
+	_, _ = fmt.Fprintf(out, "%s=%s\n", key, val)
+}
+
+// sortedEnvDefaultKeys lists the keys of an env map in sorted order, so a
+// generated file never depends on map iteration order.
+func sortedEnvDefaultKeys(env map[string]string) []string {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	return keys
 }
 
 // appendEnvFields is appendEnvKeys' worker. topLevel marks the walk over
 // the Options struct itself (embedded structs are promoted into it), where
 // the adapter field is the service's selector and not an option.
-func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLevel bool) {
+func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLevel bool, defaults map[string]string) {
 	v := addressableCopy(opts)
 	if !v.IsValid() {
 		return
@@ -2378,7 +2523,7 @@ func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLeve
 		f := v.Field(i)
 
 		if sf.Anonymous && f.Kind() == reflect.Struct {
-			appendEnvFields(out, prefix, sep, f.Addr().Interface(), topLevel)
+			appendEnvFields(out, prefix, sep, f.Addr().Interface(), topLevel, defaults)
 
 			continue
 		}
@@ -2398,7 +2543,7 @@ func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLeve
 					continue
 				}
 
-				_, _ = fmt.Fprintf(out, "%s%s%s%s%s=%s\n", prefix, sep, envKeyName(sf), sep, envKeyName(nsf), val)
+				writeEnvLine(out, prefix+sep+envKeyName(sf)+sep+envKeyName(nsf), val, defaults)
 			}
 
 			continue
@@ -2409,27 +2554,37 @@ func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLeve
 			continue
 		}
 
-		_, _ = fmt.Fprintf(out, "%s%s%s=%s\n", prefix, sep, envKeyName(sf), val)
+		writeEnvLine(out, prefix+sep+envKeyName(sf), val, defaults)
 	}
 }
+
+// envExampleHeader is the head of every generated .env.example: the key
+// spelling rule (the option's serialized name, so the resolver matches it)
+// and where the secrets live. It is shared by `zever new` and `zever add`,
+// and the shipped examples copy it verbatim, so the file cannot drift from
+// the keys the resolver accepts.
+const envExampleHeader = `# Managed by ` + "`zever new`" + ` and ` + "`zever add`" + `. The service env keys this
+# project reads, and the value each one runs with.
+# Keys are <SERVICE>_<FIELD> (default instance) or <SERVICE>__<NAME>__<FIELD> (named).
+# <FIELD> is the option's serialized name, upper-cased (DB_MAX_CONNS,
+# AUTH_JWT_SECRET); the resolver matches case and "_" loosely, so both
+# spellings reach the same option. Every value re-parses via ApplyEnv.
+# Adapter extras (e.g. CACHE_TABLE) follow the same SERVICE_FIELD rule;
+# tune the rest with container.WithOptions in internal/app/wiring.go.
+# Secrets live in .env, which is never committed.
+`
 
 // renderEnvExample generates .env.example from the Options structs of the
 // wired batteries: every key and default, straight from
 // config.DefaultOptions, so the file cannot drift from what ApplyEnv
 // resolves. Every key is the option's serialized name, so the file
 // resolves as it stands; the adapter selector is written once, here.
-// Copy it to .env and fill secrets for local runs.
+// The scaffold's own values (see scaffoldEnvDefaults) replace the bare
+// option defaults where the project needs one (the sqlite path).
 func renderEnvExample(selections []batterySelection) []byte {
 	var b strings.Builder
 
-	b.WriteString("# Managed by `zever new` and `zever add`. Copy to .env and fill secrets.\n")
-	b.WriteString("# Keys are <SERVICE>_<FIELD> (default instance) or <SERVICE>__<NAME>__<FIELD> (named).\n")
-	b.WriteString("# <FIELD> is the option's serialized name, upper-cased (DB_MAX_CONNS,\n")
-	b.WriteString("# AUTH_JWT_SECRET); the resolver matches case and \"_\" loosely, so both\n")
-	b.WriteString("# spellings reach the same option. Defaults shown; every value re-parses\n")
-	b.WriteString("# via ApplyEnv. Adapter extras (e.g. CACHE_TABLE) follow the same\n")
-	b.WriteString("# SERVICE_FIELD rule; tune the rest with container.WithOptions in\n")
-	b.WriteString("# internal/app/wiring.go.\n")
+	b.WriteString(envExampleHeader)
 
 	sorted := append([]batterySelection(nil), selections...)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -2445,7 +2600,7 @@ func renderEnvExample(selections []batterySelection) []byte {
 		fmt.Fprintf(&b, "%s_ADAPTER=%s\n", strings.ToUpper(s.Battery), s.Adapter)
 
 		if opts := config.DefaultOptions(s.Battery, ""); opts != nil {
-			appendEnvKeys(&b, strings.ToUpper(s.Battery), "_", opts)
+			appendEnvKeys(&b, strings.ToUpper(s.Battery), "_", opts, scaffoldEnvDefaults(s.Battery, ""))
 		}
 	}
 
@@ -2459,12 +2614,17 @@ func isSecretField(sf reflect.StructField) bool {
 	return sf.Tag.Get("zever") == "secret"
 }
 
-// collectDevSecrets walks one Options struct value, returning KEY=random
-// lines for empty string fields tagged `zever:"secret"` under prefix (one
-// nesting level, mirroring appendEnvKeys). Non-empty secret fields already
-// carry a default and need no generated value; non-string secrets have no
-// text form and are skipped.
-func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
+// walkSecretFields calls fn with the env key of every secret string field
+// of the Options struct value, in the order the .env file lists them:
+// empty string fields tagged `zever:"secret"` under prefix (one nesting
+// level, mirroring appendEnvKeys). Non-empty secret fields already carry a
+// default and need no generated value; non-string secrets have no text form
+// and are skipped.
+//
+// The key is the full env key (PREFIX_FIELD, or PREFIX_OUTER_INNER for a
+// nested secret) built from the options' serialized names, so the .env
+// writer and the README name the same keys the resolver matches.
+func walkSecretFields(prefix string, opts any, fn func(key string)) {
 	v := addressableCopy(opts)
 	if !v.IsValid() {
 		return
@@ -2481,7 +2641,7 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 		f := v.Field(i)
 
 		if sf.Anonymous && f.Kind() == reflect.Struct {
-			collectDevSecrets(out, prefix, f.Addr().Interface())
+			walkSecretFields(prefix, f.Addr().Interface(), fn)
 
 			continue
 		}
@@ -2503,12 +2663,7 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 					continue
 				}
 
-				secret, err := randomSecret()
-				if err != nil {
-					continue
-				}
-
-				_, _ = fmt.Fprintf(out, "%s_%s_%s=%s\n", prefix, envKeyName(sf), envKeyName(nsf), secret)
+				fn(prefix + "_" + envKeyName(sf) + "_" + envKeyName(nsf))
 			}
 
 			continue
@@ -2522,13 +2677,24 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 			continue
 		}
 
+		fn(prefix + "_" + envKeyName(sf))
+	}
+}
+
+// collectDevSecrets walks one Options struct value, returning KEY=random
+// lines for empty string fields tagged `zever:"secret"` under prefix (one
+// nesting level, mirroring appendEnvKeys). Non-empty secret fields already
+// carry a default and need no generated value; non-string secrets have no
+// text form and are skipped.
+func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
+	walkSecretFields(prefix, opts, func(key string) {
 		secret, err := randomSecret()
 		if err != nil {
-			continue
+			return
 		}
 
-		_, _ = fmt.Fprintf(out, "%s_%s=%s\n", prefix, envKeyName(sf), secret)
-	}
+		_, _ = fmt.Fprintf(out, "%s=%s\n", key, secret)
+	})
 }
 
 // randomSecret returns 32 random bytes as base64: the per-project dev
@@ -2544,6 +2710,54 @@ func randomSecret() (string, error) {
 	return base64.StdEncoding.EncodeToString(buf), nil
 }
 
+// devSecretKeys lists the env keys the generated .env carries a secret
+// for, in the order the file writes them: the per-project CRYPTO_KEY, the
+// secret fields of every wired battery, and the pre-generated
+// AUTH_JWT_SECRET (written when the auth battery is not wired yet, so
+// `zever add auth` works with zero extra steps).
+//
+// The README names the same keys, so a developer reading it knows which
+// values to rotate before production.
+func devSecretKeys(selections []batterySelection) []string {
+	keys := []string{"CRYPTO_KEY"}
+
+	sorted := append([]batterySelection(nil), selections...)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Battery != "db" && sorted[j].Battery == "db" {
+			return false
+		}
+
+		if sorted[i].Battery != sorted[j].Battery {
+			return sorted[i].Battery < sorted[j].Battery
+		}
+
+		return sorted[i].Adapter < sorted[j].Adapter
+	})
+
+	hasAuth := false
+
+	for _, s := range sorted {
+		if s.Battery == "auth" {
+			hasAuth = true
+		}
+
+		opts := config.DefaultOptions(s.Battery, "")
+		if opts == nil {
+			continue
+		}
+
+		walkSecretFields(strings.ToUpper(s.Battery), opts, func(key string) {
+			keys = append(keys, key)
+		})
+	}
+
+	if !hasAuth {
+		keys = append(keys, "AUTH_JWT_SECRET")
+	}
+
+	return keys
+}
+
 // renderDevEnv generates .env: a random per-project CRYPTO_KEY (so serve's
 // dev-key guard passes without ZEVER_ENV games), random dev secrets for
 // every empty `zever:"secret"` field of the wired batteries, plus a
@@ -2553,8 +2767,9 @@ func randomSecret() (string, error) {
 func renderDevEnv(selections []batterySelection) ([]byte, error) {
 	var b strings.Builder
 
-	b.WriteString("# Local dev secrets. Generated per project by `zever new`; never commit.\n")
-	b.WriteString("# Dev only: set real values via the environment in production.\n")
+	b.WriteString("# Local dev config and secrets. Generated per project by `zever new`;\n")
+	b.WriteString("# never commit. Dev only: set real values via the environment in\n")
+	b.WriteString("# production.\n")
 
 	cryptoKey, err := randomSecret()
 	if err != nil {
@@ -2579,6 +2794,18 @@ func renderDevEnv(selections []batterySelection) ([]byte, error) {
 	})
 
 	for _, s := range sorted {
+		// The scaffold's own values (the sqlite path) go in .env too: the
+		// server and the CLI read the same file, so the database the user
+		// migrates is the database the server opens.
+		defaults := scaffoldEnvDefaults(s.Battery, "")
+		if len(defaults) > 0 {
+			fmt.Fprintf(&b, "\n# %s\n", s.Battery)
+
+			for _, key := range sortedEnvDefaultKeys(defaults) {
+				fmt.Fprintf(&b, "%s=%s\n", key, defaults[key])
+			}
+		}
+
 		if opts := config.DefaultOptions(s.Battery, ""); opts != nil {
 			var section strings.Builder
 			collectDevSecrets(&section, strings.ToUpper(s.Battery), opts)

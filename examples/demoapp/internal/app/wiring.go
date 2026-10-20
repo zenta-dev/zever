@@ -46,6 +46,7 @@ import (
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/examples/demoapp/internal/api"
+	"github.com/zenta-dev/zever/examples/demoapp/locales"
 	"github.com/zenta-dev/zever/serve"
 
 	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
@@ -208,7 +209,7 @@ func Providers() []container.Provider {
 		container.Provide(EventBus, eventbusmemory.New),
 		container.Provide(Flag, flagstatic.New),
 		container.Provide(Geo, geostatic.New),
-		container.Provide(I18n, i18nembed.New),
+		container.Provide(I18n, i18nWithLocales),
 		container.Provide(Idempotency, idempotencymemory.New),
 		container.Provide(Lock, lockmemory.New),
 		container.Provide(Log, container.WrapNoErr(logslog.New)),
@@ -241,6 +242,18 @@ func Providers() []container.Provider {
 		container.Provide(Webhook, webhookhttp.New),
 		container.Provide(Workflow, workflowmemory.New),
 	}
+}
+
+// i18nWithLocales opens the embed i18n adapter on the catalogs this
+// project embeds. The catalogs live in the binary (an fs.FS cannot come
+// from the environment), so the wiring -- the one place that selects the
+// adapters -- hands the adapter its FS.
+func i18nWithLocales(o i18n.Options) (i18n.I18n, error) {
+	if o.Embed.FS == nil {
+		o.Embed = i18n.EmbedOptions{FS: locales.FS, Dir: ".", Fallback: "en"}
+	}
+
+	return i18nembed.New(o)
 }
 
 // Modules returns the serve modules mounted at boot, after the shared gRPC

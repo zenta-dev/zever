@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -130,6 +131,57 @@ func TestP32ScaffoldBootsE2E(t *testing.T) {
 	}
 
 	httpPort := freeLoopbackPort(ctx, t)
+
+	// The doctor mode of the built server: `zever doctor` execs it with
+	// --doctor and parses the JSON report, so the scaffolded entrypoint
+	// must accept that argument (the flags it parses are -addr and
+	// -grpc-addr; flag.Parse would exit 2 on --doctor).
+	doctorCtx, doctorCancel := context.WithTimeout(t.Context(), DefaultE2ETimeout)
+	defer doctorCancel()
+
+	doctorCmd := exec.CommandContext(doctorCtx, serverBin, "--doctor")
+	doctorCmd.Dir = projDir
+	doctorCmd.Env = os.Environ()
+
+	doctorOut, doctorErr := doctorCmd.CombinedOutput()
+	if doctorErr != nil {
+		t.Fatalf("server --doctor: %v\n%s", doctorErr, doctorOut)
+	}
+
+	var doctorDoc struct {
+		OK        bool `json:"ok"`
+		Batteries []struct {
+			Name string `json:"name"`
+			OK   bool   `json:"ok"`
+		} `json:"batteries"`
+	}
+
+	if err := json.Unmarshal(doctorOut, &doctorDoc); err != nil {
+		t.Fatalf("decode doctor report: %v\n%s", err, doctorOut)
+	}
+
+	if !doctorDoc.OK {
+		t.Fatalf("doctor report not ok: %s", doctorOut)
+	}
+
+	doctorRows := make(map[string]bool, len(doctorDoc.Batteries))
+	for _, row := range doctorDoc.Batteries {
+		doctorRows[row.Name] = true
+	}
+
+	for _, want := range []string{"config", "db", "log", "router"} {
+		if !doctorRows[want] {
+			t.Errorf("doctor report lacks the %q row: %s", want, doctorOut)
+		}
+	}
+
+	// The generated server wires the boot set only: a battery the project
+	// did not wire has no adapter in the binary and must not be reported.
+	for _, unwanted := range []string{"queue", "auth", "permission", "scheduler"} {
+		if doctorRows[unwanted] {
+			t.Errorf("doctor report covers the unwired %q battery: %s", unwanted, doctorOut)
+		}
+	}
 
 	// The generated server reads its listeners from the environment
 	// (PORT, GRPC_ADDR) and refuses the deterministic dev crypto key

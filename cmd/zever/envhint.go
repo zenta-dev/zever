@@ -18,7 +18,7 @@ func serviceEnvFields(battery string) []string {
 
 	var b strings.Builder
 
-	appendEnvKeys(&b, "X", "_", opts)
+	appendEnvKeys(&b, "X", "_", opts, nil)
 
 	fields := []string{"ADAPTER"}
 

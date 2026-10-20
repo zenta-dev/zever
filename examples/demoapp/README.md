@@ -7,7 +7,7 @@ SQL schema; `container.Container` resolves only explicitly-registered adapters.
 This app runs with **zero external services** — every battery uses its
 in-memory/local adapter by default (sqlite files under `data/`). Swap
 adapters in `internal/app/wiring.go` or via env (`AUTH_JWT_SECRET`,
-`DB_MAXCONNS`, …) for production.
+`DB_MAX_CONNS`, …) for production.
 
 > Split with `examples/showcase`: **demoapp = battery breadth over HTTP**
 > (one endpoint per battery, thin handlers), **showcase = DSL depth** (every
@@ -61,7 +61,16 @@ Schema-first DSL: [`schema/app.zen`](schema/app.zen) defines 7 entities
 
 ## Quickstart
 
-Run from `examples/demoapp/` so `data/` resolves:
+Run from `examples/demoapp/` so `data/` resolves. The entrypoints need two
+secrets; they go in `.env` (never commit it):
+
+```sh
+cp .env.example .env
+printf 'AUTH_JWT_SECRET=%s\nCRYPTO_KEY=%s\n' \
+  "$(head -c 32 /dev/urandom | base64)" "$(head -c 32 /dev/urandom | base64)" >> .env
+```
+
+Then:
 
 ```bash
 # 1. Generate all backends (already committed under generated/; re-run to verify, from repo root)
@@ -79,6 +88,9 @@ go run ./cmd/server          # :8080 (-addr to change)
 # 5. Run worker + scheduler (in another shell)
 go run ./cmd/worker
 ```
+
+The DSN in step 2 is the file `DB_PATH` points at in `.env`, so the
+migrated tables are the ones the server opens.
 
 Exercise:
 

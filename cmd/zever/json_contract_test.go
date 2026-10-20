@@ -156,6 +156,10 @@ func TestGraphJSONEmitsEnvelope(t *testing.T) {
 func TestDoctorJSONFailureEnvelope(t *testing.T) {
 	jbuf := mustJSONMode(t)
 
+	// Empty directory: no built server entrypoint, so the checks run in
+	// the CLI against the stubbed local table.
+	t.Chdir(t.TempDir())
+
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
