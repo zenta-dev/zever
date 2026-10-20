@@ -171,18 +171,18 @@ func TestDoctorFooterPointsAtThePerRowFix(t *testing.T) {
 func TestDoctorEnvFailureNamesTheOffendingKey(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("ZEVER_NO_HINT", "")
-	t.Setenv("DB_HOST", "localhost")
+	t.Setenv("DB_MAXCONN", "5")
 
 	err := runDoctorWith(DoctorConfig{Out: &bytes.Buffer{}})
 	if err == nil {
-		t.Fatal("runDoctorWith stray env key: got nil error, want non-nil")
+		t.Fatal("runDoctorWith typo env key: got nil error, want non-nil")
 	}
 
-	if !strings.Contains(err.Error(), `"DB_HOST"`) {
+	if !strings.Contains(err.Error(), `"DB_MAXCONN"`) {
 		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
 	}
 
-	if !strings.Contains(err.Error(), "unset it") {
-		t.Fatalf("error = %q, want the hint to say what to do", err.Error())
+	if !strings.Contains(err.Error(), `"DB_MAX_CONNS"`) {
+		t.Fatalf("error = %q, want the hint to name the corrected key", err.Error())
 	}
 }

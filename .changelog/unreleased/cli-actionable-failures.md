@@ -1,6 +1,7 @@
 - fix(cli): `zever doctor` now prints a fix line under every failing battery, naming the exact env key to set (for example `AUTH_JWT_SECRET`) instead of only a generic "check service env" footer.
-- fix(cli): an unknown env key now names the service's real keys (`"DB_HOST" is not a db option — unset it, or use one of: DB_ADAPTER, DB_DSN, ...`), and the same hint now reaches `zever explain` and `zever outbox`, which resolved the service config without it.
+- fix(cli): an unknown env key now names the key to fix and the service's real keys (`"DB_HOST" is not a db option — unset it, or use one of: DB_ADAPTER, DB_DSN, ...` under `ZEVER_CONFIG_STRICT=1`), and the same hint now reaches `zever explain` and `zever outbox`, which resolved the service config without it.
 - fix(cli): `zever config`, `zever db`, and `zever generate` now print the unknown-subcommand error first and the hint after it, instead of burying the error under a full usage block.
 - fix(cli): `zever add` with a wrong argument count now prints a three-line usage block instead of the full forty-line reference.
 - fix(cli): `zever explain` now says how to find the right name when a service or an operation does not match.
 - fix(cli): `zever db migrate` without `--dsn` now prints the exact command to re-run, after the error instead of before it.
+- fix(cli): `ZEVER_NO_HINT=1` now silences the unknown-env-key hint too, like every other hint.

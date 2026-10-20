@@ -138,24 +138,24 @@ func TestRunExplainUnknownServiceNamesTheListCommand(t *testing.T) {
 }
 
 // TestRunExplainEnvFailureNamesTheOffendingKey pins that the wiring graph
-// carries the shared env-key hint: a stray variable under a wired service
-// prefix names the key to unset instead of dead-ending.
+// carries the shared env-key hint: a typo under a wired service prefix
+// names the key to fix instead of dead-ending.
 func TestRunExplainEnvFailureNamesTheOffendingKey(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("ZEVER_NO_HINT", "")
-	t.Setenv("DB_HOST", "localhost")
+	t.Setenv("DB_MAXCONN", "5")
 
 	err := runExplain(nil)
 	if err == nil {
-		t.Fatal("runExplain with stray env key: got nil error, want non-nil")
+		t.Fatal("runExplain with typo env key: got nil error, want non-nil")
 	}
 
-	if !strings.Contains(err.Error(), `"DB_HOST"`) {
+	if !strings.Contains(err.Error(), `"DB_MAXCONN"`) {
 		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
 	}
 
-	if !strings.Contains(err.Error(), "unset it") {
-		t.Fatalf("error = %q, want the hint to say what to do", err.Error())
+	if !strings.Contains(err.Error(), `"DB_MAX_CONNS"`) {
+		t.Fatalf("error = %q, want the hint to name the corrected key", err.Error())
 	}
 }
 

@@ -1,11 +1,42 @@
 package main
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/config"
 )
+
+// TestEnvTypoHintStrictModeNamesTheRealKeys pins the strict-mode guidance
+// end to end: with ZEVER_CONFIG_STRICT=1 an unrelated variable fails
+// resolution again, and the hint says what to do with it instead of
+// dead-ending.
+func TestEnvTypoHintStrictModeNamesTheRealKeys(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "")
+	t.Setenv("ZEVER_CONFIG_STRICT", "1")
+	t.Setenv("DB_HOST", "localhost")
+
+	t.Chdir(t.TempDir())
+
+	err := runConfigShowWith(ConfigConfig{Out: &bytes.Buffer{}})
+	if err == nil {
+		t.Fatal("runConfigShowWith strict ambient key: got nil error, want non-nil")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, `"DB_HOST"`) {
+		t.Fatalf("error = %q, want the hint to name the offending key", msg)
+	}
+
+	if !strings.Contains(msg, "unset it") {
+		t.Fatalf("error = %q, want the hint to say what to do", msg)
+	}
+
+	if !strings.Contains(msg, "DB_DSN") {
+		t.Fatalf("error = %q, want the hint to list the service's real keys", msg)
+	}
+}
 
 // TestEnvTypoHintNamesTheOffendingKey pins the env guidance every
 // env-resolving command shares: the hint names the exact key that carries
