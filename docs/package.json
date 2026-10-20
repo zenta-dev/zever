@@ -7,7 +7,11 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "audit": "node scripts/audit-facts.mjs",
+    "audit:self-test": "node scripts/audit-facts.mjs --self-test",
+    "lint": "node scripts/lint-docs.mjs",
+    "check-links": "node scripts/check-links.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",
@@ -21,6 +25,9 @@
     "satori": "^0.35.0",
     "sharp": "^0.35.5",
     "starlight-theme-black": "^0.7.1"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.3.2"
   },
   "overrides": {
     "fflate": "^0.7.5"

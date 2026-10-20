@@ -307,10 +307,28 @@ vulncheck-all: ## Scan every module; reachable vulns fail unless allowlisted wit
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
 	$(GO) run ./tools/vulngate --govulncheck "$(GOVULNCHECK)" $(if $(MODULES),$(MODULES),$(SHARD_MODULES))
 
-.PHONY: docs-dev docs-build docs-preview
+.PHONY: docs-dev docs-build docs-preview docs-audit docs-lint docs-links
 docs-dev: ## Run docs dev server
 	cd docs && npm run dev
 docs-build: ## Build docs site
 	cd docs && npm run build
 docs-preview: ## Preview built docs site
 	cd docs && npm run preview
+
+# Docs gates: they cross-check the published pages against the Go source.
+# They need the docs dependencies once (npm ci in docs/).
+.PHONY: docs-audit
+docs-audit: ## Audit docs claims against the Go code (env keys, adapters, flags, imports)
+	cd docs && node scripts/audit-facts.mjs
+
+.PHONY: docs-audit-self-test
+docs-audit-self-test: ## Prove the docs audit rejects the env-key mistakes it guards against
+	cd docs && node scripts/audit-facts.mjs --self-test
+
+.PHONY: docs-lint
+docs-lint: ## Lint docs style (em/en dashes, sentence case, Asides)
+	cd docs && node scripts/lint-docs.mjs
+
+.PHONY: docs-links
+docs-links: ## Check every internal link in the built site (run make docs-build first)
+	cd docs && node scripts/check-links.mjs

@@ -153,13 +153,13 @@ DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, 
 - The second service to open a DSN borrows the first pool and never closes it. The shared pool takes the first opener's pool settings, and a differing nonzero `max_conns` logs a warning without DSN content.
 - Set `dedicated_pool: true` to open a private pool. Use it with a separate database for `queue`, `workflow`, and `scheduler` under sustained load.
 - `dedicated_pool` is ignored on `db` itself, which owns the pool.
-- Env: `SEARCH__DEFAULT__DEDICATEDPOOL=true`, `QUEUE__DEFAULT__DSN=...`, `SESSION__DEFAULT__DSN=...`.
+- Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
 - Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so remove those lines before a downgrade.
 
 ```sh
-SEARCH__DEFAULT__ADAPTER=db
-SEARCH__DEFAULT__DSN=postgres://app:secret@db:5432/app?sslmode=require
-SEARCH__DEFAULT__DEDICATED_POOL=false
+SEARCH_ADAPTER=db
+SEARCH_DSN=postgres://app:secret@db:5432/app?sslmode=require
+SEARCH_DEDICATED_POOL=false
 ```
 
 ## Service reference
@@ -188,10 +188,10 @@ LLM completions, chat, and embeddings. Every backend needs a key, so there is no
 | `timeout` | duration | `0` | Request timeout |
 
 ```sh
-AI__DEFAULT__ADAPTER=anthropic
-AI__DEFAULT__API_KEY=sk-ant-...
-AI__DEFAULT__MODEL=claude-sonnet-4-5
-AI__DEFAULT__TIMEOUT=30s
+AI_ADAPTER=anthropic
+AI_API_KEY=sk-ant-...
+AI_MODEL=claude-sonnet-4-5
+AI_TIMEOUT=30s
 ```
 
 ### `analytics`
@@ -215,9 +215,9 @@ Event tracking, identify, and group calls.
 | `max_properties` | integer | `0` | Bounds the number of properties per call |
 
 ```sh
-ANALYTICS__DEFAULT__ADAPTER=posthog
-ANALYTICS__DEFAULT__API_KEY=phc_...
-ANALYTICS__DEFAULT__GROUP_TYPE=organization
+ANALYTICS_ADAPTER=posthog
+ANALYTICS_API_KEY=phc_...
+ANALYTICS_GROUP_TYPE=organization
 ```
 
 ### `auth`
@@ -248,10 +248,10 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 The `session` adapter has no env-settable options: its `session.Store` is injected from Go.
 
 ```sh
-AUTH__DEFAULT__ADAPTER=jwt
-AUTH__DEFAULT__JWT_SECRET=change-me-to-at-least-32-bytes
-AUTH__DEFAULT__JWT_ISSUER=my-app
-AUTH__DEFAULT__JWT_MAX_TTL=1h
+AUTH_ADAPTER=jwt
+AUTH_JWT_SECRET=change-me-to-at-least-32-bytes
+AUTH_JWT_ISSUER=my-app
+AUTH_JWT_MAX_TTL=1h
 ```
 
 ### `billing`
@@ -273,8 +273,8 @@ Customers, subscriptions, and invoices through a billing provider.
 | `sandbox` | boolean | `false` | Selects the provider sandbox environment |
 
 ```sh
-BILLING__DEFAULT__ADAPTER=stripe
-BILLING__DEFAULT__SECRET_KEY=sk_live_...
+BILLING_ADAPTER=stripe
+BILLING_SECRET_KEY=sk_live_...
 ```
 
 ### `cache`
@@ -303,9 +303,9 @@ Redis connection keys, documented in [Redis connection options](#redis-connectio
 The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The `adapter` field inside `options` is a legacy duplicate and is omitted here; use the outer `adapter` string.
 
 ```sh
-CACHE__DEFAULT__ADAPTER=redis
-CACHE__DEFAULT__ADDR=localhost:6379
-CACHE__DEFAULT__REQUIRE_TLS=true
+CACHE_ADAPTER=redis
+CACHE_ADDR=localhost:6379
+CACHE_REQUIRE_TLS=true
 ```
 
 ### `cdn`
@@ -326,9 +326,9 @@ Invalidates cached content at the edge. `noop` discards purges (default); `cloud
 | `base_url` | string | `""` | Overrides the Cloudflare API endpoint (cloudflare adapter) |
 
 ```sh
-CDN__DEFAULT__ADAPTER=cloudflare
-CDN__DEFAULT__API_TOKEN=CLOUDFLARE_API_TOKEN
-CDN__DEFAULT__ZONE_ID=CLOUDFLARE_ZONE_ID
+CDN_ADAPTER=cloudflare
+CDN_API_TOKEN=CLOUDFLARE_API_TOKEN
+CDN_ZONE_ID=CLOUDFLARE_ZONE_ID
 ```
 
 ### `crypto`
@@ -356,9 +356,9 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not a file option. Use `local` for file-only setups.
 
 ```sh
-CRYPTO__DEFAULT__ADAPTER=local
-CRYPTO__DEFAULT__KEY=<base64-32-bytes>
-CRYPTO__DEFAULT__SIGN_KEY=<base64-64-bytes>
+CRYPTO_ADAPTER=local
+CRYPTO_KEY=<base64-32-bytes>
+CRYPTO_SIGN_KEY=<base64-64-bytes>
 ```
 
 ### `db`
@@ -418,9 +418,9 @@ Render documents to PDF or images locally, through a remote service, or with LaT
 | `latex_allow_unsafe_source` | boolean | `false` | Disables the LaTeX source pre-scan (absolute or `..` file paths, shell-escape packages). Trusted sources only |
 
 ```sh
-DOCUMENT__DEFAULT__ADAPTER=latex
-DOCUMENT__DEFAULT__LATEX_COMMAND=pdflatex
-DOCUMENT__DEFAULT__TIMEOUT=1m
+DOCUMENT_ADAPTER=latex
+DOCUMENT_LATEX_COMMAND=pdflatex
+DOCUMENT_TIMEOUT=1m
 ```
 
 ### `eventbus`
@@ -446,9 +446,9 @@ In-process or Redis publish/subscribe.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
-EVENTBUS__DEFAULT__ADAPTER=redis
-EVENTBUS__DEFAULT__REDIS_ADDR=localhost:6379
-EVENTBUS__DEFAULT__REDIS_PREFIX=events
+EVENTBUS_ADAPTER=redis
+EVENTBUS_REDIS_ADDR=localhost:6379
+EVENTBUS_REDIS_PREFIX=events
 ```
 
 ### `flag`
@@ -471,9 +471,9 @@ Feature flags from a static file or Firebase. Options nest under the adapter nam
 | `firebase.timeout` | duration | `30s` | Operation timeout |
 
 ```sh
-FLAG__DEFAULT__ADAPTER=static
-FLAG__DEFAULT__STATIC_PATH=flags.json
-FLAG__DEFAULT__STATIC_RELOAD=true
+FLAG_ADAPTER=static
+FLAG_STATIC_PATH=flags.json
+FLAG_STATIC_RELOAD=true
 ```
 
 ### `geo`
@@ -500,8 +500,8 @@ Geocoding and reverse geocoding.
 | `user_agent` | string | `""` | User-Agent for OSM Nominatim |
 
 ```sh
-GEO__DEFAULT__ADAPTER=osm
-GEO__DEFAULT__USER_AGENT=my-app/1.0 (ops@example.com)
+GEO_ADAPTER=osm
+GEO_USER_AGENT=my-app/1.0 (ops@example.com)
 ```
 
 ### `i18n`
@@ -527,9 +527,9 @@ Message catalogs. Options nest under the adapter name.
 | `remote.allow_private` | boolean | `false` | Permits dialing private, loopback, and link-local addresses (local sidecars). Logs a line at startup |
 
 ```sh
-I18N__DEFAULT__ADAPTER=embed
-I18N__DEFAULT__EMBED_DIR=locales
-I18N__DEFAULT__EMBED_FALLBACK=en
+I18N_ADAPTER=embed
+I18N_EMBED_DIR=locales
+I18N_EMBED_FALLBACK=en
 ```
 
 ### `idempotency`
@@ -555,9 +555,9 @@ Reserve-then-commit store that makes retried requests safe.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
-IDEMPOTENCY__DEFAULT__ADAPTER=redis
-IDEMPOTENCY__DEFAULT__TTL=24h
-IDEMPOTENCY__DEFAULT__REDIS_ADDR=localhost:6379
+IDEMPOTENCY_ADAPTER=redis
+IDEMPOTENCY_TTL=24h
+IDEMPOTENCY_REDIS_ADDR=localhost:6379
 ```
 
 ### `lock`
@@ -582,9 +582,9 @@ Distributed leases with a TTL.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
 
 ```sh
-LOCK__DEFAULT__ADAPTER=redis
-LOCK__DEFAULT__ADDR=localhost:6379
-LOCK__DEFAULT__TTL=30s
+LOCK_ADAPTER=redis
+LOCK_ADDR=localhost:6379
+LOCK_TTL=30s
 ```
 
 ### `log`
@@ -603,8 +603,8 @@ Structured logging. Only the minimum level is configurable here.
 | `min_level` | integer | `0` | Minimum severity emitted by the logger: `0` debug, `1` info, `2` warn, `3` error, `4` fatal. In a file it is an integer, not a name. |
 
 ```sh
-LOG__DEFAULT__ADAPTER=slog
-LOG__DEFAULT__MIN_LEVEL=1
+LOG_ADAPTER=slog
+LOG_MIN_LEVEL=1
 ```
 
 ### `mailer`
@@ -629,12 +629,12 @@ Outbound email. `host` and `port` are required by validation, so the default `lo
 | `max_message_size` | integer | `10 MiB` | Maximum message size in bytes |
 
 ```sh
-MAILER__DEFAULT__ADAPTER=smtp
-MAILER__DEFAULT__HOST=smtp.example.com
-MAILER__DEFAULT__PORT=587
-MAILER__DEFAULT__USERNAME=apikey
-MAILER__DEFAULT__PASSWORD=secret
-MAILER__DEFAULT__ENCRYPTION=starttls
+MAILER_ADAPTER=smtp
+MAILER_HOST=smtp.example.com
+MAILER_PORT=587
+MAILER_USERNAME=apikey
+MAILER_PASSWORD=secret
+MAILER_ENCRYPTION=starttls
 ```
 
 ### `media`
@@ -666,11 +666,11 @@ Image and video storage and derivation, locally or on S3.
 | `ffprobe` | string | `ffprobe` | Ffprobe binary path |
 
 ```sh
-MEDIA__DEFAULT__ADAPTER=s3
-MEDIA__DEFAULT__BUCKET=my-media
-MEDIA__DEFAULT__REGION=us-east-1
-MEDIA__DEFAULT__ACCESS_KEY_ID=AKIA...
-MEDIA__DEFAULT__SECRET_ACCESS_KEY=...
+MEDIA_ADAPTER=s3
+MEDIA_BUCKET=my-media
+MEDIA_REGION=us-east-1
+MEDIA_ACCESS_KEY_ID=AKIA...
+MEDIA_SECRET_ACCESS_KEY=...
 ```
 
 ### `notification`
@@ -694,10 +694,10 @@ SMS and push notifications. Twilio and FCM options nest under their names.
 | `fcm.service_account` | string | `""` | Path to the service account JSON key file |
 
 ```sh
-NOTIFICATION__DEFAULT__ADAPTER=twilio
-NOTIFICATION__DEFAULT__TWILIO_ACCOUNT_SID=AC...
-NOTIFICATION__DEFAULT__TWILIO_AUTH_TOKEN=...
-NOTIFICATION__DEFAULT__TWILIO_FROM_NUMBER=+15551234567
+NOTIFICATION_ADAPTER=twilio
+NOTIFICATION_TWILIO_ACCOUNT_SID=AC...
+NOTIFICATION_TWILIO_AUTH_TOKEN=...
+NOTIFICATION_TWILIO_FROM_NUMBER=+15551234567
 ```
 
 ### `observability`
@@ -726,10 +726,10 @@ Traces and metrics, to stdout or an OTLP collector.
 | `attr_value_limit` | integer | `0` | Caps string attribute values; 0 selects the default |
 
 ```sh
-OBSERVABILITY__DEFAULT__ADAPTER=otlp
-OBSERVABILITY__DEFAULT__ENDPOINT=collector:4317
-OBSERVABILITY__DEFAULT__SERVICE_NAME=my-app
-OBSERVABILITY__DEFAULT__SAMPLE_RATIO=0.1
+OBSERVABILITY_ADAPTER=otlp
+OBSERVABILITY_ENDPOINT=collector:4317
+OBSERVABILITY_SERVICE_NAME=my-app
+OBSERVABILITY_SAMPLE_RATIO=0.1
 ```
 
 ### `outbox`
@@ -762,10 +762,10 @@ Transactional outbox and inbox with a polling relay, or postgres logical-replica
 | `retry` | object |  | Backoff policy. Keys are listed in [Retry policy](#retry-policy). |
 
 ```sh
-OUTBOX__DEFAULT__ADAPTER=db
-OUTBOX__DEFAULT__DSN=postgres://app:secret@db:5432/app
-OUTBOX__DEFAULT__POLL_INTERVAL=1s
-OUTBOX__DEFAULT__PUBLISHER=eventbus
+OUTBOX_ADAPTER=db
+OUTBOX_DSN=postgres://app:secret@db:5432/app
+OUTBOX_POLL_INTERVAL=1s
+OUTBOX_PUBLISHER=eventbus
 ```
 
 ### `password`
@@ -788,12 +788,12 @@ Argon2id password hashing. All five parameters are range-validated.
 | `key_length` | integer | `32` | Derived key length in bytes in the range 16-128 |
 
 ```sh
-PASSWORD__DEFAULT__ADAPTER=argon2id
-PASSWORD__DEFAULT__TIME=3
-PASSWORD__DEFAULT__MEMORY=65536
-PASSWORD__DEFAULT__THREADS=4
-PASSWORD__DEFAULT__SALT_LENGTH=16
-PASSWORD__DEFAULT__KEY_LENGTH=32
+PASSWORD_ADAPTER=argon2id
+PASSWORD_TIME=3
+PASSWORD_MEMORY=65536
+PASSWORD_THREADS=4
+PASSWORD_SALT_LENGTH=16
+PASSWORD_KEY_LENGTH=32
 ```
 
 ### `payment`
@@ -820,9 +820,9 @@ Payment intents and webhooks. The `stub` adapter performs no webhook verificatio
 The refund idempotency store (`Idempotency`) is injected from Go and is not a file option.
 
 ```sh
-PAYMENT__DEFAULT__ADAPTER=stripe
-PAYMENT__DEFAULT__SECRET_KEY=sk_live_...
-PAYMENT__DEFAULT__WEBHOOK_SECRET=whsec_...
+PAYMENT_ADAPTER=stripe
+PAYMENT_SECRET_KEY=sk_live_...
+PAYMENT_WEBHOOK_SECRET=whsec_...
 ```
 
 ### `permission`
@@ -854,10 +854,10 @@ Authorization checks from inline rules, RBAC roles, or Casbin files.
 | `OwnedAttr` | string | `""` | Resource attribute carrying the owner ID. Required when `OwnedOnly` is true. |
 
 ```sh
-PERMISSION__DEFAULT__ADAPTER=rbac
-PERMISSION__DEFAULT__ROLES_-_ROLE=admin
-PERMISSION__DEFAULT__ROLES_ACTION=*
-PERMISSION__DEFAULT__ROLES_EFFECT=allow
+PERMISSION_ADAPTER=rbac
+PERMISSION_ROLES_-_ROLE=admin
+PERMISSION_ROLES_ACTION=*
+PERMISSION_ROLES_EFFECT=allow
 ```
 
 ### `queue`
@@ -885,9 +885,9 @@ Message queue with visibility timeouts.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
 
 ```sh
-QUEUE__DEFAULT__ADAPTER=redis
-QUEUE__DEFAULT__ADDR=localhost:6379
-QUEUE__DEFAULT__VISIBILITY_TIMEOUT=30s
+QUEUE_ADAPTER=redis
+QUEUE_ADDR=localhost:6379
+QUEUE_VISIBILITY_TIMEOUT=30s
 ```
 
 ### `ratelimit`
@@ -914,9 +914,9 @@ Token-bucket rate limiting. `rate` and `burst` are required.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
-RATELIMIT__DEFAULT__ADAPTER=memory
-RATELIMIT__DEFAULT__RATE=100
-RATELIMIT__DEFAULT__BURST=200
+RATELIMIT_ADAPTER=memory
+RATELIMIT_RATE=100
+RATELIMIT_BURST=200
 ```
 
 ### `resilience`
@@ -952,10 +952,10 @@ Retry, timeout, circuit breaker, and bulkhead policies.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
-RESILIENCE__DEFAULT__ADAPTER=memory
-RESILIENCE__DEFAULT__TIMEOUT=5s
-RESILIENCE__DEFAULT__BREAKER_ENABLED=true
-RESILIENCE__DEFAULT__BREAKER_CONSECUTIVE_FAILURES=5
+RESILIENCE_ADAPTER=memory
+RESILIENCE_TIMEOUT=5s
+RESILIENCE_BREAKER_ENABLED=true
+RESILIENCE_BREAKER_CONSECUTIVE_FAILURES=5
 ```
 
 ### `router`
@@ -974,8 +974,8 @@ HTTP router adapter.
 | `app_name` | string | `app` | Application name used by adapters, defaulting to "app" when empty |
 
 ```sh
-ROUTER__DEFAULT__ADAPTER=fiber
-ROUTER__DEFAULT__APP_NAME=my-app
+ROUTER_ADAPTER=fiber
+ROUTER_APP_NAME=my-app
 ```
 
 ### `scheduler`
@@ -995,10 +995,10 @@ Cron-style scheduler. It resolves the job dispatcher, so it shares the process-w
 | `dsn` | string | `""` | Postgres connection string or sqlite path for the postgres adapter |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-`scheduler.Options.Dispatcher` is required and is injected in code, so a file `options` block replaces it with nil and `Load` fails with `dispatcher_is_required`. Leave `options` out of the file and set `close_timeout`, `dsn`, and `dedicated_pool` with env instead: `SCHEDULER__DEFAULT__CLOSETIMEOUT=3s`, `SCHEDULER__DEFAULT__DSN=...`.
+`scheduler.Options.Dispatcher` is required and is injected in code, so a file `options` block replaces it with nil and `Load` fails with `dispatcher_is_required`. Leave `options` out of the file and set `close_timeout`, `dsn`, and `dedicated_pool` with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
 
 ```sh
-SCHEDULER__DEFAULT__ADAPTER=postgres
+SCHEDULER_ADAPTER=postgres
 ```
 
 ### `search`
@@ -1021,9 +1021,9 @@ Full-text search. `db` is the canonical name; `postgres` and `sqlite` stay as al
 | `allow_insecure` | boolean | `false` | Permits an http:// Host for testing |
 
 ```sh
-SEARCH__DEFAULT__ADAPTER=meilisearch
-SEARCH__DEFAULT__HOST=https://search.example.com
-SEARCH__DEFAULT__API_KEY=...
+SEARCH_ADAPTER=meilisearch
+SEARCH_HOST=https://search.example.com
+SEARCH_API_KEY=...
 ```
 
 ### `secrets`
@@ -1051,10 +1051,10 @@ Secret lookup from the environment or Vault. `prefix` is required.
 | `region` | string | `""` | AWS region |
 
 ```sh
-SECRETS__DEFAULT__ADAPTER=vault
-SECRETS__DEFAULT__ADDR=https://vault.example.com
-SECRETS__DEFAULT__TOKEN_FILE=/run/secrets/vault-token
-SECRETS__DEFAULT__MOUNT=secret
+SECRETS_ADAPTER=vault
+SECRETS_ADDR=https://vault.example.com
+SECRETS_TOKEN_FILE=/run/secrets/vault-token
+SECRETS_MOUNT=secret
 ```
 
 ### `session`
@@ -1079,9 +1079,9 @@ Server-side session store.
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
-SESSION__DEFAULT__ADAPTER=redis
-SESSION__DEFAULT__TTL=15m
-SESSION__DEFAULT__REDIS_ADDR=localhost:6379
+SESSION_ADAPTER=redis
+SESSION_TTL=15m
+SESSION_REDIS_ADDR=localhost:6379
 ```
 
 ### `storage`
@@ -1122,10 +1122,10 @@ Object storage with presigned URLs and an optional access policy.
 `<op>` is one of `read` (downloads), `write` (new objects), `update` (overwrites), or `delete`.
 
 ```sh
-STORAGE__DEFAULT__ADAPTER=s3
-STORAGE__DEFAULT__REGION=us-east-1
-STORAGE__DEFAULT__ACCESS_KEY_ID=AKIA...
-STORAGE__DEFAULT__SECRET_ACCESS_KEY=...
+STORAGE_ADAPTER=s3
+STORAGE_REGION=us-east-1
+STORAGE_ACCESS_KEY_ID=AKIA...
+STORAGE_SECRET_ACCESS_KEY=...
 ```
 
 ### `tenant`
@@ -1146,8 +1146,8 @@ Tenant resolution from a fixed ID, a header, or a subdomain.
 | `id` | string | `default` | Fixed tenant ID for the single-tenant backend |
 
 ```sh
-TENANT__DEFAULT__ADAPTER=header
-TENANT__DEFAULT__HEADER=X-Tenant-ID
+TENANT_ADAPTER=header
+TENANT_HEADER=X-Tenant-ID
 ```
 
 ### `vectorstore`
@@ -1171,10 +1171,10 @@ Embedding storage and similarity search. `db` is canonical; `sqlite` and `pgvect
 | `allow_insecure` | boolean | `false` | Permits an http:// URL for testing |
 
 ```sh
-VECTORSTORE__DEFAULT__ADAPTER=qdrant
-VECTORSTORE__DEFAULT__URL=https://qdrant.example.com
-VECTORSTORE__DEFAULT__API_KEY=...
-VECTORSTORE__DEFAULT__DIMENSION=1536
+VECTORSTORE_ADAPTER=qdrant
+VECTORSTORE_URL=https://qdrant.example.com
+VECTORSTORE_API_KEY=...
+VECTORSTORE_DIMENSION=1536
 ```
 
 ### `webhook`
@@ -1203,9 +1203,9 @@ Signed webhook delivery with retries, directly over HTTP or through the queue.
 `Logger` is injected from Go and is not a file option.
 
 ```sh
-WEBHOOK__DEFAULT__ADAPTER=http
-WEBHOOK__DEFAULT__TIMEOUT=10s
-WEBHOOK__DEFAULT__MAX_RETRIES=5
+WEBHOOK_ADAPTER=http
+WEBHOOK_TIMEOUT=10s
+WEBHOOK_MAX_RETRIES=5
 ```
 
 ### `workflow`
@@ -1228,7 +1228,7 @@ Durable workflow runs. An empty DSN selects sqlite, a postgres URL selects postg
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
 ```sh
-WORKFLOW__DEFAULT__ADAPTER=db
-WORKFLOW__DEFAULT__DSN=postgres://app:secret@db:5432/app
-WORKFLOW__DEFAULT__TABLE=workflow_runs
+WORKFLOW_ADAPTER=db
+WORKFLOW_DSN=postgres://app:secret@db:5432/app
+WORKFLOW_TABLE=workflow_runs
 ```
