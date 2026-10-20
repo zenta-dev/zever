@@ -127,5 +127,5 @@ One-line summary.
 1. Run `npm run build` in `docs/` and fix any warning you introduced.
 2. Run `node scripts/check-links.mjs dist`. It checks links and anchors in the built site and must report zero broken targets.
 3. Run `node scripts/lint-docs.mjs`. It errors on dashes, a lowercase brand name in prose, a missing or long description, and more than two callouts, and warns on title-cased headings.
-4. Run `node scripts/audit-facts.mjs`. It cross-checks config keys, container accessors, CLI commands and flags, and import paths against the code, and must end with 0 problems.
+4. Run `node scripts/audit-facts.mjs`. It cross-checks env config keys, container accessors, CLI commands and flags, and import paths against the code, and must end with 0 problems.
 5. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.
