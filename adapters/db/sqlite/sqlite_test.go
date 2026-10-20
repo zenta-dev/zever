@@ -146,6 +146,24 @@ func TestNew_ConfigureError(t *testing.T) {
 	assertWrapped(t, "New", err)
 }
 
+// TestNew_ConfigureError_namesTheFailingStep proves the startup failure
+// names the step that failed ("ping"), so a developer can tell a connect
+// failure from a configuration failure.
+func TestNew_ConfigureError_namesTheFailingStep(t *testing.T) {
+	_, err := New(db.Options{Path: filepath.Join(t.TempDir(), "nope", "x.db")})
+	if err == nil {
+		t.Fatal("New() error = nil, want error")
+	}
+
+	if !strings.HasPrefix(err.Error(), "sqlite: ping: ") {
+		t.Errorf("New() error = %q, want prefix %q", err.Error(), "sqlite: ping: ")
+	}
+
+	if strings.Contains(err.Error(), "configure") {
+		t.Errorf("New() error = %q, want the failing step named, not \"configure\"", err.Error())
+	}
+}
+
 func TestNew_FilePoolKnobs(t *testing.T) {
 	d := newTempDB(t, db.Options{
 		Path:            filepath.Join(t.TempDir(), "pool.db"),

@@ -122,7 +122,11 @@ func New(opts db.Options) (db.DB, error) {
 		// Best-effort close after ping failure; nothing actionable to report.
 		_ = conn.Close()
 
-		return nil, fmt.Errorf("sqlite: configure: %w", err)
+		// "ping" names the failing step: the ping is what opens the
+		// database file, so its failure is a connect/open failure, not a
+		// configuration one. The path stays out of the message (see the
+		// package's error style note above).
+		return nil, fmt.Errorf("sqlite: ping: %w", err)
 	}
 
 	return &adapter{
