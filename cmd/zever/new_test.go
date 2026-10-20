@@ -1118,6 +1118,93 @@ func TestAllServiceAdaptersMatchDefault(t *testing.T) {
 	}
 }
 
+// TestScaffoldReplaceBlockCoversEveryFrameworkModule pins the local-checkout
+// replace set of a scaffolded project: every framework module the checkout
+// ships under core/, shared/ and adapters/ must be replaced, so the
+// scaffolded project's module graph resolves every sibling module against
+// the checkout instead of the module proxy (which cannot serve a version
+// that is not published yet).
+//
+// The expected set is enumerated from the checkout's directories, not from
+// the code that renders the replaces, so a module the framework adds later
+// fails this test until the scaffold covers it.
+//
+// The reverse direction matters too: a replace pointing at a module the
+// checkout does not ship breaks `go mod tidy` outright, so no replace may
+// name a directory that is not there.
+func TestScaffoldReplaceBlockCoversEveryFrameworkModule(t *testing.T) {
+	t.Parallel()
+
+	root := repoRootAbs(t)
+
+	data, err := renderNewGoMod("zever new", NewConfig{
+		ModulePath:       "example.com/acme",
+		GoVersion:        "1.27",
+		FrameworkVersion: "v0.0.0",
+		FrameworkDir:     root,
+		OutDir:           t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("renderNewGoMod: %v", err)
+	}
+
+	replaced := map[string]bool{}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 3 && fields[0] == "replace" && strings.HasPrefix(fields[1], frameworkModulePath) {
+			replaced[fields[1]] = true
+		}
+	}
+
+	for _, dir := range checkoutRuntimeModuleDirs(t, root) {
+		path := frameworkModulePath + "/" + dir
+		if !replaced[path] {
+			t.Errorf("framework module %q has no replace in the scaffolded go.mod", path)
+		}
+	}
+
+	for path := range replaced {
+		dir := strings.TrimPrefix(path, frameworkModulePath+"/")
+		if _, serr := os.Stat(filepath.Join(root, dir, "go.mod")); serr != nil {
+			t.Errorf("replace %q points at a module the checkout does not ship: %v", path, serr)
+		}
+	}
+}
+
+// checkoutRuntimeModuleDirs lists the repo-relative directories of every
+// module the checkout ships under the runtime roots (the batteries, the
+// adapters and the shared helpers). It reads the filesystem directly, so it
+// stays independent of the scaffold's own module-graph scan.
+func checkoutRuntimeModuleDirs(t *testing.T, root string) []string {
+	t.Helper()
+
+	var dirs []string
+
+	for _, top := range []string{"adapters", "core", "shared"} {
+		entries, rerr := os.ReadDir(filepath.Join(root, top))
+		if rerr != nil {
+			t.Fatalf("read %s: %v", top, rerr)
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			dir := top + "/" + entry.Name()
+
+			if _, serr := os.Stat(filepath.Join(root, dir, "go.mod")); serr == nil {
+				dirs = append(dirs, dir)
+			}
+		}
+	}
+
+	sort.Strings(dirs)
+
+	return dirs
+}
+
 // TestRenderNewGoModGolden pins the exact bytes of a version-pinned go.mod
 // (no checkout paths, so the output is deterministic).
 func TestRenderNewGoModGolden(t *testing.T) {
