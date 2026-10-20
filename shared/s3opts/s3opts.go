@@ -61,19 +61,45 @@ func (o Options) WithDefaults(defaultRegion string) Options {
 }
 
 // ValidateBucket reports an error when Bucket is empty.
+//
+// The message names the env key that carries the bucket: the config layer
+// names a service option <SERVICE>_<FIELD> (the media service's bucket is
+// MEDIA_BUCKET).
 func (o Options) ValidateBucket() error {
 	if strings.TrimSpace(o.Bucket) == "" {
-		return ErrMissingBucket
+		return fmt.Errorf("%w: set <SERVICE>_BUCKET to the target bucket name", ErrMissingBucket)
 	}
 	return nil
 }
 
-// ValidateCredentials reports an error when AccessKeyID or SecretAccessKey is empty.
+// ValidateCredentials reports an error when AccessKeyID or SecretAccessKey is
+// empty.
+//
+// The message names the env keys that carry the missing credentials, so a
+// developer knows exactly which value to set instead of guessing between
+// the two. The keys are the config layer's <SERVICE>_<FIELD> form (the media
+// service's access key is MEDIA_ACCESS_KEY_ID).
 func (o Options) ValidateCredentials() error {
-	if strings.TrimSpace(o.AccessKeyID) == "" || strings.TrimSpace(o.SecretAccessKey) == "" {
-		return ErrMissingCredentials
+	missing := make([]string, 0, 2)
+
+	if strings.TrimSpace(o.AccessKeyID) == "" {
+		missing = append(missing, "access_key_id")
 	}
-	return nil
+
+	if strings.TrimSpace(o.SecretAccessKey) == "" {
+		missing = append(missing, "secret_access_key")
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(missing))
+	for _, field := range missing {
+		keys = append(keys, "<SERVICE>_"+strings.ToUpper(field))
+	}
+
+	return fmt.Errorf("%w: set %s", ErrMissingCredentials, strings.Join(keys, " and "))
 }
 
 func validateURL(value string) error {
