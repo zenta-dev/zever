@@ -1,0 +1,3 @@
+- fix(config): `zever config show --json` now renders a duration option as its canonical string form (`"30s"`, the form the env layer parses) instead of dropping it. `encoding/json/v2` has no default representation for `time.Duration`, so every service carrying a timeout (`ai`, `db`, `cache`, `queue`, ...) used to report an empty `options` object, and the named instances (`db/REPORTING`) reported the raw nanosecond count.
+- fix(config): the JSON codec renders a `time.Duration` as its canonical string form, so a config envelope shows the effective timeout instead of failing to encode.
+- fix(retry): `retry.Policy.OnRetry` is a Go-API-only hook and is now tagged `json:"-"`, so a config envelope renders the rest of the policy instead of failing to encode.
