@@ -103,8 +103,10 @@ func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
 
 // AI resolves and returns the AI service instance.
 func (c *Container) AI() (ai.AI, error) {
-	if v, ok, err := c.providedDefault(ai.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(ai.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.ai.get(func() (ai.AI, error) {
 		return openService("ai", c.cfg.AI.Adapter, ai.ParseAdapter, ai.Open, c.cfg.AI.Options)
@@ -113,8 +115,10 @@ func (c *Container) AI() (ai.AI, error) {
 
 // Analytics resolves and returns the analytics service instance.
 func (c *Container) Analytics() (analytics.Analytics, error) {
-	if v, ok, err := c.providedDefault(analytics.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(analytics.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.analytics.get(func() (analytics.Analytics, error) {
 		return openService("analytics", c.cfg.Analytics.Adapter, analytics.ParseAdapter, analytics.Open, c.cfg.Analytics.Options)
@@ -123,8 +127,10 @@ func (c *Container) Analytics() (analytics.Analytics, error) {
 
 // Auth resolves and returns the auth service instance.
 func (c *Container) Auth() (auth.Auth, error) {
-	if v, ok, err := c.providedDefault(auth.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(auth.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.auth.get(func() (auth.Auth, error) {
 		return openService("auth", c.cfg.Auth.Adapter, auth.ParseAdapter, auth.Open, c.cfg.Auth.Options)
@@ -133,8 +139,10 @@ func (c *Container) Auth() (auth.Auth, error) {
 
 // Billing resolves and returns the billing service instance.
 func (c *Container) Billing() (billing.Billing, error) {
-	if v, ok, err := c.providedDefault(billing.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(billing.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.billing.get(func() (billing.Billing, error) {
 		return openService("billing", c.cfg.Billing.Adapter, billing.ParseAdapter, billing.Open, c.cfg.Billing.Options)
@@ -145,8 +153,10 @@ func (c *Container) Billing() (billing.Billing, error) {
 // pointing at an already-pooled DSN borrows the shared pool (owns=false);
 // DedicatedPool or a non-shareable DSN opens a private pool as before.
 func (c *Container) Cache() (cache.Cache, error) {
-	if v, ok, err := c.providedDefault(cache.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(cache.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.cache.get(func() (cache.Cache, error) {
 		if v, shared, err := c.openSharedCache(); shared || err != nil {
@@ -159,8 +169,10 @@ func (c *Container) Cache() (cache.Cache, error) {
 
 // CDN resolves and returns the CDN service instance.
 func (c *Container) CDN() (cdn.CDN, error) {
-	if v, ok, err := c.providedDefault(cdn.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(cdn.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.cdn.get(func() (cdn.CDN, error) {
 		return openService("cdn", c.cfg.CDN.Adapter, cdn.ParseAdapter, cdn.Open, c.cfg.CDN.Options)
@@ -169,8 +181,10 @@ func (c *Container) CDN() (cdn.CDN, error) {
 
 // Crypto resolves and returns the crypto service instance.
 func (c *Container) Crypto() (crypto.Crypto, error) {
-	if v, ok, err := c.providedDefault(crypto.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(crypto.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.crypto.get(func() (crypto.Crypto, error) {
 		return openService("crypto", c.cfg.Crypto.Adapter, crypto.ParseAdapter, crypto.Open, c.cfg.Crypto.Options)
@@ -181,8 +195,10 @@ func (c *Container) Crypto() (crypto.Crypto, error) {
 // in the DSN registry for borrowers; DedicatedPool is meaningless on db
 // itself and is ignored.
 func (c *Container) DB() (db.DB, error) {
-	if v, ok, err := c.providedDefault(db.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(db.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.db.get(func() (db.DB, error) {
 		return c.openDB()
@@ -208,8 +224,10 @@ func (c *Container) Transactor() (db.Transactor, error) {
 
 // Document resolves and returns the document service instance.
 func (c *Container) Document() (document.Document, error) {
-	if v, ok, err := c.providedDefault(document.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(document.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.document.get(func() (document.Document, error) {
 		return openService("document", c.cfg.Document.Adapter, document.ParseAdapter, document.Open, c.cfg.Document.Options)
@@ -218,8 +236,10 @@ func (c *Container) Document() (document.Document, error) {
 
 // EventBus resolves and returns the eventbus service instance.
 func (c *Container) EventBus() (eventbus.EventBus, error) {
-	if v, ok, err := c.providedDefault(eventbus.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(eventbus.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.eventbus.get(func() (eventbus.EventBus, error) {
 		return openService("eventbus", c.cfg.EventBus.Adapter, eventbus.ParseAdapter, eventbus.Open, c.cfg.EventBus.Options)
@@ -233,8 +253,10 @@ func (c *Container) Eventbus() (eventbus.EventBus, error) {
 
 // Flag resolves and returns the flag service instance.
 func (c *Container) Flag() (flag.Flag, error) {
-	if v, ok, err := c.providedDefault(flag.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(flag.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.flag.get(func() (flag.Flag, error) {
 		return openService("flag", c.cfg.Flag.Adapter, flag.ParseAdapter, flag.Open, c.cfg.Flag.Options)
@@ -243,8 +265,10 @@ func (c *Container) Flag() (flag.Flag, error) {
 
 // Geo resolves and returns the geo service instance.
 func (c *Container) Geo() (geo.Geo, error) {
-	if v, ok, err := c.providedDefault(geo.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(geo.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.geo.get(func() (geo.Geo, error) {
 		return openService("geo", c.cfg.Geo.Adapter, geo.ParseAdapter, geo.Open, c.cfg.Geo.Options)
@@ -311,8 +335,10 @@ func (c *Container) GRPCClient(target string, opts ...grpcclient.Option) (*grpc.
 
 // I18n resolves and returns the i18n service instance.
 func (c *Container) I18n() (i18n.I18n, error) {
-	if v, ok, err := c.providedDefault(i18n.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(i18n.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.i18n.get(func() (i18n.I18n, error) {
 		return openService("i18n", c.cfg.I18n.Adapter, i18n.ParseAdapter, i18n.Open, c.cfg.I18n.Options)
@@ -324,8 +350,10 @@ func (c *Container) I18n() (i18n.I18n, error) {
 // pool (owns=false); DedicatedPool or a non-shareable DSN opens a private
 // pool as before.
 func (c *Container) Idempotency() (idempotency.Store, error) {
-	if v, ok, err := c.providedDefault(idempotency.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(idempotency.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.idempotency.get(func() (idempotency.Store, error) {
 		if v, shared, err := c.openSharedIdempotency(); shared || err != nil {
@@ -360,8 +388,10 @@ func (c *Container) Job() (*job.Dispatcher, error) {
 
 // Lock resolves and returns the lock service instance.
 func (c *Container) Lock() (lock.Locker, error) {
-	if v, ok, err := c.providedDefault(lock.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(lock.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.lock.get(func() (lock.Locker, error) {
 		return openService("lock", c.cfg.Lock.Adapter, lock.ParseAdapter, lock.Open, c.cfg.Lock.Options)
@@ -370,8 +400,10 @@ func (c *Container) Lock() (lock.Locker, error) {
 
 // Log resolves and returns the log service instance.
 func (c *Container) Log() (log.Logger, error) {
-	if v, ok, err := c.providedDefault(log.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(log.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.log.get(func() (log.Logger, error) {
 		return openService("log", c.cfg.Log.Adapter, log.ParseAdapter, log.Open, c.cfg.Log.Options)
@@ -380,8 +412,10 @@ func (c *Container) Log() (log.Logger, error) {
 
 // Mailer resolves and returns the mailer service instance.
 func (c *Container) Mailer() (mailer.Mailer, error) {
-	if v, ok, err := c.providedDefault(mailer.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(mailer.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.mailer.get(func() (mailer.Mailer, error) {
 		return openService("mailer", c.cfg.Mailer.Adapter, mailer.ParseAdapter, mailer.Open, c.cfg.Mailer.Options)
@@ -390,8 +424,10 @@ func (c *Container) Mailer() (mailer.Mailer, error) {
 
 // Media resolves and returns the media service instance.
 func (c *Container) Media() (media.Media, error) {
-	if v, ok, err := c.providedDefault(media.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(media.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.media.get(func() (media.Media, error) {
 		return openService("media", c.cfg.Media.Adapter, media.ParseAdapter, media.Open, c.cfg.Media.Options)
@@ -400,8 +436,10 @@ func (c *Container) Media() (media.Media, error) {
 
 // Notification resolves and returns the notification service instance.
 func (c *Container) Notification() (notification.Notifier, error) {
-	if v, ok, err := c.providedDefault(notification.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(notification.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.notification.get(func() (notification.Notifier, error) {
 		return openService("notification", c.cfg.Notification.Adapter, notification.ParseAdapter, notification.Open, c.cfg.Notification.Options)
@@ -410,8 +448,10 @@ func (c *Container) Notification() (notification.Notifier, error) {
 
 // Observability resolves and returns the observability service instance.
 func (c *Container) Observability() (observability.Provider, error) {
-	if v, ok, err := c.providedDefault(observability.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(observability.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.observability.get(func() (observability.Provider, error) {
 		return openService("observability", c.cfg.Observability.Adapter, observability.ParseAdapter, observability.Open, c.cfg.Observability.Options)
@@ -426,8 +466,10 @@ func (c *Container) Observability() (observability.Provider, error) {
 // separately, so use OutboxRelay(ctx) to attach it and start draining. This
 // accessor keeps working for Record after the relay is running.
 func (c *Container) Outbox() (outbox.Store, error) {
-	if v, ok, err := c.providedDefault(outbox.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(outbox.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.outbox.get(func() (outbox.Store, error) {
 		opts := c.cfg.Outbox.Options
@@ -444,8 +486,10 @@ func (c *Container) Outbox() (outbox.Store, error) {
 
 // Password resolves and returns the password service instance.
 func (c *Container) Password() (password.Hasher, error) {
-	if v, ok, err := c.providedDefault(password.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(password.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.password.get(func() (password.Hasher, error) {
 		return openService("password", c.cfg.Password.Adapter, password.ParseAdapter, password.Open, c.cfg.Password.Options)
@@ -457,8 +501,10 @@ func (c *Container) Password() (password.Hasher, error) {
 // resolved idempotency service is reused for webhook replay dedupe; an
 // unresolvable idempotency service never blocks payment resolution.
 func (c *Container) Payment() (payment.Payment, error) {
-	if v, ok, err := c.providedDefault(payment.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(payment.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.payment.get(func() (payment.Payment, error) {
 		opts := c.cfg.Payment.Options
@@ -474,8 +520,10 @@ func (c *Container) Payment() (payment.Payment, error) {
 
 // Permission resolves and returns the permission service instance.
 func (c *Container) Permission() (permission.Checker, error) {
-	if v, ok, err := c.providedDefault(permission.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(permission.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.permission.get(func() (permission.Checker, error) {
 		return openService("permission", c.cfg.Permission.Adapter, permission.ParseAdapter, permission.Open, c.cfg.Permission.Options)
@@ -488,8 +536,10 @@ func (c *Container) Permission() (permission.Checker, error) {
 // Under sustained load prefer a separate queue database with
 // DedicatedPool (Solid Queue guidance).
 func (c *Container) Queue() (queue.Queue, error) {
-	if v, ok, err := c.providedDefault(queue.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(queue.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.queue.get(func() (queue.Queue, error) {
 		if v, shared, err := c.openSharedQueue(); shared || err != nil {
@@ -552,8 +602,10 @@ func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
 
 // RateLimit resolves and returns the ratelimit service instance.
 func (c *Container) RateLimit() (ratelimit.Limiter, error) {
-	if v, ok, err := c.providedDefault(ratelimit.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(ratelimit.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.ratelimit.get(func() (ratelimit.Limiter, error) {
 		return openService("ratelimit", c.cfg.RateLimit.Adapter, ratelimit.ParseAdapter, ratelimit.Open, c.cfg.RateLimit.Options)
@@ -567,8 +619,10 @@ func (c *Container) Ratelimit() (ratelimit.Limiter, error) {
 
 // Resilience resolves and returns the resilience service instance.
 func (c *Container) Resilience() (resilience.Manager, error) {
-	if v, ok, err := c.providedDefault(resilience.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(resilience.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.resilience.get(func() (resilience.Manager, error) {
 		return openService("resilience", c.cfg.Resilience.Adapter, resilience.ParseAdapter, resilience.Open, c.cfg.Resilience.Options)
@@ -577,8 +631,10 @@ func (c *Container) Resilience() (resilience.Manager, error) {
 
 // Router resolves and returns the router service instance.
 func (c *Container) Router() (router.Router, error) {
-	if v, ok, err := c.providedDefault(router.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(router.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.router.get(func() (router.Router, error) {
 		return openService("router", c.cfg.Router.Adapter, router.ParseAdapter, router.Open, c.cfg.Router.Options)
@@ -592,8 +648,10 @@ func (c *Container) Router() (router.Router, error) {
 // already-pooled DSN borrows the shared pool (owns=false); DedicatedPool
 // or a non-shareable DSN opens a private pool as before.
 func (c *Container) Scheduler() (scheduler.Scheduler, error) {
-	if v, ok, err := c.providedDefault(scheduler.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(scheduler.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.scheduler.get(func() (scheduler.Scheduler, error) {
 		if v, shared, err := c.openSharedScheduler(); shared || err != nil {
@@ -619,8 +677,10 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 // an already-pooled DSN borrows the shared pool (owns=false);
 // DedicatedPool or a non-shareable DSN opens a private pool as before.
 func (c *Container) Search() (search.Search, error) {
-	if v, ok, err := c.providedDefault(search.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(search.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.search.get(func() (search.Search, error) {
 		if v, shared, err := c.openSharedSearch(); shared || err != nil {
@@ -633,8 +693,10 @@ func (c *Container) Search() (search.Search, error) {
 
 // Secrets resolves and returns the secrets service instance.
 func (c *Container) Secrets() (secrets.Secrets, error) {
-	if v, ok, err := c.providedDefault(secrets.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(secrets.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.secrets.get(func() (secrets.Secrets, error) {
 		return openService("secrets", c.cfg.Secrets.Adapter, secrets.ParseAdapter, secrets.Open, c.cfg.Secrets.Options)
@@ -646,8 +708,10 @@ func (c *Container) Secrets() (secrets.Secrets, error) {
 // (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
 // as before.
 func (c *Container) Session() (session.Store, error) {
-	if v, ok, err := c.providedDefault(session.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(session.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.session.get(func() (session.Store, error) {
 		if v, shared, err := c.openSharedSession(); shared || err != nil {
@@ -660,8 +724,10 @@ func (c *Container) Session() (session.Store, error) {
 
 // Storage resolves and returns the storage service instance.
 func (c *Container) Storage() (storage.Storage, error) {
-	if v, ok, err := c.providedDefault(storage.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(storage.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.storage.get(func() (storage.Storage, error) {
 		return openService("storage", c.cfg.Storage.Adapter, storage.ParseAdapter, storage.Open, c.cfg.Storage.Options)
@@ -670,8 +736,10 @@ func (c *Container) Storage() (storage.Storage, error) {
 
 // Tenant resolves and returns the tenant service instance.
 func (c *Container) Tenant() (tenant.Tenant, error) {
-	if v, ok, err := c.providedDefault(tenant.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(tenant.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.tenant.get(func() (tenant.Tenant, error) {
 		return openService("tenant", c.cfg.Tenant.Adapter, tenant.ParseAdapter, tenant.Open, c.cfg.Tenant.Options)
@@ -684,8 +752,10 @@ func (c *Container) Tenant() (tenant.Tenant, error) {
 // (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
 // as before.
 func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
-	if v, ok, err := c.providedDefault(vectorstore.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(vectorstore.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.vectorstore.get(func() (vectorstore.VectorStore, error) {
 		if v, shared, err := c.openSharedVectorStore(); shared || err != nil {
@@ -698,8 +768,10 @@ func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
 
 // Webhook resolves and returns the webhook service instance.
 func (c *Container) Webhook() (webhook.Webhook, error) {
-	if v, ok, err := c.providedDefault(webhook.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(webhook.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.webhook.get(func() (webhook.Webhook, error) {
 		return openService("webhook", c.cfg.Webhook.Adapter, webhook.ParseAdapter, webhook.Open, c.cfg.Webhook.Options)
@@ -712,8 +784,10 @@ func (c *Container) Webhook() (webhook.Webhook, error) {
 // or a non-shareable DSN opens a private pool as before. Under sustained
 // load prefer a separate workflow database with DedicatedPool.
 func (c *Container) Workflow() (workflow.Workflow, error) {
-	if v, ok, err := c.providedDefault(workflow.DefaultRef()); ok {
-		return v, err
+	if c.provDefs != nil {
+		if v, ok, err := c.providedDefault(workflow.DefaultRef()); ok {
+			return v, err
+		}
 	}
 	return c.workflow.get(func() (workflow.Workflow, error) {
 		if v, shared, err := c.openSharedWorkflow(); shared || err != nil {

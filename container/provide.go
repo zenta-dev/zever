@@ -688,6 +688,10 @@ func (c *Container) Wired() []string {
 // provider was wired for it. It reports ok=false when no provider exists,
 // in which case the caller falls back to the legacy config path. When a
 // provider exists, ok is true and err carries the resolution result.
+//
+// Callers guard the call with a provDefs nil check: a container built
+// without providers has none, and the guard keeps the legacy accessor path
+// a single predictable branch instead of a generic call plus a map probe.
 func (c *Container) providedDefault[T, O any](r ref.Ref[T, O]) (T, bool, error) {
 	var zero T
 
