@@ -9,7 +9,7 @@ params, and schedules.
 
 ## Services (zero-infra)
 
-Every adapter in `zever.yaml` is zero-infra — sqlite plus in-memory and
+Every wired adapter is zero-infra — sqlite plus in-memory and
 local backends — so showcase runs with no external services and ships no
 `compose.yaml`. `zever new` only generates a compose file when a picked
 battery needs Postgres (`db`, `search`, `vectorstore`, `workflow`) or
@@ -66,7 +66,7 @@ so seeding needs no JWT secret.
 - `internal/service/seed/` — idempotent demo data via the zenorm backend.
 - `internal/service/jobs/` — one `Handle*` handler per declared job
   (`generate worker` naming).
-- `zever.yaml` — explicit zero-infra service adapters.
+- `.env.example` — every service env key with its default.
 - `data/` — local sqlite path (git-kept empty) + static geo fixture.
 
 ## DSL coverage map
@@ -98,7 +98,7 @@ join table has no DDL — the atlas backend materializes entity tables only.
 
 ## Runbook
 
-Run from `examples/showcase/` so `zever.yaml` and `data/` resolve.
+Run from `examples/showcase/` so `data/` resolves.
 `AUTH_JWT_SECRET` (≥32 bytes) is required by every entrypoint.
 
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/showcase.db schema/shop/shop.zen`
@@ -115,6 +115,6 @@ Run from `examples/showcase/` so `zever.yaml` and `data/` resolve.
 - `zever explain ShopService.Checkout schema/shop/shop.zen`
 - `zever check-boundaries schema/shop/shop.zen`
 - `zever breaking --help` (needs two schema revisions)
-- `zever doctor --config zever.yaml` (needs `AUTH_JWT_SECRET` set): 32 OK,
+- `zever doctor` (needs `AUTH_JWT_SECRET` set): 32 OK,
   2 FAIL — `ai` (no API key) and `i18n` (embed FS comes from code, like
   bookings). Both are expected zero-infra defaults, not bugs.

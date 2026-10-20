@@ -104,6 +104,84 @@ func TestRunExplainUnknownOperation(t *testing.T) {
 	if !strings.Contains(err.Error(), "no operation matches") {
 		t.Fatalf("error = %q, want it to mention 'no operation matches'", err.Error())
 	}
+
+	// The next step names the path shape and the command that lists the
+	// real operations, so a wrong path is not a dead end.
+	if !strings.Contains(err.Error(), "Service.Operation") {
+		t.Fatalf("error = %q, want it to name the path shape", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "zever routes") {
+		t.Fatalf("error = %q, want it to point at 'zever routes'", err.Error())
+	}
+}
+
+// TestRunExplainUnknownServiceNamesTheListCommand pins the wiring-graph
+// not-found guidance: the error says how to see every wired service.
+func TestRunExplainUnknownServiceNamesTheListCommand(t *testing.T) {
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	t.Chdir(dir)
+
+	err := runExplain([]string{"nosuchservice"})
+	if err == nil {
+		t.Fatal("expected error for unknown service, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "no service matches") {
+		t.Fatalf("error = %q, want it to mention 'no service matches'", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "zever explain") {
+		t.Fatalf("error = %q, want it to point at the wiring graph", err.Error())
+	}
+}
+
+// TestRunExplainNotFoundSilencesHints pins ZEVER_NO_HINT: the "how to find
+// the right name" line is a hint, so silencing hints leaves the failure
+// alone.
+func TestRunExplainNotFoundSilencesHints(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "1")
+
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	t.Chdir(dir)
+
+	err := runExplain([]string{"nosuchservice"})
+	if err == nil {
+		t.Fatal("expected error for unknown service, got nil")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "hint:") {
+		t.Fatalf("error carries a hint while ZEVER_NO_HINT is set:\n%s", msg)
+	}
+
+	if !strings.Contains(msg, "no service matches") {
+		t.Fatalf("error = %q, want the failure itself", msg)
+	}
+}
+
+// TestRunExplainEnvFailureNamesTheOffendingKey pins that the wiring graph
+// carries the shared env-key hint: a typo under a wired service prefix
+// names the key to fix instead of dead-ending.
+func TestRunExplainEnvFailureNamesTheOffendingKey(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "")
+	t.Setenv("DB_MAXCONN", "5")
+
+	err := runExplain(nil)
+	if err == nil {
+		t.Fatal("runExplain with typo env key: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(err.Error(), `"DB_MAXCONN"`) {
+		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), `"DB_MAX_CONNS"`) {
+		t.Fatalf("error = %q, want the hint to name the corrected key", err.Error())
+	}
 }
 
 func TestRunExplainSuggestsClosestMatch(t *testing.T) {

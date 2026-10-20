@@ -11,7 +11,7 @@ no handlers yet.
 - `generated/` — CLI output (`--backend=zenorm,proto,protogogen,gogen,openapi,atlas`).
   Never hand-edit; regenerate with `zever compile`.
 - `internal/api/testdata/schema.sql` — DDL via `zever db migrate --dry-run --adapter=sqlite`.
-- `zever.yaml` — explicit zero-infra service adapters for later PRs.
+- `.env.example` — every service env key with its default (copy to `.env` and fill in secrets).
 - `data/` — local sqlite path (git-kept empty).
 
 ## Runbook outline
@@ -24,7 +24,7 @@ no handlers yet.
 
 ## Doctor note
 
-`zever doctor --config zever.yaml` reports FAILs that are expected with
+`zever doctor` reports FAILs that are expected with
 zero-infra defaults, not framework bugs (do not fix framework code):
 
 - ai, auth, geo, i18n: same 4 FAILs as bare defaults (missing api key,
@@ -35,7 +35,7 @@ zero-infra defaults, not framework bugs (do not fix framework code):
 
 ## Worker, seed, webhooks (this PR)
 
-Run from `examples/bookings/` so `zever.yaml` and `data/` resolve:
+Run from `examples/bookings/` so `data/` resolves:
 
 1. Migrate: `zever db migrate --adapter=sqlite --dsn=data/bookings.db schema/bookings.zen`
 2. Seed (idempotent, safe to re-run): `go run ./db/seed`
@@ -58,7 +58,7 @@ Run from `examples/bookings/` so `zever.yaml` and `data/` resolve:
 
 Two demo targets, `booking.created` and `booking.cancelled`, with
 per-target secrets from the environment (secrets/env adapter, never stored
-in `zever.yaml`):
+in a file):
 
 - `BOOKINGS_WEBHOOK_CREATED_TARGET` / `BOOKINGS_WEBHOOK_CREATED_SECRET`
 - `BOOKINGS_WEBHOOK_CANCELLED_TARGET` / `BOOKINGS_WEBHOOK_CANCELLED_SECRET`
