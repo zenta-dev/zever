@@ -84,6 +84,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	release := flags.String("release", "v0.7.2", "baseline release tag")
 	out := flags.String("out", "", "output file")
 	check := flags.Bool("check", false, "verify the committed file instead of writing it")
+	list := flags.Bool("list-unregistered", false, "list the wire structs of the tree that are not registered")
 
 	if err := flags.Parse(args); err != nil {
 		return 2
@@ -99,6 +100,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "taggolden: %v\n", err)
 		return 2
+	}
+
+	if *list {
+		return listUnregistered(*root, entries, stdout, stderr)
 	}
 
 	git := &repo{dir: *root}
@@ -134,6 +139,88 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "taggolden: wrote %s (%d pinned keys)\n", outPath, countKeys(data))
 
 	return 0
+}
+
+// listUnregistered prints the wire structs of the tree that are not
+// registered in the registry. It is the helper for the registry: a struct
+// that exposes json keys belongs in golden_wire_structs.txt, so its keys
+// get pinned, unless it is excepted with a justification.
+func listUnregistered(root string, entries []entry, stdout, stderr io.Writer) int {
+	registered := map[string]bool{}
+	for _, e := range entries {
+		registered[e.dir+"\t"+e.name] = true
+	}
+
+	excepted, err := loadExcepted(filepath.Join(root, "tools", "tagcheck", "golden_wire_exceptions.txt"))
+	if err != nil {
+		fmt.Fprintf(stderr, "taggolden: %v\n", err)
+		return 2
+	}
+
+	var missing []string
+
+	err = wire.WalkStructs(root, func(dir, name string, fields []wire.Field) error {
+		if registered[dir+"\t"+name] || excepted[dir+"\t"+name] {
+			return nil
+		}
+
+		for _, field := range fields {
+			if field.State() == wire.StateNamed {
+				missing = append(missing, dir+"\t"+name)
+
+				return nil
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "taggolden: %v\n", err)
+		return 2
+	}
+
+	sort.Strings(missing)
+
+	for _, item := range missing {
+		fmt.Fprintln(stdout, item)
+	}
+
+	if len(missing) == 0 {
+		fmt.Fprintln(stdout, "every wire struct of the tree is registered")
+	}
+
+	return 0
+}
+
+// loadExcepted parses the exception list of the registry: tab-separated
+// package dir, struct name, and the justification.
+func loadExcepted(path string) (map[string]bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]bool{}, nil
+		}
+
+		return nil, fmt.Errorf("read exception list: %w", err)
+	}
+
+	excepted := map[string]bool{}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		text := strings.TrimSpace(line)
+		if text == "" || strings.HasPrefix(text, "#") {
+			continue
+		}
+
+		parts := strings.Split(text, "\t")
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("malformed exception line %q", text)
+		}
+
+		excepted[parts[0]+"\t"+parts[1]] = true
+	}
+
+	return excepted, nil
 }
 
 // countKeys counts the data lines of the generated file.

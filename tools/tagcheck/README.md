@@ -20,6 +20,7 @@ payload read a key that no longer existed. The tags were restored in
 | `golden-key` | an exported field of a registered wire struct whose `json` key differs from the pinned one, whose key is empty, that is dropped from the wire (`json:"-"`), or that came back onto the wire |
 | `golden-missing` | a pinned wire key the struct no longer exposes (the field was deleted, or renamed together with its key) |
 | `golden-nofields` | a registered wire struct whose keys are not pinned: the golden field data was not regenerated |
+| `unregistered-wire` | a struct that exposes json keys but is not registered as a wire struct |
 | `golden-removed` | a registered wire struct that disappeared from the tree |
 
 Files that are skipped: `_test.go` files, generated files (a `DO NOT EDIT`
@@ -32,6 +33,7 @@ marker in a leading comment), and the `.git`, `.worktrees`, `.claude`,
 |---|---|---|
 | `golden_wire_structs.txt` | `dir<TAB>struct<TAB>source file` | the wire-struct registry: every struct that is (or was) a JSON wire type |
 | `golden_wire_fields.txt` | `dir<TAB>struct<TAB>field<TAB>key<TAB>base revision` | the pinned wire key of every field of every registered struct |
+| `golden_wire_exceptions.txt` | `dir<TAB>struct<TAB>reason` | structs that expose json keys but are deliberately not pinned |
 | `tag_allowlist.txt` | `path` or `path:line` | the permitted `yaml:`/`toml:` tag locations |
 
 `golden_wire_fields.txt` is generated, never hand-edited.
@@ -108,3 +110,44 @@ The rule set follows the compatibility contracts other ecosystems enforce:
   testing catches "schema violations where your API returns different data
   than documented", and supports a baseline mode that fails CI only on new
   violations. <https://github.com/schemathesis/schemathesis>
+
+## Registering a new wire struct
+
+A struct that exposes json keys — an exported field with a non-empty,
+non-`-` json name — is a wire struct. It must be registered, so that its
+keys get pinned:
+
+```sh
+# 1. list the wire structs of the tree that are not registered yet
+go -C tools/tagcheck run ./cmd/taggolden -root . -list-unregistered
+
+# 2. add a line to golden_wire_structs.txt, then pin its keys
+make tag-golden
+```
+
+A struct that mixes json-tagged fields with a Go-API-only field (a logger,
+a store handle) cannot be registered: the registry pins every exported
+field of a registered struct, and an untagged field has no wire key to
+pin. Such a struct goes into `golden_wire_exceptions.txt` with a
+justification. The guard rejects an exception that names a struct which
+does not exist, that is registered already, or that is fully json-tagged.
+
+## Why "exposes a json key" is the registration signal
+
+The `unregistered-wire` rule asks whether a struct reaches a JSON
+marshaller. A precise answer needs type-flow analysis: `musttag` resolves
+the argument type of `json.Marshal` with `go/types` and checks the tags of
+the struct it finds (<https://github.com/go-simpler/musttag>). That
+approach only sees the *static* type at the call site: a value held in an
+`any`, returned by a function, or stored in a `map[string]any` (as
+`serve/doctor.go` does with its doctor report) hides the struct, so the
+analysis is both incomplete and expensive — it needs a type-checked
+program, not just a parsed file.
+
+The guard therefore uses a precise, purely syntactic signal instead: a
+struct that exposes at least one json key is a wire struct and must be
+registered. The criterion is the same one the registry was originally
+derived with, it has no false positives on the current tree, and the
+exceptions file keeps the few deliberate hybrids (a config `Options`
+struct that mixes json tags with a Go-API-only handle) visible and
+reviewable.

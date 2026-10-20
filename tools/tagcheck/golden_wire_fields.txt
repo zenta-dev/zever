@@ -289,6 +289,11 @@ cmd/zever	tinkerRequest	Verb	verb	v0.7.2
 cmd/zever	tinkerRequest	Args	args	v0.7.2
 cmd/zever	tinkerResponse	Result	result	v0.7.2
 cmd/zever	tinkerResponse	Error	error	v0.7.2
+cmd/zever	wiringRow	Ref	ref	0eaaefc30d3a
+cmd/zever	wiringRow	Driver	driver	0eaaefc30d3a
+cmd/zever	wiringRow	Drivers	drivers	0eaaefc30d3a
+cmd/zever	wiringRow	Depends	depends	0eaaefc30d3a
+cmd/zever	wiringRow	Env	env	0eaaefc30d3a
 config	Config	AI	ai	v0.7.2
 config	Config	Analytics	analytics	v0.7.2
 config	Config	Auth	auth	v0.7.2
@@ -869,6 +874,9 @@ examples/todo/internal/api	registerRequest	Password	password	v0.7.2
 examples/todo/internal/api	updateNoteRequest	Title	title	v0.7.2
 examples/todo/internal/api	updateNoteRequest	Body	body	v0.7.2
 examples/todo/internal/api	updateNoteRequest	Done	done	v0.7.2
+serve	doctorBattery	Name	name	5cd294214c0a
+serve	doctorBattery	OK	ok	5cd294214c0a
+serve	doctorBattery	Error	error	5cd294214c0a
 shared/mcpclient	inbound	JSONRPC	jsonrpc	v0.7.2
 shared/mcpclient	inbound	ID	id	v0.7.2
 shared/mcpclient	inbound	Method	method	v0.7.2

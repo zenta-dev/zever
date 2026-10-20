@@ -9,7 +9,11 @@ package wire
 
 import (
 	"go/ast"
+	"go/parser"
 	"go/token"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 )
@@ -168,4 +172,116 @@ func exportedFields(st *ast.StructType) []Field {
 	}
 
 	return fields
+}
+
+// WalkStructs calls fn for every struct type declared in the Go files under
+// root. Test files, generated files (a "DO NOT EDIT" marker in a leading
+// comment) and the .git, .worktrees, .claude, vendor, node_modules and
+// generated directories are skipped, exactly like the struct-tag guard
+// skips them. The dir argument of fn is the package directory of the
+// struct, relative to root.
+func WalkStructs(root string, fn func(dir, name string, fields []Field) error) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			if SkipDir(d.Name()) {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+
+		dir := filepath.ToSlash(filepath.Dir(rel))
+
+		return structsOfFile(path, dir, fn)
+	})
+}
+
+// structsOfFile calls fn for every struct type declared in one Go file.
+func structsOfFile(path, dir string, fn func(dir, name string, fields []Field) error) error {
+	src, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	fset := token.NewFileSet()
+
+	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+	if err != nil {
+		return err
+	}
+
+	if Generated(fset, f) {
+		return nil
+	}
+
+	for _, decl := range f.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.TYPE {
+			continue
+		}
+
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+
+			if err := fn(dir, ts.Name.Name, exportedFields(st)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// Generated reports whether a file carries a "DO NOT EDIT" marker in one
+// of its leading comments.
+func Generated(fset *token.FileSet, f *ast.File) bool {
+	for _, cg := range f.Comments {
+		if fset.Position(cg.Pos()).Line > 10 {
+			break
+		}
+
+		for _, c := range cg.List {
+			if strings.Contains(c.Text, "DO NOT EDIT") {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// SkipDir reports whether a walk must not descend into a directory with
+// that name.
+func SkipDir(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+
+	switch name {
+	case "vendor", "node_modules", "generated":
+		return true
+	}
+
+	return false
 }

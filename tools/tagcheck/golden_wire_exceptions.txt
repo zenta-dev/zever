@@ -1,0 +1,23 @@
+# golden_wire_exceptions.txt — wire structs that expose json keys but are
+# deliberately not registered as wire structs (tagcheck rule
+# unregistered-wire).
+#
+# Format: <repo-relative package dir><TAB><struct name><TAB><justification>
+# Blank lines and # comments are ignored.
+#
+# A struct belongs here when it mixes json-tagged fields with a Go-API-only
+# field (a logger, a store handle) that has no wire representation. Such a
+# struct cannot be registered: the registry pins every exported field of a
+# registered struct, and an untagged field has no wire key to pin. These
+# three config Options structs are the only shapes in the tree that mix the
+# two.
+#
+# The guard rejects an exception that names a struct which does not exist,
+# that is registered already, or that is fully json-tagged (such a struct
+# belongs in golden_wire_structs.txt, where its keys get pinned).
+#
+# To add an entry, the struct must really be a Go-API/wire hybrid; a plain
+# wire struct is registered instead.
+adapters/scheduler/postgres	Options	Go-API-only PoolOptions field (an embedded pool config, not a wire payload)
+core/payment	Options	Go-API-only Idempotency store handle
+core/webhook	Options	Go-API-only Logger handle
