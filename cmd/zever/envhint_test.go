@@ -153,7 +153,7 @@ func TestServiceEnvKeysMatchTheEnvExample(t *testing.T) {
 	t.Parallel()
 
 	keys := serviceEnvKeys("DB", "db")
-	want := []string{"DB_ADAPTER", "DB_DSN", "DB_MAXCONNS"}
+	want := []string{"DB_ADAPTER", "DB_DSN", "DB_MAX_CONNS"}
 
 	for _, w := range want {
 		found := false

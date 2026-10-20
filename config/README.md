@@ -83,17 +83,21 @@ configuration itself).
 
 ```sh
 DB_ADAPTER=postgres
-DB_MAXCONNS=20
-DB_MAXCONNLIFETIME=5m
+DB_MAX_CONNS=20
+DB_MAX_CONN_LIFETIME=5m
 AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 RATELIMIT_RATE=100
 ```
 
 Field matching is case-insensitive with `_` ignored (`MAX_RETRIES` matches
-`MaxRetries`). One nesting level is supported by splitting at the first `_`
-(`AUTH_JWT_SECRET` sets `Options.JWT.Secret`). Durations take `"5s"` style
-strings. `_ADAPTER` sets the service adapter (validated later by
-`Validate`, not at assignment).
+`MaxRetries`), and the field name is the option's serialized name (its
+`json` tag): `DB_MAX_CONNS` and `DB_MAXCONNS` both set `max_conns`. One
+nesting level is supported (`AUTH_JWT_SECRET` sets `Options.JWT.Secret`).
+The split point is resolved by matching, not by counting underscores, so a
+segment that carries an `_` of its own works too
+(`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`). Durations
+take `"5s"` style strings. `_ADAPTER` sets the service adapter (validated
+later by `Validate`, not at assignment).
 
 Named instances add a middle segment: `DB__REPORTING__DSN` sets the DSN of
 the `reporting` db instance. Instance names normalize case-insensitively;
@@ -194,7 +198,7 @@ registered as aliases; new configuration should use `db`.
   `MaxConns` warns without DSN content. Queue, workflow, and scheduler
   under sustained load should use `dedicated_pool: true` with a separate
   database (Solid Queue guidance).
-- Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
+- Env: `SEARCH_DEDICATED_POOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
 
 Env names are unaffected by option renames: env matching ignores `_` and
 case, so `DB_MAXCONNS` keeps working for `max_conns`.
@@ -255,12 +259,12 @@ log:
 # after: .env
 DB_ADAPTER=postgres
 DB_DSN=postgres://app:secret@db:5432/app
-DB_MAXCONNS=20
+DB_MAX_CONNS=20
 LOG_ADAPTER=slog
 ```
 
 Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes
-`<SERVICE>_<KEY>` uppercased (`max_conns` → `DB_MAXCONNS`); one nesting
+`<SERVICE>_<KEY>` uppercased (`max_conns` → `DB_MAX_CONNS`); one nesting
 level flattens with a single `_` (`jwt: {secret: ...}` under auth →
 `AUTH_JWT_SECRET`); the `project:` table (if any) is dropped — project
 layout is defaults-only for now. Option values that are maps, lists, or

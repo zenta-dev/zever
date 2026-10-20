@@ -284,8 +284,54 @@ func matchEnvField(target reflect.Value, rest string) envFieldMatch {
 		m.Path = []string{rest}
 	case nestedOK:
 		m.Path = []string{outerName, innerName}
+	default:
+		// The flat field resolved to no option: the key may name a
+		// nested path whose outer segment carries an "_" of its own
+		// (webhook's queue_opts), so every underscore is a candidate
+		// split point.
+		if path, outer, ok := matchNestedPath(target, rest); ok {
+			m.Path = path
+			m.OuterStruct = outer
+			m.OuterName = path[0]
+			m.InnerName = path[1]
+			m.HasNesting = true
+		}
 	}
 	return m
+}
+
+// matchNestedPath resolves a field remainder to a nested path: an outer
+// struct field and one of its scalar fields. The split point is not fixed,
+// because a field name may itself contain an "_" (queue_opts): every
+// underscore in the remainder is tried, left to right, and the first pair
+// that names a struct field and a scalar field inside it wins. Field
+// matching ignores case and "_", so the segments are matched the same way
+// the flat names are.
+func matchNestedPath(target reflect.Value, rest string) (path []string, outerStruct reflect.Value, ok bool) {
+	for i := range len(rest) {
+		if rest[i] != '_' || i == 0 || i+1 >= len(rest) {
+			continue
+		}
+
+		outer, found := findField(target, rest[:i])
+		if !found {
+			continue
+		}
+
+		indir := reflect.Indirect(outer)
+		if !indir.IsValid() || indir.Kind() != reflect.Struct {
+			continue
+		}
+
+		in, found := findField(indir, rest[i+1:])
+		if !found || !isScalarField(in) {
+			continue
+		}
+
+		return []string{rest[:i], rest[i+1:]}, indir, true
+	}
+
+	return nil, reflect.Value{}, false
 }
 
 // applyPrefixKey reports the field remainder of an env key under the wired

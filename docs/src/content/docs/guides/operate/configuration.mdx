@@ -51,7 +51,10 @@ A named instance only reaches the container through a matching named Ref
 reads the flat `SERVICE_FIELD` namespace.
 
 Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries` and
-`DB_MAX_CONNS` matches `DB_MAXCONNS`. One nesting level splits at the first `_`: `AUTH_JWT_SECRET` sets `Options.JWT.Secret`.
+`DB_MAX_CONNS` matches `DB_MAXCONNS`. One nesting level is supported
+(`AUTH_JWT_SECRET` sets `Options.JWT.Secret`); the split point is resolved by
+matching, not by counting underscores, so a segment that carries an `_` of its
+own works too (`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`).
 
 Durations accept `"5s"` strings in env; there is no integer form.
 
