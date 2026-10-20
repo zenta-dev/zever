@@ -17,13 +17,16 @@ SBOM ?= sbom.json
 # at root), so every *-all target loops per-module with fail-fast `set -e`.
 # examples/external-sms and docs/examples stay outside `go.work` by design
 # (third-party/consumer proofs); verify them standalone with: GOWORK=off go -C examples/external-sms test ./...
-# .claude/worktrees holds agent harness checkouts, not repo modules: without
-# the exclusion the list balloons past ARG_MAX, `printf` fails, and every
-# *-all loop silently tests nothing (false green).
+# The harness checkout dirs (.git, .worktrees, .claude) are skipped at ANY
+# depth, like tools/modgraph and tools/tag-release.sh do: a worktree nested
+# under a module dir holds a full checkout of the repo, so counting it made
+# the module list differ from the tag list. Without the exclusion the list
+# balloons past ARG_MAX, `printf` fails, and every *-all loop silently tests
+# nothing (false green).
 # Go's own tooling ignores testdata trees; compile-fail fixture modules
 # (container/testdata/compilefail/*) must fail `go build` by design, so
 # they are excluded here like the harness checkouts above.
-ALL_MODULES := $(shell find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
+ALL_MODULES := $(shell find . -type f -name go.mod -not -path "*/.git/*" -not -path "*/.worktrees/*" -not -path "*/.claude/*" -not -path "./examples/external-sms/*" -not -path "./docs/examples/*" -not -path "*/testdata/*" -exec dirname {} \; | sort)
 
 # The two modules that stay outside `go.work` by design (third-party and
 # consumer proofs). They are not workspace members, so the go command

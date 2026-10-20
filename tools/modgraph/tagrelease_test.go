@@ -104,6 +104,45 @@ func TestTagReleaseRefusesStalePins(t *testing.T) {
 	}
 }
 
+// TestTagReleaseSkipsNestedWorktrees pins the exclusion set shared with
+// tools/modgraph: a worktree is a full checkout of the repo, so a module
+// inside one must never be tagged. The exclusion applies at any depth, so a
+// worktree nested under a module dir is skipped too.
+func TestTagReleaseSkipsNestedWorktrees(t *testing.T) {
+	for _, bin := range []string{"bash", "git"} {
+		if _, err := exec.LookPath(bin); err != nil {
+			t.Skipf("%s not available", bin)
+		}
+	}
+	script, err := filepath.Abs(filepath.Join("..", "tag-release.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "libs", "ok", "go.mod"),
+		"module github.com/zenta-dev/zever/libs/ok\n\ngo 1.27.0\n")
+	// A top-level worktree and a worktree nested under a module dir.
+	mustWriteFile(t, filepath.Join(root, ".worktrees", "wt", "libs", "wtmod", "go.mod"),
+		"module github.com/zenta-dev/zever/libs/wtmod\n\ngo 1.27.0\n")
+	mustWriteFile(t, filepath.Join(root, "libs", "ok", ".worktrees", "wt", "nested", "go.mod"),
+		"module github.com/zenta-dev/zever/libs/ok/nested\n\ngo 1.27.0\n")
+	gitRun(t, root, "init", "-q")
+
+	cmd := exec.CommandContext(t.Context(), "bash", script, "--dry-run", "v1.2.3")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+t.TempDir())
+	out, runErr := cmd.CombinedOutput()
+	if runErr != nil {
+		t.Fatalf("--dry-run: %v\n%s", runErr, out)
+	}
+	if !strings.Contains(string(out), "would tag: libs/ok/v1.2.3") {
+		t.Fatalf("dry-run does not tag the real module:\n%s", out)
+	}
+	if strings.Contains(string(out), "wtmod") || strings.Contains(string(out), "nested") {
+		t.Fatalf("dry-run tags a module inside a worktree:\n%s", out)
+	}
+}
+
 // gitRun runs git in dir with a hermetic environment, failing the
 // test on error and returning combined output.
 func gitRun(t *testing.T, dir string, args ...string) string {

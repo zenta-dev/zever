@@ -34,7 +34,7 @@ updates:
   - package-ecosystem: gomod
     directories:
 EOF
-  find . -type f -name go.mod -not -path "./.git/*" -not -path "./.worktrees/*" -not -path "./.claude/*" -not -path "*/testdata/*" -exec dirname {} \; \
+  find . -type f -name go.mod -not -path "*/.git/*" -not -path "*/.worktrees/*" -not -path "*/.claude/*" -not -path "*/testdata/*" -exec dirname {} \; \
     | LC_ALL=C sort \
     | while IFS= read -r d; do
       if [ "$d" = "." ]; then
