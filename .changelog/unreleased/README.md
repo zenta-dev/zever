@@ -31,4 +31,7 @@ an entry prefix, even-space continuation indent, no truncated duplicates.
   `## [vX.Y.Z] - YYYY-MM-DD` section while its version has no git tag yet).
   `make changelog-compile-check` fails when the top section is not
   `## [Unreleased]`. Never edit `CHANGELOG.md` and a fragment for the same
-  change: the release notes must carry the entry exactly once.
+  change: the release notes must carry the entry exactly once. The compile
+  step skips (with a warning) an entry that is already in the pending
+  section, and `make changelog-lint` fails when an entry appears twice in
+  the same section.

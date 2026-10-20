@@ -115,14 +115,98 @@ fi
 # Sorted for deterministic output.
 IFS=$'\n' frags=($(printf '%s\n' "${frags[@]}" | LC_ALL=C sort)); unset IFS
 
-tmp="$(mktemp)"
-{
-  for f in "${frags[@]}"; do
-    # Strip blank lines at fragment edges; keep interior content verbatim.
-    awk 'NF { started = 1 } started { buf[++n] = $0 } END { while (n > 0 && buf[n] ~ /^[[:space:]]*$/) n--; for (i = 1; i <= n; i++) print buf[i] }' "$f"
-    echo
-  done
-} > "$tmp.entries"
+# An entry is a "- " bullet plus its indented continuation lines. Its key is
+# those lines joined with a literal "\n" (trailing whitespace stripped), so
+# two entries can be compared line by line.
+entry_key() {
+  awk '
+    function flush(   i, k, line) {
+      if (n == 0) return
+      k = ""
+      for (i = 1; i <= n; i++) {
+        line = buf[i]
+        sub(/[ \t]+$/, "", line)
+        k = k (i > 1 ? "\\n" : "") line
+      }
+      print k
+      n = 0
+    }
+    /^- / || /^\* / { flush(); buf[++n] = $0; next }
+    /^[[:space:]]*$/ { flush(); next }
+    /^[[:space:]]/ { if (n > 0) { buf[++n] = $0; next } }
+    { flush(); buf[++n] = $0 }
+    END { flush() }
+  ' "$1"
+}
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# The entries the pending section already carries: a fragment entry that is
+# already there is skipped (with a warning), so the release notes hold the
+# entry exactly once even when the same change was compiled before or was
+# edited into CHANGELOG.md by hand.
+awk -v target="$target" '
+  { trimmed = $0; gsub(/^[ \t]+|[ \t]+$/, "", trimmed) }
+  /^## / { inSection = (trimmed == target); next }
+  inSection { print }
+' "$changelog" >"$tmp.section"
+entry_key "$tmp.section" >"$tmp.keys"
+
+: >"$tmp.entries"
+: >"$tmp.warn"
+for f in "${frags[@]}"; do
+  # Strip blank lines at fragment edges; keep interior content verbatim.
+  awk 'NF { started = 1 } started { buf[++n] = $0 } END { while (n > 0 && buf[n] ~ /^[[:space:]]*$/) n--; for (i = 1; i <= n; i++) print buf[i] }' "$f" >"$tmp.frag"
+  : >"$tmp.newkeys"
+  # Emit the entries that are not already in the pending section; the
+  # skipped ones are reported on stderr.
+  awk -v keysfile="$tmp.keys" -v newkeysfile="$tmp.newkeys" '
+    BEGIN {
+      while ((getline k < keysfile) > 0) { seen[k] = 1 }
+      close(keysfile)
+    }
+    function flush(   i, k, line) {
+      if (n == 0) return
+      k = ""
+      for (i = 1; i <= n; i++) {
+        line = buf[i]
+        sub(/[ \t]+$/, "", line)
+        k = k (i > 1 ? "\\n" : "") line
+      }
+      if (k in seen) {
+        printf("changelog-compile: skipped duplicate entry: %s\n", buf[1]) > "/dev/stderr"
+        n = 0
+        blanks = 0
+        return
+      }
+      for (i = 1; i <= pend; i++) print ""
+      pend = 0
+      for (i = 1; i <= n; i++) print buf[i]
+      print k > newkeysfile
+      n = 0
+      pend = blanks
+      blanks = 0
+    }
+    /^- / || /^\* / { flush(); buf[++n] = $0; next }
+    /^[[:space:]]*$/ { if (n > 0) blanks++; else pend++; next }
+    /^[[:space:]]/ { if (n > 0) { buf[++n] = $0; next } }
+    { flush(); buf[++n] = $0 }
+    END { flush() }
+  ' "$tmp.frag" >"$tmp.out" 2>>"$tmp.warn"
+  # The entries compiled so far join the known ones: a later fragment that
+  # repeats an entry compiled in this run is skipped as well.
+  cat "$tmp.newkeys" >>"$tmp.keys"
+  if [ -s "$tmp.out" ]; then
+    cat "$tmp.out" >>"$tmp.entries"
+    echo >>"$tmp.entries"
+  fi
+done
+
+if [ -s "$tmp.warn" ]; then
+  cat "$tmp.warn" >&2
+fi
+skipped="$(grep -c . "$tmp.warn" || true)"
 
 # Insert below the pending section header, swallowing the one blank line
 # that used to separate the header from the old entries (the compiled
@@ -153,4 +237,8 @@ fi
 mv "$changelog.new" "$changelog"
 rm -f "$tmp.entries"
 rm -f "${frags[@]}"
-echo "changelog-compile: compiled ${#frags[@]} fragment(s) into $target"
+if [ "${skipped:-0}" -gt 0 ]; then
+  echo "changelog-compile: compiled ${#frags[@]} fragment(s) into $target ($skipped duplicate entry/entries skipped)"
+else
+  echo "changelog-compile: compiled ${#frags[@]} fragment(s) into $target"
+fi
