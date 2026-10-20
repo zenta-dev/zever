@@ -571,12 +571,13 @@ func (c *Container) resolveProvider(key refKey) (any, error) {
 
 // buildProvider resolves def's dependencies depth-first, seeds a fresh
 // Options value from the service defaults overlaid with the process
-// environment (see New), runs its WithOptions appliers, and runs the
+// environment (see resolveEnv), runs its WithOptions appliers, and runs the
 // factory. A missing Optional dependency resolves to its zero value.
 // Refs for unknown services skip the env overlay and start from zero O.
 func (c *Container) buildProvider(def *provider) (any, error) {
-	if c.envErr != nil {
-		return nil, fmt.Errorf("container: %s: resolve env: %w", def.key, c.envErr)
+	env, envErr := c.resolveEnv()
+	if envErr != nil {
+		return nil, fmt.Errorf("container: %s: resolve env: %w", def.key, envErr)
 	}
 
 	depVals := make([]any, len(def.deps))
@@ -610,7 +611,7 @@ func (c *Container) buildProvider(def *provider) (any, error) {
 		// The overlay applies to struct Options (every battery's are).
 		// Non-struct Options skip it; WithOptions still applies below.
 		if rv := reflect.ValueOf(opts); rv.Kind() == reflect.Pointer && !rv.IsNil() && rv.Elem().Kind() == reflect.Struct {
-			if err := config.ApplyEnv(c.env, def.key.service, name, opts); err != nil {
+			if err := config.ApplyEnv(env, def.key.service, name, opts); err != nil {
 				return nil, fmt.Errorf("container: %s: %w", def.key, err)
 			}
 		}
@@ -619,6 +620,21 @@ func (c *Container) buildProvider(def *provider) (any, error) {
 	def.apply(opts)
 
 	return def.build(opts, depVals)
+}
+
+// resolveEnv returns the process environment, reading it exactly once per
+// container. Only the provider build path needs it, to seed Options; the
+// legacy config path never does, so a container without providers never
+// reads the process environment at all.
+//
+// The read is a one-shot on purpose: a failed resolution is recorded once
+// and fails every provider build, exactly like the eager read it replaces.
+func (c *Container) resolveEnv() (config.Env, error) {
+	c.envOnce.Do(func() {
+		c.env, c.envErr = config.FromEnv()
+	})
+
+	return c.env, c.envErr
 }
 
 // Get resolves the wired instance for r. With zero providers it returns a
@@ -672,6 +688,10 @@ func (c *Container) Wired() []string {
 // provider was wired for it. It reports ok=false when no provider exists,
 // in which case the caller falls back to the legacy config path. When a
 // provider exists, ok is true and err carries the resolution result.
+//
+// Callers guard the call with a provDefs nil check: a container built
+// without providers has none, and the guard keeps the legacy accessor path
+// a single predictable branch instead of a generic call plus a map probe.
 func (c *Container) providedDefault[T, O any](r ref.Ref[T, O]) (T, bool, error) {
 	var zero T
 
