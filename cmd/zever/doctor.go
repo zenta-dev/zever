@@ -485,7 +485,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	if failed {
 		summary := fmt.Sprintf("%d OK, %d %s", okCount, failCount, failure("FAIL"))
 		_, _ = fmt.Fprintln(out, dim("Summary: ")+summary)
-		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — each FAIL row above names the env key to set (e.g. AUTH_JWT_SECRET)"))
+		_, _ = fmt.Fprintln(os.Stderr, formatHint("some batteries failed — each FAIL row above names the fix (the env key to set, or the command to run)"))
 		_, _ = fmt.Fprintln(os.Stderr, dim("zever doctor: one or more batteries failed to resolve (see above)"))
 
 		return fmt.Errorf("zever doctor: %d of %d batteries failed", failCount, len(rows))

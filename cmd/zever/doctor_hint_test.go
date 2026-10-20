@@ -138,3 +138,29 @@ func TestDoctorHumanOutputHidesFixWhenHintsSuppressed(t *testing.T) {
 		t.Fatalf("output carries a hint while ZEVER_NO_HINT is set:\n%s", got)
 	}
 }
+
+// TestDoctorFooterPointsAtThePerRowFix pins the footer: it tells the
+// developer where the next action is, instead of naming an env key that
+// not every failing row has.
+func TestDoctorFooterPointsAtThePerRowFix(t *testing.T) {
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", doctorFailingBatteryFixture)
+	t.Chdir(dir)
+
+	t.Setenv("ZEVER_NO_HINT", "")
+
+	var out bytes.Buffer
+
+	var err error
+
+	stderr := captureZeverStderr(t, func() {
+		err = runDoctorWith(DoctorConfig{Out: &out})
+	})
+	if err == nil {
+		t.Fatal("runDoctorWith failing battery: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(stderr, "each FAIL row above names the fix") {
+		t.Fatalf("footer does not point at the per-row fix:\n%s", stderr)
+	}
+}
