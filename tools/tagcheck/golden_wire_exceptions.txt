@@ -18,6 +18,10 @@
 #
 # To add an entry, the struct must really be a Go-API/wire hybrid; a plain
 # wire struct is registered instead.
+#
+# core/payment and core/webhook left this list when their Go-API-only
+# Idempotency store handle and Logger handle gained the json:"-" tag: the
+# registry pins a dropped field with the "-" key, exactly like
+# core/storage.Options.Logger, so both structs are registered wire structs
+# now.
 adapters/scheduler/postgres	Options	Go-API-only PoolOptions field (an embedded pool config, not a wire payload)
-core/payment	Options	Go-API-only Idempotency store handle
-core/webhook	Options	Go-API-only Logger handle

@@ -133,18 +133,18 @@ Services with a Redis adapter embed the same connection keys. Flat services (`ca
 
 ### Retry policy
 
-`outbox` and `resilience` take a `retry` block. Its keys are exported Go field names, matched case-insensitively.
+`outbox` and `resilience` take a `retry` block. Its keys are snake_case, matched case-insensitively.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `retry.BaseDelay` | duration | `0` | Delay before the first retry. `resilience` default is `50ms`. |
-| `retry.MaxDelay` | duration | unbounded | Cap on the computed delay, before jitter. `resilience` default is `2s`. |
-| `retry.Multiplier` | number | `0` | Per-attempt growth factor. Values `<= 1` keep the delay flat. `resilience` default is `2`. |
-| `retry.Linear` | boolean | `false` | Grow linearly (`BaseDelay * attempt`) instead of exponentially. Ignores `Multiplier`. |
-| `retry.Jitter` | number | `0` | Fraction of the delay to randomize, clamped to `[0, 1]`. `resilience` default is `0.1`. |
-| `retry.JitterMode` | integer | `0` | `0` symmetric (plus or minus), `1` additive (never shortens), `2` flat (adds up to `JitterMax`). |
-| `retry.JitterMax` | duration | `0` | Upper bound of the flat jitter draw. Used only when `JitterMode` is `2`. |
-| `retry.MaxAttempts` | integer | `1` | Total attempts including the first. `<= 0` means 1. `resilience` default is `3`. |
+| `retry.base_delay` | duration | `0` | Delay before the first retry. `resilience` default is `50ms`. |
+| `retry.max_delay` | duration | unbounded | Cap on the computed delay, before jitter. `resilience` default is `2s`. |
+| `retry.multiplier` | number | `0` | Per-attempt growth factor. Values `<= 1` keep the delay flat. `resilience` default is `2`. |
+| `retry.linear` | boolean | `false` | Grow linearly (`base_delay * attempt`) instead of exponentially. Ignores `multiplier`. |
+| `retry.jitter` | number | `0` | Fraction of the delay to randomize, clamped to `[0, 1]`. `resilience` default is `0.1`. |
+| `retry.jitter_mode` | integer | `0` | `0` symmetric (plus or minus), `1` additive (never shortens), `2` flat (adds up to `jitter_max`). |
+| `retry.jitter_max` | duration | `0` | Upper bound of the flat jitter draw. Used only when `jitter_mode` is `2`. |
+| `retry.max_attempts` | integer | `1` | Total attempts including the first. `<= 0` means 1. `resilience` default is `3`. |
 
 ### Pool sharing
 

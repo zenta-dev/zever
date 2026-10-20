@@ -37,7 +37,9 @@ type Options struct {
 	// MaxWebhookBytes bounds the webhook payload size.
 	MaxWebhookBytes int `json:"max_webhook_bytes"`
 	// Idempotency holds the optional refund idempotency store. Nil skips the guard.
-	Idempotency idempotency.Store
+	// It is a Go-API-only handle: the json tag keeps it out of the config
+	// envelope, so the store is not serialized as a null key.
+	Idempotency idempotency.Store `json:"-"`
 }
 
 // Validate checks options for consistency, joining all violations.

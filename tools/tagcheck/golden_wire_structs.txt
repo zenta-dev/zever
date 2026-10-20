@@ -34,6 +34,16 @@
 #     structs created after v0.7.2 (the CLI rewrite and the serve library),
 #     so they were not in the v0.7.2 derivation. They are registered here
 #     so the unregistered-wire rule can pin their keys too.
+#   - shared/retry.Policy added: the retry policy is a config option that
+#     the outbox and resilience batteries embed, so it reaches the
+#     `zever config show --json` envelope. It gained snake_case json tags
+#     (and a json:"-" on the Go-API-only OnRetry hook) so the envelope
+#     shows the same key style as every other option.
+#   - core/payment.Options and core/webhook.Options moved here from
+#     golden_wire_exceptions.txt: their Go-API-only Idempotency store
+#     handle and Logger handle gained the json:"-" tag, so both structs are
+#     fully tagged now and the registry can pin their keys (the dropped
+#     fields are pinned with the "-" key, like core/storage.Options.Logger).
 #
 # How to extend: when a NEW struct becomes a wire type (JSON request or
 # response, MCP payload, doctor envelope, ...), add a line here and give
@@ -184,6 +194,7 @@ core/observability	Options	core/observability/options.go
 core/outbox	Message	core/outbox/message.go
 core/outbox	Options	core/outbox/options.go
 core/password	Options	core/password/options.go
+core/payment	Options	core/payment/options.go
 core/permission	Options	core/permission/options.go
 core/queue	DBOptions	core/queue/options.go
 core/queue	Options	core/queue/options.go
@@ -209,6 +220,7 @@ core/storage	Rule	core/storage/policy.go
 core/storage	S3Options	core/storage/options.go
 core/tenant	Options	core/tenant/options.go
 core/vectorstore	Options	core/vectorstore/options.go
+core/webhook	Options	core/webhook/options.go
 core/workflow	Options	core/workflow/options.go
 core/workflow	PostgresOptions	core/workflow/options.go
 dsl/backend/mcp	mergedManifest	dsl/backend/mcp/manifest.go
@@ -286,6 +298,7 @@ shared/mcpclient	rpcErrorWire	shared/mcpclient/client.go
 shared/providersopt	Common	shared/providersopt/providersopt.go
 shared/redisopt	ConnectOptions	shared/redisopt/connect.go
 shared/redisopt	Options	shared/redisopt/options.go
+shared/retry	Policy	shared/retry/retry.go
 shared/s3opts	Options	shared/s3opts/s3opts.go
 tools/affected	output	tools/affected/main.go
 tools/apidiff	baselineEntry	tools/apidiff/apidiff.go
