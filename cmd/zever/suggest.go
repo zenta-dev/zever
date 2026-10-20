@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -32,8 +31,21 @@ func unknownSubcommandError(command, sub string, choices []string, listCmd strin
 		msg += "\n" + formatHint("run '"+listCmd+"' to list the subcommands")
 	}
 
-	return errors.New(msg)
+	return &subcommandError{msg: msg}
 }
+
+// subcommandError is the error an unrecognized sub-subcommand produces. It
+// keeps the ErrUnknownSubcommand sentinel reachable through errors.Is, so
+// a caller that branches on the sentinel still sees it.
+type subcommandError struct {
+	msg string
+}
+
+// Error renders the error message.
+func (e *subcommandError) Error() string { return e.msg }
+
+// Unwrap exposes ErrUnknownSubcommand for errors.Is.
+func (e *subcommandError) Unwrap() error { return ErrUnknownSubcommand }
 
 // allTopLevel returns every suggestible top-level name derived from the
 // Cobra tree: each subcommand name plus each alias (including the deliberate

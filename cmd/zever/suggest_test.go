@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -135,6 +136,43 @@ func TestUnknownSubcommandErrorPutsTheErrorFirst(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "zever config -h") {
 		t.Fatalf("error lacks the list command: %q", err.Error())
+	}
+}
+
+// TestUnknownSubcommandErrorKeepsTheSentinel pins that the reworded error
+// still satisfies errors.Is against ErrUnknownSubcommand, so a caller that
+// branches on the sentinel is unaffected by the message change.
+func TestUnknownSubcommandErrorKeepsTheSentinel(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "")
+
+	err := unknownSubcommandError("zever config", "showw", []string{"show"}, "zever config -h")
+	if err == nil {
+		t.Fatal("unknownSubcommandError: got nil error")
+	}
+
+	if !errors.Is(err, ErrUnknownSubcommand) {
+		t.Fatalf("error %q does not match ErrUnknownSubcommand", err.Error())
+	}
+}
+
+// TestUnknownSubcommandErrorSilencesHints pins ZEVER_NO_HINT: the
+// did-you-mean and list-command lines are hints, so silencing hints leaves
+// the failure alone.
+func TestUnknownSubcommandErrorSilencesHints(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "1")
+
+	err := unknownSubcommandError("zever config", "showw", []string{"show"}, "zever config -h")
+	if err == nil {
+		t.Fatal("unknownSubcommandError: got nil error")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "hint:") {
+		t.Fatalf("error carries a hint while ZEVER_NO_HINT is set:\n%s", msg)
+	}
+
+	if !strings.Contains(msg, `unknown subcommand "showw"`) {
+		t.Fatalf("error = %q, want the failure itself", msg)
 	}
 }
 
