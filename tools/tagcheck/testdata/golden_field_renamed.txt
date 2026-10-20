@@ -1,0 +1,8 @@
+package pkg
+
+// wireStruct is a golden wire struct whose Error field was renamed in Go
+// but kept its wire key.
+type wireStruct struct {
+	Name    string `json:"name"`
+	Message string `json:"error"`
+}

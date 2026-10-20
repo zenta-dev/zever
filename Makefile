@@ -99,8 +99,16 @@ err-lint: ## Scan for error-convention violations (unprefixed messages, bracket 
 	$(GO) -C tools/errscan run . "$(CURDIR)"
 
 .PHONY: check-tags
-check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags)
+check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags or wire keys)
 	$(GO) -C tools/tagcheck run . "$(CURDIR)"
+
+.PHONY: tag-golden
+tag-golden: ## Regenerate the pinned json wire keys of the struct-tag guard (needs the v0.7.2 tag and the full history)
+	$(GO) -C tools/tagcheck run ./cmd/taggolden -root "$(CURDIR)"
+
+.PHONY: tag-golden-check
+tag-golden-check: ## Verify the pinned json wire keys still match the git history (needs the v0.7.2 tag and the full history)
+	$(GO) -C tools/tagcheck run ./cmd/taggolden -root "$(CURDIR)" -check
 
 .PHONY: apidiff
 apidiff: ## Check Core-tier public API against last release tags (fails on undocumented breaking changes)

@@ -11,12 +11,23 @@
 //     (tag_allowlist.txt). The v0.8.0 migration removed yaml/toml
 //     serialization deliberately; reintroducing it fails the gate unless
 //     the file is allowlisted with a justification.
-//   - golden-json: an exported field of a v0.7.2 wire struct (see
+//   - golden-json: an exported field of a registered wire struct (see
 //     golden_wire_structs.txt) lacking a json tag, or a golden struct that
 //     no longer exists in the tree. The list is the registry of structs
 //     that carried json tags at v0.7.2, the last release before the
 //     strip; new structs are not pinned, but existing wire structs must
 //     keep their tags.
+//   - golden-key: an exported field of a registered wire struct whose json
+//     key differs from the pinned one (golden_wire_fields.txt), whose json
+//     key is empty (the wire falls back to the Go field name), or that is
+//     dropped from the wire (json:"-"). A renamed key is a silent wire
+//     break: the field still marshals, under a key no consumer reads.
+//   - golden-missing: a pinned wire key the struct no longer exposes, for
+//     example after the field was deleted or renamed together with its
+//     key.
+//   - golden-nofields: a registered wire struct with no pinned keys: the
+//     golden field data was not regenerated after the struct was
+//     registered.
 //
 // Skipped: _test.go files, generated files (a "DO NOT EDIT" marker in a
 // leading comment), and the .git/.worktrees/.claude/vendor/node_modules/
@@ -38,8 +49,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
+
+	"github.com/zenta-dev/zever/tools/tagcheck/internal/wire"
 )
 
 // violation is one struct-tag rule breach: file, line, rule, detail.
@@ -50,20 +64,37 @@ type violation struct {
 	msg  string
 }
 
-// goldenStructs is the v0.7.2 wire-struct registry: package dir (relative
-// to the scan root) -> struct name -> v0.7.2 source file (documentation).
+// goldenStructs is the wire-struct registry: package dir (relative to the
+// scan root) -> struct name -> v0.7.2 source file (documentation).
 type goldenStructs map[string]map[string]string
+
+// goldenFields pins the wire key of every field of a registered wire
+// struct: package dir -> struct name -> Go field name -> wire key.
+type goldenFields map[string]map[string]map[string]string
 
 // allowlist holds permitted yaml:/toml: tag locations: bare paths allow the
 // whole file, path:line allows one field line (1-based).
 type allowlist map[string]bool
+
+// rules holds the golden data the scan compares the tree against.
+type rules struct {
+	structs goldenStructs
+	fields  goldenFields
+	allowed allowlist
+}
+
+// fieldInfo is one exported struct field with its source line.
+type fieldInfo struct {
+	wire.Field
+	line int
+}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
 // run executes the scan over the root selected by args (default "."),
-// loading the golden list and tag allowlist from the tagcheck tool
+// loading the golden lists and tag allowlist from the tagcheck tool
 // directory. The return value is the process exit code: 0 when clean, 1 on
 // violations, 2 on scan error.
 func run(args []string, stdout, stderr io.Writer) int {
@@ -74,9 +105,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	toolDir := filepath.Join(root, "tools", "tagcheck")
 
-	golden, err := loadGolden(toolDir)
+	structs, err := loadGolden(toolDir)
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: load golden list: %v\n", err)
+		return 2
+	}
+
+	fields, err := loadGoldenFields(toolDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "tagcheck: load golden field list: %v\n", err)
 		return 2
 	}
 
@@ -86,7 +123,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	vs, err := scan(root, golden, allowed)
+	vs, err := scan(root, rules{structs: structs, fields: fields, allowed: allowed})
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: %v\n", err)
 		return 2
@@ -179,6 +216,47 @@ func loadGolden(dir string) (goldenStructs, error) {
 	return g, nil
 }
 
+// loadGoldenFields parses golden_wire_fields.txt in dir: tab-separated
+// package dir, struct name, Go field name, pinned wire key, and the base
+// revision the key was taken from. Blank lines and # comments are ignored.
+func loadGoldenFields(dir string) (goldenFields, error) {
+	f, closeFile, err := openContained(dir, "golden_wire_fields.txt")
+	if err != nil {
+		return nil, fmt.Errorf("tagcheck: open golden field list: %w", err)
+	}
+	defer closeFile()
+
+	g := goldenFields{}
+
+	parseErr := eachDataLine(f, "golden_wire_fields.txt", func(line string) error {
+		parts := strings.Split(line, "\t")
+		if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
+			return fmt.Errorf("tagcheck: malformed golden field line %q", line)
+		}
+
+		names := g[parts[0]]
+		if names == nil {
+			names = map[string]map[string]string{}
+			g[parts[0]] = names
+		}
+
+		fields := names[parts[1]]
+		if fields == nil {
+			fields = map[string]string{}
+			names[parts[1]] = fields
+		}
+
+		fields[parts[2]] = parts[3]
+
+		return nil
+	})
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	return g, nil
+}
+
 // loadAllowlist parses tag_allowlist.txt in dir: one entry per line,
 // either a bare repo-relative path or path:line (1-based field line).
 // Blank lines and # comments are ignored.
@@ -224,9 +302,9 @@ func eachDataLine(r io.Reader, origin string, fn func(string) error) error {
 }
 
 // scan walks root, checking every non-test, non-generated Go file against
-// the three tag rules. seen records golden (dir, struct) pairs found in
-// the tree so checkGoldenPresent can report vanished golden structs.
-func scan(root string, golden goldenStructs, allowed allowlist) ([]violation, error) {
+// the tag rules. seen records golden (dir, struct) pairs found in the tree
+// so checkGoldenPresent can report vanished golden structs.
+func scan(root string, r rules) ([]violation, error) {
 	var vs []violation
 
 	seen := map[string]bool{}
@@ -256,7 +334,7 @@ func scan(root string, golden goldenStructs, allowed allowlist) ([]violation, er
 
 		rel = filepath.ToSlash(rel)
 
-		fileVs, isGenerated, scanErr := checkFile(rel, path, golden, allowed)
+		fileVs, isGenerated, decls, scanErr := checkFile(rel, path, r)
 		if scanErr != nil {
 			return scanErr
 		}
@@ -268,7 +346,7 @@ func scan(root string, golden goldenStructs, allowed allowlist) ([]violation, er
 		}
 
 		dir := filepath.ToSlash(filepath.Dir(rel))
-		collectSeen(dir, path, seen)
+		collectSeen(dir, decls, seen)
 
 		return nil
 	})
@@ -276,7 +354,7 @@ func scan(root string, golden goldenStructs, allowed allowlist) ([]violation, er
 		return nil, err
 	}
 
-	return append(vs, checkGoldenPresent(golden, seen)...), nil
+	return append(vs, checkGoldenPresent(r.structs, seen)...), nil
 }
 
 // checkGoldenPresent reports golden structs missing from the tree: a
@@ -324,46 +402,31 @@ func checkGoldenPresent(golden goldenStructs, seen map[string]bool) []violation 
 }
 
 // collectSeen records which golden (dir, struct) pairs the file defines.
-func collectSeen(dir, path string, seen map[string]bool) {
-	fset := token.NewFileSet()
-
-	f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
-	if err != nil {
-		return
+func collectSeen(dir string, decls []structDecl, seen map[string]bool) {
+	for _, decl := range decls {
+		seen[dir+"\t"+decl.name] = true
 	}
+}
 
-	for _, decl := range f.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok || gd.Tok != token.TYPE {
-			continue
-		}
-
-		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-
-			if _, ok := ts.Type.(*ast.StructType); ok {
-				seen[dir+"\t"+ts.Name.Name] = true
-			}
-		}
-	}
+// structDecl is one struct type declared in a file.
+type structDecl struct {
+	name string
 }
 
 // checkFile parses one Go file and returns its tag-rule violations. The
 // second result reports whether the file is generated (DO NOT EDIT marker
-// in a leading comment), in which case it is skipped entirely.
-func checkFile(rel, path string, golden goldenStructs, allowed allowlist) (vs []violation, generated bool, err error) {
+// in a leading comment), in which case it is skipped entirely. The third
+// result lists the struct types the file declares.
+func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls []structDecl, err error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	for _, cg := range f.Comments {
@@ -373,7 +436,7 @@ func checkFile(rel, path string, golden goldenStructs, allowed allowlist) (vs []
 
 		for _, c := range cg.List {
 			if strings.Contains(c.Text, "DO NOT EDIT") {
-				return nil, true, nil
+				return nil, true, nil, nil
 			}
 		}
 	}
@@ -397,68 +460,242 @@ func checkFile(rel, path string, golden goldenStructs, allowed allowlist) (vs []
 				continue
 			}
 
-			for _, field := range st.Fields.List {
-				if len(field.Names) == 0 {
-					continue // embedded fields carry no json key
-				}
+			fields := collectFields(fset, st)
 
-				isWire := false
-				if _, ok := golden[dir][ts.Name.Name]; ok {
-					isWire = true
-				}
+			decls = append(decls, structDecl{name: ts.Name.Name})
 
-				line := fset.Position(field.Pos()).Line
-
-				var tag reflect.StructTag
-				if field.Tag != nil {
-					tag = reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
-
-					if strings.TrimSpace(string(tag)) == "" {
-						vs = append(vs, violation{
-							path: rel,
-							line: line,
-							rule: "empty-tag",
-							msg:  fmt.Sprintf("field %s has an empty struct tag; wire keys fall back to the Go field name", field.Names[0].Name),
-						})
-
-						continue
-					}
-
-					for _, kind := range []string{"yaml", "toml"} {
-						if _, present := tag.Lookup(kind); present && !allowed[rel] && !allowed[fmt.Sprintf("%s:%d", rel, line)] {
-							vs = append(vs, violation{
-								path: rel,
-								line: line,
-								rule: "forbidden-tag",
-								msg:  fmt.Sprintf("field %s carries a %s: tag outside the tag allowlist (tag_allowlist.txt)", field.Names[0].Name, kind),
-							})
-						}
-					}
-				}
-
-				if !isWire {
-					continue
-				}
-
-				for _, name := range field.Names {
-					if !name.IsExported() {
-						continue
-					}
-
-					if _, present := tag.Lookup("json"); !present {
-						vs = append(vs, violation{
-							path: rel,
-							line: line,
-							rule: "golden-json",
-							msg:  fmt.Sprintf("exported field %s of wire struct %s lacks a json tag", name.Name, ts.Name.Name),
-						})
-					}
-				}
-			}
+			vs = append(vs, checkStruct(rel, dir, fset.Position(st.Pos()).Line, ts.Name.Name, fields, r)...)
 		}
 	}
 
-	return vs, false, nil
+	return vs, false, decls, nil
+}
+
+// collectFields returns the exported fields of st with their source lines.
+func collectFields(fset *token.FileSet, st *ast.StructType) []fieldInfo {
+	var fields []fieldInfo
+
+	for _, field := range st.Fields.List {
+		if len(field.Names) == 0 {
+			continue // embedded fields carry no json key
+		}
+
+		line := fset.Position(field.Pos()).Line
+
+		for _, ident := range field.Names {
+			if !ident.IsExported() {
+				continue
+			}
+
+			fld := fieldInfo{line: line}
+			fld.Name = ident.Name
+			if field.Tag != nil {
+				fld.Tag = strings.Trim(field.Tag.Value, "`")
+				fld.HasTag = true
+			}
+
+			fields = append(fields, fld)
+		}
+	}
+
+	return fields
+}
+
+// checkStruct applies the per-struct rules to one struct type.
+func checkStruct(rel, dir string, line int, name string, fields []fieldInfo, r rules) []violation {
+	var vs []violation
+
+	registered := false
+	if names, ok := r.structs[dir]; ok {
+		_, registered = names[name]
+	}
+
+	pinned := r.fields[dir][name]
+
+	for _, field := range fields {
+		if field.HasTag && strings.TrimSpace(field.Tag) == "" {
+			vs = append(vs, violation{
+				path: rel,
+				line: field.line,
+				rule: "empty-tag",
+				msg:  fmt.Sprintf("field %s has an empty struct tag; wire keys fall back to the Go field name", field.Name),
+			})
+
+			continue
+		}
+
+		for _, kind := range []string{"yaml", "toml"} {
+			if _, present := reflect.StructTag(field.Tag).Lookup(kind); present &&
+				!r.allowed[rel] && !r.allowed[fmt.Sprintf("%s:%d", rel, field.line)] {
+				vs = append(vs, violation{
+					path: rel,
+					line: field.line,
+					rule: "forbidden-tag",
+					msg:  fmt.Sprintf("field %s carries a %s: tag outside the tag allowlist (tag_allowlist.txt)", field.Name, kind),
+				})
+			}
+		}
+
+		if !registered {
+			continue
+		}
+
+		if field.State() == wire.StateMissing {
+			vs = append(vs, violation{
+				path: rel,
+				line: field.line,
+				rule: "golden-json",
+				msg:  fmt.Sprintf("exported field %s of wire struct %s lacks a json tag", field.Name, name),
+			})
+
+			continue
+		}
+
+		want, hasPinned := pinned[field.Name]
+		if !hasPinned {
+			continue
+		}
+
+		if v := checkGoldenKey(rel, field.line, name, field, want); v != nil {
+			vs = append(vs, *v)
+		}
+	}
+
+	vs = append(vs, checkPinnedKeys(rel, line, name, fields, pinned, registered)...)
+
+	return vs
+}
+
+// checkGoldenKey compares the wire key a field is encoded under with the
+// key pinned in the golden field list. It returns nil when they agree.
+//
+// A pinned key of "-" means the field must stay off the wire.
+func checkGoldenKey(rel string, line int, structName string, field fieldInfo, want string) *violation {
+	got, onWire := effectiveKey(field)
+
+	switch {
+	case want == "-" && !onWire:
+		return nil
+	case want == "-":
+		return &violation{
+			path: rel,
+			line: line,
+			rule: "golden-key",
+			msg:  fmt.Sprintf("field %s of wire struct %s is on the wire again (json key %q); the golden contract keeps it off the wire", field.Name, structName, got),
+		}
+	case !onWire:
+		return &violation{
+			path: rel,
+			line: line,
+			rule: "golden-key",
+			msg:  fmt.Sprintf("field %s of wire struct %s is dropped from the wire (json:\"-\"); the golden wire key is %q", field.Name, structName, want),
+		}
+	case got == want:
+		return nil
+	case field.State() == wire.StateEmpty:
+		return &violation{
+			path: rel,
+			line: line,
+			rule: "golden-key",
+			msg:  fmt.Sprintf("field %s of wire struct %s has an empty json key; the wire falls back to the Go field name %q, the golden wire key is %q", field.Name, structName, got, want),
+		}
+	default:
+		return &violation{
+			path: rel,
+			line: line,
+			rule: "golden-key",
+			msg:  fmt.Sprintf("field %s of wire struct %s exposes the json key %q; the golden wire key is %q", field.Name, structName, got, want),
+		}
+	}
+}
+
+// effectiveKey returns the wire key a field is encoded under and whether
+// the field is on the wire at all. encoding/json falls back to the Go
+// field name when the json tag carries no name.
+func effectiveKey(field fieldInfo) (string, bool) {
+	return field.Key()
+}
+
+// checkPinnedKeys reports pinned wire keys the struct no longer exposes and
+// registered structs whose keys were never pinned.
+func checkPinnedKeys(rel string, line int, name string, fields []fieldInfo, pinned map[string]string, registered bool) []violation {
+	var vs []violation
+
+	if !registered {
+		return vs
+	}
+
+	if len(pinned) == 0 {
+		if len(fields) == 0 {
+			return vs // a struct without exported fields has no wire key to pin
+		}
+
+		return append(vs, violation{
+			path: rel,
+			line: line,
+			rule: "golden-nofields",
+			msg:  fmt.Sprintf("wire struct %s has no pinned json keys; regenerate golden_wire_fields.txt", name),
+		})
+	}
+
+	present := map[string]bool{}
+	dropped := false
+
+	for _, field := range fields {
+		if field.State() == wire.StateDropped {
+			dropped = true
+
+			continue
+		}
+
+		key, onWire := effectiveKey(field)
+		if onWire {
+			present[key] = true
+		}
+	}
+
+	names := make([]string, 0, len(pinned))
+	for field := range pinned {
+		names = append(names, field)
+	}
+
+	sort.Strings(names)
+
+	for _, field := range names {
+		key := pinned[field]
+
+		if slices.ContainsFunc(fields, func(f fieldInfo) bool { return f.Name == field }) {
+			continue
+		}
+
+		if key == "-" {
+			if dropped {
+				continue
+			}
+
+			vs = append(vs, violation{
+				path: rel,
+				line: line,
+				rule: "golden-missing",
+				msg:  fmt.Sprintf("wire struct %s no longer drops the field %s from the wire (json:\"-\")", name, field),
+			})
+
+			continue
+		}
+
+		if present[key] {
+			continue // the Go field was renamed, the wire key survived
+		}
+
+		vs = append(vs, violation{
+			path: rel,
+			line: line,
+			rule: "golden-missing",
+			msg:  fmt.Sprintf("wire struct %s no longer exposes the golden wire key %q", name, key),
+		})
+	}
+
+	return vs
 }
 
 // skipDir reports whether the walk must not descend into name.

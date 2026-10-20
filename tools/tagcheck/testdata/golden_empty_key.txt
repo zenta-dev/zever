@@ -1,0 +1,8 @@
+package pkg
+
+// wireStruct is a golden wire struct whose Error key was emptied: the wire
+// falls back to the Go field name.
+type wireStruct struct {
+	Name  string `json:"name"`
+	Error string `json:""`
+}

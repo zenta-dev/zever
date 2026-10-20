@@ -1,0 +1,8 @@
+package pkg
+
+// wireStruct is a golden wire struct whose Error key was renamed: the
+// field still marshals, under a key no consumer reads.
+type wireStruct struct {
+	Name  string `json:"name"`
+	Error string `json:"message"`
+}
