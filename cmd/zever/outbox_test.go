@@ -137,6 +137,28 @@ func TestOutboxUsage(t *testing.T) {
 	}
 }
 
+// TestOutboxEnvFailureNamesTheOffendingKey pins that the outbox commands
+// carry the shared env-key hint: a stray variable under a wired service
+// prefix names the key to unset instead of dead-ending.
+func TestOutboxEnvFailureNamesTheOffendingKey(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "")
+	t.Setenv("DB_HOST", "localhost")
+
+	err := runOutbox([]string{"status"})
+	if err == nil {
+		t.Fatal("runOutbox status with stray env key: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(err.Error(), `"DB_HOST"`) {
+		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "unset it") {
+		t.Fatalf("error = %q, want the hint to say what to do", err.Error())
+	}
+}
+
 // TestOutboxStatusCommand asserts the human status block reports every
 // counter from the seeded rows.
 func TestOutboxStatusCommand(t *testing.T) {

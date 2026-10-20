@@ -164,3 +164,25 @@ func TestDoctorFooterPointsAtThePerRowFix(t *testing.T) {
 		t.Fatalf("footer does not point at the per-row fix:\n%s", stderr)
 	}
 }
+
+// TestDoctorEnvFailureNamesTheOffendingKey pins the doctor path that fails
+// before any battery runs: an unknown env key under a wired service prefix
+// names the key to fix.
+func TestDoctorEnvFailureNamesTheOffendingKey(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "")
+	t.Setenv("DB_HOST", "localhost")
+
+	err := runDoctorWith(DoctorConfig{Out: &bytes.Buffer{}})
+	if err == nil {
+		t.Fatal("runDoctorWith stray env key: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(err.Error(), `"DB_HOST"`) {
+		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "unset it") {
+		t.Fatalf("error = %q, want the hint to say what to do", err.Error())
+	}
+}

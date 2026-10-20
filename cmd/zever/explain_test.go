@@ -137,6 +137,28 @@ func TestRunExplainUnknownServiceNamesTheListCommand(t *testing.T) {
 	}
 }
 
+// TestRunExplainEnvFailureNamesTheOffendingKey pins that the wiring graph
+// carries the shared env-key hint: a stray variable under a wired service
+// prefix names the key to unset instead of dead-ending.
+func TestRunExplainEnvFailureNamesTheOffendingKey(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "")
+	t.Setenv("DB_HOST", "localhost")
+
+	err := runExplain(nil)
+	if err == nil {
+		t.Fatal("runExplain with stray env key: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(err.Error(), `"DB_HOST"`) {
+		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), "unset it") {
+		t.Fatalf("error = %q, want the hint to say what to do", err.Error())
+	}
+}
+
 func TestRunExplainSuggestsClosestMatch(t *testing.T) {
 	dir := t.TempDir()
 	schemaPath := writeInspectFixture(t, dir, "user.zen", inspectExplainSchema)
