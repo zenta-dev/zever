@@ -196,3 +196,62 @@ func TestRunConfigShowTypoEnvHints(t *testing.T) {
 		t.Fatalf("error = %q, want the corrected env key", err.Error())
 	}
 }
+
+// TestRunConfigShowJSONRendersDurationsAsStrings pins the JSON envelope of
+// `zever config show`: a duration option renders as its canonical string
+// form ("30s"), the same form the env layer parses, for the default instance
+// and for a named one. encoding/json/v2 has no default representation for
+// time.Duration, so the options object of every duration-carrying service
+// used to come out empty and the envelope lied about the effective config.
+func TestRunConfigShowJSONRendersDurationsAsStrings(t *testing.T) {
+	t.Setenv("DB_MAX_CONN_LIFETIME", "30s")
+	t.Setenv("DB__REPORTING__MAX_CONN_LIFETIME", "5m")
+	t.Setenv("DB__REPORTING__DSN", "postgres://user:s3cret@localhost/db?sslmode=disable")
+	t.Chdir(t.TempDir())
+
+	jbuf := mustJSONMode(t)
+
+	if err := runConfigShowWith(ConfigConfig{JSON: true}); err != nil {
+		t.Fatalf("runConfigShowWith: %v", err)
+	}
+
+	env := mustDecodeEnvelope(t, jbuf)
+	if !env.OK || env.Command != "config show" {
+		t.Fatalf("envelope = %+v, want the config show success envelope", env)
+	}
+
+	data := envelopeData(t, env)
+
+	services := mapField(t, data, "services")
+	db := mapField(t, services, "db")
+	dbOptions := mapField(t, db, "options")
+
+	if got := dbOptions["max_conn_lifetime"]; got != "30s" {
+		t.Errorf("db: max_conn_lifetime = %v, want %q", got, "30s")
+	}
+
+	instances := mapField(t, data, "instances")
+	reporting := mapField(t, instances, "db/REPORTING")
+	reportingOptions := mapField(t, reporting, "options")
+
+	if got := reportingOptions["max_conn_lifetime"]; got != "5m0s" {
+		t.Errorf("db/REPORTING: max_conn_lifetime = %v, want %q", got, "5m0s")
+	}
+
+	// The named instance still redacts its secret.
+	if got := reportingOptions["dsn"]; got != config.RedactedValue {
+		t.Errorf("db/REPORTING: dsn = %v, want %q", got, config.RedactedValue)
+	}
+}
+
+// mapField reads one object member of a decoded JSON object.
+func mapField(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+
+	obj, ok := m[key].(map[string]any)
+	if !ok {
+		t.Fatalf("%q = %v, want a JSON object", key, m[key])
+	}
+
+	return obj
+}
