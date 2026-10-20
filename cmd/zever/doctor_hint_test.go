@@ -23,7 +23,7 @@ func TestDoctorFixHintNamesMissingEnvKey(t *testing.T) {
 			name:    "ai api key",
 			battery: "ai",
 			errText: "container: ai: ai: open anthropic: ai: open anthropic: ai: invalid options: api_key is required",
-			want:    "set AI_APIKEY in .env, then re-run 'zever doctor'",
+			want:    "set AI_API_KEY in .env, then re-run 'zever doctor'",
 		},
 		{
 			name:    "auth jwt secret",
@@ -41,7 +41,7 @@ func TestDoctorFixHintNamesMissingEnvKey(t *testing.T) {
 			name:    "geo user agent",
 			battery: "geo",
 			errText: "geo: open osm: osm: user_agent is required",
-			want:    "set GEO_USERAGENT in .env, then re-run 'zever doctor'",
+			want:    "set GEO_USER_AGENT in .env, then re-run 'zever doctor'",
 		},
 		{
 			name:    "crypto key",
@@ -93,7 +93,7 @@ func TestDoctorFixHintNeverInventsAKey(t *testing.T) {
 	t.Parallel()
 
 	// "secret" alone is not a field of the ai battery (its key is
-	// AI_APIKEY), so the hint must not claim AI_SECRET.
+	// AI_API_KEY), so the hint must not claim AI_SECRET.
 	if got := doctorFixHint("ai", "ai: invalid options: secret is required"); strings.Contains(got, "AI_SECRET") {
 		t.Fatalf("doctorFixHint invented a key: %q", got)
 	}

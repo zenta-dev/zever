@@ -2130,7 +2130,7 @@ func main() {
 	opts := []serve.Option{}
 
 	if port, err := serverPort(*addr); err != nil {
-		fmt.Fprintln(os.Stderr, "server:", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	} else if port != "" {
 		opts = append(opts, serve.WithPort(port))
@@ -2181,7 +2181,7 @@ func serverPort(addr string) (string, error) {
 
 	if _, port, err := net.SplitHostPort(addr); err == nil {
 		if port == "" {
-			return "", fmt.Errorf("-addr %q names no port", addr)
+			return "", fmt.Errorf("server: -addr %q names no port", addr)
 		}
 
 		return port, nil
@@ -2191,7 +2191,7 @@ func serverPort(addr string) (string, error) {
 		return addr, nil
 	}
 
-	return "", fmt.Errorf("-addr %q wants :port or host:port", addr)
+	return "", fmt.Errorf("server: -addr %q wants :port or host:port", addr)
 }
 `
 
@@ -2247,12 +2247,55 @@ func (s *Service) Mount(r router.Router, c *container.Container) error {
 }
 `
 
-// envKeyName maps a struct field name to its env key segment: upper-cased,
-// matching the canonical <SERVICE>_<FIELD> form the README documents
-// (DB_MAXCONNS, AUTH_JWT_SECRET). ApplyEnv resolves the same field through
-// either spelling, so generated keys always round-trip.
-func envKeyName(field string) string {
-	return strings.ToUpper(field)
+// envKeyName maps a struct field to its env key segment: the field's
+// serialized name (its json tag), upper-cased, so the generated key is the
+// very name config's resolver derives from the same tag. The Go field name
+// is not a substitute: the resolver ignores only case and "_", so SaltLen
+// ("salt_length") and TLSCertFile ("tls_cert") never match a key spelled
+// after the Go name.
+//
+// A field whose tag carries no name (json:",omitempty") falls back to the
+// Go field name, which the resolver derives the same way (the snake_case
+// form of the Go name), so those keys still round-trip.
+func envKeyName(sf reflect.StructField) string {
+	if tag, ok := sf.Tag.Lookup("json"); ok {
+		if name, _, _ := strings.Cut(tag, ","); name != "" && name != "-" {
+			return strings.ToUpper(name)
+		}
+	}
+
+	return strings.ToUpper(sf.Name)
+}
+
+// jsonHidden reports whether sf is kept off the wire by its json tag ("-"),
+// so no env key can name it. Such a field is skipped, never emitted under
+// its Go name.
+func jsonHidden(sf reflect.StructField) bool {
+	tag, ok := sf.Tag.Lookup("json")
+	if !ok {
+		return false
+	}
+
+	name, _, _ := strings.Cut(tag, ",")
+
+	return name == "-"
+}
+
+// isAdapterField reports whether sf selects the backend adapter. The
+// <SERVICE>_ADAPTER key is reserved for that selection (the resolver
+// applies it to the service envelope and never to the Options struct), so
+// the generator emits it once: a second, empty ADAPTER key would override
+// the selected adapter and the config would fail to resolve.
+func isAdapterField(sf reflect.StructField) bool {
+	name := sf.Name
+
+	if tag, ok := sf.Tag.Lookup("json"); ok {
+		if n, _, _ := strings.Cut(tag, ","); n != "" && n != "-" {
+			name = n
+		}
+	}
+
+	return strings.EqualFold(strings.ReplaceAll(name, "_", ""), "adapter")
 }
 
 // envScalarValue formats one Options scalar for .env.example: strings
@@ -2303,7 +2346,18 @@ func addressableCopy(opts any) reflect.Value {
 // PREFIX_OUTER_INNER (mirroring ApplyEnv), skipping json:"-" fields and
 // types with no env string form. sep is "_" for default instances and "__"
 // for named ones (SERVICE__NAME__FIELD).
+//
+// The Options-level adapter field is skipped: the adapter is selected by
+// the <SERVICE>_ADAPTER key the caller writes, and a second ADAPTER key
+// would override it with the field's empty default.
 func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
+	appendEnvFields(out, prefix, sep, opts, true)
+}
+
+// appendEnvFields is appendEnvKeys' worker. topLevel marks the walk over
+// the Options struct itself (embedded structs are promoted into it), where
+// the adapter field is the service's selector and not an option.
+func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLevel bool) {
 	v := addressableCopy(opts)
 	if !v.IsValid() {
 		return
@@ -2313,19 +2367,18 @@ func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
 
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
-		if sf.PkgPath != "" {
+		if sf.PkgPath != "" || jsonHidden(sf) {
 			continue
 		}
 
-		tag := sf.Tag.Get("json")
-		if tag == "-" {
+		if topLevel && isAdapterField(sf) {
 			continue
 		}
 
 		f := v.Field(i)
 
 		if sf.Anonymous && f.Kind() == reflect.Struct {
-			appendEnvKeys(out, prefix, sep, f.Addr().Interface())
+			appendEnvFields(out, prefix, sep, f.Addr().Interface(), topLevel)
 
 			continue
 		}
@@ -2334,7 +2387,7 @@ func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
 			nested := f
 			for j := 0; j < nested.Type().NumField(); j++ {
 				nsf := nested.Type().Field(j)
-				if nsf.PkgPath != "" || nsf.Tag.Get("json") == "-" {
+				if nsf.PkgPath != "" || jsonHidden(nsf) {
 					continue
 				}
 
@@ -2345,7 +2398,7 @@ func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
 					continue
 				}
 
-				_, _ = fmt.Fprintf(out, "%s%s%s%s%s=%s\n", prefix, sep, envKeyName(sf.Name), sep, envKeyName(nsf.Name), val)
+				_, _ = fmt.Fprintf(out, "%s%s%s%s%s=%s\n", prefix, sep, envKeyName(sf), sep, envKeyName(nsf), val)
 			}
 
 			continue
@@ -2356,22 +2409,27 @@ func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any) {
 			continue
 		}
 
-		_, _ = fmt.Fprintf(out, "%s%s%s=%s\n", prefix, sep, envKeyName(sf.Name), val)
+		_, _ = fmt.Fprintf(out, "%s%s%s=%s\n", prefix, sep, envKeyName(sf), val)
 	}
 }
 
 // renderEnvExample generates .env.example from the Options structs of the
-// wired batteries: every key, default and type comment, straight from
+// wired batteries: every key and default, straight from
 // config.DefaultOptions, so the file cannot drift from what ApplyEnv
-// resolves. Copy it to .env and fill secrets for local runs.
+// resolves. Every key is the option's serialized name, so the file
+// resolves as it stands; the adapter selector is written once, here.
+// Copy it to .env and fill secrets for local runs.
 func renderEnvExample(selections []batterySelection) []byte {
 	var b strings.Builder
 
 	b.WriteString("# Managed by `zever new` and `zever add`. Copy to .env and fill secrets.\n")
 	b.WriteString("# Keys are <SERVICE>_<FIELD> (default instance) or <SERVICE>__<NAME>__<FIELD> (named).\n")
-	b.WriteString("# Defaults shown; every value re-parses via ApplyEnv. Adapter extras\n")
-	b.WriteString("# (e.g. CACHE_TABLE) follow the same SERVICE_FIELD rule; tune the rest\n")
-	b.WriteString("# with container.WithOptions in internal/app/wiring.go.\n")
+	b.WriteString("# <FIELD> is the option's serialized name, upper-cased (DB_MAX_CONNS,\n")
+	b.WriteString("# AUTH_JWT_SECRET); the resolver matches case and \"_\" loosely, so both\n")
+	b.WriteString("# spellings reach the same option. Defaults shown; every value re-parses\n")
+	b.WriteString("# via ApplyEnv. Adapter extras (e.g. CACHE_TABLE) follow the same\n")
+	b.WriteString("# SERVICE_FIELD rule; tune the rest with container.WithOptions in\n")
+	b.WriteString("# internal/app/wiring.go.\n")
 
 	sorted := append([]batterySelection(nil), selections...)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -2416,7 +2474,7 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
-		if sf.PkgPath != "" || sf.Tag.Get("json") == "-" {
+		if sf.PkgPath != "" || jsonHidden(sf) {
 			continue
 		}
 
@@ -2432,7 +2490,7 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 			nested := f
 			for j := 0; j < nested.Type().NumField(); j++ {
 				nsf := nested.Type().Field(j)
-				if nsf.PkgPath != "" || nsf.Tag.Get("json") == "-" {
+				if nsf.PkgPath != "" || jsonHidden(nsf) {
 					continue
 				}
 
@@ -2450,7 +2508,7 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 					continue
 				}
 
-				_, _ = fmt.Fprintf(out, "%s_%s_%s=%s\n", prefix, envKeyName(sf.Name), envKeyName(nsf.Name), secret)
+				_, _ = fmt.Fprintf(out, "%s_%s_%s=%s\n", prefix, envKeyName(sf), envKeyName(nsf), secret)
 			}
 
 			continue
@@ -2469,7 +2527,7 @@ func collectDevSecrets(out *strings.Builder, prefix string, opts any) {
 			continue
 		}
 
-		_, _ = fmt.Fprintf(out, "%s_%s=%s\n", prefix, envKeyName(sf.Name), secret)
+		_, _ = fmt.Fprintf(out, "%s_%s=%s\n", prefix, envKeyName(sf), secret)
 	}
 }
 

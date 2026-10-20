@@ -24,8 +24,14 @@ an entry prefix, even-space continuation indent, no truncated duplicates.
   entries, so breaking changes stay covered while unmerged.
 - Fragments are compiled into `CHANGELOG.md`'s pending section (and deleted)
   by `make changelog-compile`, run at PR-merge time and by
-  `make release-prep`. The pending section is `## [Unreleased]`, or — between
-  the release cut and the tag push — the top `## [vX.Y.Z] - YYYY-MM-DD`
-  section whose version has no git tag yet (the same rule `make apidiff`
-  uses). Never edit `CHANGELOG.md` and a fragment for the same change; the
-  compile step would duplicate the entry.
+  `make release-prep`. The pending section is `## [Unreleased]`: the release
+  cut renames it to `## [vX.Y.Z] - YYYY-MM-DD` and leaves a fresh, empty
+  `## [Unreleased]` section at the top, so the next release always has one
+  (a changelog that predates that rule falls back to the top
+  `## [vX.Y.Z] - YYYY-MM-DD` section while its version has no git tag yet).
+  `make changelog-compile-check` fails when the top section is not
+  `## [Unreleased]`. Never edit `CHANGELOG.md` and a fragment for the same
+  change: the release notes must carry the entry exactly once. The compile
+  step skips (with a warning) an entry that is already in the pending
+  section, and `make changelog-lint` fails when an entry appears twice in
+  the same section.

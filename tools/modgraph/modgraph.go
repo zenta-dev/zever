@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -133,24 +132,26 @@ type modEditJSON struct {
 // skipModuleDir reports whether the walk must not descend into the
 // directory at repo-relative slash path rel. The excluded set is the one
 // tools/tag-release.sh filters out of its `find`: the git metadata dir,
-// nested worktrees and the agent harness checkout dir at the repo root, plus
-// any vendored node_modules copy. A nested worktree is a full checkout of
-// the repo, so its modules are duplicates of the repo's own: counting them
-// made the module graph see a module that does not exist in the tagged tree
-// (tag path rule) and made the pin gate read a worktree's go.mod. Keeping
+// nested worktrees and the agent harness checkout dir, plus any vendored
+// node_modules copy. A nested worktree is a full checkout of the repo, so
+// its modules are duplicates of the repo's own: counting them made the
+// module graph see a module that does not exist in the tagged tree (tag
+// path rule) and made the pin gate read a worktree's go.mod. Keeping
 // both tools on the same exclusion set keeps the tag list and the module
-// list in agreement. testdata modules are NOT excluded: they are real
-// modules of the tree and their pins are checked like every other one (the
-// tagger does not publish them).
+// list in agreement. The excluded names are matched at ANY depth: a
+// worktree nested under a module dir (tools/.worktrees/wt) is a checkout
+// too, and the tagger skips it as well. testdata modules are NOT excluded:
+// they are real modules of the tree and their pins are checked like every
+// other one (the tagger does not publish them).
 func skipModuleDir(rel string) bool {
 	if rel == "." {
 		return false
 	}
-	switch path.Base(rel) {
-	case ".git", ".worktrees", ".claude":
-		return !strings.Contains(rel, "/")
-	case "node_modules":
-		return true
+	for _, part := range strings.Split(rel, "/") {
+		switch part {
+		case ".git", ".worktrees", ".claude", "node_modules":
+			return true
+		}
 	}
 	return false
 }
