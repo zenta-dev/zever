@@ -130,6 +130,10 @@ changelog-compile: ## Compile .changelog/unreleased/*.md fragments into the chan
 changelog-compile-test: ## Test the changelog fragment compiler (pending-section rule)
 	bash tools/changelog-compile-test.sh
 
+.PHONY: sbom-test
+sbom-test: ## Test the SBOM resolution script (offline: empty proxy, stubbed cyclonedx-gomod)
+	bash tools/sbom-test.sh
+
 .PHONY: compile-check
 compile-check: ## Verify committed generated code matches the schema (zever compile --check over every example)
 	cd examples/todo && $(GO) run ../../cmd/zever compile --check --out ./generated schema/todo.zen schema/todo_grpc.zen
@@ -210,7 +214,7 @@ SBOM_OWN_LICENSE ?= Apache-2.0
 sbom: ## Generate a CycloneDX SBOM per module under sbom/ (override list via MODULES)
 	@command -v $(CYCLONEDX_GOMOD) >/dev/null 2>&1 || { printf '%s\n' "cyclonedx-gomod not found: run 'make setup'"; exit 1; }
 	@command -v jq >/dev/null 2>&1 || { printf '%s\n' "jq not found: install jq to stamp own-module licenses"; exit 1; }
-	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); (cd $$d && GOWORK=off $(GO) mod download all && GOWORK=off $(CYCLONEDX_GOMOD) mod -licenses -std -json -output "$$root/sbom/$$slug.json" . 2>&1 | grep -v "no licenses detected.*github.com/zenta-dev/zever" || true); jq --arg p "$(SBOM_OWN_PREFIX)" --arg l "$(SBOM_OWN_LICENSE)" '(.metadata.component, .components[]?) |= (if (.name | startswith($$p)) and ((.licenses // []) | length) == 0 then .licenses = [{license: {id: $$l}}] else . end)' "$$root/sbom/$$slug.json" > "$$root/sbom/$$slug.json.tmp" && mv "$$root/sbom/$$slug.json.tmp" "$$root/sbom/$$slug.json"; done
+	mkdir -p sbom; set -e; root="$$PWD"; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; slug=$$(echo "$$d" | sed 's|^\./||; s|/|_|g'); GO="$(GO)" CYCLONEDX_GOMOD="$(CYCLONEDX_GOMOD)" SBOM_OWN_PREFIX="$(SBOM_OWN_PREFIX)" SBOM_OWN_LICENSE="$(SBOM_OWN_LICENSE)" SBOM_REPO_ROOT="$$root" $(CURDIR)/tools/sbom.sh "$$d" "$$root/sbom/$$slug.json"; done
 
 .PHONY: clean
 clean: ## Remove coverage output and build artifacts
@@ -218,7 +222,7 @@ clean: ## Remove coverage output and build artifacts
 	rm -f $(COVERAGE) $(SBOM)
 
 .PHONY: check
-check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
+check: require-tools download fmt check-all check-tags modgraph-check dependabot-check lint-all vulncheck-all installer-test changelog-compile-test sbom-test compile-check version-check changelog-lint ## Run all local CI checks (run 'make setup' first)
 
 # Multi-module targets: per-module loops over the committed go.work workspace.
 .PHONY: download-all
