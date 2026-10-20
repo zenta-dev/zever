@@ -94,7 +94,7 @@ the protocol stream.
   to stderr by design; check for wrapper scripts or editor plugins that
   merge the streams.
 - There is no `--version` (or any) CLI flag: the server speaks LSP over
-   stdio only. The version (`0.6.1` in `server.go`) is reported in the
+   stdio only. The version (`0.8.0` in `server.go`) is reported in the
   `initialize` result's `serverInfo`.
 
 ## The DSL itself
