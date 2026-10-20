@@ -13,7 +13,7 @@ import { CardGrid, Card } from '@astrojs/starlight/components';
     `zever compile`, `check`, `breaking`, `fmt`, `doctor`, `config show`, `routes`, `explain`, `check-boundaries`, `graph`. See the [command table](#reference).
   </Card>
   <Card title="Runtime" icon="seti:server">
-    `zever serve`, `dev`, `queue:work`, `schedule:run`, `tinker`. See the [command table](#reference) and [dev and tinker rules](#dev-and-tinker-rules).
+    `zever serve`, `dev`, `worker`, `schedule run`, `tinker`. See the [command table](#reference) and [dev and tinker rules](#dev-and-tinker-rules).
   </Card>
   <Card title="Database" icon="seti:db">
     `zever db migrate`, `db rollback`, `db seed`. See the [command table](#reference).
@@ -128,23 +128,23 @@ exit:0
 |---|---|
 | Scaffold | `zever new` (battery picker adds beyond the `log, router` floor; `--profile minimal\|api\|full` presets) |
 | Scaffold | `zever add <battery>[/<adapter>]` (adds a battery to an existing project; `zever add -h` prints flags) |
-| Scaffold | `zever generate` |
+| Scaffold | `zever generate` (bare and non-interactive: runs the full pipeline, compile with the default backend set, stamp, write, scaffold) |
 | Scaffold | `zever generate tinker` |
 | Scaffold | `zever extract` |
-| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs; runs `go mod tidy` when generated code imports modules `go.mod` lacks, skip with `--no-tidy`) |
+| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs; a differing stamped zever version alone is only a note unless `--strict`; runs `go mod tidy` when generated code imports modules `go.mod` lacks, skip with `--no-tidy`) |
 | Inspect | `zever check` |
 | Inspect | `zever breaking` |
 | Inspect | `zever fmt` |
 | Inspect | `zever doctor` |
 | Inspect | `zever config show` |
 | Inspect | `zever routes` |
-| Inspect | `zever explain` |
+| Inspect | `zever explain` (bare: the wiring graph; a `service` or `service/name` ref: that instance's wiring; a dotted `Service.Operation` path: the operation summary) |
 | Inspect | `zever check-boundaries` |
 | Inspect | `zever graph` |
 | Runtime | `zever serve` |
 | Runtime | `zever dev` |
-| Runtime | `zever queue:work` |
-| Runtime | `zever schedule:run` |
+| Runtime | `zever worker` |
+| Runtime | `zever schedule run` |
 | Runtime | `zever tinker` |
 | Database | `zever db migrate` |
 | Database | `zever db rollback` |
@@ -154,6 +154,10 @@ exit:0
 | Operations | `zever upgrade` (upgrade the `zever` binary to the latest release; `--version`, `--check`, `--dry-run`, `--yes`/`--force`) |
 | Tooling | `zever completion <bash\|zsh\|fish\|powershell>` |
 | Tooling | `zever docs --dir <dir>` |
+
+The legacy spellings `queue:work`, `schedule:run`, and `check:boundaries`
+still work, but they are hidden from `--help`; use `worker`, `schedule run`,
+and `check-boundaries`.
 
 | Flag | Effect |
 |---|---|
@@ -166,6 +170,7 @@ exit:0
 | `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt) |
 | `--profile minimal\|api\|full` | `zever new`: start-small preset (explicit `--batteries` add to it) |
 | `--check` | `zever compile`: verify committed output matches a fresh compile, write nothing (exit 1 on drift) |
+| `--strict` | `zever compile --check`: also fail when the committed files differ only in the stamped zever version |
 | `--no-tidy` | `zever compile`: print a hint instead of running `go mod tidy` when go.mod misses modules the generated code imports |
 | `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt) |
 | `-y`, `--yes` | `zever new`: skip all prompts, scaffold floor plus flags only |

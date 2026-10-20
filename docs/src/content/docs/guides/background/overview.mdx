@@ -34,7 +34,7 @@ Zever has no single "jobs framework". Background work is a handful of small batt
 
 ## Run it: server and worker
 
-A server and a worker are separate processes that each build their own container from the same config. The scaffold gives you both entrypoints (`cmd/server`, `cmd/worker`); `zever generate worker` regenerates the worker from your schema's `job` declarations, and `zever queue:work` and `zever schedule:run` run the pieces on their own.
+A server and a worker are separate processes that each build their own container from the same config. The scaffold gives you both entrypoints (`cmd/server`, `cmd/worker`); `zever generate worker` regenerates the worker from your schema's `job` declarations, and `zever worker` and `zever schedule run` run the pieces on their own.
 
 The queue adapter decides what is possible:
 
