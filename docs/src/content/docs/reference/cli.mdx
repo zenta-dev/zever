@@ -131,7 +131,7 @@ exit:0
 | Scaffold | `zever generate` (bare and non-interactive: runs the full pipeline, compile with the default backend set, stamp, write, scaffold) |
 | Scaffold | `zever generate tinker` |
 | Scaffold | `zever extract` |
-| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs; a differing stamped zever version alone is only a note unless `--strict`; runs `go mod tidy` when generated code imports modules `go.mod` lacks, skip with `--no-tidy`) |
+| Inspect | `zever compile` (`--check` gates drift: exit 1 when committed output differs; a differing stamped CLI version alone is only a note unless `--strict`; runs `go mod tidy` when generated code imports modules `go.mod` lacks, skip with `--no-tidy`) |
 | Inspect | `zever check` |
 | Inspect | `zever breaking` |
 | Inspect | `zever fmt` |
@@ -170,7 +170,7 @@ and `check-boundaries`.
 | `--batteries a,b` | `zever new`: extra batteries to scaffold beyond the floor (skips the battery prompt) |
 | `--profile minimal\|api\|full` | `zever new`: start-small preset (explicit `--batteries` add to it) |
 | `--check` | `zever compile`: verify committed output matches a fresh compile, write nothing (exit 1 on drift) |
-| `--strict` | `zever compile --check`: also fail when the committed files differ only in the stamped zever version |
+| `--strict` | `zever compile --check`: also fail when the committed files differ only in the stamped CLI version |
 | `--no-tidy` | `zever compile`: print a hint instead of running `go mod tidy` when go.mod misses modules the generated code imports |
 | `--adapters b=a,...` | `zever new`: per-battery adapter overrides (implies the battery, skips its adapter prompt) |
 | `-y`, `--yes` | `zever new`: skip all prompts, scaffold floor plus flags only |
