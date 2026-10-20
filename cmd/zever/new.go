@@ -25,7 +25,7 @@ Scaffolds a brand new, buildable zever application from scratch: a fresh
 go.mod, a starter schema/app.zen, cmd/server/main.go,
 internal/app/wiring.go and internal/service/hello, at exactly the default
 locations project.go's ProjectConfig assumes -- so every other zever
-subcommand (serve, dev, queue:work, db migrate/seed, tinker) works against
+subcommand (serve, dev, worker, db migrate/seed, tinker) works against
 the new project with no zever.yaml/.json needed.
 
 By default the new project depends on the published zever module
