@@ -187,9 +187,9 @@ and `check-boundaries`.
 
 When `zever new` resolves against a local framework checkout (the
 auto-detected checkout or `ZEVER_FRAMEWORK_PATH`), the generated `go.mod`
-replaces every module of that checkout's module graph — the batteries, the
+replaces every module of that checkout's module graph (the batteries, the
 adapters, the shared helpers and everything they require inside the
-repository — so the project's module graph resolves against the checkout
+repository), so the project's module graph resolves against the checkout
 instead of the module proxy. The set is derived from the checkout itself,
 so a module the framework adds later is covered automatically.
 
@@ -316,7 +316,7 @@ or network error aborts before anything is replaced. POSIX installs
 atomically (temp file in the binary directory, `chmod +x`, rename over
 the running binary); Windows stages `zever.new.exe` beside the binary
 and spawns a detached `cmd /C` helper that moves it into place after
-our PID exits — restart the shell to complete. Confirmation follows
+our PID exits. Restart the shell to complete. Confirmation follows
 the same TTY rules as `uninstall`; `--json` emits the envelope.
 
 ### Dev and tinker rules

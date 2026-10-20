@@ -38,7 +38,7 @@ if err != nil {
 
 ## Key rotation
 
-List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported — use a custom auth adapter if you need them. `alg: none` tokens are rejected.
+List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported. Use a custom auth adapter if you need them. `alg: none` tokens are rejected.
 
 ```sh
 AUTH_ADAPTER=jwt
@@ -67,7 +67,7 @@ Login returns `200` with a signed JWT in `token`; register `201`; missing or inv
 
 - CSPRNG secret (32+ bytes) in env or a mounted file, never source. See [Secrets](../secrets/).
 - Rotate with overlap: add the new key to `jwt.keys`, flip `jwt.active_kid`, and only remove the old key after its tokens have expired.
-- Prefer `session` for immediate revocation across instances; JWT revocation is per-process by default (the memory store dies with the process and is invisible to other instances), so multi-instance deployments must inject the shared `revocation/redis` store via `auth.JWTOptions.RevocationStore` — otherwise revoked tokens stay valid on sibling instances until TTL.
+- Prefer `session` for immediate revocation across instances; JWT revocation is per-process by default (the memory store dies with the process and is invisible to other instances), so multi-instance deployments must inject the shared `revocation/redis` store via `auth.JWTOptions.RevocationStore`; otherwise revoked tokens stay valid on sibling instances until TTL.
 - Rate-limit login; hashing cost is not an attempt limit. See [Rate limiting](../ratelimit/).
 - Display config only via `cfg.RedactedServices()` or `config.Redact`.
 

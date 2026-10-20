@@ -916,7 +916,12 @@ jobs:
   # accessors, CLI commands/flags, import paths). The audit reads the Go
   # source as its only truth, so it runs on every PR: a code change that
   # invalidates a page fails here even when no page was touched.
-  # Local mirror: `make docs-audit`.
+  #
+  # The same job runs the two offline docs gates (style lint, internal
+  # link check) so they hold on every PR, not only on the ones that touch
+  # docs/. The external link check needs the network and lives in the
+  # docs workflow as a report.
+  # Local mirror: `make docs-gates`.
   docs-audit:
     name: docs-audit
     timeout-minutes: 10
@@ -938,6 +943,21 @@ jobs:
         working-directory: docs
       - name: Prove the docs audit rejects the mistakes it guards against
         run: npm run audit:self-test
+        working-directory: docs
+      - name: Lint docs style
+        run: npm run lint
+        working-directory: docs
+      - name: Prove the docs style lint rejects the mistakes it guards against
+        run: npm run lint:self-test
+        working-directory: docs
+      - name: Build docs
+        run: npm run build
+        working-directory: docs
+      - name: Check internal links
+        run: npm run check-links
+        working-directory: docs
+      - name: Prove the docs link check rejects the mistakes it guards against
+        run: npm run check-links:self-test
         working-directory: docs
 
   # Compile-fail gate (stream G): every misuse fixture under

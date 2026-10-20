@@ -54,7 +54,7 @@ Env names follow the usual scheme: `OBSERVABILITY_ADAPTER`, `OBSERVABILITY_SERVI
 
 ## Metrics
 
-Zever does not serve a Prometheus `/metrics` endpoint. Metrics (for example the `outbox.*` relay counters) leave the process over OTLP together with the traces, so run a collector and let it expose or forward them: the OpenTelemetry Collector's `prometheus` exporter gives Prometheus a scrape target, and `prometheusremotewrite` pushes instead. See the [outbox operations guide](../../digging-deeper/outbox-ops/) for the metric names and alert rules.
+Zever does not serve a Prometheus `/metrics` endpoint. Metrics (for example the `outbox.*` relay counters) leave the process over OTLP together with the traces, so run a collector and let it expose or forward them: the OpenTelemetry Collector's `prometheus` exporter gives Prometheus a scrape target, and `prometheusremotewrite` pushes instead. See the [outbox operations guide](../../background/outbox-ops/) for the metric names and alert rules.
 
 ## Profiling with pprof
 
@@ -106,5 +106,5 @@ A string over `attr_value_limit` (default 4096) or more than 32 attributes per s
   <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" description="Spans around job runs." />
   <LinkCard title="Tenants" href="../tenants/" description="Tenant as a span attribute." />
   <LinkCard title="Cache" href="../../data/cache/" description="Cache hit counters as metrics." />
-  <LinkCard title="Cross-Service Tracing" href="./cross-service-tracing/" description="Inbound extraction, outbound injection, baggage, semconv names." />
+  <LinkCard title="Cross-Service Tracing" href="../cross-service-tracing/" description="Inbound extraction, outbound injection, baggage, semconv names." />
 </CardGrid>

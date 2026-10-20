@@ -307,7 +307,7 @@ vulncheck-all: ## Scan every module; reachable vulns fail unless allowlisted wit
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
 	$(GO) run ./tools/vulngate --govulncheck "$(GOVULNCHECK)" $(if $(MODULES),$(MODULES),$(SHARD_MODULES))
 
-.PHONY: docs-dev docs-build docs-preview docs-audit docs-lint docs-links
+.PHONY: docs-dev docs-build docs-preview docs-audit docs-lint docs-links docs-gates
 docs-dev: ## Run docs dev server
 	cd docs && npm run dev
 docs-build: ## Build docs site
@@ -329,6 +329,26 @@ docs-audit-self-test: ## Prove the docs audit rejects the env-key mistakes it gu
 docs-lint: ## Lint docs style (em/en dashes, sentence case, Asides)
 	cd docs && node scripts/lint-docs.mjs
 
+.PHONY: docs-lint-self-test
+docs-lint-self-test: ## Prove the docs style lint rejects the mistakes it guards against
+	cd docs && node scripts/lint-docs.mjs --self-test
+
 .PHONY: docs-links
-docs-links: ## Check every internal link in the built site (run make docs-build first)
+docs-links: docs-build ## Check every internal link in the built site
 	cd docs && node scripts/check-links.mjs
+
+.PHONY: docs-links-self-test
+docs-links-self-test: ## Prove the docs link check rejects the mistakes it guards against
+	cd docs && node scripts/check-links.mjs --self-test
+
+# Every offline docs gate in one target, the same set the CI docs job runs.
+# The external link check is not here: it needs the network and stays a
+# report (the lychee job in .github/workflows/docs.yml).
+.PHONY: docs-gates
+docs-gates: ## Run every offline docs gate (audit, style lint, internal links)
+	$(MAKE) docs-audit
+	$(MAKE) docs-audit-self-test
+	$(MAKE) docs-lint
+	$(MAKE) docs-lint-self-test
+	$(MAKE) docs-links
+	$(MAKE) docs-links-self-test

@@ -53,7 +53,7 @@ Re-ran the fiber benches on the same machine class after the `newHTTPHandler` re
 Takeaways:
 
 - `stdhttp` is the recommended default router (and the `zever new` scaffold default): the param path costs 17 allocs/op against fiber's 46 (~2.7x fewer), and is ~3x faster per request on this machine. The gap is the `fasthttpadaptor` net/http conversion plus header/status/body merge-back, which every fiber request pays regardless of handler logic.
-- The older "45–55 allocs/op adaptor cost" note above is stale for the isolated adaptor: it now measures 35 allocs/op. The 45–55 range still brackets the full fiber `ServeHTTP` (46) through concurrent (55) paths.
+- The older "45-55 allocs/op adaptor cost" note above is stale for the isolated adaptor: it now measures 35 allocs/op. The 45-55 range still brackets the full fiber `ServeHTTP` (46) through concurrent (55) paths.
 
 Reproduce:
 
@@ -324,7 +324,7 @@ Benchmarks use `b.Context()`; helpers assert `t.Helper` where applicable.
 
 ## Cold start & binary size (2026-10-14)
 
-Release-style build (`go build ./cmd/zever`, Go 1.27.2, linux/amd64): **309 MB** on disk. Process cold start (`--help` to exit): **~420 ms first run** (page cache cold), **~60–90 ms warm**; in-process `--help` (`BenchmarkHelpStartup`) is **~99 µs/op, 69 KB/op, 625 allocs/op** — binary load and package `init` dominate, not Cobra dispatch. `GODEBUG=inittrace=1` shows ~700 init functions but negligible init clock time; the bulk of wall time before `main` is mapping the binary.
+Release-style build (`go build ./cmd/zever`, Go 1.27.2, linux/amd64): **309 MB** on disk. Process cold start (`--help` to exit): **~420 ms first run** (page cache cold), **~60-90 ms warm**; in-process `--help` (`BenchmarkHelpStartup`) is **~99 µs/op, 69 KB/op, 625 allocs/op**: binary load and package `init` dominate, not Cobra dispatch. `GODEBUG=inittrace=1` shows ~700 init functions but negligible init clock time; the bulk of wall time before `main` is mapping the binary.
 
 `go tool nm -size` top contributors by symbol size: third-party adapter/UI dependencies (`github.com/...` group, ~60 MB: charm UI stack, sqlite driver via `modernc.org/...`), Go FIPS crypto tables (~33 MB `crypto/internal/fips140/drbg`), and codegen/grpc (`google.golang.org/...`, `go/types`). The CLI already links only the zero-infra adapter set (`cmd/zever/adapters.go`: memory/log/noop/stdhttp); the weight is transitive (embedded sqlite, TUI, telemetry), not registered adapters.
 
@@ -332,15 +332,15 @@ Repro: `go build -o /tmp/zever ./cmd/zever && ls -lh /tmp/zever`, `GODEBUG=initt
 
 ## Slim CLI (`zever build --adapters`, 2026-10-14)
 
-`zever build --adapters=a,b` compiles a slim CLI registering only the selected adapters (bare battery = every known adapter for it, `battery/adapter` = one pin; empty = full CLI). Unselected adapter packages leave the binary via a `go build -overlay` of the central registration list (`cmd/zever/adapters.go`), so no build-tagged source variants are committed — explicit list filtering, not tags. Unknown names fail listing the choices. The `doctor` adapters meta-check is scoped to the project's enabled batteries, so a slim binary passes its own `doctor` for its project (smoke-check with `<out> doctor`).
+`zever build --adapters=a,b` compiles a slim CLI registering only the selected adapters (bare battery = every known adapter for it, `battery/adapter` = one pin; empty = full CLI). Unselected adapter packages leave the binary via a `go build -overlay` of the central registration list (`cmd/zever/adapters.go`), so no build-tagged source variants are committed: explicit list filtering, not tags. Unknown names fail listing the choices. The `doctor` adapters meta-check is scoped to the project's enabled batteries, so a slim binary passes its own `doctor` for its project (smoke-check with `<out> doctor`).
 
 Measured on this machine (Go 1.27.2, linux/amd64, warm page cache, medians of 5 `--help` process spawns per session; wall time varies with load, so ranges across two sessions):
 
 | Binary | Size | Warm `--help` |
 | --- | --- | --- |
-| Full CLI (`go build ./cmd/zever`) | 309.7 MB | ~40–56 ms |
-| Slim floor (`--adapters=log,router`: 4 log + 2 router adapters) | 63.3 MB | ~27–38 ms |
+| Full CLI (`go build ./cmd/zever`) | 309.7 MB | ~40-56 ms |
+| Slim floor (`--adapters=log,router`: 4 log + 2 router adapters) | 63.3 MB | ~27-38 ms |
 
-The floor build is ~80% smaller (~5x) and ~32% faster to start; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs). In-process `--help` (`BenchmarkHelpStartup`, ~99 µs/op) is unchanged — the delta is binary mapping and package init, not dispatch.
+The floor build is ~80% smaller (~5x) and ~32% faster to start; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs). In-process `--help` (`BenchmarkHelpStartup`, ~99 µs/op) is unchanged. The delta is binary mapping and package init, not dispatch.
 
 Repro: `go build -o /tmp/zever-full ./cmd/zever && /tmp/zever-full build --adapters=log,router --out /tmp/zever-slim && ls -lh /tmp/zever-full /tmp/zever-slim`, then `printf 'LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\n' > /tmp/slimdemo/.env && /tmp/zever-slim doctor` (exit 0, all OK).

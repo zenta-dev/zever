@@ -28,11 +28,11 @@ FLAG_STATIC_RELOAD=true
 FLAG_ADAPTER=static
 ```
 
-Env rule: `FLAG_<FIELD>=value`, uppercase, no prefix (for example `FLAG_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](./config/).
+Env rule: `FLAG_<FIELD>=value`, uppercase, no prefix (for example `FLAG_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
 
 ## Options
 
-Options nest under the adapter name. Authority for types and defaults: [Config reference](./config/#flag).
+Options nest under the adapter name. Authority for types and defaults: [Config reference](../config/#flag).
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
@@ -64,6 +64,6 @@ A missing flag key is not an error: the lookup returns the caller-supplied fallb
 ## Related
 
 - [Feature flags guide](../../guides/operate/flags/) for targeting context and reload behavior.
-- [Config reference](./config/#flag) for the full option table and layering rules.
-- [Adapters matrix](./adapters-matrix/) for every service, adapter module, and container accessor.
-- [Errors](./errors/) for the repo-wide message format, wrapping, and branching conventions.
+- [Config reference](../config/#flag) for the full option table and layering rules.
+- [Adapters matrix](../adapters-matrix/) for every service, adapter module, and container accessor.
+- [Errors](../errors/) for the repo-wide message format, wrapping, and branching conventions.

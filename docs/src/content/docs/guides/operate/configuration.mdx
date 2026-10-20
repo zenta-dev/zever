@@ -11,7 +11,7 @@ Zever reads all service configuration from **environment variables only**. There
 
 Layers (later wins): `defaults < .env < .env.local < process environment`.
 
-- **defaults**: `config.Default()` — zero-infra adapters (sqlite, slog, stdhttp, memory caches, etc.)
+- **defaults**: `config.Default()`, which uses zero-infra adapters (sqlite, slog, stdhttp, memory caches, etc.)
 - **`.env`**: project-committed example + local overrides (gitignored)
 - **`.env.local`**: machine-local overrides (gitignored, higher priority)
 - **process environment**: highest priority, no file I/O
@@ -88,7 +88,7 @@ If `zever.yaml`/`.yml`/`.json` exists in the working directory, `config.FromEnv(
 config: zever.yaml found in working directory: ignored; see migration guide in config/README.md
 ```
 
-The file is **ignored entirely** — no values are read from it.
+The file is **ignored entirely**: no values are read from it.
 
 ## Generated env template
 
@@ -98,7 +98,7 @@ The file is **ignored entirely** — no values are read from it.
 
 Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  adapter=<x>` header per service plus its masked options, then a `<service>/<NAME>` section per named instance.
 
-Duration options (`DB_MAX_CONN_LIFETIME`, `AI_TIMEOUT`, ...) print in the same string form the env layer parses (`30s`, `5m`) — the human table and the `--json` envelope alike — never as a raw nanosecond count.
+Duration options (`DB_MAX_CONN_LIFETIME`, `AI_TIMEOUT`, ...) print in the same string form the env layer parses (`30s`, `5m`), in the human table and the `--json` envelope alike, never as a raw nanosecond count.
 
 ```go title="main.go"
 for name, sc := range cfg.RedactedServices() {
@@ -137,7 +137,7 @@ A resolved field failed to parse. Set an integer. Unset variables are ignored, b
 <details>
 <summary>`AUTH_TOKEN` fails at startup</summary>
 
-`AUTH_TOKEN` names no field of the `auth` service, and it is close to none of them, so it is treated as an unrelated ambient variable and ignored — which is usually a mistake. Set the real key: `AUTH_JWT_SECRET` (or `AUTH_OIDC_ISSUER`, `AUTH_SESSION_SECRET`). To make such keys fail loudly instead, run with `ZEVER_CONFIG_STRICT=1`, or use a near-miss spelling such as `AUTH_JWT_SECRT`, which is reported as a typo with a did-you-mean hint.
+`AUTH_TOKEN` names no field of the `auth` service, and it is close to none of them, so it is treated as an unrelated ambient variable and ignored, which is usually a mistake. Set the real key: `AUTH_JWT_SECRET` (or `AUTH_OIDC_ISSUER`, `AUTH_SESSION_SECRET`). To make such keys fail loudly instead, run with `ZEVER_CONFIG_STRICT=1`, or use a near-miss spelling such as `AUTH_JWT_SECRT`, which is reported as a typo with a did-you-mean hint.
 </details>
 
 <Aside type="danger" title="Dev-only keys">

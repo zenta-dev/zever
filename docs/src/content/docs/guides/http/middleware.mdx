@@ -105,7 +105,7 @@ attribute names: `http.request.method`, `url.path`, and
 `rpc.method`, and `rpc.grpc.status_code` for gRPC. The pre-migration
 names were **removed**, not aliased, so a query on an old attribute
 returns nothing after upgrading rather than failing loudly.
-[Cross-Service Tracing](../operate/cross-service-tracing/) has the
+[Cross-Service Tracing](../../operate/cross-service-tracing/) has the
 full old-to-new table.
 
 Limiter errors fail open by default, so a Redis blip does not take the site down. Pass `middleware.WithFailMode(middleware.FailClosed)` on sensitive endpoints to answer 429 on a limiter error instead.
