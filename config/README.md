@@ -101,21 +101,48 @@ a flat field and a nested path matching one key is a collision and fails.
 `InstanceNames(env, "db")` lists the configured instance names
 (uppercased, sorted).
 
-### Fail-fast rule and ambient-environment safety
+### Ambient-environment safety and the typo rule
 
-Env application fails on unknown keys under a wired service prefix: the
-head (up to the first `_`) must name a known service and the remainder must
-resolve to a settable field, otherwise resolution returns an
-`UnknownFieldError` with a did-you-mean hint — typos fail fast instead of
-booting with defaults. Unknown heads (`PATH`, `HOME`, `FOO_BAR`) and bare
-names (`DB`) are silently ignored, so unrelated process environment can
-never break startup. Only values that fail to *parse* for a resolved field
-(`DB_MAXCONNS=abc`) return `InvalidOptionsError`. Error text names services
-and fields only — values are never echoed.
+The env namespace is flat (`<SERVICE>_<FIELD>`), so it shares the process
+environment with every other program on the machine. A key under a wired
+service prefix therefore has three outcomes:
 
-Note the deliberate asymmetry with the old file layer: files were strict
-and env was best-effort. Now env is the only layer and it is strict about
-keys it understands, best-effort about everything else.
+| Key | Outcome |
+|---|---|
+| Resolves to a settable field | Applied. |
+| Resolves to no field but is close to one (a typo) | Fails with an `UnknownFieldError` and a did-you-mean hint (`DB_MAXCONN` → `did you mean "max_conns"?`). |
+| Resolves to no field and is close to none | Ignored: an unrelated ambient variable (`AI_AGENT`, `LOG_LEVEL`, `DB_URL`, `CACHE_DIR`). It lands on no field. |
+
+"Close" is the existing suggestion machinery (`closest` in `suggest.go`):
+edit distance ≤ 2, or ≤ 3 for names longer than six characters. That
+threshold is what separates a typo from an ambient variable: `AUTH_JWT_SECRT`
+is one edit away from `secret`, while `AI_AGENT` is nowhere near any `ai`
+field.
+
+Unknown heads (`PATH`, `HOME`, `FOO_BAR`), bare names (`DB`), and keys of
+other services are ignored in every mode. Only values that fail to *parse*
+for a resolved field (`DB_MAXCONNS=abc`) return `InvalidOptionsError`. Error
+text names services and fields only — values are never echoed.
+
+Note the deliberate asymmetry with the old file layer: files were strict and
+env was best-effort. Now env is the only layer, and it stays best-effort
+about keys it does not understand — strict only where a close field shows a
+typo is likely.
+
+### Strict mode
+
+`ZEVER_CONFIG_STRICT=1` restores the v0.8 behavior: **every** unknown key
+under a wired service prefix fails, with or without a suggestion. The switch
+is read from the same environment map `Resolve` and `ApplyEnv` are given, so
+it needs no CLI flag:
+
+```sh
+ZEVER_CONFIG_STRICT=1 zever serve
+```
+
+`config.UnresolvedKeys(env)` lists the keys that were ignored, so a caller
+(for example `zever doctor`) can report them; a key with a non-empty
+`Suggestion` is a near-miss typo.
 
 ## Dotenv files
 
@@ -205,8 +232,8 @@ real key (`CRYPTO_KEY`).
 
 `ZEVER_*` names are CLI/test switches only (`ZEVER_INTERACTIVE`,
 `ZEVER_NO_HINT`, `ZEVER_JSON`, `ZEVER_ENV`, `ZEVER_DEBUG`,
-test-only `ZEVER_CHROMEDP_NO_SANDBOX`): service configuration itself is
-always unprefixed `<SERVICE>_*`.
+`ZEVER_CONFIG_STRICT`, test-only `ZEVER_CHROMEDP_NO_SANDBOX`): service
+configuration itself is always unprefixed `<SERVICE>_*`.
 
 ## Migration from zever.yaml
 
@@ -239,7 +266,9 @@ level flattens with a single `_` (`jwt: {secret: ...}` under auth →
 layout is defaults-only for now. Option values that are maps, lists, or
 other complex shapes have no string form and cannot move to env: re-check
 whether the adapter needs them. Unknown keys that used to fail file
-decoding now fail `Resolve` with a did-you-mean hint instead.
+decoding now fail `Resolve` with a did-you-mean hint when they are close to
+a known field; the rest are ignored as ambient variables (see
+[Ambient-environment safety](#ambient-environment-safety-and-the-typo-rule)).
 
 ## Reload: restart-only, except SIGHUP
 

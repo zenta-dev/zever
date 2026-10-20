@@ -116,7 +116,7 @@ A pre-rename flat spelling. Rename it to snake_case (e.g., `maxconns` → `max_c
 <details>
 <summary>Unknown field under a wired service prefix</summary>
 
-`config.Resolve` fails with a did-you-mean hint. Check the service's options struct.
+`config.Resolve` fails when the key is close to a known field: it is a typo, and the error carries a did-you-mean hint (`DB_MAXCONN` → `did you mean "max_conns"?`). Check the service's options struct.
 </details>
 
 <details>
@@ -128,7 +128,7 @@ A resolved field failed to parse. Set an integer. Unset variables are ignored, b
 <details>
 <summary>`AUTH_TOKEN` does nothing</summary>
 
-Env is best-effort: `AUTH` is known but the remainder matches no field. Set `AUTH_JWT_SECRET`.
+`AUTH` is a known service, but `TOKEN` is close to none of its fields, so the key is treated as an unrelated ambient variable and ignored. Set `AUTH_JWT_SECRET`. Run with `ZEVER_CONFIG_STRICT=1` to reject unknown keys instead of ignoring them.
 </details>
 
 <Aside type="danger" title="Dev-only keys">
