@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
@@ -209,37 +210,49 @@ func TestWorkerWaitDrainDoneBranch(t *testing.T) {
 	Reset()
 	w := &Worker{DrainTimeout: 50 * time.Millisecond}
 	var wg sync.WaitGroup
-	start := time.Now()
-	w.waitDrain(&wg)
-	if elapsed := time.Since(start); elapsed > 20*time.Millisecond {
-		t.Fatalf("waitDrain empty WaitGroup took %v want <20ms", elapsed)
-	}
+	// In a synctest bubble the clock is virtual and only advances once
+	// every goroutine is durably blocked: a drain over an empty WaitGroup
+	// returns without waiting, so the clock must not move at all. The
+	// wall-clock bound this replaces failed on a loaded CI runner.
+	synctest.Test(t, func(t *testing.T) {
+		start := time.Now()
+		w.waitDrain(&wg)
+		if elapsed := time.Since(start); elapsed != 0 {
+			t.Fatalf("waitDrain over an empty WaitGroup advanced the clock by %v (fake clock), want 0", elapsed)
+		}
+	})
 }
 
 func TestWorkerWaitDrainTimerBranch(t *testing.T) {
 	Reset()
 	w := &Worker{DrainTimeout: 20 * time.Millisecond}
 	var wg sync.WaitGroup
-	wg.Add(1)
-	start := time.Now()
-	done := make(chan struct{})
-	go func() {
-		w.waitDrain(&wg)
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("waitDrain timer branch did not return within 200ms")
-	}
-	elapsed := time.Since(start)
-	if elapsed < 15*time.Millisecond {
-		t.Fatalf("waitDrain timer branch elapsed %v want >=15ms", elapsed)
-	}
-	if elapsed > 100*time.Millisecond {
-		t.Fatalf("waitDrain timer branch elapsed %v want <100ms", elapsed)
-	}
-	// cleanup: let wg be GC'd; keep Add without Done is intentional for test
+	synctest.Test(t, func(t *testing.T) {
+		// Add inside the bubble: a WaitGroup is only durably blocking
+		// when its Add ran inside the bubble too, so the fake clock can
+		// advance to the drain timeout.
+		wg.Add(1)
+		// Release the still-blocked Wait when the bubble ends, so a failed
+		// assertion does not leave the bubble deadlocked.
+		t.Cleanup(func() { wg.Done() })
+		start := time.Now()
+		done := make(chan struct{})
+		go func() {
+			w.waitDrain(&wg)
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("waitDrain timer branch did not return within 200ms")
+		}
+		// The fake clock advances exactly to the drain timeout: the drain
+		// waited out the whole budget, deterministically. The wall-clock
+		// bounds this replaces failed on a loaded CI runner.
+		if elapsed := time.Since(start); elapsed != 20*time.Millisecond {
+			t.Fatalf("waitDrain timer branch elapsed %v (fake clock), want exactly %v", elapsed, 20*time.Millisecond)
+		}
+	})
 }
 
 func TestWorkerEffectiveAttempt(t *testing.T) {

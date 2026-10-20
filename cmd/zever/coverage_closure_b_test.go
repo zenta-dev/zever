@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -379,14 +380,24 @@ func TestDevChildStopKillsWedged(t *testing.T) {
 		return strings.Contains(string(out), "sleep")
 	})
 
-	start := time.Now()
+	// The shell ignores TERM, so it can only die through the SIGKILL
+	// fallback: a reaped child proves the grace period was waited out and
+	// the fallback fired. Both facts are observable, where the old
+	// wall-clock check could only measure how long stop took.
 	child.stop(100 * time.Millisecond)
-	elapsed := time.Since(start)
-	if elapsed > 10*time.Second {
-		t.Fatalf("stop took %v, SIGKILL fallback did not fire", elapsed)
+
+	select {
+	case <-child.done:
+	default:
+		t.Fatal("stop returned while the wedged child was still running")
 	}
-	if elapsed < 90*time.Millisecond {
-		t.Fatalf("stop returned in %v without waiting out the grace period", elapsed)
+
+	wait, ok := cmd.ProcessState.Sys().(syscall.WaitStatus)
+	if !ok {
+		t.Fatalf("wait status = %T, want syscall.WaitStatus", cmd.ProcessState.Sys())
+	}
+	if !wait.Signaled() || wait.Signal() != syscall.SIGKILL {
+		t.Fatalf("child ended with %v, want the SIGKILL of the fallback", wait)
 	}
 }
 
