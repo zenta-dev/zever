@@ -189,7 +189,9 @@ func explainNotFoundError(path string, modules []*ir.Module) error {
 		msg += fmt.Sprintf(" (did you mean %q?)", s)
 	}
 
-	msg += "\n" + formatHint("use Service.Operation or Module.Service.Operation ('zever routes' lists every HTTP route)")
+	if shouldShowHint() {
+		msg += "\n" + formatHint("use Service.Operation or Module.Service.Operation ('zever routes' lists every HTTP route)")
+	}
 
 	return errors.New(msg)
 }
@@ -460,7 +462,9 @@ func wiringNotFoundError(ref string, services map[string]config.ServiceConfig) e
 		msg += fmt.Sprintf(" (did you mean %q?)", s)
 	}
 
-	msg += "\n" + formatHint("run 'zever explain' with no arguments to list every wired service")
+	if shouldShowHint() {
+		msg += "\n" + formatHint("run 'zever explain' with no arguments to list every wired service")
+	}
 
 	return errors.New(msg)
 }

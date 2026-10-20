@@ -137,6 +137,31 @@ func TestRunExplainUnknownServiceNamesTheListCommand(t *testing.T) {
 	}
 }
 
+// TestRunExplainNotFoundSilencesHints pins ZEVER_NO_HINT: the "how to find
+// the right name" line is a hint, so silencing hints leaves the failure
+// alone.
+func TestRunExplainNotFoundSilencesHints(t *testing.T) {
+	t.Setenv("ZEVER_NO_HINT", "1")
+
+	dir := t.TempDir()
+	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	t.Chdir(dir)
+
+	err := runExplain([]string{"nosuchservice"})
+	if err == nil {
+		t.Fatal("expected error for unknown service, got nil")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "hint:") {
+		t.Fatalf("error carries a hint while ZEVER_NO_HINT is set:\n%s", msg)
+	}
+
+	if !strings.Contains(msg, "no service matches") {
+		t.Fatalf("error = %q, want the failure itself", msg)
+	}
+}
+
 // TestRunExplainEnvFailureNamesTheOffendingKey pins that the wiring graph
 // carries the shared env-key hint: a typo under a wired service prefix
 // names the key to fix instead of dead-ending.

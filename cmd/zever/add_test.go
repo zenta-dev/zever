@@ -685,6 +685,28 @@ func TestRunAddArityErrorStaysShort(t *testing.T) {
 	}
 }
 
+// TestRunAddArityErrorSilencesHints pins ZEVER_NO_HINT: the pointer to the
+// full reference is a hint, so silencing hints drops it and leaves the
+// usage shape.
+func TestRunAddArityErrorSilencesHints(t *testing.T) {
+	withWorkingDir(t, t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "1")
+
+	err := runAdd(nil)
+	if err == nil {
+		t.Fatal("runAdd(nil): got nil error, want an arity error")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "hint:") {
+		t.Fatalf("error carries a hint while ZEVER_NO_HINT is set:\n%s", msg)
+	}
+
+	if !strings.Contains(msg, "usage: zever add <battery>[/<adapter>]") {
+		t.Fatalf("error = %q, want the usage line", msg)
+	}
+}
+
 func TestRunAddErrors(t *testing.T) {
 	t.Run("arity", func(t *testing.T) {
 		withWorkingDir(t, t.TempDir())

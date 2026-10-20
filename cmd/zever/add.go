@@ -69,11 +69,16 @@ your project root (the directory holding go.mod).`
 // full reference. It replaces the 40-line addUsageBody in the error path,
 // so a mistyped invocation prints three lines instead of a wall of prose.
 func addShortUsage() string {
-	return joinLines(
+	lines := []string{
 		"usage: zever add <battery>[/<adapter>] [--adapter NAME] [--name N] [--uses R]",
-		"recipes: "+strings.Join(sortedKeys(addRecipeNames), ", "),
-		formatHint("run 'zever add -h' for the full reference, 'zever new --list-batteries' for the battery list"),
-	)
+		"recipes: " + strings.Join(sortedKeys(addRecipeNames), ", "),
+	}
+
+	if shouldShowHint() {
+		lines = append(lines, formatHint("run 'zever add -h' for the full reference, 'zever new --list-batteries' for the battery list"))
+	}
+
+	return joinLines(lines...)
 }
 
 // addRecipeNames are the opt-in file recipes `zever add` writes from
