@@ -14,9 +14,9 @@ import (
 func doctorFixHint(battery, errText string) string {
 	switch battery {
 	case "config":
-		// The config row's error already names the offending service and
-		// field ("config: unknown field ... for service ...").
-		return "fix the SERVICE_FIELD env key named above, then re-run 'zever doctor'"
+		// The config row is the whole config's validation, not one
+		// battery: the error names the service whose options are wrong.
+		return "fix the service env the error names, then re-run 'zever doctor'"
 	case "adapters":
 		// The adapters row is a meta-check over every service, not one
 		// battery: the fix is the adapter selector of the named service.
@@ -71,15 +71,9 @@ func doctorEnvKey(battery, field string) string {
 		return ""
 	}
 
-	prefix := strings.ToUpper(battery) + "_"
-
-	for _, key := range serviceEnvKeys(battery, battery) {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-
-		if foldEnvField(strings.TrimPrefix(key, prefix)) == want {
-			return key
+	for _, f := range serviceEnvFields(battery) {
+		if foldEnvField(f) == want {
+			return strings.ToUpper(battery) + "_" + f
 		}
 	}
 

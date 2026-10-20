@@ -62,10 +62,10 @@ func TestDoctorFixHintNamesMissingEnvKey(t *testing.T) {
 			want:    "run 'zever config show' to see the resolved geo values",
 		},
 		{
-			name:    "config row names the env key",
+			name:    "config row names the service",
 			battery: "config",
-			errText: "config: unknown field \"AGENT\" for service \"ai\"",
-			want:    "fix the SERVICE_FIELD env key named above, then re-run 'zever doctor'",
+			errText: "config: invalid options auth: jwt secret must be at least 32 bytes",
+			want:    "fix the service env the error names, then re-run 'zever doctor'",
 		},
 		{
 			name:    "adapters row names the adapter selector",
