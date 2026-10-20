@@ -252,6 +252,67 @@ func TestApplyEnvCollisionErrors(t *testing.T) {
 	}
 }
 
+// TestApplyEnvNestedSegmentWithUnderscore pins the nesting split: the
+// split point is resolved by matching, not guessed at the first
+// underscore, so a nested option whose own segment carries an "_"
+// (webhook's queue_opts) is reachable under its serialized name.
+func TestApplyEnvNestedSegmentWithUnderscore(t *testing.T) {
+	t.Parallel()
+	type inner struct {
+		Buffer int `json:"buffer"`
+	}
+	type options struct {
+		QueueOpts inner `json:"queue_opts"`
+	}
+	dst := &options{}
+	if err := ApplyEnv(Env{"DB_QUEUE_OPTS_BUFFER": "7"}, "db", "", dst); err != nil {
+		t.Fatalf("ApplyEnv: %v", err)
+	}
+	if dst.QueueOpts.Buffer != 7 {
+		t.Fatalf("got %d, want 7", dst.QueueOpts.Buffer)
+	}
+}
+
+// TestApplyEnvNestedSegmentsWithUnderscores pins the same split when both
+// segments carry an "_": the resolver tries every underscore until one
+// names a struct field and a scalar field inside it.
+func TestApplyEnvNestedSegmentsWithUnderscores(t *testing.T) {
+	t.Parallel()
+	type inner struct {
+		MaxTTL int `json:"max_ttl"`
+	}
+	type options struct {
+		QueueOpts inner `json:"queue_opts"`
+	}
+	dst := &options{}
+	if err := ApplyEnv(Env{"DB_QUEUE_OPTS_MAX_TTL": "9"}, "db", "", dst); err != nil {
+		t.Fatalf("ApplyEnv: %v", err)
+	}
+	if dst.QueueOpts.MaxTTL != 9 {
+		t.Fatalf("got %d, want 9", dst.QueueOpts.MaxTTL)
+	}
+}
+
+// TestApplyEnvNestedSegmentSeparatorInsensitive pins that the split keeps
+// the resolver's loose matching: the segments are matched like flat
+// names, ignoring case and "_".
+func TestApplyEnvNestedSegmentSeparatorInsensitive(t *testing.T) {
+	t.Parallel()
+	type inner struct {
+		Buffer int `json:"buffer"`
+	}
+	type options struct {
+		QueueOpts inner `json:"queue_opts"`
+	}
+	dst := &options{}
+	if err := ApplyEnv(Env{"DB_QUEUEOPTS_BUFFER": "3"}, "db", "", dst); err != nil {
+		t.Fatalf("ApplyEnv: %v", err)
+	}
+	if dst.QueueOpts.Buffer != 3 {
+		t.Fatalf("got %d, want 3", dst.QueueOpts.Buffer)
+	}
+}
+
 func TestInstanceNames(t *testing.T) {
 	t.Parallel()
 	env := Env{
