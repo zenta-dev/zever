@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/ai/openai
 go 1.27.2
 
 require (
-	github.com/openai/openai-go/v3 v3.78.0
+	github.com/openai/openai-go/v3 v3.79.0
 	github.com/zenta-dev/zever/core/ai v0.8.0
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0
 	github.com/zenta-dev/zever/shared/httpclient v0.8.0
