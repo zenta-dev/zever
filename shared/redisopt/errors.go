@@ -26,11 +26,17 @@ type InvalidAddressError struct {
 }
 
 // Error returns a formatted description of the invalid address.
+//
+// The address is masked with RedactAddr before it is echoed: a rejected
+// address may be a redis:// URL carrying a password, and error text must
+// never leak one.
 func (e *InvalidAddressError) Error() string {
+	addr := RedactAddr(e.Addr)
+
 	if e.Err != nil {
-		return fmt.Sprintf("%s %q: %v", ErrInvalidAddress.Error(), e.Addr, e.Err)
+		return fmt.Sprintf("%s %q: %v", ErrInvalidAddress.Error(), addr, e.Err)
 	}
-	return fmt.Sprintf("%s %q", ErrInvalidAddress.Error(), e.Addr)
+	return fmt.Sprintf("%s %q", ErrInvalidAddress.Error(), addr)
 }
 
 // Unwrap returns the sentinel joined with the underlying error for error
@@ -50,8 +56,13 @@ type PlaintextRejectedError struct {
 }
 
 // Error returns a formatted description of the rejected plaintext connection.
+//
+// It names the address that would have been dialled in plaintext (masked by
+// RedactAddr) and the two ways to turn TLS on, so the developer can fix the
+// option without reading the adapter's source.
 func (e *PlaintextRejectedError) Error() string {
-	return fmt.Sprintf("%s %q", ErrPlaintextRejected.Error(), e.Addr)
+	return fmt.Sprintf("%s %q: set tls, or use a rediss:// address, to connect over TLS",
+		ErrPlaintextRejected.Error(), RedactAddr(e.Addr))
 }
 
 // Unwrap returns the sentinel error for error inspection.
