@@ -58,7 +58,7 @@ if err := cache.Register(fooAdapter, foo.New); err != nil {
 c, err := cache.Open(fooAdapter, cache.Options{})
 ```
 
-With the container, set `cache: {adapter: foo}` (or `CACHE_ADAPTER=foo`) and the first `container.Cache()` call resolves your factory like any core adapter.
+With the container, set `CACHE_ADAPTER=foo` and the first `container.Cache()` call resolves your factory like any core adapter.
 
 Follow these rules:
 

@@ -1,0 +1,1 @@
+- chore(examples): drop the dead `zever.yaml` files from `bookings`, `demoapp`, `showcase`, and `todo`. Service config has been env-only since v0.8.0, so those files were ignored and only produced the "found in working directory: ignored" warning; each example ships a `.env.example` instead.

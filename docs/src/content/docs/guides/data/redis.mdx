@@ -12,14 +12,18 @@ Most stateful services default to an in-memory adapter with a Redis twin: develo
 Point each shared service at the same `addr`. `cache`, `queue`, and `lock` read flat keys; `session`, `ratelimit`, `eventbus`, and `idempotency` nest a `redis` block.
 
 ```sh
-OPTIONS_ADDR=redis:6379
-OPTIONS_POOL_SIZE=20
-OPTIONS_MIN_IDLE_CONNS=2
+CACHE_ADAPTER=redis
+CACHE_ADDR=redis:6379
+CACHE_POOL_SIZE=20
+CACHE_MIN_IDLE_CONNS=2
 QUEUE_ADAPTER=redis
 QUEUE_ADDR=redis:6379
 LOCK_ADAPTER=redis
 LOCK_ADDR=redis:6379
-OPTIONS_REDIS_ADDR=redis:6379
+SESSION_ADAPTER=redis
+SESSION_REDIS_ADDR=redis:6379
+RATELIMIT_ADAPTER=redis
+RATELIMIT_REDIS_ADDR=redis:6379
 ```
 
 ```sh
@@ -90,7 +94,7 @@ Cause: both run `memory` sessions. Fix: point both at the same Redis `addr`.
 <details>
 <summary>Rate limits diverge across replicas</summary>
 
-Cause: `memory` token buckets are per process. Fix: set `ratelimit.adapter: redis`.
+Cause: `memory` token buckets are per process. Fix: set `RATELIMIT_ADAPTER=redis` (with a shared `RATELIMIT_REDIS_ADDR`).
 </details>
 
 <details>

@@ -34,11 +34,12 @@ earlier tags cannot be installed this way; use the installer above or a
 prebuilt release binary for those.
 
 After install, `zever upgrade` self-updates (`--check` to preview,
-`--version` to pin a target) and `zever uninstall` removes both binaries
+`--version` to pin a target, `--project` to upgrade the current project's
+`go.mod` instead of the binary) and `zever uninstall` removes both binaries
 (`--keep-lsp`, `--dry-run`).
 
-Then `zever --help` prints the grouped command map (Scaffolding /
-Inspection / Runtime / Database / Operations).
+Then `zever --help` prints the grouped command map (Start / Build / Data /
+Run & ops, plus the additional commands).
 
 ## Global flags and exit codes
 
@@ -81,21 +82,40 @@ Inspection / Runtime / Database / Operations).
   `zever help <command>` always prints flags without running anything.
 - **`zever new` battery picker (opt-in)**: without `--interactive` the command
   never prompts and scaffolds the floor set (`log`+`router`) plus whatever
-  `--batteries a,b` and `--adapters b=a` select; `-y` / `--yes` skips all
+  `--with a,b=c` selects (batteries with optional adapter pins; it replaces
+  the older `--batteries a,b` and `--adapters b=a`); `-y` / `--yes` skips all
    prompts, `--list-batteries` prints the battery/default-adapter table and
-   exits. `--profile minimal|api|full` scaffolds a start-small preset
-  (explicit `--batteries` add to it).
+   exits. `--profile minimal|api|full` is a deprecated alias for `--with`.
 - **`zever compile --check`**: verifies the committed `generated/` tree
   matches a fresh compile (exit `1` naming `missing`/`differs`/`extra`
   files, writes nothing) — the CI drift gate for projects that commit
-  generated output. Every scaffolded `.github/workflows/ci.yml`
-  regenerates from the schema and then runs `--check`.
+  generated output. A difference in the stamped CLI version alone is only a
+  note unless `--strict` is passed. Every scaffolded
+  `.github/workflows/ci.yml` regenerates from the schema and then runs
+  `--check`.
+- **`zever add <battery>[/<adapter>]`**: edits `internal/app/wiring.go` with
+  `go/ast` (a `Ref` var plus a `container.Provide` entry), appends the
+  battery's keys to `.env.example`, adds the core and adapter requires to
+  `go.mod`, then runs `go get` and `go mod tidy`. `--name N` wires a named
+  instance, `--uses R` records a boot-order edge, `--diff` prints the diff
+  and changes nothing, and `--yes` applies without prompting.
 - `zever new --module PATH`: Go module path for the new project (default:
   the app name itself).
 - `zever new --dir PATH`: output directory (default `./<name>`).
 - `zever new --framework-version V`: depend on a published zever version
   instead of a local replace directive.
 - `zever new --force`: scaffold into a non-empty directory anyway.
+- **Local-checkout replace set**: when the scaffold resolves against a
+  framework checkout (`ZEVER_FRAMEWORK_PATH` or the auto-detected
+  checkout), the generated `go.mod` replaces every module of
+  the checkout's module graph — the batteries (`core/<battery>`), the
+  adapters (`adapters/<battery>/<adapter>`), the shared helpers and
+  everything they require inside the repository — not just the modules the
+  project imports. The set is derived from the checkout's own `go.mod`
+  files, so a module the framework adds later is covered without touching
+  the CLI, and the project's module graph never reaches the module proxy
+  for a sibling module (which cannot serve a version that is not published
+  yet).
 - For the full command list, see `zever --help`.
 
 ## `zever new` contributor tooling

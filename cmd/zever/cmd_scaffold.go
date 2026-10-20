@@ -16,7 +16,7 @@ func newScaffoldCmds() []*cobra.Command {
 
 func newNewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force]",
+		Use:   "new <name> [--module PATH] [--dir PATH] [--framework-version V] [--force] [--with a,b=c] [--yes] [--list-batteries] [--no-tidy] [--dry-run]",
 		Short: "Scaffold a brand new zever application",
 		Long: `Scaffold a brand new, buildable zever application from scratch:
 a fresh go.mod, a starter schema/app.zen, cmd/server + cmd/worker +
@@ -53,9 +53,13 @@ db/seed entrypoints, and internal/app wiring.`,
 	cmd.Flags().String("framework-version", "", "depend on a published zever version instead of a local replace directive")
 	cmd.Flags().Bool("force", false, "scaffold into a non-empty directory anyway")
 	cmd.Flags().Bool("dry-run", false, "print the scaffold plan without writing any files")
-	cmd.Flags().String("profile", "", "scaffold profile: minimal (bootable floor only), api, or full (every battery)")
-	cmd.Flags().String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber)")
-	cmd.Flags().String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache)")
+	cmd.Flags().String("profile", "", "deprecated alias for --with (minimal|api|full)")
+	cmd.Flags().String("adapters", "", "comma-separated battery=adapter pairs (e.g. --adapters db=postgres,router=fiber); prefer --with")
+	cmd.Flags().String("batteries", "", "comma-separated extra batteries to scaffold (e.g. --batteries db,cache); prefer --with")
+	cmd.Flags().String("with", "", "comma-separated batteries with optional adapter pins (e.g. --with cache,queue=redis); replaces --batteries/--adapters")
+	cmd.Flags().Bool("yes", false, "skip all prompts, scaffold floor+flags only")
+	cmd.Flags().Bool("list-batteries", false, "print the battery/default-adapter table to stdout and exit")
+	cmd.Flags().Bool("no-tidy", false, "skip running 'go mod tidy' after scaffolding")
 
 	return cmd
 }
@@ -65,11 +69,12 @@ db/seed entrypoints, and internal/app wiring.`,
 // addUsageBody and the real flags stay authoritative for execution.
 func newAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "add <battery>[/<adapter>] [--adapter NAME] [--force] [--module PATH[@VERSION]]",
+		Use:   "add <battery>[/<adapter>] [--adapter NAME] [--name N] [--uses R] [--force] [--module PATH[@VERSION]] [--diff] [--yes] [--dry-run]",
 		Short: "Add one battery to the calling project",
 		Long: `Add one battery to the calling project: a require (plus a local
-replace for local checkouts) in go.mod, a Register() call in
-internal/app/app.go, and a stanza in zever.yaml with the chosen adapter.`,
+replace for local checkouts) in go.mod, a Ref var plus a container.Provide
+entry in internal/app/wiring.go, and an .env.example section with the
+chosen adapter.`,
 		Example: `  zever add cache
   zever add cache/redis --force
   zever add sms/stub --module example.com/sms-plugin`,
@@ -94,8 +99,12 @@ internal/app/app.go, and a stanza in zever.yaml with the chosen adapter.`,
 		},
 	}
 	cmd.Flags().String("adapter", "", "adapter pick, overriding the positional battery/adapter slash form when both agree")
-	cmd.Flags().Bool("force", false, "overwrite the zever.yaml stanza when the battery is already present")
+	cmd.Flags().String("name", "", "wire a named instance (e.g. --name analytics for db.Ref(\"analytics\")) instead of the default")
+	cmd.Flags().String("uses", "", "declare a boot-order edge on another wired instance (battery or battery/name, e.g. --uses db)")
+	cmd.Flags().Bool("force", false, "allow adapter swaps and overwrite existing recipe files")
 	cmd.Flags().String("module", "", "plugin battery's Go module path, with optional @version suffix (required for plugin batteries)")
+	cmd.Flags().Bool("yes", false, "apply wiring.go changes without prompting")
+	cmd.Flags().Bool("diff", false, "print the wiring.go diff and change nothing")
 	cmd.Flags().Bool("dry-run", false, "print the file edits without writing them")
 
 	return cmd

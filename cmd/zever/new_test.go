@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1116,6 +1117,255 @@ func TestAllServiceAdaptersMatchDefault(t *testing.T) {
 			t.Errorf("allServiceAdapters[%q] has no runtime service", name)
 		}
 	}
+}
+
+// TestScaffoldReplaceBlockCoversEveryFrameworkModule pins the local-checkout
+// replace set of a scaffolded project, in four directions:
+//
+//  1. every framework module the checkout ships under the runtime roots
+//     (adapters/<battery>/<adapter>, core/<battery>, shared/<helper>) is
+//     replaced, so the project's module graph resolves every sibling module
+//     against the checkout instead of the module proxy (which cannot serve a
+//     version that is not published yet), and a module the framework adds
+//     later is covered as soon as the checkout ships it;
+//  2. every framework module the scaffold requires is replaced, so the
+//     project's own imports never reach the proxy;
+//  3. the set is closed under the checkout's intra-repo requires: a replaced
+//     module that requires another framework module has that one replaced
+//     too -- this is the direction that used to break (container requires
+//     core/agent, serve requires core/authz);
+//  4. no replace points at a module the checkout does not ship (that breaks
+//     `go mod tidy` outright), and no replace points at a directory whose
+//     go.mod declares another module.
+//
+// The expected set is enumerated from the checkout's directories, not from
+// the code that renders the replaces, so a module the framework adds later
+// fails this test until the scaffold covers it.
+func TestScaffoldReplaceBlockCoversEveryFrameworkModule(t *testing.T) {
+	t.Parallel()
+
+	root := repoRootAbs(t)
+
+	data, err := renderNewGoMod("zever new", NewConfig{
+		ModulePath:       "example.com/acme",
+		GoVersion:        "1.27",
+		FrameworkVersion: "v0.0.0",
+		FrameworkDir:     root,
+		OutDir:           t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("renderNewGoMod: %v", err)
+	}
+
+	replaced, required := scaffoldGoModModules(t, string(data))
+
+	shipped := checkoutModuleDirs(t, root)
+
+	// 1. the whole runtime surface of the checkout is replaced.
+	for path := range checkoutRuntimeModules(t, root) {
+		if !replaced[path] {
+			t.Errorf("framework module %q has no replace in the scaffolded go.mod", path)
+		}
+	}
+
+	// 2. the modules the project itself requires are replaced.
+	for path := range required {
+		if !replaced[path] {
+			t.Errorf("required framework module %q has no replace in the scaffolded go.mod", path)
+		}
+	}
+
+	// 3. the set is closed under the checkout's intra-repo requires.
+	for path := range replaced {
+		dir, ok := shipped[path]
+		if !ok {
+			continue // not a module of this checkout (checked in 4)
+		}
+
+		for _, dep := range checkoutModuleRequires(t, filepath.Join(root, dir, "go.mod")) {
+			if !strings.HasPrefix(dep, frameworkModulePath+"/") {
+				continue // an external dependency: the proxy serves it
+			}
+
+			if !replaced[dep] {
+				t.Errorf("framework module %q is replaced but requires %q, which is not replaced", path, dep)
+			}
+		}
+	}
+
+	// 4. every replace points at the module it claims to.
+	for path := range replaced {
+		dir, ok := shipped[path]
+		if !ok {
+			t.Errorf("replace %q points at a module the checkout does not ship", path)
+
+			continue
+		}
+
+		if got := checkoutModulePath(t, filepath.Join(root, dir, "go.mod")); got != path {
+			t.Errorf("replace %q points at %q, whose go.mod declares %q", path, dir, got)
+		}
+	}
+}
+
+// scaffoldGoModModules parses the framework modules a rendered go.mod
+// replaces and requires, ignoring every other module path.
+func scaffoldGoModModules(t *testing.T, gomod string) (replaced, required map[string]bool) {
+	t.Helper()
+
+	replaced = map[string]bool{}
+	required = map[string]bool{}
+
+	for _, line := range strings.Split(gomod, "\n") {
+		fields := strings.Fields(line)
+
+		switch {
+		case len(fields) >= 3 && fields[0] == "replace" && strings.HasPrefix(fields[1], frameworkModulePath):
+			replaced[fields[1]] = true
+		case len(fields) >= 2 && fields[0] == "require" && strings.HasPrefix(fields[1], frameworkModulePath):
+			required[fields[1]] = true
+		}
+	}
+
+	return replaced, required
+}
+
+// checkoutRuntimeModules returns every framework module the checkout ships
+// under the runtime roots (the batteries, the adapters and the shared
+// helpers), keyed by module path. It walks the filesystem directly, so it
+// stays independent of the scaffold's own module-graph scan.
+func checkoutRuntimeModules(t *testing.T, root string) map[string]string {
+	t.Helper()
+
+	return checkoutModulesUnder(t, root, "adapters", "core", "shared")
+}
+
+// checkoutModuleDirs returns every framework module the checkout ships,
+// keyed by module path, with its repo-relative directory.
+func checkoutModuleDirs(t *testing.T, root string) map[string]string {
+	t.Helper()
+
+	return checkoutModulesUnder(t, root, "")
+}
+
+// checkoutModulesUnder returns every framework module the checkout ships
+// under the given repo-relative directories (the whole checkout when the
+// only directory is ""), keyed by module path, with its repo-relative
+// directory.
+func checkoutModulesUnder(t *testing.T, root string, tops ...string) map[string]string {
+	t.Helper()
+
+	mods := map[string]string{}
+
+	for _, top := range tops {
+		base := filepath.Join(root, filepath.FromSlash(top))
+
+		err := filepath.WalkDir(base, func(p string, d fs.DirEntry, werr error) error {
+			if werr != nil {
+				return werr
+			}
+
+			if d.IsDir() {
+				if d.Name() == "testdata" || d.Name() == "node_modules" || strings.HasPrefix(d.Name(), ".") {
+					return filepath.SkipDir
+				}
+
+				return nil
+			}
+
+			if d.Name() != "go.mod" {
+				return nil
+			}
+
+			path := checkoutModulePath(t, p)
+			if path == "" || !strings.HasPrefix(path, frameworkModulePath+"/") {
+				return nil
+			}
+
+			rel, rerr := filepath.Rel(root, filepath.Dir(p))
+			if rerr != nil {
+				return rerr
+			}
+
+			mods[path] = filepath.ToSlash(rel)
+
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", top, err)
+		}
+	}
+
+	return mods
+}
+
+// checkoutModulePath reads the module path a go.mod declares, or "" when it
+// declares none.
+func checkoutModulePath(t *testing.T, gomodPath string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(gomodPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", gomodPath, err)
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module ")
+		if !ok {
+			continue
+		}
+
+		return strings.Trim(strings.TrimSpace(rest), `"`)
+	}
+
+	return ""
+}
+
+// checkoutModuleRequires returns the module paths a go.mod requires, in
+// both the single-line and the block form, ignoring every other path.
+func checkoutModuleRequires(t *testing.T, gomodPath string) []string {
+	t.Helper()
+
+	data, err := os.ReadFile(gomodPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", gomodPath, err)
+	}
+
+	var out []string
+
+	inBlock := false
+
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+
+		if inBlock {
+			if trimmed == ")" {
+				inBlock = false
+
+				continue
+			}
+
+			if fields := strings.Fields(trimmed); len(fields) > 0 {
+				out = append(out, fields[0])
+			}
+
+			continue
+		}
+
+		if trimmed == "require (" || trimmed == "require(" {
+			inBlock = true
+
+			continue
+		}
+
+		if rest, ok := strings.CutPrefix(trimmed, "require "); ok {
+			if fields := strings.Fields(rest); len(fields) > 0 {
+				out = append(out, fields[0])
+			}
+		}
+	}
+
+	return out
 }
 
 // TestRenderNewGoModGolden pins the exact bytes of a version-pinned go.mod

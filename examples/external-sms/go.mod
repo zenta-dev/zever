@@ -27,8 +27,8 @@ replace (
 	github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
 	github.com/zenta-dev/zever/adapters/payment/stub => ../../adapters/payment/stub
 	github.com/zenta-dev/zever/adapters/permission/noop => ../../adapters/permission/noop
-	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/queue/db => ../../adapters/queue/db
+	github.com/zenta-dev/zever/adapters/queue/memory => ../../adapters/queue/memory
 	github.com/zenta-dev/zever/adapters/ratelimit/memory => ../../adapters/ratelimit/memory
 	github.com/zenta-dev/zever/adapters/router/stdhttp => ../../adapters/router/stdhttp
 	github.com/zenta-dev/zever/adapters/secrets/env => ../../adapters/secrets/env
@@ -58,8 +58,8 @@ replace (
 	github.com/zenta-dev/zever/core/lock => ../../core/lock
 	github.com/zenta-dev/zever/core/log => ../../core/log
 	github.com/zenta-dev/zever/core/mailer => ../../core/mailer
-	github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 	github.com/zenta-dev/zever/core/media => ../../core/media
+	github.com/zenta-dev/zever/core/middleware => ../../core/middleware
 	github.com/zenta-dev/zever/core/notification => ../../core/notification
 	github.com/zenta-dev/zever/core/observability => ../../core/observability
 	github.com/zenta-dev/zever/core/outbox => ../../core/outbox

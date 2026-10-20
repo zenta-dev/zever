@@ -137,6 +137,28 @@ func TestOutboxUsage(t *testing.T) {
 	}
 }
 
+// TestOutboxEnvFailureNamesTheOffendingKey pins that the outbox commands
+// carry the shared env-key hint: a typo under a wired service prefix names
+// the key to fix instead of dead-ending.
+func TestOutboxEnvFailureNamesTheOffendingKey(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("ZEVER_NO_HINT", "")
+	t.Setenv("DB_MAXCONN", "5")
+
+	err := runOutbox([]string{"status"})
+	if err == nil {
+		t.Fatal("runOutbox status with typo env key: got nil error, want non-nil")
+	}
+
+	if !strings.Contains(err.Error(), `"DB_MAXCONN"`) {
+		t.Fatalf("error = %q, want the hint to name the offending key", err.Error())
+	}
+
+	if !strings.Contains(err.Error(), `"DB_MAX_CONNS"`) {
+		t.Fatalf("error = %q, want the hint to name the corrected key", err.Error())
+	}
+}
+
 // TestOutboxStatusCommand asserts the human status block reports every
 // counter from the seeded rows.
 func TestOutboxStatusCommand(t *testing.T) {
