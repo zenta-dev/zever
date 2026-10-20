@@ -46,25 +46,29 @@ jobs:
       - name: Prove the docs audit rejects the mistakes it guards against
         run: npm run audit:self-test
         working-directory: docs
-      # Style lint: report only for now. It flags pre-existing em/en
-      # dashes, lowercase "zever", and >2 Asides across pages that predate
-      # this workflow, so it cannot gate yet; it runs so the debt stays
-      # visible and shrinks over time.
+      # Style lint: the pages must follow the repo's own style guide
+      # (docs/src/content/docs/contribute/writing-docs.mdx): no em/en
+      # dashes, "Zever" spelled out in prose, a description on every page,
+      # at most two Asides. Every rule is mechanical, so a finding is
+      # never a judgement call: this gates.
       - name: Lint docs style
         run: npm run lint
         working-directory: docs
-        continue-on-error: true
+      - name: Prove the docs style lint rejects the mistakes it guards against
+        run: npm run lint:self-test
+        working-directory: docs
       - name: Build docs
         run: npm run build
         working-directory: docs
-      # Internal link check over the built site: report only for now. It
-      # finds pre-existing broken relative links in pages that predate this
-      # workflow, so it cannot gate yet; the lychee job below covers the
-      # external links.
+      # Internal link check over the built site. This half is offline: it
+      # only reads the built HTML, so it gates. The external (http) links
+      # need the network and stay a report in the lychee job below.
       - name: Check internal links
         run: npm run check-links
         working-directory: docs
-        continue-on-error: true
+      - name: Prove the docs link check rejects the mistakes it guards against
+        run: npm run check-links:self-test
+        working-directory: docs
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: docs/dist
@@ -82,6 +86,10 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
 
+  # External link check. This half needs the network, and third-party
+  # pages rot, so it stays a report instead of a gate. The offline half
+  # (every internal link and anchor in the built site) is the
+  # "Check internal links" step in the build job above, and it gates.
   linkcheck:
     name: lychee link check
     timeout-minutes: 10
