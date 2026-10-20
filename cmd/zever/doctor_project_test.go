@@ -428,6 +428,8 @@ func TestServerTemplateHasDoctorMode(t *testing.T) {
 		`flag.String("addr"`,
 		`flag.String("grpc-addr"`,
 		"serve.Main(app.Providers(), modules, opts...)",
+		"doctorMode(os.Args[1:])",
+		"func doctorMode(args []string) bool {",
 		"func grpcWired() bool {",
 		"func serverPort(addr string) (string, error) {",
 	} {

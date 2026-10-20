@@ -150,6 +150,11 @@ func TestRunDoctorWithCoreBadConfigFile(t *testing.T) {
 func TestRunDoctorWithAppliesEnvOverrides(t *testing.T) {
 	t.Setenv("DB_ADAPTER", "postgres")
 
+	// The CLI's own package directory holds a cmd/server fixture, which
+	// would make the doctor check the project inside the built server
+	// instead of the stubbed local table. Run in an empty directory.
+	t.Chdir(t.TempDir())
+
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 
@@ -206,6 +211,10 @@ func TestRunDoctorInteractiveLongForm(t *testing.T) {
 // battery surfaces a non-nil error so `zever doctor --strict` (and plain
 // `zever doctor`, since P3-3) gates a CI/pre-deploy pipeline on exit code.
 func TestRunDoctorStrictFailsOnBatteryFailure(t *testing.T) {
+	// Empty directory: no built server entrypoint, so the checks run in
+	// the CLI against the stubbed local table.
+	t.Chdir(t.TempDir())
+
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
@@ -224,6 +233,10 @@ func TestRunDoctorStrictFailsOnBatteryFailure(t *testing.T) {
 // TestRunDoctorHumanFailsWithoutStrict pins the P3-3 exit-code fix: a
 // failing battery fails the command even without --strict (exit 1).
 func TestRunDoctorHumanFailsWithoutStrict(t *testing.T) {
+	// Empty directory: no built server entrypoint, so the checks run in
+	// the CLI against the stubbed local table.
+	t.Chdir(t.TempDir())
+
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
@@ -244,6 +257,10 @@ var errFakeBatteryFailure = errors.New("fake battery failure")
 func TestRunDoctorFlagsDevKeyInNonDevEnv(t *testing.T) {
 	t.Setenv("ZEVER_ENV", "")
 
+	// Empty directory: no built server entrypoint, so every battery is
+	// checked in the CLI (the crypto row included).
+	t.Chdir(t.TempDir())
+
 	var out bytes.Buffer
 	// Defaults fail other batteries too (auth/jwt has no secret), so the
 	// command errors; the assertion is the crypto row flagging the dev key.
@@ -262,6 +279,10 @@ func TestRunDoctorFlagsDevKeyInNonDevEnv(t *testing.T) {
 
 func TestRunDoctorDevKeyAllowedInDevEnv(t *testing.T) {
 	t.Setenv("ZEVER_ENV", "test")
+
+	// Empty directory: no built server entrypoint, so every battery is
+	// checked in the CLI (the crypto row included).
+	t.Chdir(t.TempDir())
 
 	var out bytes.Buffer
 	// Other default batteries still fail (auth/jwt has no secret), so the
@@ -291,6 +312,10 @@ func doctorLine(out, name string) (string, bool) {
 }
 
 func TestRunDoctorWithAllOK(t *testing.T) {
+	// Empty directory: no built server entrypoint, so the checks run in
+	// the CLI against the stubbed local table.
+	t.Chdir(t.TempDir())
+
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 	doctorChecksFor = func(_ *container.Container, _ *config.Config) map[string]func() error {
