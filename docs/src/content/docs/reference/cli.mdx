@@ -185,6 +185,14 @@ and `check-boundaries`.
 | `--project` | `zever upgrade`: upgrade the current project's go.mod instead of the binary |
 | `-h` | print flags without running |
 
+When `zever new` resolves against a local framework checkout (the
+auto-detected checkout or `ZEVER_FRAMEWORK_PATH`), the generated `go.mod`
+replaces every module of that checkout's module graph — the batteries, the
+adapters, the shared helpers and everything they require inside the
+repository — so the project's module graph resolves against the checkout
+instead of the module proxy. The set is derived from the checkout itself,
+so a module the framework adds later is covered automatically.
+
 ### `zever add`
 
 Adds one core battery to an existing project. Synopsis (exactly one
