@@ -133,6 +133,7 @@ naming rules.
 Write idiomatic Go. When in doubt, follow [Effective Go](https://go.dev/doc/effective_go).
 
 - **Formatting.** Always run `make fmt-fix` before committing.
+- **Mass refactors.** Repo-wide edits to Go source must use AST-aware tooling (`gofmt -r`, `go/ast`, `gopls rename`) or a script run with a dry run and reviewed before/after diff. Never rewrite struct tags with regex — the `json`/`toml`/`yaml` tags are the wire contract and are guarded by `make check-tags` in CI.
 - **Static analysis.** Keep `make vet`, `make lint`, and `make vulncheck` clean.
 - **Error handling.** Handle errors explicitly. Return and propagate errors instead of swallowing them. Do not use `log.Fatal` in library code.
 - **Meaningful naming.** Prefer clear, descriptive names over short cryptic ones. The name of an exported identifier is part of its public API.
@@ -195,7 +196,7 @@ Before changing anything exported (functions, types, methods, interfaces, constr
 
 Keep public API changes minimal and deliberate. Do not make unrelated breaking changes as a side effect of another fix. Public API changes should be called out explicitly in the pull request and reviewed by a maintainer.
 
-The `apidiff` CI gate (`make apidiff`) enforces this for Core-tier modules. An incompatible change in module `M` must be covered by a `**Breaking:**` entry under `## [Unreleased]` in `CHANGELOG.md` that names `M`. An entry is a `- ` bullet plus its indented continuation lines; it covers `M` when it carries a backticked token that is the module path (`github.com/zenta-dev/zever/core/auth`), the module directory (`core/auth`), a package path under either (`core/auth/jwt`, a trailing `/...` is ignored), the short name (`auth`) or a qualified identifier (`auth.JWTOptions`). A `**Breaking:**` line that names only other modules does not satisfy the gate. A Core-tier module with no `<dir>/v*` baseline tag fails the gate unless it is listed, with a reason and an `expires` date (`YYYY-MM-DD`), in `.github/apidiff-baseline-allowlist.json`; expired entries fail again.
+The `apidiff` CI gate (`make apidiff`) enforces this for Core-tier modules. An incompatible change in module `M` must be covered by a `**Breaking:**` entry under the changelog's pending-release section that names `M`. The pending section is `## [Unreleased]`, or — between the release cut and the tag push — the top `## [vX.Y.Z] - YYYY-MM-DD` section whose version is not tagged yet: the API-diff baseline stays at the last existing tag, so a break documented in a cut-but-untagged release still passes. Only the top-most released section counts this way, so an older untagged section never absorbs a new break; once `tools/tag-release.sh` creates the tags, the section is released and its entries no longer count. An entry is a `- ` bullet plus its indented continuation lines; it covers `M` when it carries a backticked token that is the module path (`github.com/zenta-dev/zever/core/auth`), the module directory (`core/auth`), a package path under either (`core/auth/jwt`, a trailing `/...` is ignored), the short name (`auth`) or a qualified identifier (`auth.JWTOptions`). A `**Breaking:**` line that names only other modules does not satisfy the gate. A Core-tier module with no `<dir>/v*` baseline tag fails the gate unless it is listed, with a reason and an `expires` date (`YYYY-MM-DD`), in `.github/apidiff-baseline-allowlist.json`; expired entries fail again.
 
 ## Versioning
 
@@ -219,7 +220,7 @@ Every release ships one number across all modules via `tools/tag-release.sh` (fi
 release-version constant (schema `v1`/`v2` segments are API versions, not
 releases) — everything else moves together:
 
-- `CHANGELOG.md`: cut `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD`.
+- `CHANGELOG.md`: cut `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD`. Until `tools/tag-release.sh` creates the tags, `make apidiff` treats that top section as the pending release, so a break documented there still satisfies the gate (see [Versioning](#versioning)).
 - Installers: `install.sh` (`ZEVER_VERSION_DEFAULT`, header and usage text) and
   `install.ps1` (`$Version` default and help text).
 - Root pins: `README.md` (installer URLs), `CITATION.cff`, `cmd/zever/new.go` (`defaultFrameworkVersion`)

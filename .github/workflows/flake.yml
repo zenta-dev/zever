@@ -25,7 +25,7 @@ jobs:
   flake:
     name: flake (shard ${{ matrix.index }}/8)
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -61,7 +61,7 @@ jobs:
     name: track nightly failures
     timeout-minutes: 10
     if: needs.flake.result == 'failure'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [flake]
     permissions:
       issues: write
