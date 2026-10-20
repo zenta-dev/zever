@@ -60,9 +60,9 @@ worker cmd/worker/main.go, seed db/seed/main.go, k8s k8s/app.yaml.
 Existing files need --force; nothing else in your project is touched.
 
 WHAT THIS DOES NOT DO: it never rewrites your code (wiring.go edits are
-insert-only; a swap replaces exactly one entry), and it never touches
-zever.yaml (config is env-only: see .env.example). Run it from your
-project root (the directory holding go.mod).`
+insert-only; a swap replaces exactly one entry). Config is env-only, so the
+adapter selection lands in .env.example, never in a config file. Run it from
+your project root (the directory holding go.mod).`
 
 // addRecipeNames are the opt-in file recipes `zever add` writes from
 // templates. No battery shares these names, so the dispatch is exact.

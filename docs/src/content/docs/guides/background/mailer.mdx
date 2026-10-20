@@ -82,10 +82,10 @@ MAILER_TIMEOUT=30s
 </Tabs>
 
 - `encryption`: `starttls` (default when empty), `implicit`, or `none`.
-- `timeout`: zero means the 30s default. File durations are integer nanoseconds, env accepts `"30s"`.
+- `timeout`: zero means the 30s default. Durations take Go strings such as `"30s"`.
 - `max_message_size`: zero means the 10 MiB default; larger messages fail with `ErrMessageTooLarge`.
 
-File decoding is strict snake_case. All keys: [mailer config reference](../../../reference/config/#mailer).
+Env keys are strict snake_case (`MAILER_HOST`, `MAILER_PORT`, `MAILER_TIMEOUT`). All keys: [mailer config reference](../../../reference/config/#mailer).
 
 | Adapter | Package | Notes |
 |---|---|---|
