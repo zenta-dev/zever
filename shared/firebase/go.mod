@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	firebase.google.com/go/v4 v4.22.0
-	google.golang.org/api v0.302.0
+	google.golang.org/api v0.304.0
 )
 
 require (
