@@ -125,3 +125,46 @@ func TestCheckPatchPassesOnGoodFixture(t *testing.T) {
 		t.Errorf("--check-patch on good fixture = exit %d, want 0\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
 	}
 }
+
+// TestCheckPatchGrandfathersShippedPatch is fixtures (d) and (e): v0.7.2
+// shipped a Core breaking change in a patch before the guard existed, so the
+// VERSION floor (0.8.0) must grandfather it and the real changelog must not
+// fail spuriously — while a patch above the floor still fails.
+func TestCheckPatchGrandfathersShippedPatch(t *testing.T) {
+	shipped := []string{
+		"# Changelog",
+		"",
+		"## [v0.8.0] - 2026-10-18",
+		"",
+		"- **Breaking:** `config`: env-only config (minor, allowed)",
+		"",
+		"## [v0.7.2] - 2026-10-17",
+		"",
+		"- **Breaking:** `core/session` changes store keys (shipped patch, grandfathered)",
+		"",
+	}
+	f := mustChangelog(t, shipped)
+
+	var stdout, stderr strings.Builder
+	code := run(context.Background(), []string{"--check-patch", "--floor", "0.8.0", "--changelog", f}, &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("grandfathered shipped patch = exit %d, want 0\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+	}
+
+	next := append(append([]string{}, shipped...),
+		"## [v0.8.1] - 2026-11-01",
+		"",
+		"- **Breaking:** `container` drops a method (Core break in a patch)",
+		"",
+	)
+	f2 := mustChangelog(t, next)
+	stdout.Reset()
+	stderr.Reset()
+	code = run(context.Background(), []string{"--check-patch", "--floor", "0.8.0", "--changelog", f2}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("patch above floor = exit %d, want 1\nstdout:\n%s\nstderr:\n%s", code, stdout.String(), stderr.String())
+	}
+	if out := stdout.String() + stderr.String(); !strings.Contains(out, "v0.8.1") {
+		t.Errorf("guard output does not name v0.8.1:\n%s", out)
+	}
+}

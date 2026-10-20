@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -158,7 +159,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	raw = appendChangelogFragments(raw, filepath.Join(filepath.Dir(changelog), ".changelog", "unreleased"))
-	entries := breakingEntries(string(raw))
+	body := string(raw)
+	pending := pendingHeaders(body, func(version string) bool { return tagExists(ctx, root, version) })
+	label := pendingLabel(pending)
+	entries := breakingEntries(body, pending)
 	uncovered := 0
 	for _, f := range failures {
 		mod, merr := goModPath(filepath.Join(root, f.module, "go.mod"))
@@ -167,16 +171,16 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		if !anyCovers(entries, f.module, mod) {
-			fmt.Fprintf(stdout, "apidiff: %s: incompatible changes need a **Breaking:** entry under ## [Unreleased] in %s "+
+			fmt.Fprintf(stdout, "apidiff: %s: incompatible changes need a **Breaking:** entry under %s in %s "+
 				"naming the module (`%s`), a package under it or its short name (`%s`) in backticks\n",
-				f.module, changelog, f.module, path.Base(f.module))
+				f.module, label, changelog, f.module, path.Base(f.module))
 			uncovered++
 		}
 	}
 	if uncovered > 0 || missing > 0 {
 		return 1
 	}
-	fmt.Fprintf(stdout, "apidiff: incompatible changes documented under ## [Unreleased]\n")
+	fmt.Fprintf(stdout, "apidiff: incompatible changes documented under %s\n", label)
 	return 0
 }
 
@@ -370,7 +374,7 @@ func isInternalPackage(pkgPath, modulePath string) bool {
 }
 
 // appendChangelogFragments appends every .md fragment in fragDir (except
-// README.md) under a synthetic ## [Unreleased] header, so the Unreleased
+// README.md) under a synthetic ## [Unreleased] header, so the pending-section
 // scan in breakingEntries also covers entries carried by parallel PRs that
 // have not been compiled into the changelog yet. Missing dir or no
 // fragments leaves body unchanged. Fragment entries must already satisfy
@@ -416,15 +420,92 @@ func appendChangelogFragments(body []byte, fragDir string) []byte {
 	return []byte(sb.String())
 }
 
+// unreleasedHeader is the Keep a Changelog section for changes not yet cut
+// into a release.
+const unreleasedHeader = "## [Unreleased]"
+
+// releaseHeader matches a released section header and captures its version,
+// e.g. "## [v0.8.0] - 2026-10-18" or "## [0.8.0]".
+var releaseHeader = regexp.MustCompile(`^## \[[vV]?(\d+\.\d+\.\d+)[^]]*\]`)
+
+// sectionHeaders returns every "## ..." header line in body, trimmed, in
+// document order.
+func sectionHeaders(body string) []string {
+	var out []string
+	for _, line := range strings.Split(body, "\n") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "## ") {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+// pendingHeaders returns the section headers whose entries document changes
+// that are not released yet, so a **Breaking:** entry there covers an
+// incompatible change. ## [Unreleased] always counts. The top-most released
+// section counts too when its version has no git tag yet: the release
+// checklist cuts ## [Unreleased] to ## [vX.Y.Z] - DATE before the tags are
+// created, and the API-diff baseline stays at the last existing tag, so a
+// break documented in that cut-but-untagged section must still satisfy the
+// gate. Only the top-most released section is considered, so an old untagged
+// section can never silently absorb a new break. tagged reports whether a
+// version (e.g. "0.8.0") already has a git tag; nil means "assume untagged".
+func pendingHeaders(body string, tagged func(version string) bool) []string {
+	var out []string
+	seenRelease := false
+	for _, h := range sectionHeaders(body) {
+		if h == unreleasedHeader {
+			out = append(out, h)
+			continue
+		}
+		m := releaseHeader.FindStringSubmatch(h)
+		if m == nil || seenRelease {
+			continue
+		}
+		seenRelease = true
+		if tagged == nil || !tagged(m[1]) {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// pendingLabel renders the pending section headers for a gate message,
+// falling back to ## [Unreleased] when the changelog has none.
+func pendingLabel(headers []string) string {
+	if len(headers) == 0 {
+		return unreleasedHeader
+	}
+	return strings.Join(headers, " or ")
+}
+
+// tagExists reports whether version has been released: a historical bare
+// "vX.Y.Z" tag or any lockstep per-module "<dir>/vX.Y.Z" tag. A git failure
+// counts as untagged, so the check degrades to the pending-section rule
+// instead of passing an undocumented break.
+func tagExists(ctx context.Context, root, version string) bool {
+	tag := "v" + strings.TrimPrefix(version, "v")
+	out, err := exec.CommandContext(ctx, "git", "-C", root, "tag", "--list", tag, "*/"+tag).Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) != ""
+}
+
 // unreleasedHasBreaking reports whether body carries a **Breaking:** entry
 // inside the ## [Unreleased] section (stopping at the next ## [x] header).
 func unreleasedHasBreaking(body string) bool {
-	return len(breakingEntries(body)) > 0
+	return len(breakingEntries(body, []string{unreleasedHeader})) > 0
 }
 
-// breakingEntries returns the ## [Unreleased] list entries (a "- " bullet
-// plus its indented continuation lines) that contain a **Breaking:** marker.
-func breakingEntries(body string) []string {
+// breakingEntries returns the list entries (a "- " bullet plus its indented
+// continuation lines) inside the given section headers that contain a
+// **Breaking:** marker.
+func breakingEntries(body string, headers []string) []string {
+	want := make(map[string]bool, len(headers))
+	for _, h := range headers {
+		want[h] = true
+	}
 	var entries []string
 	var cur []string
 	flush := func() {
@@ -437,14 +518,14 @@ func breakingEntries(body string) []string {
 		}
 		cur = nil
 	}
-	inUnreleased := false
+	inSection := false
 	for _, line := range strings.Split(body, "\n") {
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(trimmed, "## "):
 			flush()
-			inUnreleased = trimmed == "## [Unreleased]"
-		case !inUnreleased:
+			inSection = want[trimmed]
+		case !inSection:
 		case strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* "):
 			flush()
 			cur = []string{line}

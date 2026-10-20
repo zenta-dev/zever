@@ -338,3 +338,169 @@ func TestEntryCovers(t *testing.T) {
 		}
 	}
 }
+
+func TestPendingHeaders(t *testing.T) {
+	t.Parallel()
+	allTagged := func(string) bool { return true }
+	noneTagged := func(string) bool { return false }
+	upTo072 := func(v string) bool { return v == "0.7.2" }
+	tests := []struct {
+		name   string
+		body   string
+		tagged func(string) bool
+		want   []string
+	}{
+		{
+			name:   "unreleased only",
+			body:   "# Changelog\n\n## [Unreleased]\n\n- x\n",
+			tagged: upTo072,
+			want:   []string{"## [Unreleased]"},
+		},
+		{
+			name:   "untagged top release is pending",
+			body:   "# Changelog\n\n## [v0.8.0] - 2026-10-18\n\n- x\n\n## [v0.7.2] - 2026-10-17\n\n- y\n",
+			tagged: upTo072,
+			want:   []string{"## [v0.8.0] - 2026-10-18"},
+		},
+		{
+			name:   "tagged top release is not pending",
+			body:   "# Changelog\n\n## [v0.7.2] - 2026-10-17\n\n- y\n",
+			tagged: upTo072,
+			want:   nil,
+		},
+		{
+			name:   "unreleased plus untagged top",
+			body:   "# Changelog\n\n## [v0.8.0] - 2026-10-18\n\n- x\n\n## [Unreleased]\n\n- z\n",
+			tagged: upTo072,
+			want:   []string{"## [v0.8.0] - 2026-10-18", "## [Unreleased]"},
+		},
+		{
+			name:   "only the top release is considered",
+			body:   "# Changelog\n\n## [Unreleased]\n\n- x\n\n## [v0.7.2] - 2026-10-17\n\n- y\n\n## [v0.6.0] - 2026-01-01\n\n- z\n",
+			tagged: noneTagged,
+			want:   []string{"## [Unreleased]", "## [v0.7.2] - 2026-10-17"},
+		},
+		{
+			name:   "nil tagged assumes untagged",
+			body:   "# Changelog\n\n## [v0.1.0] - 2026-01-01\n\n- x\n",
+			tagged: nil,
+			want:   []string{"## [v0.1.0] - 2026-01-01"},
+		},
+		{
+			name:   "everything tagged",
+			body:   "# Changelog\n\n## [v0.7.2] - 2026-10-17\n\n- y\n",
+			tagged: allTagged,
+			want:   nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := pendingHeaders(tc.body, tc.tagged)
+			if strings.Join(got, "|") != strings.Join(tc.want, "|") {
+				t.Errorf("pendingHeaders = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPendingLabel(t *testing.T) {
+	t.Parallel()
+	if got := pendingLabel(nil); got != "## [Unreleased]" {
+		t.Errorf("pendingLabel(nil) = %q, want ## [Unreleased]", got)
+	}
+	want := "## [v0.8.0] - 2026-10-18 or ## [Unreleased]"
+	if got := pendingLabel([]string{"## [v0.8.0] - 2026-10-18", "## [Unreleased]"}); got != want {
+		t.Errorf("pendingLabel = %q, want %q", got, want)
+	}
+}
+
+func TestTagExists(t *testing.T) {
+	t.Parallel()
+	root := initRepo(t)
+	mustGit(t, root, "tag", "mod/v0.1.0")
+	mustGit(t, root, "tag", "v0.2.0")
+	ctx := context.Background()
+	for _, tc := range []struct {
+		version string
+		want    bool
+	}{
+		{"0.1.0", true},  // lockstep per-module tag
+		{"v0.2.0", true}, // historical bare tag
+		{"0.9.9", false},
+	} {
+		if got := tagExists(ctx, root, tc.version); got != tc.want {
+			t.Errorf("tagExists(%q) = %v, want %v", tc.version, got, tc.want)
+		}
+	}
+}
+
+// untaggedReleaseRepo tags mod/v0.1.0, breaks the exported API, and writes a
+// CHANGELOG whose top section is a cut-but-untagged release (## [v0.2.0])
+// carrying body as its entries (no ## [Unreleased]).
+func untaggedReleaseRepo(t *testing.T, body string) string {
+	t.Helper()
+	root := breakingRepo(t)
+	mustWrite(t, filepath.Join(root, "CHANGELOG.md"),
+		"# Changelog\n\n## [v0.2.0] - 2026-10-20\n\n"+body+"\n")
+	return root
+}
+
+// TestGateUntaggedTopSectionCoversBreak is fixture (a): the changelog's top
+// section is a cut release whose tag does not exist yet, and its
+// **Breaking:** entry covers the incompatible change.
+func TestGateUntaggedTopSectionCoversBreak(t *testing.T) {
+	root := untaggedReleaseRepo(t, "- **Breaking:** `mod` drops `api.Hello` and widens `api.World.Method`")
+	if code, out := runGate(t, root); code != 0 {
+		t.Errorf("exit %d, want 0 (untagged top section documents the break)\n%s", code, out)
+	}
+}
+
+// TestGateUntaggedTopSectionWithoutEntryFails is fixture (b): the cut but
+// untagged section exists, but no **Breaking:** entry documents the change,
+// so the gate must fail and point at that section.
+func TestGateUntaggedTopSectionWithoutEntryFails(t *testing.T) {
+	root := untaggedReleaseRepo(t, "- a compatible-looking change")
+	code, out := runGate(t, root)
+	if code == 0 {
+		t.Fatalf("exit 0, want non-zero\n%s", out)
+	}
+	if !strings.Contains(out, "## [v0.2.0]") {
+		t.Errorf("message does not name the pending section:\n%s", out)
+	}
+	if !strings.Contains(out, "**Breaking:**") {
+		t.Errorf("message does not ask for a **Breaking:** entry:\n%s", out)
+	}
+}
+
+// TestGateTaggedTopSectionIsReleased is fixture (c): once ## [v0.2.0] is
+// tagged, the diff baseline moves to it and its entries no longer count as
+// pending documentation, so the break must be documented under
+// ## [Unreleased] instead.
+func TestGateTaggedTopSectionIsReleased(t *testing.T) {
+	root := initRepo(t)
+	mustGit(t, root, "tag", "mod/v0.1.0")
+	mustGit(t, root, "tag", "mod/v0.2.0") // tagged at the compatible commit
+	mustWrite(t, filepath.Join(root, "mod", "api.go"), breakAPI)
+	mustGit(t, root, "add", "-A")
+	mustGit(t, root, "commit", "-qm", "break api after v0.2.0")
+	mustWrite(t, filepath.Join(root, "CHANGELOG.md"),
+		"# Changelog\n\n## [v0.2.0] - 2026-10-20\n\n- **Breaking:** `mod` drops `api.Hello`\n")
+
+	code, out := runGate(t, root)
+	if code == 0 {
+		t.Fatalf("exit 0, want non-zero (tagged section is not pending)\n%s", out)
+	}
+	if !strings.Contains(out, "breaks mod/v0.2.0") {
+		t.Errorf("baseline did not move to the tagged v0.2.0:\n%s", out)
+	}
+	if !strings.Contains(out, "## [Unreleased]") {
+		t.Errorf("message does not point at ## [Unreleased]:\n%s", out)
+	}
+
+	mustWrite(t, filepath.Join(root, "CHANGELOG.md"),
+		"# Changelog\n\n## [Unreleased]\n\n- **Breaking:** `mod` drops `api.Hello`\n\n## [v0.2.0] - 2026-10-20\n")
+	if code, out := runGate(t, root); code != 0 {
+		t.Errorf("exit %d, want 0 once documented under ## [Unreleased]\n%s", code, out)
+	}
+}
