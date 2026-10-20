@@ -70,3 +70,22 @@ func FuzzMatchService(f *testing.F) {
 		_, _ = matchService(head)
 	})
 }
+
+// FuzzCamelToSnake proves the CamelCase -> snake_case helper never panics on
+// arbitrary input (including non-ASCII and control bytes): it is pure string
+// rewriting with no integer conversions, so G115 cannot fire and the prev/next
+// indexing only runs on the ASCII-uppercase branch.
+func FuzzCamelToSnake(f *testing.F) {
+	for _, seed := range []string{
+		"", "A", "APIKey", "dbMaxConns", "HTTPServer", "OIDCIssuerURL",
+		"DB2Conn", "Ünicode", "caféAPIKey", "\x00\xff", strings.Repeat("A", 100),
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, s string) {
+		t.Parallel()
+
+		_ = camelToSnake(s)
+	})
+}

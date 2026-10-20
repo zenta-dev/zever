@@ -279,3 +279,40 @@ func TestSetOptionFieldDirect(t *testing.T) {
 		t.Fatalf("want UnknownFieldError, got %v", err)
 	}
 }
+
+// TestCamelToSnake pins the CamelCase -> snake_case conversion used by
+// jsonFieldName for untagged Options fields. Expectations are derived from the
+// implementation in env.go, not from a spec: an uppercase ASCII rune inserts
+// "_" when the previous byte is lowercase ASCII or the next byte is lowercase
+// ASCII, and is otherwise lowercased with no separator. Digits are written
+// verbatim and never trigger a separator, so an uppercase letter is only split
+// off a digit run when the following letter is lowercase (DB2 -> db2,
+// DB2Conn -> db2_conn). Non-ASCII runes are written unchanged: they are never
+// lowercased and never index prev/next, so non-ASCII input cannot panic.
+func TestCamelToSnake(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"A", "a"},
+		{"API", "api"},
+		{"APIKey", "api_key"},
+		{"dbMaxConns", "db_max_conns"},
+		{"HTTPServer", "http_server"},
+		{"OIDCIssuerURL", "oidc_issuer_url"},
+		{"ABCDef", "abc_def"},
+		{"DB2", "db2"},
+		{"DB2Conn", "db2_conn"},
+		{"Max2Retries", "max2_retries"},
+		{"Ünicode", "Ünicode"},
+		{"caféAPIKey", "caféapi_key"},
+	}
+	for _, tt := range tests {
+		if got := camelToSnake(tt.in); got != tt.want {
+			t.Errorf("camelToSnake(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
