@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,6 +62,31 @@ func TestNew_missingDSN(t *testing.T) {
 
 	if _, err := New(db.Options{}); err == nil {
 		t.Fatal("want error for missing dsn, got nil")
+	}
+}
+
+// TestNew_missingDSN_namesTheFix proves the missing-DSN error says which
+// option is missing and how to set it: the DSN is the single most common
+// reason a postgres boot fails.
+func TestNew_missingDSN_namesTheFix(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(db.Options{})
+	if err == nil {
+		t.Fatal("want error for missing dsn, got nil")
+	}
+
+	msg := err.Error()
+
+	for _, want := range []string{
+		`postgres: option "dsn" is required`,
+		"set <SERVICE>_DSN to a postgres:// URL",
+		"DB_DSN=postgres://",
+		"sslmode=disable",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("New() error = %q, want substring %q", msg, want)
+		}
 	}
 }
 

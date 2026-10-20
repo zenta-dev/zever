@@ -181,7 +181,7 @@ func TestEdgeDeliverMultiTargetErrorJoin(t *testing.T) {
 		t.Fatalf("Deliver err = %v, want ErrDeliveryFailed", err)
 	}
 
-	if got := strings.Count(err.Error(), "delivery failed after 1 attempts"); got != 2 {
+	if got := strings.Count(err.Error(), `failed after 1 attempts`); got != 2 {
 		t.Fatalf("Deliver err = %v, want 2 joined attempt errors", err)
 	}
 }

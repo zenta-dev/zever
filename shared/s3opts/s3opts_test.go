@@ -95,6 +95,56 @@ func TestValidateCredentials(t *testing.T) {
 	}
 }
 
+// TestValidateBucket_namesTheFix proves the missing-bucket error says which
+// env key to set: the bucket is the option a developer forgets first.
+func TestValidateBucket_namesTheFix(t *testing.T) {
+	t.Parallel()
+
+	err := Config{}.ValidateBucket()
+	if err == nil {
+		t.Fatal("ValidateBucket() error = nil, want error")
+	}
+
+	want := "s3opts: bucket is required: set <SERVICE>_BUCKET to the target bucket name"
+	if got := err.Error(); got != want {
+		t.Errorf("ValidateBucket() = %q, want %q", got, want)
+	}
+}
+
+// TestValidateCredentials_namesTheMissingFields proves the error says which
+// credential is missing and which env key carries it, instead of a blanket
+// "credentials are required".
+func TestValidateCredentials_namesTheMissingFields(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   Config
+		want []string
+	}{
+		{"both empty", Config{}, []string{"<SERVICE>_ACCESS_KEY_ID", "<SERVICE>_SECRET_ACCESS_KEY"}},
+		{"key empty", Config{SecretAccessKey: "sk"}, []string{"<SERVICE>_ACCESS_KEY_ID"}},
+		{"secret empty", Config{AccessKeyID: "ak"}, []string{"<SERVICE>_SECRET_ACCESS_KEY"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tc.in.ValidateCredentials()
+			if err == nil {
+				t.Fatal("ValidateCredentials() error = nil, want error")
+			}
+
+			for _, want := range tc.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("ValidateCredentials() = %q, want substring %q", err.Error(), want)
+				}
+			}
+		})
+	}
+}
+
 func TestValidateEndpoint(t *testing.T) {
 	t.Parallel()
 	valid := []string{"", "https://example.com", "https://example.com/x", "http://localhost:9000"}

@@ -1,7 +1,7 @@
 package redisopt
 
 import (
-	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -40,45 +40,56 @@ type ConnectOptions struct {
 
 // ValidateAddr checks a Redis host:port address.
 // Empty means the adapter default and is valid.
+//
+// Every rejection names the offending value (with any embedded credentials
+// masked by RedactAddr), says which part of the address is wrong, and
+// states the shape the address must have, so the developer can fix the
+// setting without reading the adapter's source.
 func ValidateAddr(addr string) error {
 	if addr == "" {
 		return nil
 	}
 
+	// The address is echoed back, so mask any credentials first: an address
+	// may be a redis:// URL carrying a password.
+	shown := RedactAddr(addr)
+
 	if strings.Contains(addr, "://") {
-		return errors.New("redis: addr must be host:port without scheme")
+		return fmt.Errorf("redis: addr %q must be host:port without a scheme (drop the redis:// prefix, or set the url option instead)", shown)
 	}
 
 	if strings.ContainsAny(addr, "/?#") {
-		return errors.New("redis: addr must be host:port")
+		return fmt.Errorf("redis: addr %q must be host:port (no path, query, or fragment)", shown)
 	}
 
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		return errors.New("redis: addr must be host:port")
+		return fmt.Errorf("redis: addr %q must be host:port (expected \"host:port\")", shown)
 	}
 
 	if host == "" {
-		return errors.New("redis: addr host must be non-empty")
+		return fmt.Errorf("redis: addr %q must include a host", shown)
 	}
 
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port <= 0 || port > MaxPort {
-		return errors.New("redis: addr port must be 1-65535")
+		return fmt.Errorf("redis: addr %q port must be 1-65535", shown)
 	}
 
 	return nil
 }
 
-// ValidatePrefix checks a Redis key prefix: at most MaxPrefixLen token characters.
+// ValidatePrefix checks a Redis key prefix: at most MaxPrefixLen token
+// characters. A rejection names the prefix, the limit it broke, and the
+// character that was not a token character.
 func ValidatePrefix(prefix string) error {
 	if len(prefix) > MaxPrefixLen {
-		return errors.New("redis: prefix must be at most 64 characters")
+		return fmt.Errorf("redis: prefix %q is %d characters, max is %d", prefix, len(prefix), MaxPrefixLen)
 	}
 
 	for i := 0; i < len(prefix); i++ {
 		if !IsTokenChar(prefix[i]) {
-			return errors.New("redis: prefix must contain only token characters")
+			return fmt.Errorf("redis: prefix %q must contain only token characters (found %q at position %d)", prefix, prefix[i], i)
 		}
 	}
 
@@ -101,17 +112,29 @@ func IsTokenChar(c byte) bool {
 
 // RedactAddr masks any embedded userinfo credentials in addr, suitable for
 // error messages. The password from options is never included.
+//
+// Both the URL form ("redis://user:pass@host:6379") and the scheme-less
+// form ("user:pass@host:6379") are masked: url.Parse reads the scheme-less
+// form's "user" as a scheme, so the userinfo segment is masked by hand.
 func RedactAddr(addr string) string {
 	raw := strings.TrimSpace(addr)
 
 	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
+	if err == nil && u.User != nil {
+		u.User = url.UserPassword(u.User.Username(), "xxxxx")
+
+		return u.String()
 	}
 
-	u.User = url.UserPassword(u.User.Username(), "xxxxx")
+	// Scheme-less userinfo: mask everything before the last "@" that
+	// carries a "user:password" pair.
+	if at := strings.LastIndex(raw, "@"); at > 0 {
+		if colon := strings.LastIndex(raw[:at], ":"); colon >= 0 {
+			return raw[:colon] + ":xxxxx" + raw[at:]
+		}
+	}
 
-	return u.String()
+	return raw
 }
 
 // RedactEndpoint returns the URL-or-Addr endpoint with any embedded userinfo

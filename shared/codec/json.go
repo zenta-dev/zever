@@ -2,7 +2,7 @@ package codec
 
 import (
 	"encoding/json/v2"
-	"errors"
+	"reflect"
 	"time"
 )
 
@@ -54,19 +54,43 @@ var durationUnmarshalers = json.UnmarshalFunc(func(data []byte, d *time.Duration
 type JSONCodec[V any] struct{}
 
 // Encode marshals v into JSON.
+//
+// A failure names the value's type, so a caller can tell which payload
+// shape broke without re-deriving it from the call site.
 func (JSONCodec[V]) Encode(v V) ([]byte, error) {
 	data, err := json.Marshal(v, json.Deterministic(true), json.WithMarshalers(durationMarshalers))
 	if err != nil {
-		return nil, errors.Join(ErrEncode, err)
+		return nil, &EncodeError{Type: encodeTypeName(v), Err: err}
 	}
 	return data, nil
 }
 
 // Decode unmarshals JSON data into a value of type V.
+//
+// A failure names the target type, so a caller can tell which payload shape
+// broke without re-deriving it from the call site.
 func (JSONCodec[V]) Decode(data []byte) (V, error) {
 	var v V
 	if err := json.Unmarshal(data, &v, json.WithUnmarshalers(durationUnmarshalers)); err != nil {
-		return v, errors.Join(ErrDecode, err)
+		return v, &DecodeError{Type: decodeTypeName[V](), Err: err}
 	}
 	return v, nil
+}
+
+// encodeTypeName renders the concrete type of an encoded value, falling back
+// to the codec's declared type for a nil value (which would otherwise render
+// as "<nil>").
+func encodeTypeName[V any](v V) string {
+	if t := reflect.TypeOf(v); t != nil {
+		return t.String()
+	}
+
+	return reflect.TypeFor[V]().String()
+}
+
+// decodeTypeName renders the codec's declared type: the bytes are being
+// decoded into that type, whatever the decoder managed to fill in before it
+// failed.
+func decodeTypeName[V any]() string {
+	return reflect.TypeFor[V]().String()
 }
