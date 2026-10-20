@@ -570,11 +570,7 @@ func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.Pl
 func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOptions, lint bool) error {
 	conn, err := openZeverDB(adapter, dsn)
 	if err != nil {
-		if h := migrateDSNHint(adapter, dsn); h != "" {
-			return fmt.Errorf("%w\n%s", err, h)
-		}
-
-		return err
+		return withHint(err, migrateDSNHint(adapter, dsn))
 	}
 
 	ctx := context.Background()

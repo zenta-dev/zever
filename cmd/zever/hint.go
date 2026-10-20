@@ -13,6 +13,30 @@ func shouldShowHint() bool {
 	return os.Getenv("ZEVER_NO_HINT") == "" && !quietMode
 }
 
+// hintedError carries a hint line under an error message: the failure
+// first, the next step after it. It wraps the original error, so
+// errors.Is and errors.As still reach it.
+type hintedError struct {
+	err  error
+	hint string
+}
+
+// Error renders the wrapped error with the hint on the next line.
+func (e *hintedError) Error() string { return e.err.Error() + "\n" + e.hint }
+
+// Unwrap exposes the wrapped error for errors.Is and errors.As.
+func (e *hintedError) Unwrap() error { return e.err }
+
+// withHint attaches a hint line to err, or returns err unchanged when
+// there is no hint to attach.
+func withHint(err error, hint string) error {
+	if err == nil || hint == "" {
+		return err
+	}
+
+	return &hintedError{err: err, hint: hint}
+}
+
 // isTransientGoFailure reports whether go tool output looks like a flaky
 // network/proxy error rather than a deterministic resolution or build error.
 func isTransientGoFailure(out string) bool {
