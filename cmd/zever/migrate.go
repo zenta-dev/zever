@@ -570,8 +570,8 @@ func dryRunDiff(adapter, dsn string, result *compile.Result, planOpts migrate.Pl
 func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOptions, lint bool) error {
 	conn, err := openZeverDB(adapter, dsn)
 	if err != nil {
-		if shouldShowHint() {
-			_, _ = fmt.Fprintln(os.Stderr, formatHint("use -i for guided DSN prompt"))
+		if h := migrateDSNHint(adapter, dsn); h != "" {
+			return fmt.Errorf("%w\n%s", err, h)
 		}
 
 		return err
@@ -644,6 +644,40 @@ func openZeverDB(adapterName, dsn string) (db.DB, error) {
 	}
 
 	return conn, nil
+}
+
+// migrateDSNHint returns the next step for a failed open with no DSN: the
+// exact command to re-run, so a first-run failure is copy-pasteable
+// instead of a bare "dsn required". It returns "" when the DSN was set
+// (the failure is not a missing DSN) or the adapter has no example.
+func migrateDSNHint(adapter, dsn string) string {
+	if strings.TrimSpace(dsn) != "" {
+		return ""
+	}
+
+	switch adapter {
+	case "sqlite", "postgres":
+	default:
+		return ""
+	}
+
+	if !shouldShowHint() {
+		return ""
+	}
+
+	return formatHint(fmt.Sprintf("run 'zever db migrate --adapter=%s --dsn=%s' (or -i for a guided DSN prompt)",
+		adapter, migrateDSNExample(adapter)))
+}
+
+// migrateDSNExample returns the example DSN for an adapter: the sqlite
+// file the scaffold creates, or a placeholder postgres connection string.
+func migrateDSNExample(adapter string) string {
+	switch adapter {
+	case "postgres":
+		return "postgres://user:pass@localhost/db?sslmode=disable"
+	default:
+		return DefaultDevDBPath
+	}
 }
 
 // migrateDialect maps a db adapter name to the SQL dialect the DDL
