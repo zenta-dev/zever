@@ -108,6 +108,8 @@ replace (
 	github.com/zenta-dev/zever/container => ../../container
 	github.com/zenta-dev/zever/core/db => ../../core/db
 	github.com/zenta-dev/zever/core/log => ../../core/log
+	github.com/zenta-dev/zever/core/observability => ../../core/observability
+	github.com/zenta-dev/zever/core/ratelimit => ../../core/ratelimit
 	github.com/zenta-dev/zever/core/router => ../../core/router
 	github.com/zenta-dev/zever/serve => ../../serve
 	github.com/zenta-dev/zever/shared/ref => ../../shared/ref
