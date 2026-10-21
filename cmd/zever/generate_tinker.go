@@ -18,7 +18,7 @@ target project's module that builds the real container via its internal/app pack
 and answers ` + "`zever tinker`" + `'s line-delimited JSON verbs over stdin/stdout.
 
 The shim is written to <tinker_entry>/main.go (default cmd/tinker-shim,
-override with the ZEVER_TINKER_ENTRY env key).
+override with the ZEVER_TINKER_ENTRY env key in ` + projectEnvHint + `).
 
 The shim exists because ` + "`zever`" + `, a root-module binary, cannot import a
 project's internal/app across the module boundary.`
@@ -126,7 +126,7 @@ func runGenerateTinker(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("generate tinker", flag.ContinueOnError)
 	appPkg := fs.String("app", "", "import path of the project's app package (default: <module>/internal/app)")
-	dir := fs.String("dir", "", "output directory (default: the ZEVER_TINKER_ENTRY env key)")
+	dir := fs.String("dir", "", "output directory (default: the ZEVER_TINKER_ENTRY env key in "+projectEnvHint+")")
 	force := fs.Bool("force", false, "overwrite an existing shim")
 	dryRun := fs.Bool("dry-run", false, "print the planned write without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive

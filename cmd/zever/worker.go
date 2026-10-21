@@ -23,8 +23,9 @@ func resolveWorkerConfig(project ProjectConfig, args []string) WorkerConfig {
 }
 
 // newWorkerCmd returns the canonical `worker` command: run the project's
-// background worker entrypoint (override with the ZEVER_WORKER_ENTRY env key,
-// default cmd/worker).
+// background worker entrypoint (override with the ZEVER_WORKER_ENTRY env key
+// in the .env at the project root or the process environment, default
+// cmd/worker).
 // The legacy `queue:work` top-level command stays registered but hidden
 // (see root.go), so existing scripts keep working while --help shows only
 // `worker`.
@@ -33,8 +34,9 @@ func newWorkerCmd() *cobra.Command {
 		Use:   "worker",
 		Short: "Run worker entrypoint (default cmd/worker)",
 		Long: `Run this project's background worker by running its worker
-entrypoint package (override with the ZEVER_WORKER_ENTRY env key,
-default cmd/worker). Every argument is passed through to that package.`,
+entrypoint package (override with the ZEVER_WORKER_ENTRY env key in
+` + projectEnvHint + `, default cmd/worker). Every argument is passed
+through to that package.`,
 		Example:            `  zever worker`,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
@@ -62,7 +64,7 @@ default cmd/worker). Every argument is passed through to that package.`,
 // why this shells out instead of running a worker in-process.
 func runQueueWork(args []string) error {
 	if hasHelpFlag(args) {
-		printLauncherHelp(flag.CommandLine.Output(), "zever queue:work", "Starts this project's background worker by running its worker entrypoint package (override with the ZEVER_WORKER_ENTRY env key, default cmd/worker). Every argument is passed through to that package -- the scaffolded worker entrypoint itself accepts none by default.", "zever queue:work")
+		printLauncherHelp(flag.CommandLine.Output(), "zever queue:work", "Starts this project's background worker by running its worker entrypoint package (override with the ZEVER_WORKER_ENTRY env key in "+projectEnvHint+", default cmd/worker). Every argument is passed through to that package -- the scaffolded worker entrypoint itself accepts none by default.", "zever queue:work")
 		return nil
 	}
 
