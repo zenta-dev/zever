@@ -9,7 +9,7 @@ import (
 )
 
 // pluginValidators maps plugin names to their option validators. It is the
-// registry backing per-plugin Validate hooks: file and env layers stay raw
+// registry backing per-plugin Validate hooks: the env layer stays raw
 // (unknown option fields pass through), and only Validate interprets the
 // options via the registered hook. Access is mutex-guarded so parallel
 // tests registering distinct names stay race-free.

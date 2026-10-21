@@ -97,6 +97,10 @@ func (pc ProjectConfig) withDefaults() ProjectConfig {
 // project root the CLI already resolves its project-relative paths from
 // (the go.mod preflight asks for the project root by name).
 //
+// No other file is consulted: a pre-v0.8.0 config file in the working
+// directory is inert, exactly like everywhere else in the framework, and it
+// is never warned about.
+//
 // A malformed .env or .env.local fails closed, naming the file and the line,
 // like every other env read in the framework.
 func loadProjectConfig() (ProjectConfig, error) {
