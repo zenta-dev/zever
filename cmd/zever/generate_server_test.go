@@ -322,7 +322,7 @@ func TestRunGenerateServerIgnoresStrayProjectConfig(t *testing.T) {
 	readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
 
 	if _, err := os.Stat(filepath.Join(dir, "cmd", "api", "main.go")); !os.IsNotExist(err) {
-		t.Fatalf("scaffold honoured a stray project.server_entry")
+		t.Fatalf("scaffold honoured a stray server_entry key from a config file")
 	}
 }
 

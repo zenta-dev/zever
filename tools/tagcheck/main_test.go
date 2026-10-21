@@ -75,6 +75,14 @@ func writeGo(t *testing.T, root, rel, fixture string) {
 func scanFixture(t *testing.T, files map[string]string, golden, fields, except, allowlist string) []violation {
 	t.Helper()
 
+	return scanFixtureWith(t, files, golden, fields, except, allowlist, "")
+}
+
+// scanFixtureWith is scanFixture with the no-config-file allowlist: one
+// entry per line, either a bare repo-relative path or path:line.
+func scanFixtureWith(t *testing.T, files map[string]string, golden, fields, except, allowlist, noConfigAllowlist string) []violation {
+	t.Helper()
+
 	root := t.TempDir()
 
 	for rel, fixture := range files {
@@ -97,6 +105,7 @@ func scanFixture(t *testing.T, files map[string]string, golden, fields, except, 
 	writeFile(t, filepath.Join(toolDir, "golden_wire_fields.txt"), fields)
 	writeFile(t, filepath.Join(toolDir, "golden_wire_exceptions.txt"), except)
 	writeFile(t, filepath.Join(toolDir, "tag_allowlist.txt"), allowlist)
+	writeFile(t, filepath.Join(toolDir, "no_config_file_allowlist.txt"), noConfigAllowlist)
 
 	g, err := loadGolden(toolDir)
 	if err != nil {
@@ -118,7 +127,12 @@ func scanFixture(t *testing.T, files map[string]string, golden, fields, except, 
 		t.Fatal(err)
 	}
 
-	vs, err := scan(root, rules{structs: g, fields: f, except: e, allowed: a})
+	n, err := loadNoConfigAllowlist(toolDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vs, err := scan(root, rules{structs: g, fields: f, except: e, allowed: a, noConfigAllowed: n})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,25 @@
+# no_config_file_allowlist.txt — allowlist for the retired-config-file rule
+# (tagcheck rule no-config-file). The v0.8.0 env-only config break removed
+# the zever.{json,yaml,yml,toml} formats for good, and the rule fails the
+# gate on every mention of one of those names in a non-test Go file. The
+# allowlist starts EMPTY: the current tree has zero such mentions once the
+# env-only break PRs land.
+#
+# This list is NOT tag_allowlist.txt: that one permits yaml:/toml: struct
+# TAGS, this one permits mentions of the retired FILE NAMES. Two different
+# concepts, two different files.
+#
+# Format: one entry per line, either
+#   path/to/file.go          whole file
+#   path/to/file.go:123      specific line (1-based)
+# Blank lines and # comments are ignored.
+#
+# To add an entry, the mention must be load-bearing and unavoidable — e.g.
+# a code generator that has to write the retired file name into a legacy
+# project, or a migration tool that must still clean one up. The framework
+# itself must never name a retired config file: the formats are gone, and a
+# stale file is ignored silently.
+#
+# Justify the exception in a trailing comment on the entry and in the commit
+# message. An unjustified mention of a retired config format is exactly what
+# this gate exists to catch.

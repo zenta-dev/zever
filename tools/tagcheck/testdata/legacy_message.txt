@@ -1,0 +1,6 @@
+package pkg
+
+// legacyMessage tells the user the retired format is gone.
+func legacyMessage() string {
+	return "zever.json is no longer read"
+}

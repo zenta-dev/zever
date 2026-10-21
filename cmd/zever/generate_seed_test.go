@@ -106,7 +106,7 @@ func TestRunGenerateSeedIgnoresStrayProjectConfig(t *testing.T) {
 	stub := readGenerated(t, filepath.Join(dir, "internal", "service", "seed", "seed.go"))
 
 	if strings.Contains(stub, "internal/orm/") {
-		t.Fatalf("seed stub honoured a stray project.generated_dir:\n%s", stub)
+		t.Fatalf("seed stub honoured a stray generated_dir key from a config file:\n%s", stub)
 	}
 }
 

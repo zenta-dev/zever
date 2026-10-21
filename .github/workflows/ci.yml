@@ -950,6 +950,12 @@ jobs:
       - name: Prove the docs style lint rejects the mistakes it guards against
         run: npm run lint:self-test
         working-directory: docs
+      - name: Check the docs never configure through a config file
+        run: npm run check-legacy-config
+        working-directory: docs
+      - name: Prove the legacy config file check rejects the mistakes it guards against
+        run: npm run check-legacy-config:self-test
+        working-directory: docs
       - name: Build docs
         run: npm run build
         working-directory: docs

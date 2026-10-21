@@ -1,0 +1,8 @@
+package pkg
+
+// legacyRaw is a multi-line text that names a retired config file.
+const legacyRaw = `Scaffolds a worker.
+The worker selects the adapter in zever.yaml.
+`
+
+func legacyRawText() string { return legacyRaw }

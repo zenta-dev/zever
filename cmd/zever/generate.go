@@ -298,7 +298,7 @@ func printBoxedUsage(fs *flag.FlagSet, header, usage, body string, examples []us
 
 // parseEntrypointFlags parses the --force/--interactive preamble both
 // runGenerateSeed and runGenerateWorker share: peel -i, define the flags,
-// set interactiveMode, load the project config and module path, and confirm
+// set interactiveMode, load the project layout and module path, and confirm
 // overwriting an existing entrypoint. entryFile selects the entry directory
 // (SeedEntry vs WorkerEntry) and confirm is the matching prompt seam.
 // Identical to the inlined originals it replaces.

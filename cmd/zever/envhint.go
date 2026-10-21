@@ -9,7 +9,7 @@ import (
 // serviceEnvFields lists the env field names a battery accepts, without the
 // service prefix: "ADAPTER", "DSN", "MAXCONNS", ... The list comes from the
 // same Options struct the .env.example generator renders, so a hint always
-// names keys the project file already lists.
+// names keys the project's .env file already lists.
 func serviceEnvFields(battery string) []string {
 	opts := config.DefaultOptions(battery, "")
 	if opts == nil {

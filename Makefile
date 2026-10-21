@@ -102,7 +102,7 @@ err-lint: ## Scan for error-convention violations (unprefixed messages, bracket 
 	$(GO) -C tools/errscan run . "$(CURDIR)"
 
 .PHONY: check-tags
-check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags or wire keys)
+check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags or wire keys, retired config file names)
 	$(GO) -C tools/tagcheck run . "$(CURDIR)"
 
 .PHONY: tag-golden
@@ -341,6 +341,14 @@ docs-links: docs-build ## Check every internal link in the built site
 docs-links-self-test: ## Prove the docs link check rejects the mistakes it guards against
 	cd docs && node scripts/check-links.mjs --self-test
 
+.PHONY: docs-legacy-config
+docs-legacy-config: ## Check the docs never configure Zever through a legacy config file
+	cd docs && node scripts/no-legacy-config.mjs
+
+.PHONY: docs-legacy-config-self-test
+docs-legacy-config-self-test: ## Prove the legacy config file check rejects the mistakes it guards against
+	cd docs && node scripts/no-legacy-config.mjs --self-test
+
 # Every offline docs gate in one target, the same set the CI docs job runs.
 # The external link check is not here: it needs the network and stays a
 # report (the lychee job in .github/workflows/docs.yml).
@@ -350,5 +358,7 @@ docs-gates: ## Run every offline docs gate (audit, style lint, internal links)
 	$(MAKE) docs-audit-self-test
 	$(MAKE) docs-lint
 	$(MAKE) docs-lint-self-test
+	$(MAKE) docs-legacy-config
+	$(MAKE) docs-legacy-config-self-test
 	$(MAKE) docs-links
 	$(MAKE) docs-links-self-test

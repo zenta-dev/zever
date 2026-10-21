@@ -1,5 +1,12 @@
 # Shared Postgres pool (connshare Phase 6) — design proposal
 
+> **Historical (predates v0.8.0).** This proposal was written when
+> `zever.yaml` was still a configuration file. Since v0.8.0 the framework is
+> env-only: a `zever.yaml`/`.yml`/`.json`/`.toml` file is never read (no
+> probe, no discovery step, no warning), and the project layout knobs are
+> the `ZEVER_*` environment variables. Read the yaml examples below as the
+> record of a proposal written then, not as current behaviour.
+
 Status: **proposal, needs human sign-off. No code in this phase.**
 Branch: `consol/connshare` on top of `main` at `65b904b`
 (containing merged PRs #273–#281). Implementation is a later pass.

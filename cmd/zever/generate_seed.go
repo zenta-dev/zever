@@ -9,8 +9,8 @@ import (
 )
 
 const seedUsageBody = `Scaffolds the database seed entrypoint at <seed_entry>/main.go (default
-db/seed, override with project.seed_entry), plus internal/app/app.go if the
-project does not have one yet.
+db/seed, override with the ZEVER_SEED_ENTRY env key), plus
+internal/app/app.go if the project does not have one yet.
 
 The scaffold builds the container and opens the database; filling it is
 project-specific, so the body is a worked comment showing how to call the
@@ -181,7 +181,8 @@ const seedStubRoot = "internal/service/seed"
 // shutdown — no HTTP and no queue wiring, since a seeder neither serves nor
 // consumes anything. The actual seed rows live in seedStubTemplate's
 // skip-if-exists output instead of inline here, so re-running
-// `zever generate seed --force` (e.g. after project.seed_entry changes)
+// `zever generate seed --force` (e.g. after the ZEVER_SEED_ENTRY env key
+// changes)
 // never clobbers hand-written seed logic.
 const seedTemplate = `// Command seed populates this project's database with development data.
 //

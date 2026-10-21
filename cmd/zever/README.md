@@ -179,5 +179,5 @@ command output.
   against a live container, so run it against a development database only.`
   to stderr (see `tinkerDevWarning` in `tinker.go`). The REPL talks
   to the project's real container via the per-project shim
-  (`project.tinker_entry`, default `cmd/tinker-shim` — scaffold it with
-  `zever generate tinker`); never point it at production data.
+  (`ZEVER_TINKER_ENTRY` env key, default `cmd/tinker-shim` — scaffold it
+  with `zever generate tinker`); never point it at production data.
