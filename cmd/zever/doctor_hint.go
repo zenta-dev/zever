@@ -64,7 +64,7 @@ func doctorMissingField(errText string) string {
 // doctorEnvKey returns the env key that carries the named option field for
 // the battery, or "" when the battery declares no such field. The key comes
 // from the same Options struct the .env.example generator renders, so the
-// hint names the exact key the project file already lists.
+// hint names the exact key the project's .env file already lists.
 func doctorEnvKey(battery, field string) string {
 	want := foldEnvField(field)
 	if want == "" {

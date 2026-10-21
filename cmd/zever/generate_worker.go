@@ -265,7 +265,7 @@ func collectZenFiles(tag, dir string) (map[string]string, error) {
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("%s: schema_dir %q is not a directory", tag, dir)
+		return nil, fmt.Errorf("%s: schema dir %q is not a directory (the ZEVER_SCHEMA_DIR env key)", tag, dir)
 	}
 
 	paths, walkErr := walkZenFiles(dir)
