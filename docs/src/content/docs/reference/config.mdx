@@ -99,16 +99,16 @@ no service (`PATH`, `FOO_BAR`) stay ignored in every mode.
 | [`resilience`](#resilience) | **memory**, redis | `c.Resilience()` | [Resilience](../../guides/operate/resilience/) |
 | [`router`](#router) | fiber, **stdhttp** | `c.Router()` | [Routing](../../guides/http/routing/) |
 | [`scheduler`](#scheduler) | **embedded**, postgres | `c.Scheduler()` | [Scheduler and jobs](../../guides/background/scheduler-jobs/) |
-| [`search`](#search) | **db**, postgres, meilisearch, sqlite | `c.Search()` | [Search](../../guides/data/search/) |
+| [`search`](#search) | **db**, meilisearch | `c.Search()` | [Search](../../guides/data/search/) |
 | [`secrets`](#secrets) | **env**, vault | `c.Secrets()` | [Secrets](../../guides/security/secrets/) |
 | [`session`](#session) | **memory**, redis, db | `c.Session()` | [Sessions](../../guides/http/sessions/) |
 | [`storage`](#storage) | **local**, s3, r2 | `c.Storage()` | [Storage](../../guides/data/storage-media/) |
 | [`tenant`](#tenant) | **single**, header | `c.Tenant()` | [Tenants](../../guides/operate/tenants/) |
-| [`vectorstore`](#vectorstore) | **db**, sqlite, pgvector, qdrant | `c.VectorStore()` | [Vectorstore](../../guides/data/vectorstore/) |
+| [`vectorstore`](#vectorstore) | **db**, qdrant | `c.VectorStore()` | [Vectorstore](../../guides/data/vectorstore/) |
 | [`webhook`](#webhook) | **http**, queue | `c.Webhook()` | [Webhooks](../../guides/background/webhooks/) |
-| [`workflow`](#workflow) | **memory**, db, postgres | `c.Workflow()` | [Workflows](../../guides/background/workflows/) |
+| [`workflow`](#workflow) | **memory**, db | `c.Workflow()` | [Workflows](../../guides/background/workflows/) |
 
-The bold adapter is the default. The `search`, `vectorstore`, and `workflow` services accept `db` as the canonical DB-backed name (empty DSN selects embedded sqlite, a postgres URL selects postgres). The older `postgres`, `sqlite`, and `pgvector` names stay registered as aliases.
+The bold adapter is the default. The `search`, `vectorstore`, and `workflow` services take `db` as their DB-backed adapter (empty DSN selects embedded sqlite, a postgres URL selects postgres). The older `postgres`, `sqlite`, and `pgvector` names for those services are gone; use `db`.
 
 ## Shared option groups
 
@@ -1003,11 +1003,11 @@ SCHEDULER_ADAPTER=postgres
 
 ### `search`
 
-Full-text search. `db` is the canonical name; `postgres` and `sqlite` stay as aliases.
+Full-text search. `db` is the only DB-backed name.
 
 | | |
 |---|---|
-| Adapters | `db`, `postgres`, `meilisearch`, `sqlite` |
+| Adapters | `db`, `meilisearch` |
 | Default adapter | `db` |
 | Accessor | `c.Search()` |
 | Guide | [Search guide](../../guides/data/search/) |
@@ -1016,7 +1016,7 @@ Full-text search. `db` is the canonical name; `postgres` and `sqlite` stay as al
 |---|---|---|---|
 | `host` | string | `""` | Meilisearch URL required by meilisearch |
 | `api_key` | string | `""` | Backend API key. Never logged |
-| `dsn` | string | `""` | Postgres URL or sqlite path, required by postgres/sqlite |
+| `dsn` | string | `""` | Postgres URL or sqlite path, required by `db` |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 | `allow_insecure` | boolean | `false` | Permits an http:// Host for testing |
 
@@ -1152,11 +1152,11 @@ TENANT_HEADER=X-Tenant-ID
 
 ### `vectorstore`
 
-Embedding storage and similarity search. `db` is canonical; `sqlite` and `pgvector` stay as aliases.
+Embedding storage and similarity search. `db` is the only DB-backed name.
 
 | | |
 |---|---|
-| Adapters | `db`, `sqlite`, `pgvector`, `qdrant` |
+| Adapters | `db`, `qdrant` |
 | Default adapter | `db` |
 | Accessor | `c.VectorStore()` |
 | Guide | [Vectorstore guide](../../guides/data/vectorstore/) |
@@ -1214,7 +1214,7 @@ Durable workflow runs. An empty DSN selects sqlite, a postgres URL selects postg
 
 | | |
 |---|---|
-| Adapters | `memory`, `db`, `postgres` |
+| Adapters | `memory`, `db` |
 | Default adapter | `memory` |
 | Accessor | `c.Workflow()` |
 | Guide | [Workflows guide](../../guides/background/workflows/) |

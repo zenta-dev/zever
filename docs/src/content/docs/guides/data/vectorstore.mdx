@@ -29,7 +29,7 @@ VECTORSTORE_API_KEY=dev-only-key
   </TabItem>
 </Tabs>
 
-Env vars: `VECTORSTORE_ADAPTER`, `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION`. `dimension` defaults to 1536 (OpenAI `text-embedding-3-small`) on pgvector and fixes the column size; Qdrant checks it only when set, and embedded sqlite learns it from the first write. A mismatched vector fails with `vectorstore.ErrDimensionMismatch`, and negatives are rejected. `url` needs a scheme and host. `dedicated_pool: true` opts out of per-DSN pool sharing. `sqlite` and `pgvector` alias `db`. See the [vectorstore options](../../../reference/config/#vectorstore).
+Env vars: `VECTORSTORE_ADAPTER`, `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION`. `dimension` defaults to 1536 (OpenAI `text-embedding-3-small`) on pgvector and fixes the column size; Qdrant checks it only when set, and embedded sqlite learns it from the first write. A mismatched vector fails with `vectorstore.ErrDimensionMismatch`, and negatives are rejected. `url` needs a scheme and host. `dedicated_pool: true` opts out of per-DSN pool sharing. The DB-backed adapter is named `db`: a sqlite path gives embedded SQLite, a postgres URL gives pgvector. See the [vectorstore options](../../../reference/config/#vectorstore).
 
 ## Upsert and query vectors
 
@@ -87,7 +87,7 @@ match: doc-2 0
 - Use `UpsertBatch` for batches; looping `Upsert` costs one round trip per vector.
 - Empty embeddings are rejected before any I/O. `api_key` never appears in logs.
 
-See the [adapters matrix](../../../reference/adapters-matrix/) for `db` (legacy `sqlite`, `pgvector`) and `qdrant`.
+See the [adapters matrix](../../../reference/adapters-matrix/) for `db` and `qdrant`.
 
 ## Troubleshooting
 

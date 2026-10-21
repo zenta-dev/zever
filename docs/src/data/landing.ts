@@ -37,14 +37,14 @@ export const SERVICES: Record<string, string[]> = {
   resilience: ['memory', 'redis'],
   router: ['fiber', 'stdhttp'],
   scheduler: ['embedded', 'postgres'],
-  search: ['db', 'postgres', 'meilisearch', 'sqlite'],
+  search: ['db', 'meilisearch'],
   secrets: ['env', 'vault'],
   session: ['memory', 'redis', 'db'],
   storage: ['local', 's3', 'r2'],
   tenant: ['single', 'header'],
-  vectorstore: ['db', 'sqlite', 'pgvector', 'qdrant'],
+  vectorstore: ['db', 'qdrant'],
   webhook: ['http', 'queue'],
-  workflow: ['memory', 'db', 'postgres'],
+  workflow: ['memory', 'db'],
 };
 
 export const SERVICE_COUNT = Object.keys(SERVICES).length;
