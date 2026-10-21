@@ -34,6 +34,17 @@ type dotEnvEntry struct {
 // quotes, `#` comments, and an optional `export` prefix; values may
 // reference earlier keys via ${VAR} (unset names expand to empty).
 //
+// LoadEnv parses dotenv files ONLY: the KEY=VALUE format above, never
+// yaml/json/toml. There is no config-file format behind it — a yaml file
+// is not a dotenv file, and a `KEY: VALUE` line is a malformed line, not a
+// mapping.
+//
+// LoadEnv is the explicit-file half of the pair: the caller names the exact
+// files to read, and LoadEnv returns their parsed map without touching the
+// process environment. FromEnv is the discovery half: it finds `.env` and
+// `.env.local` in the working directory and overlays the process environment
+// on top. Both feed the same Env layer; see Resolve.
+//
 // LoadEnv is strict about presence: a missing file is an error. It is
 // fail-closed about content: a malformed line fails with the file and line
 // number, never the value. `$(...)` and backticks are literal text, never
