@@ -78,10 +78,12 @@ The map below is the upgrade path, not a runtime fallback: v0.8 reads `.env`,
 |------|------|
 | `zever.yaml` | `.env` + `wiring.go` |
 | `config.Load("")` | `config.FromEnv()` + `config.Resolve(env)` |
-| `ServiceConfig.Adapter` | wired in `wiring.go` via `container.Provide` |
+| `ServiceConfig.Adapter` | `<SERVICE>_ADAPTER` |
 | `DB_MAXCONNS` | `DB_MAXCONNS` (same) |
 | `DB__ANALYTICS__DSN` | `DB__ANALYTICS__DSN` (same format) |
 | `zever doctor --config` | `zever doctor` (no flag) |
+
+`<SERVICE>_ADAPTER` is a sibling of the options, never a field inside them: it selects the adapter and lands on the service envelope, next to the option map. The container binds the adapter implementation per instance in `wiring.go` with `container.Provide`; see the [Container concept page](../../../concepts/container/).
 
 ## Legacy config files
 
