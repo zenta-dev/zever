@@ -362,7 +362,7 @@ func runDoctorWith(cfg DoctorConfig) error {
 func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 	out := outOrStdout(cfg.Out)
 
-	resolved, err := resolveServiceConfig("")
+	resolved, err := resolveServiceConfig()
 	if err != nil {
 		// resolveServiceConfig already fused env+dotenv; re-read the env
 		// for the exact-key typo hint (best-effort: a hint failure keeps

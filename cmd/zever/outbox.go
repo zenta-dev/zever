@@ -124,7 +124,7 @@ type outboxTarget struct {
 // discovery plus the process environment (see config.FromEnv) and applies
 // the --dsn/--table flag overrides.
 func resolveOutboxTarget(dsn, table string) (outboxTarget, error) {
-	cfg, err := resolveServiceConfig("")
+	cfg, err := resolveServiceConfig()
 	if err != nil {
 		// Re-read the env for the exact-key hint (best-effort: a hint
 		// failure keeps the wrapped error).
