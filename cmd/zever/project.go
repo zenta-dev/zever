@@ -8,7 +8,8 @@ import (
 // Project layout env keys. Project layout comes from compiled-in defaults
 // below, overridable per-field by these variables. Service batteries stay
 // env-only via config.FromEnv; these six keys are the sole project-settings
-// surface (no --config file flag, no zever.yaml discovery).
+// surface (no --config file flag and no file discovery: they are read from
+// the process environment).
 const (
 	// EnvSchemaDir overrides the .zen schema directory.
 	EnvSchemaDir = "ZEVER_SCHEMA_DIR"
@@ -74,8 +75,9 @@ func (pc ProjectConfig) withDefaults() ProjectConfig {
 
 // loadProjectConfig returns the effective project layout: compiled-in
 // defaults overlaid by the ZEVER_* environment (whitespace-only values count
-// as unset). It performs no file discovery and no parsing: zever.yaml files
-// are ignored (config.FromEnv warns once when one sits in the cwd).
+// as unset). It performs no file discovery and no parsing: configuration
+// comes from the environment (config.FromEnv warns once when a pre-v0.8.0
+// config file sits in the cwd).
 //
 //nolint:unparam // the error return is reserved for future fallible sources.
 func loadProjectConfig() (ProjectConfig, error) {

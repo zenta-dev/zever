@@ -32,7 +32,8 @@ WIRING (by hand, after filling in the TODOs): zever registers adapters
 explicitly, not via init(). Add a Name constant to the battery's Adapter
 enum plus its ParseAdapter case in core/<battery>/adapter.go, point the
 scaffolded register.go at it (replacing the ParseAdapter placeholder), and
-select the adapter in zever.yaml (<battery>: {adapter: <name>}).
+select the adapter with the <BATTERY>_ADAPTER env key (e.g.
+CACHE_ADAPTER=redis) in .env at the project root.
 
 This is a contributor command: it writes into this repository's own
 adapters/<battery>/<name>/ module directory, and the generated files are
