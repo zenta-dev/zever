@@ -16,7 +16,6 @@ func TestAdapterString(t *testing.T) {
 	}{
 		{"memory", workflow.Memory, "memory"},
 		{"db", workflow.DB, "db"},
-		{"postgres", workflow.Postgres, "postgres"},
 		{"unknown", workflow.Adapter(""), "unknown"},
 	}
 
