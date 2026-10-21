@@ -11,24 +11,25 @@ func TestClosure3SeedStubRender(t *testing.T) {
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/app")
 
-	// Legacy project tables are ignored: a newline generated_dir no longer
-	// reaches generation, so the seed scaffolds at the default location.
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  generated_dir: \"a\\nb\"\n")
+	// A stray project config file is ignored: a newline generated_dir no
+	// longer reaches generation, so the seed scaffolds at the default
+	// location.
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  generated_dir: \"a\\nb\"\n")
 
 	if err := runGenerateSeed([]string{"--force"}); err != nil {
-		t.Fatalf("legacy project table must not fail generation: %v", err)
+		t.Fatalf("stray config file must not fail generation: %v", err)
 	}
 
-	if err := os.Remove(filepath.Join(dir, "zever.yaml")); err != nil {
+	if err := os.Remove(filepath.Join(dir, strayConfigFile)); err != nil {
 		t.Fatal(err)
 	}
 
-	// Legacy config files are ignored: loadProjectConfig returns defaults
-	// even with a malformed zever.yaml present.
-	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
+	// A stray config file is ignored: loadProjectConfig returns defaults
+	// even with a malformed one present.
+	writeZeverFixture(t, dir, strayConfigFile, "project: [unclosed\n")
 
 	if _, err := loadProjectConfig(); err != nil {
-		t.Fatalf("legacy file must not fail project load: %v", err)
+		t.Fatalf("stray file must not fail project load: %v", err)
 	}
 }
 

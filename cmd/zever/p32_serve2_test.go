@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// TestP32ServePreflightIgnoresLegacyYaml proves a legacy zever.yaml battery
-// without an app.go Register no longer gates serving: config is env-only,
-// so the entrypoint launches.
-func TestP32ServePreflightIgnoresLegacyYaml(t *testing.T) {
+// TestP32ServePreflightIgnoresStrayConfig proves a config file in the
+// project root with a battery selection no longer gates serving: config is
+// env-only, so the entrypoint launches.
+func TestP32ServePreflightIgnoresStrayConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 
@@ -25,7 +25,7 @@ func TestP32ServePreflightIgnoresLegacyYaml(t *testing.T) {
 	if err := os.WriteFile(filepath.Join("cmd", "server", "main.go"), []byte("package main\nfunc main(){}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("zever.yaml", []byte("auth:\n  adapter: jwt\n"), 0o600); err != nil {
+	if err := os.WriteFile(strayConfigFile, []byte("auth:\n  adapter: jwt\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join("internal", "app"), 0o750); err != nil {

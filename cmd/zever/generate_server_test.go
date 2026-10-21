@@ -306,13 +306,13 @@ func TestRunGenerateServerKeepsAnExistingAppPackage(t *testing.T) {
 	}
 }
 
-func TestRunGenerateServerIgnoresLegacyProjectConfig(t *testing.T) {
+func TestRunGenerateServerIgnoresStrayProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
 
-	if err := os.WriteFile(filepath.Join(dir, "zever.yaml"), []byte("project:\n  server_entry: cmd/api\n"), 0o600); err != nil {
-		t.Fatalf("write zever.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, strayConfigFile), []byte("project:\n  server_entry: cmd/api\n"), 0o600); err != nil {
+		t.Fatalf("write stray config file: %v", err)
 	}
 
 	if err := runGenerateServer(nil); err != nil {
@@ -322,7 +322,7 @@ func TestRunGenerateServerIgnoresLegacyProjectConfig(t *testing.T) {
 	readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
 
 	if _, err := os.Stat(filepath.Join(dir, "cmd", "api", "main.go")); !os.IsNotExist(err) {
-		t.Fatalf("scaffold honoured the legacy project.server_entry")
+		t.Fatalf("scaffold honoured a stray project.server_entry")
 	}
 }
 

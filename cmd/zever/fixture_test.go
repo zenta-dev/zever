@@ -11,6 +11,17 @@ import (
 // inspection suite's schema so there is exactly one copy of the text.
 const zeverUserSchema = inspectUserSchema
 
+// strayConfigFile and strayConfigJSONFile are the names of a project-root
+// file that looks like configuration but steers nothing: the CLI reads no
+// config file at all, so a stray one -- malformed or not -- must change
+// nothing. The tests that use them pin that invariant: since v0.8.0 only
+// the environment (the ZEVER_* keys and the service env) configures a
+// project.
+const (
+	strayConfigFile     = "config.yaml"
+	strayConfigJSONFile = "config.json"
+)
+
 // writeZeverFixture writes content to dir/name (creating parent dirs) and
 // returns the full path. It mirrors writeInspectFixture for test files that
 // predate the shared name.

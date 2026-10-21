@@ -14,9 +14,9 @@ func TestRunDBSeedUsesDefaultSeedEntry(t *testing.T) {
 	assertOneLaunch(t, calls, defaultSeedEntry, []string{"--truncate"})
 }
 
-func TestRunDBSeedIgnoresLegacySeedEntry(t *testing.T) {
+func TestRunDBSeedIgnoresStraySeedEntry(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.json", `{"project":{"seed_entry":"db/fixtures"}}`)
+	writeZeverFixture(t, dir, strayConfigJSONFile, `{"project":{"seed_entry":"db/fixtures"}}`)
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
@@ -67,12 +67,11 @@ func TestResolveSeedConfig(t *testing.T) {
 	}
 }
 
-// TestRunDBSeedIgnoresBadLegacyConfig proves a broken legacy project file
-// no longer surfaces: layout is defaults-only, so the default seed entry
-// launches.
-func TestRunDBSeedIgnoresBadLegacyConfig(t *testing.T) {
+// TestRunDBSeedIgnoresBadStrayConfig proves a broken config file no longer
+// surfaces: layout is defaults-only, so the default seed entry launches.
+func TestRunDBSeedIgnoresBadStrayConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.json", "{bad json")
+	writeZeverFixture(t, dir, strayConfigJSONFile, "{bad json")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)

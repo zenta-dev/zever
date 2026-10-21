@@ -793,15 +793,15 @@ func TestDevRebuildReportsRelaunchFailure(t *testing.T) {
 	}
 }
 
-// TestRunDevIgnoresBadLegacyConfig pins that a broken legacy project file
-// no longer surfaces: layout is defaults-only.
-func TestRunDevIgnoresBadLegacyConfig(t *testing.T) {
+// TestRunDevIgnoresBadStrayConfig pins that a broken config file no longer
+// surfaces: layout is defaults-only.
+func TestRunDevIgnoresBadStrayConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  schema_dir: [unclosed\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  schema_dir: [unclosed\n")
 	t.Chdir(dir)
 
 	if pc, err := loadProjectConfig(); err != nil || pc != defaultProjectConfig() {
-		t.Fatalf("legacy file = %+v, %v; want defaults", pc, err)
+		t.Fatalf("stray file = %+v, %v; want defaults", pc, err)
 	}
 }
 
