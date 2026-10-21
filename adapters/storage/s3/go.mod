@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/storage/s3
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.22 // indirect

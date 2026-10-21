@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/document/local
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/chromedp/chromedp v0.21.0

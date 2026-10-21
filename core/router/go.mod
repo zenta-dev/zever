@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/core/router
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/zenta-dev/zever/adapters/router/stdhttp v0.8.0

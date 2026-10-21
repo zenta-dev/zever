@@ -71,8 +71,10 @@ const (
 	grpcGoToolVersion = "v1.6.2"
 
 	// defaultGoVersion is used when no go directive can be read from the
-	// framework checkout or an existing project.
-	defaultGoVersion = "1.27.2"
+	// framework checkout or an existing project. It tracks the framework's
+	// own Go floor (every module's go.mod), so a scaffold never asks for a
+	// toolchain older than the modules it depends on.
+	defaultGoVersion = "1.27.3"
 
 	// pseudoVersionZero is the placeholder version a require line carries
 	// when the real resolution comes from a local replace directive.
