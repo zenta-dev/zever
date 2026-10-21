@@ -55,10 +55,12 @@ func runCheckBoundariesWith(cfg BoundariesConfig) error {
 		return fmt.Errorf("zever check-boundaries: %w", err)
 	}
 
-	schemaDir := defaultSchemaDir
-	if pc, projectErr := loadProjectConfig(); projectErr == nil {
-		schemaDir = pc.SchemaDir
+	pc, err := loadProjectConfig()
+	if err != nil {
+		return fmt.Errorf("zever check-boundaries: %w", err)
 	}
+
+	schemaDir := pc.SchemaDir
 
 	result, diags := compile.WithSchemaDir(files, schemaDir)
 

@@ -81,8 +81,8 @@ recorded in the migration journal.`,
 			Use:   "seed",
 			Short: "Run seed entrypoint (default db/seed)",
 			Long: `Seed the database by running the seed entrypoint
-package (override with the ZEVER_SEED_ENTRY env key, default db/seed).
-Every argument is passed through to that package.`,
+package (override with the ZEVER_SEED_ENTRY env key in ` + projectEnvHint + `,
+default db/seed). Every argument is passed through to that package.`,
 			Example:            `  zever db seed`,
 			Args:               cobra.ArbitraryArgs,
 			DisableFlagParsing: true,

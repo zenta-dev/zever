@@ -9,8 +9,8 @@ import (
 )
 
 const seedUsageBody = `Scaffolds the database seed entrypoint at <seed_entry>/main.go (default
-db/seed, override with the ZEVER_SEED_ENTRY env key), plus
-internal/app/app.go if the project does not have one yet.
+db/seed, override with the ZEVER_SEED_ENTRY env key in ` + projectEnvHint + `),
+plus internal/app/app.go if the project does not have one yet.
 
 The scaffold builds the container and opens the database; filling it is
 project-specific, so the body is a worked comment showing how to call the

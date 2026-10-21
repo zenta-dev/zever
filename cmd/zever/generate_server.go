@@ -370,7 +370,7 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 }
 
 const serverUsageBody = `Scaffolds a thin HTTP+gRPC server entrypoint at <server_entry>/main.go
-(default cmd/server, override with the ZEVER_SERVER_ENTRY env key): a
+(default cmd/server, override with the ZEVER_SERVER_ENTRY env key in ` + projectEnvHint + `): a
 flag-parsing wrapper over the serve library (the same shape "zever new"
 writes) that passes the project's Providers and the schema modules to
 serve.Main. All boot behavior -- listeners, TLS,
