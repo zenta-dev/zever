@@ -1,0 +1,8 @@
+package pkg
+
+import "strings"
+
+// legacyJoin builds a retired config file name with strings.Join.
+func legacyJoin() string {
+	return strings.Join([]string{"zever", ".yml"}, "")
+}
