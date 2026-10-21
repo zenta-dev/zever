@@ -202,15 +202,15 @@ func TestRunGenerateWorkerRefusesToClobberWithoutForce(t *testing.T) {
 	}
 }
 
-func TestRunGenerateWorkerIgnoresLegacyProjectConfig(t *testing.T) {
+func TestRunGenerateWorkerIgnoresStrayProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
 
 	const cfg = "project:\n  worker_entry: cmd/jobs\n  schema_dir: zen\n"
 
-	if err := os.WriteFile(filepath.Join(dir, "zever.yaml"), []byte(cfg), 0o600); err != nil {
-		t.Fatalf("write zever.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, strayConfigFile), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write stray config file: %v", err)
 	}
 
 	path := filepath.Join(dir, "schema", "shop.zen")
@@ -227,7 +227,7 @@ func TestRunGenerateWorkerIgnoresLegacyProjectConfig(t *testing.T) {
 		t.Fatalf("runGenerateWorker: %v", err)
 	}
 
-	// Legacy layout tables are ignored: the worker lands at the default
+	// A stray layout table is ignored: the worker lands at the default
 	// entry, compiled from the default schema dir.
 	main := readGenerated(t, filepath.Join(dir, "cmd", "worker", "main.go"))
 

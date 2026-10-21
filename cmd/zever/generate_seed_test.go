@@ -86,15 +86,15 @@ func TestRunGenerateSeedNeverOverwritesAnExistingStub(t *testing.T) {
 	}
 }
 
-func TestRunGenerateSeedIgnoresLegacyProjectConfig(t *testing.T) {
+func TestRunGenerateSeedIgnoresStrayProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	withWorkingDir(t, dir)
 	writeGoMod(t, dir, "example.com/shop")
 
 	const cfg = "project:\n  seed_entry: cmd/seeder\n  generated_dir: internal/orm\n"
 
-	if err := os.WriteFile(filepath.Join(dir, "zever.yaml"), []byte(cfg), 0o600); err != nil {
-		t.Fatalf("write zever.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, strayConfigFile), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write stray config file: %v", err)
 	}
 
 	if err := runGenerateSeed(nil); err != nil {
@@ -106,7 +106,7 @@ func TestRunGenerateSeedIgnoresLegacyProjectConfig(t *testing.T) {
 	stub := readGenerated(t, filepath.Join(dir, "internal", "service", "seed", "seed.go"))
 
 	if strings.Contains(stub, "internal/orm/") {
-		t.Fatalf("seed stub honoured the legacy project.generated_dir:\n%s", stub)
+		t.Fatalf("seed stub honoured a stray project.generated_dir:\n%s", stub)
 	}
 }
 

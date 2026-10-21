@@ -577,15 +577,15 @@ func TestClosureRunGenerateServerBranches(t *testing.T) {
 		t.Fatal("want project/go.mod error")
 	}
 
-	// Legacy project file (still no go.mod): the error comes from the
-	// missing module, not the file.
-	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
+	// A stray project config file (still no go.mod): the error comes from
+	// the missing module, not the file.
+	writeZeverFixture(t, dir, strayConfigFile, "project: [unclosed\n")
 
 	if err := runGenerateServer(nil); err == nil {
 		t.Fatal("want project error")
 	}
 
-	if rmErr := os.Remove(filepath.Join(dir, "zever.yaml")); rmErr != nil {
+	if rmErr := os.Remove(filepath.Join(dir, strayConfigFile)); rmErr != nil {
 		t.Fatal(rmErr)
 	}
 
@@ -681,14 +681,15 @@ func TestClosureRunGenerateTinkerBranches(t *testing.T) {
 
 	stubPromptTTY(t, false)
 
-	// Legacy project file: ignored, so generation proceeds at defaults.
-	writeZeverFixture(t, dir, "zever.yaml", "project: [unclosed\n")
+	// A stray project config file: ignored, so generation proceeds at
+	// defaults.
+	writeZeverFixture(t, dir, strayConfigFile, "project: [unclosed\n")
 
 	if err := runGenerateTinker([]string{"--app", "example.com/app/internal/app"}); err != nil {
-		t.Fatalf("legacy file must not fail generation: %v", err)
+		t.Fatalf("stray file must not fail generation: %v", err)
 	}
 
-	if rmErr := os.Remove(filepath.Join(dir, "zever.yaml")); rmErr != nil {
+	if rmErr := os.Remove(filepath.Join(dir, strayConfigFile)); rmErr != nil {
 		t.Fatal(rmErr)
 	}
 
@@ -1268,8 +1269,8 @@ func TestClosureProjectBranches(t *testing.T) {
 		t.Fatalf("defaults = %+v, %v", pc, err)
 	}
 
-	// Legacy files are ignored: still defaults.
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  schema_dir: custom\n")
+	// Stray files are ignored: still defaults.
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  schema_dir: custom\n")
 	writeZeverFixture(t, dir, ".env", "SCHEMA_DIR=custom\n")
 
 	pc, err = loadProjectConfig()

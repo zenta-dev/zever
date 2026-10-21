@@ -82,9 +82,9 @@ func TestRunServeUsesDefaultServerEntry(t *testing.T) {
 	assertOneLaunch(t, calls, defaultServerEntry, []string{"-addr", ":9090"})
 }
 
-func TestRunServeIgnoresLegacyServerEntry(t *testing.T) {
+func TestRunServeIgnoresStrayServerEntry(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  server_entry: cmd/api\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  server_entry: cmd/api\n")
 	writeServePreflight(t, dir, defaultServerEntry)
 	t.Chdir(dir)
 
@@ -169,12 +169,11 @@ func TestResolveServeConfig(t *testing.T) {
 	}
 }
 
-// TestRunServeIgnoresBadLegacyConfig proves a broken legacy project file
-// no longer surfaces: layout is defaults-only, so the default entry
-// launches.
-func TestRunServeIgnoresBadLegacyConfig(t *testing.T) {
+// TestRunServeIgnoresBadStrayConfig proves a broken config file no longer
+// surfaces: layout is defaults-only, so the default entry launches.
+func TestRunServeIgnoresBadStrayConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  server_entry: [unclosed\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  server_entry: [unclosed\n")
 	writeServePreflight(t, dir, defaultServerEntry)
 	t.Chdir(dir)
 

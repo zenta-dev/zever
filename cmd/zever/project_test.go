@@ -28,11 +28,11 @@ func TestLoadProjectConfigReturnsDefaults(t *testing.T) {
 	}
 }
 
-// TestLoadProjectConfigIgnoresFiles pins the defaults-only stub: legacy
-// config files in the working directory are not parsed.
+// TestLoadProjectConfigIgnoresFiles pins the defaults-only stub: config
+// files in the working directory are not parsed.
 func TestLoadProjectConfigIgnoresFiles(t *testing.T) {
 	dir := t.TempDir()
-	writeProjectFixture(t, dir, "zever.yaml", "project:\n  schema_dir: src/zen\n")
+	writeProjectFixture(t, dir, strayConfigFile, "project:\n  schema_dir: src/zen\n")
 	writeProjectFixture(t, dir, ".env", "SCHEMA_DIR=src/zen\n")
 
 	got, err := loadProjectConfig()

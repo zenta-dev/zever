@@ -7,7 +7,7 @@ import (
 
 func TestRunScheduleRunIsAliasForQueueWork(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  worker_entry: cmd/jobs\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  worker_entry: cmd/jobs\n")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
@@ -37,11 +37,11 @@ func TestRunScheduleRunHelpStatesTheAlias(t *testing.T) {
 	}
 }
 
-// TestRunScheduleRunIgnoresBadLegacyConfig proves legacy config errors no
+// TestRunScheduleRunIgnoresBadStrayConfig proves config-file errors no
 // longer propagate through the alias: layout is defaults-only.
-func TestRunScheduleRunIgnoresBadLegacyConfig(t *testing.T) {
+func TestRunScheduleRunIgnoresBadStrayConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  worker_entry: [unclosed\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  worker_entry: [unclosed\n")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
