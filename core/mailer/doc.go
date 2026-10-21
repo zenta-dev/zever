@@ -10,8 +10,8 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
 // zero-infra defaults for tests, with the log adapter writing instead of
-// sending. Config file plus env MAILER_ADAPTER (no prefix, e.g.
-// MAILER_ADAPTER). See config/README.md.
+// sending. Env only: MAILER_ADAPTER (no prefix, e.g. MAILER_ADAPTER). See
+// config/README.md.
 //
 // Container: container.New(cfg) then c.Mailer(). Lazy per-service singleton,
 // retry on error. See container/README.md.

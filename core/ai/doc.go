@@ -9,8 +9,8 @@
 // StreamChunk are typed. Unsupported features fail closed with ErrNotSupported.
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
-// zero-infra defaults for tests. Config file plus env AI_<FIELD> (no prefix,
-// e.g. AI_ADAPTER). See config/README.md.
+// zero-infra defaults for tests. Env only: AI_<FIELD> (no prefix, e.g.
+// AI_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.AI(). Lazy per-service singleton,
 // retry on error. See container/README.md.

@@ -8,8 +8,8 @@
 // Unsupported features fail closed.
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
-// zero-infra defaults for tests. Config file plus env ANALYTICS_<FIELD> (no
-// prefix, e.g. ANALYTICS_ADAPTER). See config/README.md.
+// zero-infra defaults for tests. Env only: ANALYTICS_<FIELD> (no prefix, e.g.
+// ANALYTICS_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Analytics(). Lazy per-service
 // singleton, retry on error. See container/README.md.

@@ -41,7 +41,8 @@ type Worker struct {
 	// DrainTimeout bounds handler execution and graceful shutdown. Defaults to 30s when non-positive.
 	DrainTimeout time.Duration
 	// Provider emits the messaging consumer span opened around every drained
-	// message. Nil disables telemetry. Go-API-only: not decoded from files.
+	// message. Nil disables telemetry. Go-API-only: never set from the
+	// environment.
 	Provider observability.Provider
 }
 

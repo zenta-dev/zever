@@ -11,7 +11,7 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
 // zero-infra defaults for tests, with the log adapter writing instead of
-// sending. Config file plus env NOTIFICATION_ADAPTER (no prefix, e.g.
+// sending. Env only: NOTIFICATION_ADAPTER (no prefix, e.g.
 // NOTIFICATION_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Notification(). Lazy per-service

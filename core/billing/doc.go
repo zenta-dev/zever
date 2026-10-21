@@ -16,8 +16,8 @@
 // closed.
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
-// zero-infra defaults for tests. Config file plus env BILLING_<FIELD> (no
-// prefix, e.g. BILLING_ADAPTER). See config/README.md.
+// zero-infra defaults for tests. Env only: BILLING_<FIELD> (no prefix, e.g.
+// BILLING_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Billing(). Lazy per-service singleton,
 // retry on error. See container/README.md.

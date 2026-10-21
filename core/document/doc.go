@@ -4,7 +4,7 @@
 //
 // Type safety: Document plus typed Options plus Adapter enum plus Factory. OutputFormat is a string type limited to pdf, png, and jpg; Quality is clamped to 0-100. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env DOCUMENT_<FIELD> (no prefix, e.g. DOCUMENT_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: DOCUMENT_<FIELD> (no prefix, e.g. DOCUMENT_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Document(). Lazy per-service singleton, retry on error. See container/README.md.
 //

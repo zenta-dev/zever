@@ -8,7 +8,7 @@
 // is a UUIDv7 value with ParseMessageID validation, and Payload and Headers
 // offer Clone helpers. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env QUEUE_<FIELD> (no prefix, e.g. QUEUE_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: QUEUE_<FIELD> (no prefix, e.g. QUEUE_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Queue(). Lazy per-service singleton, retry on error. See container/README.md.
 //

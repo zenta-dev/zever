@@ -4,7 +4,7 @@
 //
 // Type safety: Scheduler plus typed Options plus Adapter enum plus Factory. EntryID aliases job.EntryID. Specs use cron standard format with MaxSpecLen 256 and fail at Schedule time. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env SCHEDULER_<FIELD> (no prefix, e.g. SCHEDULER_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: SCHEDULER_<FIELD> (no prefix, e.g. SCHEDULER_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Scheduler(). Lazy per-service singleton, retry on error. See container/README.md.
 //

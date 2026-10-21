@@ -9,7 +9,7 @@
 // (session fixation). Rotate is a free helper over Store: no interface
 // change, all backends support it.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env SESSION_<FIELD> (no prefix, e.g. SESSION_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: SESSION_<FIELD> (no prefix, e.g. SESSION_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Session(). Lazy per-service singleton, retry on error. See container/README.md.
 //

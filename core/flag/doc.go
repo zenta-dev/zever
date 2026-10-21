@@ -4,7 +4,7 @@
 //
 // Type safety: Flag plus EvalContext plus typed Options plus Adapter enum plus Factory. StaticOptions and FirebaseOptions carry per-backend settings; keys are validated for shape and length. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env FLAG_<FIELD> (no prefix, e.g. FLAG_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: FLAG_<FIELD> (no prefix, e.g. FLAG_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Flag(). Lazy per-service singleton, retry on error. See container/README.md.
 //

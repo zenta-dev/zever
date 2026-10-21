@@ -17,7 +17,7 @@
 // SecurityHeaders plus their UnaryServerInterceptor counterparts (except
 // CORS and SecurityHeaders, which are HTTP-only),
 // with RemoteAddrKey and PeerAddrKey for keying. No adapter name to parse
-// and no middleware section in config files.
+// and no middleware section in the environment.
 // See config/README.md.
 //
 // Chain order: CORS outermost, so preflights short-circuit before logging

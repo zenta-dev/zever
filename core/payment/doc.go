@@ -9,7 +9,7 @@
 // method, and event types are strings with fixed constants, and LimitDecode
 // bounds webhook JSON. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env PAYMENT_<FIELD> (no prefix, e.g. PAYMENT_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: PAYMENT_<FIELD> (no prefix, e.g. PAYMENT_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Payment(). Lazy per-service singleton, retry on error. See container/README.md.
 //

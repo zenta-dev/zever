@@ -4,7 +4,7 @@
 //
 // Type safety: VectorStore plus typed Options plus Adapter enum plus Factory. Vector plus ScoreMatch are typed; defaults are DefaultDimension 1536 and DefaultTopK 10 and DefaultSQLiteDSN memory. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env VECTORSTORE_<FIELD> (no prefix, e.g. VECTORSTORE_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: VECTORSTORE_<FIELD> (no prefix, e.g. VECTORSTORE_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.VectorStore(). Lazy per-service singleton, retry on error. See container/README.md.
 //
