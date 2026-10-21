@@ -1594,6 +1594,11 @@ type adapterFileData struct {
 	// comment (e.g. "Memcached"). It names nothing in code: adding the real
 	// constant to the battery package is a manual wiring step.
 	AdapterConst string
+	// EnvPrefix is the battery's uppercase service name, the prefix of the
+	// env key that selects the adapter (CACHE_ADAPTER for the cache
+	// battery). It is the only knob v0.8.0 reads: service config is
+	// env-only.
+	EnvPrefix string
 	// StdImports and LocalImports are kept apart so the template can emit
 	// them as the two groups goimports (local prefix
 	// github.com/zenta-dev/zever) would produce.
@@ -1616,8 +1621,9 @@ const adapterFileTemplate = `// Package {{.Name}} provides a {{.Name}} adapter f
 // filling in the TODOs, add a {{.AdapterConst}} constant to the {{.Battery}} Adapter enum
 // in core/{{.Battery}}/adapter.go (plus its ParseAdapter case), point the
 // scaffolded register.go at it (replacing the ParseAdapter placeholder),
-// and select it in zever.yaml. Until then this package builds but is
-// reachable only through its placeholder registration.
+// and select it with the {{.EnvPrefix}}_ADAPTER env key (e.g.
+// CACHE_ADAPTER=redis) in .env at the project root. Until then this package
+// builds but is reachable only through its placeholder registration.
 package {{.Name}}
 
 import (
@@ -1652,6 +1658,7 @@ func renderAdapterFile(tag string, spec batterySpec, name string) ([]byte, error
 		Name:         name,
 		Interface:    spec.Interface,
 		AdapterConst: goIdent(name),
+		EnvPrefix:    strings.ToUpper(spec.Package),
 		LocalImports: []string{"github.com/zenta-dev/zever/core/" + spec.Package},
 	}
 

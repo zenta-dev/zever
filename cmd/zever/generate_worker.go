@@ -525,8 +525,8 @@ const workerTemplate = `// Command worker runs this project's background job wor
 // Scaffolded by ` + "`zever generate worker`" + `. The scheduler dispatches onto the
 // queue and the worker consumes from it, so both must share one queue: with
 // the in-process memory adapter that means one process. Swapping the queue
-// adapter for redis/nats in zever.yaml is what makes this distributable, with
-// no code change here.
+// adapter for redis/nats (QUEUE_ADAPTER=redis in .env at the project root) is
+// what makes this distributable, with no code change here.
 package main
 
 import (
