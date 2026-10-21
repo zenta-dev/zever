@@ -329,8 +329,9 @@ the same TTY rules as `uninstall`; `--json` emits the envelope.
   `WARNING: Zever tinker is development-only: it evaluates arbitrary Go
   against a live container, so run it against a development database only.`
   to stderr. The REPL talks to the real container via the per-project shim
-  (`project.tinker_entry`, default `cmd/tinker-shim`; scaffold with
-  `zever generate tinker`). Never point it at production data.
+  (`ZEVER_TINKER_ENTRY` in the process environment, default
+  `cmd/tinker-shim`; scaffold with `zever generate tinker`). Never point it
+  at production data.
 
 ### Shell completion and generated docs
 

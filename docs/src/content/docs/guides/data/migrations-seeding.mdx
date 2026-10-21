@@ -167,7 +167,7 @@ Lossy statements warn before running; rows with no inverse are reported, skipped
 
 ## Seed deterministically
 
-`zever db seed` runs the seed entrypoint (`project.seed_entry`, default `db/seed`) and passes arguments through. Write seeds as Go with the ORM in one transaction, idempotent via an `OnConflict` upsert.
+`zever db seed` runs the seed entrypoint (`ZEVER_SEED_ENTRY`, default `db/seed`) and passes arguments through. The variable is read from the process environment of the `zever` command; the seed program reads its own service config from `.env` in the project root. Write seeds as Go with the ORM in one transaction, idempotent via an `OnConflict` upsert.
 
 ```go title="db/seed/main.go"
 db.WithTx(ctx, conn, nil, func(ctx context.Context, tx db.Tx) error {
