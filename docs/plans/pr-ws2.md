@@ -1,5 +1,12 @@
 # PR WS2: verified quickstart with CI job (+ example app proposal)
 
+> **Historical (predates v0.8.0).** This plan was written when `zever.yaml`
+> was still a configuration file. Since v0.8.0 the framework is env-only: a
+> `zever.yaml`/`.yml`/`.json`/`.toml` file is never read (no probe, no
+> discovery step, no warning), so the values the example app proposal below
+> would have carried live in `.env` or the process environment instead. The
+> plan is the record of a proposal written then.
+
 ## What / why
 
 The quickstart doc (`docs/src/content/docs/start/quickstart.mdx`) drifted from

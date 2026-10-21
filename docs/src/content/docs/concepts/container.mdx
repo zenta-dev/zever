@@ -15,7 +15,7 @@ one per       lazy first      adapter by name      retry on error
 process       use only        from config          clear on failure
 ```
 
-No globals and no `init()` wiring. `New(nil)` is valid; `Close(ctx)` never opens anything. Config picks the adapter (`<SERVICE>_ADAPTER` or `adapter:`); the remaining keys feed typed Options ([Config reference](../../reference/config/#db)). Display config with `config.RedactedServices`, never raw option maps.
+No globals and no `init()` wiring. `New(nil)` is valid; `Close(ctx)` never opens anything. Config picks the adapter (`<SERVICE>_ADAPTER`); the remaining keys feed typed Options ([Config reference](../../reference/config/#db)). Display config with `config.RedactedServices`, never raw option maps.
 
 ## Resolve services
 

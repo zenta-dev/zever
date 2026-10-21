@@ -1,5 +1,12 @@
 # Outbox/Relay Ops + Cross-Service Trace Convention — Implementation Plan
 
+> **Historical (predates v0.8.0).** This plan was written when `zever.yaml`
+> was still a configuration file. Since v0.8.0 the framework is env-only: a
+> `zever.yaml`/`.yml`/`.json`/`.toml` file is never read (no probe, no
+> discovery step, no warning), so the DSN and table the tasks below took from
+> "flags or `zever.yaml`" now come from flags or the environment. The plan is
+> the record of the work as it was scoped then.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use `subagent-driven-development`. Steps use `- [ ]`.
 
 **Goal:** fix cross-service trace propagation and add outbox/relay observability + ops tooling.

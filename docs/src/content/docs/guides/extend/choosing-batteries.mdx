@@ -5,7 +5,7 @@ description: A decision guide for picking the adapter behind each battery, from 
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every battery is one small interface with several adapters, and switching adapters is a config change, not a code change. So the question is never "which library do I commit to" but "which adapter fits this stage". Start on the zero-infrastructure defaults, then change one `adapter:` line when the deployment shape demands it.
+Every battery is one small interface with several adapters, and switching adapters is a config change, not a code change. So the question is never "which library do I commit to" but "which adapter fits this stage". Start on the zero-infrastructure defaults, then change one `<SERVICE>_ADAPTER` value when the deployment shape demands it.
 
 The default for every battery in `config.Default()` runs with no external service (`memory`, `local`, `sqlite`, `log`, `noop`, ...), which is why tests and `zever serve` work on a fresh checkout. The full table is in the [adapters matrix](../../../reference/adapters-matrix/); this page covers the choices that matter.
 

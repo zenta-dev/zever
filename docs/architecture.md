@@ -72,7 +72,7 @@ Env-only, strictly-typed: `defaults < .env < .env.local < process env`
   real process environment. `config.Resolve(env)` applies that map over the
   defaults and validates fail-closed. `config.LoadEnv(files...)` parses
   explicit dotenv files only. There are no service config files: a legacy
-  `zever.yaml`/`.yml`/`.json` in the working directory is ignored.
+  `zever.yaml`/`.yml`/`.json` in the working directory is never read.
 - Env vars — no prefix. The default instance is `<SERVICE>_<FIELD>` (for
   example `DB_MAXCONNS`), a named instance `<SERVICE>__<NAME>__<FIELD>`.
   Matching ignores case and `_`; unknown vars are ignored, unknown keys
