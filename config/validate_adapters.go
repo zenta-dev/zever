@@ -1,9 +1,6 @@
 package config
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 // serviceAdapter pairs a service name with its configured adapter string.
 type serviceAdapter struct {
@@ -64,7 +61,9 @@ func (c *Config) adapters() []serviceAdapter {
 // container.RegisteredAdapters. An adapter missing from its service's list
 // fails with UnknownAdapterError carrying a "did you mean %q?" hint when a
 // registered name is close; an empty list means nothing was imported and
-// every configured adapter fails (forgotten import).
+// every configured adapter fails (forgotten import). The failure carries the
+// "config: " prefix of the error type itself, exactly once: the message
+// reads "config: unknown adapter ...", never "config: config: ...".
 func (c *Config) ValidateAdapters(registered func(service string) []string) error {
 	return c.validateAdapters(nil, registered)
 }
@@ -117,11 +116,11 @@ func (c *Config) validateAdapters(enabled map[string]bool, registered func(servi
 			}
 		}
 		if !found {
-			errs = append(errs, fmt.Errorf("config: %w", &UnknownAdapterError{
+			errs = append(errs, &UnknownAdapterError{
 				Service:    sa.service,
 				Adapter:    sa.adapter,
 				Suggestion: closest(sa.adapter, known),
-			}))
+			})
 		}
 	}
 	return errors.Join(errs...)
