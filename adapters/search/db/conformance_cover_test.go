@@ -9,9 +9,9 @@ import (
 )
 
 // TestConformance runs the shared search kit against the migrated adapter.
-// The db leg runs on :memory: with no infra; the postgres leg keeps the
-// legacy alias name and runs only when POSTGRES_DSN (fallback
-// SEARCH_PG_DSN) names a live server.
+// The db leg runs on :memory: with no infra; the postgres leg points the
+// same "db" adapter at a live server and runs only when POSTGRES_DSN
+// (fallback SEARCH_PG_DSN) names one.
 func TestConformance(t *testing.T) {
 	t.Run("db", func(t *testing.T) {
 		searchtest.Conformance(t, func(t *testing.T) search.Search {
@@ -45,7 +45,7 @@ func TestConformance(t *testing.T) {
 
 			Register()
 
-			s, err := search.Open(search.Postgres, search.Options{DSN: dsn})
+			s, err := search.Open(search.DB, search.Options{DSN: dsn})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}

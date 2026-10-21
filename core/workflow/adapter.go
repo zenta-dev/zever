@@ -7,11 +7,9 @@ const (
 	// Memory is the in-memory workflow adapter.
 	Memory Adapter = "memory"
 	// DB selects the durable DB-backed workflow adapter
-	// (adapters/workflow/db).
+	// (adapters/workflow/db). The backend follows the DSN, so this is the
+	// only name for the DB-backed workflow adapter.
 	DB Adapter = "db"
-	// Postgres is a legacy alias for DB kept so existing zever.yaml files
-	// keep resolving.
-	Postgres Adapter = "postgres"
 )
 
 // String returns the canonical name of Adapter.
