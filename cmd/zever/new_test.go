@@ -1779,12 +1779,14 @@ func TestBatteryAdapters(t *testing.T) {
 		t.Fatalf("batteryAdapters[db] = %v, want sqlite and postgres", db)
 	}
 
-	// Consolidated DB-backed batteries offer canonical "db" first (the
-	// default) with legacy aliases after, all routing to the same db dir.
+	// The DB-backed batteries offer their canonical "db" name (the default)
+	// plus the other real backends. The per-backend names that only existed
+	// for the legacy file-based config format are gone: the backend follows
+	// DSN, so there is one name per battery.
 	for battery, want := range map[string][]string{
-		"search":      {"db", "postgres", "sqlite", "meilisearch"},
-		"vectorstore": {"db", "pgvector", "sqlite", "qdrant"},
-		"workflow":    {"db", "postgres", "memory"},
+		"search":      {"db", "meilisearch"},
+		"vectorstore": {"db", "qdrant"},
+		"workflow":    {"memory", "db"},
 	} {
 		for _, adapter := range want {
 			if !batteryPicked(all[battery], adapter) {

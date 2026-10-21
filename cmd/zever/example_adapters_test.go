@@ -13,16 +13,11 @@ import (
 // implements it. Most pairs map one-to-one; the entries here cover adapters
 // whose package directory name differs from the adapter selector.
 var exampleAdapterDir = map[string]string{
-	"password/argon2id":    "adapters/password/argon2",
-	"search/sqlite":        "adapters/search/db",
-	"search/db":            "adapters/search/db",
-	"search/postgres":      "adapters/search/db",
-	"vectorstore/sqlite":   "adapters/vectorstore/db",
-	"vectorstore/db":       "adapters/vectorstore/db",
-	"vectorstore/pgvector": "adapters/vectorstore/db",
-	"workflow/postgres":    "adapters/workflow/db",
-	"workflow/db":          "adapters/workflow/db",
-	"resilience/memory":    "adapters/resilience/inproc",
+	"password/argon2id": "adapters/password/argon2",
+	"search/db":         "adapters/search/db",
+	"vectorstore/db":    "adapters/vectorstore/db",
+	"workflow/db":       "adapters/workflow/db",
+	"resilience/memory": "adapters/resilience/inproc",
 }
 
 // TestExampleAppsRegisterConfiguredAdapters is the guard that every example
