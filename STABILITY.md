@@ -103,7 +103,7 @@ release-note docs.
 
 ## Go version policy
 
-Only the latest Go toolchain is supported (`go 1.27.2` today, pinned in
+Only the latest Go toolchain is supported (`go 1.27.3` today, pinned in
 `go.work` and every module's `go.mod`; CI tests that version). New language
 features may be used as soon as the floor moves — including generic methods
 such as `orm`'s `Column[T, V].EqOuter[U any]` (`orm/column.go`), which
