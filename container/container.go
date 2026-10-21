@@ -117,7 +117,7 @@ type Container struct {
 	// provDefs holds one entry per Provide call, keyed by service/name. It
 	// is written once by New and read-only after, so resolution reads it
 	// without locking. Empty (nil) when New received no providers, in
-	// which case every accessor takes the legacy config path — the
+	// which case every accessor takes the config-based path — the
 	// accessors guard the provider lookup with a nil check, so that path
 	// stays a single predictable branch.
 	provDefs map[refKey]*provider
@@ -138,7 +138,7 @@ type Container struct {
 	// first use. Every provider build seeds its Options from the
 	// service defaults and overlays env before WithOptions appliers run.
 	// envErr records a failed resolution and fails every provider
-	// build; the legacy config path never consults it.
+	// build; the config-based path never consults it.
 	env    config.Env
 	envErr error
 	// envOnce guards the one-shot environment resolution: the process
@@ -154,21 +154,21 @@ func (c *Container) sealed() {}
 
 // New builds a Container from cfg and optional explicit wiring. Nothing
 // opens yet except Eager providers: every other service resolves on first
-// use, whether through a Provider (see Provide) or the legacy config path.
+// use, whether through a Provider (see Provide) or the config-based path.
 // A nil cfg falls back to config.Default().
 //
 // The process environment resolves lazily, on the first provider build
 // (see resolveEnv), and seeds every provided Ref: service defaults from
 // DefaultOptions overlaid by ApplyEnv, then WithOptions appliers. An
-// unreadable environment fails provider builds; legacy accessors never
-// consult it, and a container without providers never reads the process
+// unreadable environment fails provider builds; the config-based accessors
+// never consult it, and a container without providers never reads the process
 // environment at all.
 //
 // The full provider graph is validated at construction (duplicate Refs,
 // missing non-Optional dependencies, dependency cycles); findings are
 // recorded per Ref and surfaced by Get and the provider-backed accessors,
-// so validation never opens anything. With zero providers the legacy path
-// serves every accessor exactly as before.
+// so validation never opens anything. With zero providers the config-based
+// path serves every accessor exactly as before.
 func New(cfg *config.Config, providers ...Provider) *Container {
 	if cfg == nil {
 		cfg = config.Default()

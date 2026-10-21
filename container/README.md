@@ -60,7 +60,7 @@ func Providers() []container.Provider {
 `core/<battery>` exposes `Ref(name)` and `DefaultRef()` for each service.
 `container.Get(c, ref)` resolves any wired ref; the accessors (`c.DB()`,
 `c.Cache()`) resolve the default instance when a provider exists and
-otherwise fall back to the config path.
+otherwise fall back to the config-based path.
 
 Dependency forms: `Provide`, `Provide1`, `Provide2`, and `Provide3` take
 typed dependencies in order. `container.Option` values customize one call:
@@ -88,7 +88,11 @@ dependencies, and dependency cycles are recorded per ref and surfaced by
 labels in sorted order. `zever explain` prints the same graph with drivers,
 dependencies, and env keys.
 
-## Legacy config path
+## Config-based path
+
+A container built with a config and no providers takes this path: every
+accessor resolves its service from the config and from the adapter registry,
+instead of from a wired provider.
 
 Adapters also register caller-side through each battery's core registry
 (`adapters/<battery>/<name>`). The config-based accessors use that registry
