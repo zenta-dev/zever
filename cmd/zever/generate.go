@@ -530,14 +530,14 @@ func runGenerateModule(args []string) error {
 		}
 	}
 
-	schemaDir := defaultSchemaDir
-	if pc, err := loadProjectConfig(); err == nil && pc.SchemaDir != "" {
-		schemaDir = pc.SchemaDir
+	pc, err := loadProjectConfig()
+	if err != nil {
+		return err
 	}
 
-	_, err := GenerateModule(GenerateModuleConfig{
+	_, err = GenerateModule(GenerateModuleConfig{
 		Name:      name,
-		SchemaDir: schemaDir,
+		SchemaDir: pc.SchemaDir,
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,
 		DryRun:    *dryRun || moduleDryRun,

@@ -1,15 +1,19 @@
 package main
 
 import (
-	"os"
+	"fmt"
 	"strings"
+
+	"github.com/zenta-dev/zever/config"
 )
 
 // Project layout env keys. Project layout comes from compiled-in defaults
-// below, overridable per-field by these variables. Service batteries stay
-// env-only via config.FromEnv; these six keys are the sole project-settings
-// surface (no --config file flag and no file discovery: they are read from
-// the process environment).
+// below, overridable per-field by these variables. They resolve with the
+// framework's precedence -- defaults < .env < .env.local < process
+// environment (see config.FromEnv) -- so a project configures its layout in
+// the same file as the rest of its settings. Service batteries stay env-only
+// via config.FromEnv; these six keys are the sole project-settings surface
+// (no --config file flag and no file discovery).
 const (
 	// EnvSchemaDir overrides the .zen schema directory.
 	EnvSchemaDir = "ZEVER_SCHEMA_DIR"
@@ -30,9 +34,9 @@ const (
 // launcher subcommands (serve, worker, db seed, tinker) shell out to.
 //
 // It is deliberately separate from config.Config, which resolves service
-// batteries from environment only. Layout resolves defaults < ZEVER_* env;
-// per-command flags (--entry and friends) override the resolved entrypoint
-// where the command defines one.
+// batteries from environment only. Layout resolves defaults < .env < .env.local
+// < process environment; per-command flags (--entry and friends) override the
+// resolved entrypoint where the command defines one.
 type ProjectConfig struct {
 	SchemaDir    string `json:"schema_dir"`
 	GeneratedDir string `json:"generated_dir"`
@@ -42,8 +46,9 @@ type ProjectConfig struct {
 	SeedEntry    string `json:"seed_entry"`
 }
 
-// Default project conventions. They apply unconditionally: layout is not
-// read from any file. `zever new` scaffolds exactly this layout.
+// Default project conventions. They apply when nothing overrides them:
+// layout is read from the environment, never from a config file. `zever new`
+// scaffolds exactly this layout.
 const (
 	defaultSchemaDir    = "schema"
 	defaultGeneratedDir = "generated"
@@ -74,20 +79,30 @@ func (pc ProjectConfig) withDefaults() ProjectConfig {
 }
 
 // loadProjectConfig returns the effective project layout: compiled-in
-// defaults overlaid by the ZEVER_* environment (whitespace-only values count
-// as unset). It performs no file discovery and no parsing: configuration
-// comes from the environment (config.FromEnv warns once when a pre-v0.8.0
-// config file sits in the cwd).
+// defaults overlaid by the ZEVER_* environment, resolved with the same
+// precedence the rest of the framework uses -- defaults < .env < .env.local
+// < process environment (config.FromEnv). Whitespace-only values count as
+// unset.
 //
-//nolint:unparam // the error return is reserved for future fallible sources.
+// The dotenv files are the ones in the working directory: that is the
+// project root the CLI already resolves its project-relative paths from
+// (the go.mod preflight asks for the project root by name).
+//
+// A malformed .env or .env.local fails closed, naming the file and the line,
+// like every other env read in the framework.
 func loadProjectConfig() (ProjectConfig, error) {
+	env, err := config.FromEnv()
+	if err != nil {
+		return ProjectConfig{}, fmt.Errorf("zever: resolve project layout: %w", err)
+	}
+
 	pc := ProjectConfig{
-		SchemaDir:    strings.TrimSpace(os.Getenv(EnvSchemaDir)),
-		GeneratedDir: strings.TrimSpace(os.Getenv(EnvGeneratedDir)),
-		ServerEntry:  strings.TrimSpace(os.Getenv(EnvServerEntry)),
-		WorkerEntry:  strings.TrimSpace(os.Getenv(EnvWorkerEntry)),
-		TinkerEntry:  strings.TrimSpace(os.Getenv(EnvTinkerEntry)),
-		SeedEntry:    strings.TrimSpace(os.Getenv(EnvSeedEntry)),
+		SchemaDir:    strings.TrimSpace(env[EnvSchemaDir]),
+		GeneratedDir: strings.TrimSpace(env[EnvGeneratedDir]),
+		ServerEntry:  strings.TrimSpace(env[EnvServerEntry]),
+		WorkerEntry:  strings.TrimSpace(env[EnvWorkerEntry]),
+		TinkerEntry:  strings.TrimSpace(env[EnvTinkerEntry]),
+		SeedEntry:    strings.TrimSpace(env[EnvSeedEntry]),
 	}
 
 	return pc.withDefaults(), nil

@@ -1269,7 +1269,9 @@ func TestClosureProjectBranches(t *testing.T) {
 		t.Fatalf("defaults = %+v, %v", pc, err)
 	}
 
-	// Stray files are ignored: still defaults.
+	// Stray files are ignored: still defaults. The .env names SCHEMA_DIR,
+	// which is not one of the layout keys (ZEVER_SCHEMA_DIR is), so it
+	// steers nothing either.
 	writeZeverFixture(t, dir, strayConfigFile, "project:\n  schema_dir: custom\n")
 	writeZeverFixture(t, dir, ".env", "SCHEMA_DIR=custom\n")
 
