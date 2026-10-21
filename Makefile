@@ -102,7 +102,7 @@ err-lint: ## Scan for error-convention violations (unprefixed messages, bracket 
 	$(GO) -C tools/errscan run . "$(CURDIR)"
 
 .PHONY: check-tags
-check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags or wire keys)
+check-tags: ## Scan for struct-tag wire-format violations (empty tags, yaml/toml outside the allowlist, v0.7.2 wire structs losing json tags or wire keys, retired config file names)
 	$(GO) -C tools/tagcheck run . "$(CURDIR)"
 
 .PHONY: tag-golden

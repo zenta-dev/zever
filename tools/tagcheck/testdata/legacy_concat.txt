@@ -1,0 +1,6 @@
+package pkg
+
+// legacyConcat builds a retired config file name at runtime.
+func legacyConcat() string {
+	return "zever" + ".yaml"
+}

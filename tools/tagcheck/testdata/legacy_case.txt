@@ -1,0 +1,7 @@
+package pkg
+
+// legacyCase names a retired config file in another case.
+const legacyCase = "ZEVER.YAML"
+
+// legacyComment mentions ZEVER.YAML in prose.
+func legacyComment() {}

@@ -1,0 +1,8 @@
+package pkg
+
+import "fmt"
+
+// legacyFormat builds a retired config file name with a format string.
+func legacyFormat() string {
+	return fmt.Sprintf("zever.%s", "yaml")
+}

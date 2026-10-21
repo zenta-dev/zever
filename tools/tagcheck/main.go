@@ -28,6 +28,12 @@
 //   - golden-nofields: a registered wire struct with no pinned keys: the
 //     golden field data was not regenerated after the struct was
 //     registered.
+//   - no-config-file: a non-test Go file names a retired project config
+//     file (the project name plus a json/yaml/yml/toml extension), in a
+//     string literal, in a constant expression that builds such a name, or
+//     in a comment. The v0.8.0 env-only break removed those formats for
+//     good: a stale file is ignored silently, so every mention of it in
+//     the source is a leftover of the removed formats.
 //
 // Skipped: _test.go files, generated files (a "DO NOT EDIT" marker in a
 // leading comment), and the .git/.worktrees/.claude/vendor/node_modules/
@@ -87,6 +93,12 @@ type rules struct {
 	fields  goldenFields
 	except  exceptions
 	allowed allowlist
+
+	// legacy is the retired-config-file rule data, and noConfigAllowed
+	// holds its exception list (bare paths allow a whole file, path:line
+	// allows one line).
+	legacy          *legacyConfigRule
+	noConfigAllowed allowlist
 }
 
 // structInfo summarizes one struct type found in the tree.
@@ -142,7 +154,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	vs, err := scan(root, rules{structs: structs, fields: fields, except: except, allowed: allowed})
+	noConfigAllowed, err := loadNoConfigAllowlist(toolDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "tagcheck: load no-config-file allowlist: %v\n", err)
+		return 2
+	}
+
+	vs, err := scan(root, rules{
+		structs:         structs,
+		fields:          fields,
+		except:          except,
+		allowed:         allowed,
+		legacy:          newLegacyConfigRule(),
+		noConfigAllowed: noConfigAllowed,
+	})
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: %v\n", err)
 		return 2
@@ -361,6 +386,10 @@ func eachDataLine(r io.Reader, origin string, fn func(string) error) error {
 func scan(root string, r rules) ([]violation, error) {
 	var vs []violation
 
+	if r.legacy == nil {
+		r.legacy = newLegacyConfigRule()
+	}
+
 	seen := map[string]bool{}
 	found := map[string]map[string]structInfo{}
 
@@ -543,10 +572,11 @@ type structDecl struct {
 	info structInfo
 }
 
-// checkFile parses one Go file and returns its tag-rule violations. The
-// second result reports whether the file is generated (DO NOT EDIT marker
-// in a leading comment), in which case it is skipped entirely. The third
-// result lists the struct types the file declares.
+// checkFile parses one Go file and returns its rule violations (the struct
+// tag rules and the retired-config-file rule). The second result reports
+// whether the file is generated (DO NOT EDIT marker in a leading comment),
+// in which case it is skipped entirely. The third result lists the struct
+// types the file declares.
 func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls []structDecl, err error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
@@ -572,6 +602,8 @@ func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls
 	}
 
 	dir := filepath.ToSlash(filepath.Dir(rel))
+
+	vs = append(vs, checkLegacyConfigNames(rel, fset, f, r)...)
 
 	for _, decl := range f.Decls {
 		gd, ok := decl.(*ast.GenDecl)

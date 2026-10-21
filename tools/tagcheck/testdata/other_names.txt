@@ -1,0 +1,8 @@
+package pkg
+
+// otherNames are file names that are not the retired config files.
+const (
+	otherSchema = "zever.schema.json"
+	otherTool   = "foozever.yaml"
+	otherPkg    = "zever.annotations.v1.auth"
+)
