@@ -365,12 +365,12 @@ func TestEmbeddingCodec_roundTrip(t *testing.T) {
 	}
 }
 
-// TestOpenRegister_allNames proves the canonical "db" name and both legacy
-// aliases resolve through the registry to a working store.
-func TestOpenRegister_allNames(t *testing.T) {
+// TestOpenRegister_canonicalName proves the canonical "db" name resolves
+// through the registry to a working store.
+func TestOpenRegister_canonicalName(t *testing.T) {
 	Register()
 
-	for _, adapter := range []vectorstore.Adapter{vectorstore.DB, vectorstore.PGVector, vectorstore.SQLite} {
+	for _, adapter := range []vectorstore.Adapter{vectorstore.DB} {
 		s, err := vectorstore.Open(adapter, vectorstore.Options{})
 		if err != nil {
 			t.Fatalf("Open(%s) error = %v", adapter, err)

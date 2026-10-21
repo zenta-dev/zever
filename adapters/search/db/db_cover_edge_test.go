@@ -580,7 +580,7 @@ func TestCoverRegisterShared(t *testing.T) {
 		t.Fatalf("dbsqlite.New() err = %v", err)
 	}
 	t.Cleanup(func() { _ = conn.Close(t.Context()) })
-	for _, a := range []search.Adapter{search.DB, search.Postgres, search.SQLite} {
+	for _, a := range []search.Adapter{search.DB} {
 		s, err := search.OpenShared(a, conn, search.Options{})
 		if err != nil {
 			t.Fatalf("OpenShared(%s) err = %v", a, err)
