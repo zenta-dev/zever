@@ -34,7 +34,7 @@ Pick by where state lives and who must see it:
 | `observability` | `stdout` | `otlp` to a collector. | `noop` for tests. |
 | `log` | `slog` or `pretty` | `slog` or `zerolog` for JSON logs; `noop` in tests. | |
 | `storage` | `local` | `s3` or `r2` for object storage. | |
-| `search`, `vectorstore` | `db` | `meilisearch`, `postgres`, `pgvector`, or `qdrant` when scale or features demand it. | Start on `db`. |
+| `search`, `vectorstore` | `db` | `meilisearch` or `qdrant` when scale or features demand it. | Start on `db`. |
 | `secrets` | `env` | `vault` when you need rotation or an audited store. | `env` cannot rotate without a restart. |
 | `permission` | `noop` | `rbac` or `casbin` when you enforce authorization. | |
 | `router` | `stdhttp` | `stdhttp` or `fiber`. | Pick by the middleware ecosystem you want. |

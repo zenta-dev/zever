@@ -11,8 +11,9 @@
 // filling in the TODOs, add a Memcached constant to the cache Adapter enum
 // in core/cache/adapter.go (plus its ParseAdapter case), point the
 // scaffolded register.go at it (replacing the ParseAdapter placeholder),
-// and select it in zever.yaml. Until then this package builds but is
-// reachable only through its placeholder registration.
+// and select it with the CACHE_ADAPTER env key (e.g.
+// CACHE_ADAPTER=redis) in .env at the project root. Until then this package
+// builds but is reachable only through its placeholder registration.
 package memcached
 
 import (

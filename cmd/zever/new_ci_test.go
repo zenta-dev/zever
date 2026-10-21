@@ -120,7 +120,9 @@ func TestRecipeFilesDocker(t *testing.T) {
 				}
 			}
 
-			for _, banned := range []string{"zever.yaml", ".env", "SECRET", "ENV DB_"} {
+			// No config file and no secret may be baked into the image:
+			// config comes from the environment at run time.
+			for _, banned := range []string{".yaml", ".env", "SECRET", "ENV DB_"} {
 				if strings.Contains(f.content, banned) {
 					t.Errorf("Dockerfile must not contain %q", banned)
 				}

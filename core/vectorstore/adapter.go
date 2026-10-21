@@ -6,14 +6,9 @@ type Adapter string
 const (
 	// DB selects the DB-backed vectorstore (adapters/vectorstore/db): a
 	// postgres URL selects PostgreSQL pgvector, anything else selects
-	// embedded SQLite.
+	// embedded SQLite. The backend follows the DSN, so this is the only
+	// name for the DB-backed vectorstore adapter.
 	DB Adapter = "db"
-	// SQLite is a legacy alias for DB kept so existing zever.yaml files
-	// keep resolving.
-	SQLite Adapter = "sqlite"
-	// PGVector is a legacy alias for DB kept so existing zever.yaml files
-	// keep resolving.
-	PGVector Adapter = "pgvector"
 	// Qdrant selects the Qdrant backend.
 	Qdrant Adapter = "qdrant"
 )

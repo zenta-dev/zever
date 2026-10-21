@@ -2,9 +2,7 @@ package config
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -69,9 +67,9 @@ func LoadEnv(files ...string) (Env, error) {
 // may reference process variables via ${VAR}. Process values stay literal
 // and are never re-expanded.
 //
-// When a legacy zever.yaml/.yml/.json file sits in the working directory,
-// FromEnv emits a one-line stderr warning: the file is ignored, see the
-// migration guide.
+// FromEnv reads dotenv files only: no other file in the working directory
+// is consulted, so a leftover config file from an older release is inert
+// and is not reported.
 func FromEnv() (Env, error) {
 	var files []string
 	for _, name := range []string{".env", ".env.local"} {
@@ -92,7 +90,6 @@ func FromEnv() (Env, error) {
 	if err := expandDotEnv(env, expandable, origins); err != nil {
 		return nil, err
 	}
-	warnLegacyConfigFile(os.Stderr, ".")
 	return env, nil
 }
 
@@ -346,16 +343,4 @@ func expandDotEnvValue(s string, lookup Env) (string, string) {
 		i++
 	}
 	return sb.String(), ""
-}
-
-// warnLegacyConfigFile writes a one-line warning when a legacy
-// zever.yaml/.yml/.json file sits in dir: the file is ignored, see the
-// migration guide. Absent files stay silent.
-func warnLegacyConfigFile(w io.Writer, dir string) {
-	for _, name := range []string{"zever.yaml", "zever.yml", "zever.json"} {
-		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() {
-			_, _ = fmt.Fprintf(w, "config: %s found in working directory: ignored; see migration guide in config/README.md\n", name)
-			return
-		}
-	}
 }

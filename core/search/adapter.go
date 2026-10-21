@@ -6,16 +6,11 @@ type Adapter string
 const (
 	// DB selects the DB-backed search backend (adapters/search/db): a
 	// postgres URL selects PostgreSQL tsvector/GIN, anything else selects
-	// embedded SQLite FTS5.
+	// embedded SQLite FTS5. The backend follows the DSN, so this is the
+	// only name for the DB-backed search adapter.
 	DB Adapter = "db"
-	// Postgres is a legacy alias for DB kept so existing zever.yaml files
-	// keep resolving.
-	Postgres Adapter = "postgres"
 	// Meilisearch selects the meilisearch search backend.
 	Meilisearch Adapter = "meilisearch"
-	// SQLite is a legacy alias for DB kept so existing zever.yaml files
-	// keep resolving.
-	SQLite Adapter = "sqlite"
 )
 
 // String returns the canonical name of Adapter.

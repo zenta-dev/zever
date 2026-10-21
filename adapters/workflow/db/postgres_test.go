@@ -294,8 +294,8 @@ func TestOptionsValidate(t *testing.T) {
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
 	Register()
 
-	// Canonical "db" plus the legacy "postgres" alias must both resolve.
-	for _, adapter := range []workflow.Adapter{workflow.DB, workflow.Postgres} {
+	// The canonical "db" name must resolve.
+	for _, adapter := range []workflow.Adapter{workflow.DB} {
 		wf, err := workflow.Open(adapter, workflow.Options{})
 		if err != nil {
 			t.Fatalf("Open(%s) = %v", adapter, err)

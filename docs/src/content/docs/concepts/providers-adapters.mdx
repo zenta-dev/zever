@@ -78,11 +78,13 @@ An excerpt follows. The full table covers all 37 services from `ai` to `workflow
 | `auth` | `jwt`, `session`, `oidc` | `jwt` |
 | `session` | `memory`, `redis`, `db` | `memory` |
 | `storage` | `local`, `s3`, `r2` | `local` |
-| `search` | `db`, `postgres`, `meilisearch`, `sqlite` | `db` |
-| `vectorstore` | `db`, `sqlite`, `pgvector`, `qdrant` | `db` |
+| `search` | `db`, `meilisearch` | `db` |
+| `vectorstore` | `db`, `qdrant` | `db` |
 | `payment` / `billing` | `stub`, `stripe`, `paddle` | `stub` |
 | `log` | `noop`, `zerolog`, `slog`, `pretty` | `slog` |
 | `secrets` | `env`, `vault` | `env` with `ZEVER` prefix |
+
+The `search`, `vectorstore`, and `workflow` services take `db` as their DB-backed adapter: the DSN decides the backend, so an empty or sqlite DSN selects the embedded SQLite one and a postgres URL selects PostgreSQL. The older `postgres`, `sqlite`, and `pgvector` names for those services are gone.
 
 ## Add a new adapter
 
