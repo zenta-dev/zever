@@ -1,0 +1,4 @@
+- **Breaking:** `cli`: the scaffolder offers only the canonical adapter names now. `zever new --with vectorstore=pgvector` (and the `postgres`/`sqlite` names of `search`, `vectorstore` and `workflow`) fail closed with the canonical name in the message. The scaffold no longer writes a project whose own `VECTORSTORE_ADAPTER=pgvector` does not resolve at runtime.
+- fix(cli): the battery picker's adapter list, the adapter module mapping and the generated compose rules carry the canonical adapter names only. The db-backed batteries (`search`, `vectorstore`, `workflow`) have one adapter, `db`: the backend follows the DSN.
+- fix(container): the `Search()`, `VectorStore()` and `Workflow()` doc comments no longer name the removed per-backend adapter names.
+- docs: `STABILITY.md` and the `config` and `cmd/zever` READMEs list the canonical adapter names only.

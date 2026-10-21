@@ -633,11 +633,14 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 // The password adapter dir ("argon2") maps back to its PHC-canonical
 // adapter string ("argon2id", mirroring adapterDirName) and the resilience
 // "inproc" dir maps back to its "memory" adapter string; the consolidated
-// DB-backed dirs ("search/db", "vectorstore/db", "workflow/db") map back
-// to their canonical "db" adapter name, with the legacy alias names
-// ("postgres", "pgvector", "sqlite") appended so old picks still validate
-// in --adapters and `zever add`; every battery's default adapter is
-// included even if its module dir were ever missing.
+// DB-backed dirs ("search/db", "vectorstore/db", "workflow/db") serve
+// their canonical "db" adapter name (the backend follows the DSN, so there
+// is one name per battery, not one per backend); every battery's default
+// adapter is included even if its module dir were ever missing.
+//
+// Only names that resolve at runtime belong here: a pick the scaffolder
+// offers must be an adapter the registry knows, or the scaffold writes an
+// env value the project cannot boot with.
 func batteryAdapters() map[string][]string {
 	out := map[string][]string{}
 
@@ -661,30 +664,8 @@ func batteryAdapters() map[string][]string {
 			adapter = defaultServiceAdapter(battery)
 		}
 
-		// Consolidated DB-backed dirs serve the canonical "db" name; the
-		// legacy per-backend names stay pickable as aliases (mirroring
-		// adapterDirName, which routes all of them to the same dir).
-		if adapterDir == "db" && (battery == "search" || battery == "vectorstore" || battery == "workflow") {
-			adapter = "db"
-		}
-
 		if !batteryPicked(out[battery], adapter) {
 			out[battery] = append(out[battery], adapter)
-		}
-	}
-
-	// Legacy DB-backed alias names: no module dir of their own (they share
-	// the consolidated db dir), but they must stay valid picks so old
-	// --adapters values and `zever add` invocations keep working.
-	for battery, aliases := range map[string][]string{
-		"search":      {"postgres", "sqlite"},
-		"vectorstore": {"pgvector", "sqlite"},
-		"workflow":    {"postgres"},
-	} {
-		for _, alias := range aliases {
-			if !batteryPicked(out[battery], alias) {
-				out[battery] = append(out[battery], alias)
-			}
 		}
 	}
 

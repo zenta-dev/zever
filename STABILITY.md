@@ -64,8 +64,8 @@ release-note docs.
 | `storage` | Facade (`local`, `s3`, `r2`). |
 | `media` | Facade (`local`, `s3`). |
 | `document` | Facade (`local`, `remote`, `latex`). |
-| `search` | Facade (`db`, `postgres`, `meilisearch`). |
-| `vectorstore` | Facade (`db`, `pgvector`, `qdrant`). |
+| `search` | Facade (`db`, `meilisearch`). |
+| `vectorstore` | Facade (`db`, `qdrant`). |
 | `notification` | Facade (`log`, `twilio`, `fcm`). |
 | `geo` | Facade (`google`, `static`, `osm`). |
 | `flag` | Facade (`static`, `firebase`). |

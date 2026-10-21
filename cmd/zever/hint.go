@@ -77,13 +77,30 @@ func unknownBatteryError(tag, input string) error {
 	return errors.New(msg)
 }
 
+// removedAdapterAliases maps a removed adapter name to the canonical name
+// that replaced it, per battery. The db-backed batteries (search,
+// vectorstore, workflow) register one adapter each ("db"): the backend
+// follows the DSN, so the per-backend names that only existed for the
+// legacy file-based config format are gone. The map is not a compatibility
+// shim -- a removed name never resolves -- it only lets a stale pick fail
+// with a pointer to the replacement instead of a bare "unknown adapter".
+var removedAdapterAliases = map[string]map[string]string{
+	"search":      {"postgres": "db", "sqlite": "db"},
+	"vectorstore": {"pgvector": "db", "sqlite": "db"},
+	"workflow":    {"postgres": "db"},
+}
+
 // unknownAdapterError reports an unknown adapter pick for a known battery:
-// what (the bad adapter for this battery), why (typo or unsupported), and
-// the exact next command (re-run with one of the listed choices).
+// what (the bad adapter for this battery), why (typo, unsupported, or a
+// removed name), and the exact next command (re-run with one of the listed
+// choices). A removed name points at the canonical replacement; anything
+// else rides along with a did-you-mean suggestion when one is close.
 func unknownAdapterError(tag, battery, input string, choices []string) error {
 	msg := fmt.Sprintf("%s: unknown adapter %q for battery %q", tag, input, battery)
 
-	if s := closest(input, choices); s != "" {
+	if canonical, ok := removedAdapterAliases[battery][input]; ok {
+		msg += fmt.Sprintf(" (removed name, use %q)", canonical)
+	} else if s := closest(input, choices); s != "" {
 		msg += fmt.Sprintf(" (did you mean %q?)", s)
 	}
 

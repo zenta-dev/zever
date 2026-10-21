@@ -286,8 +286,7 @@ jobs:
 //
 // The canonical "db" adapter name always provisions postgres: it selects
 // the backend by DSN at runtime (empty means embedded sqlite), and the
-// compose db service is what a postgres DSN points at. Legacy alias names
-// ("postgres", "pgvector") provision it too; legacy "sqlite" never does.
+// compose db service is what a postgres DSN points at.
 func renderNewCompose(sel []batterySelection) string {
 	needsPG := false
 	redisBatteries := []string{}
@@ -296,9 +295,8 @@ func renderNewCompose(sel []batterySelection) string {
 		switch {
 		case s.Battery == "db" && s.Adapter == "postgres":
 			needsPG = true
-		case (s.Battery == "search" && (s.Adapter == "db" || s.Adapter == "postgres")) ||
-			(s.Battery == "vectorstore" && (s.Adapter == "db" || s.Adapter == "pgvector")) ||
-			(s.Battery == "workflow" && (s.Adapter == "db" || s.Adapter == "postgres")):
+		case (s.Battery == "search" || s.Battery == "vectorstore" || s.Battery == "workflow") &&
+			s.Adapter == "db":
 			needsPG = true
 		case (s.Battery == "cache" || s.Battery == "queue" || s.Battery == "session" ||
 			s.Battery == "ratelimit" || s.Battery == "lock" || s.Battery == "eventbus" ||

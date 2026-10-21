@@ -673,9 +673,9 @@ func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 }
 
 // Search resolves and returns the search service instance. A db-backed
-// search (canonical "db" or its "postgres"/"sqlite" aliases) pointing at
-// an already-pooled DSN borrows the shared pool (owns=false);
-// DedicatedPool or a non-shareable DSN opens a private pool as before.
+// search (the "db" adapter) pointing at an already-pooled DSN borrows the
+// shared pool (owns=false); DedicatedPool or a non-shareable DSN opens a
+// private pool as before.
 func (c *Container) Search() (search.Search, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(search.DefaultRef()); ok {
@@ -747,10 +747,9 @@ func (c *Container) Tenant() (tenant.Tenant, error) {
 }
 
 // VectorStore resolves and returns the vectorstore service instance. A
-// db-backed vectorstore (canonical "db" or its "pgvector"/"sqlite"
-// aliases) pointing at an already-pooled DSN borrows the shared pool
-// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
-// as before.
+// db-backed vectorstore (the "db" adapter) pointing at an already-pooled
+// DSN borrows the shared pool (owns=false); DedicatedPool or a
+// non-shareable DSN opens a private pool as before.
 func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(vectorstore.DefaultRef()); ok {
@@ -779,10 +778,10 @@ func (c *Container) Webhook() (webhook.Webhook, error) {
 }
 
 // Workflow resolves and returns the workflow service instance. A db-backed
-// workflow (canonical "db" or its "postgres" alias) pointing at an
-// already-pooled DSN borrows the shared pool (owns=false); DedicatedPool
-// or a non-shareable DSN opens a private pool as before. Under sustained
-// load prefer a separate workflow database with DedicatedPool.
+// workflow (the "db" adapter) pointing at an already-pooled DSN borrows the
+// shared pool (owns=false); DedicatedPool or a non-shareable DSN opens a
+// private pool as before. Under sustained load prefer a separate workflow
+// database with DedicatedPool.
 func (c *Container) Workflow() (workflow.Workflow, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(workflow.DefaultRef()); ok {

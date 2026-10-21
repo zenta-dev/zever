@@ -151,8 +151,8 @@ docker build -t app .
 docker run --rm -p 8080:8080 -p 9090:9090 app
 ```
 
-When a picked battery needs external infra (`db=postgres`,
-`search=postgres`, `vectorstore=pgvector`, or any `*=redis` battery),
+When a picked battery needs external infra (`db=postgres`, `search=db`,
+`vectorstore=db`, `workflow=db`, or any `*=redis` battery),
 `zever new` also writes `compose.yaml`: `app` (build `.`) plus `db`
 (`postgres:16-bookworm`) and/or `redis` (`redis:7-alpine`) with
 health-gated `depends_on`, persistent volumes, and env-carried secrets

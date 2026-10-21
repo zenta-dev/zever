@@ -124,16 +124,19 @@ func TestResolveBuildAdaptersDedupesAndSorts(t *testing.T) {
 	}
 }
 
-// TestResolveBuildAdaptersLegacyAlias pins consolidated-dir aliases.
-func TestResolveBuildAdaptersLegacyAlias(t *testing.T) {
+// TestResolveBuildAdaptersRemovedAlias pins that a removed adapter name is
+// rejected: the per-backend names of the db-backed batteries only existed
+// for the legacy file-based config format, and a slim binary built with one
+// would fail to resolve it at runtime.
+func TestResolveBuildAdaptersRemovedAlias(t *testing.T) {
 	t.Parallel()
 
-	sel, err := resolveBuildAdapters("search/postgres")
-	if err != nil {
-		t.Fatalf("resolveBuildAdapters search/postgres error = %v", err)
+	_, err := resolveBuildAdapters("search/postgres")
+	if err == nil {
+		t.Fatal("resolveBuildAdapters search/postgres = nil error, want unknown adapter error")
 	}
 
-	if len(sel) != 1 || sel[0].Battery != "search" {
-		t.Fatalf("resolveBuildAdapters search/postgres = %v, want one search selection", sel)
+	if !strings.Contains(err.Error(), `"search/postgres"`) {
+		t.Errorf("error %q missing selection", err.Error())
 	}
 }
