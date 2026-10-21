@@ -120,10 +120,11 @@ SAFETY — writing a safe migration is an expand/contract exercise, and
 
 --lock-timeout/--statement-timeout bound every applied statement on
 postgres via SET LOCAL inside the statement's own transaction (e.g.
---lock-timeout=10s --statement-timeout=30s); unset flags fall back to
-db.options lock_timeout/statement_timeout from the config file. Waive one
-rule on one statement with a '-- zever:allow:<code>' comment, or every rule
-with a bare '-- zever:allow'.
+--lock-timeout=10s --statement-timeout=30s); unset flags fall back to the
+DB_LOCK_TIMEOUT and DB_STATEMENT_TIMEOUT env keys, read from .env at the
+project root or from the process environment. Waive one rule on one
+statement with a '-- zever:allow:<code>' comment, or every rule with a
+bare '-- zever:allow'.
 
 Driving the real Atlas engine for full diff-based migrations is deferred.`
 
@@ -236,9 +237,9 @@ func runDBMigrate(args []string) error {
 	lint := fs.Bool("lint", false,
 		"lint the planned DDL for unsafe patterns (drops, NOT NULL without default, non-concurrent index, type rewrite); error findings fail the run before anything is applied")
 	lockTimeout := fs.Duration("lock-timeout", 0,
-		"postgres SET LOCAL lock_timeout per statement (e.g. 10s); zero disables; falls back to db.options.lock_timeout from the config file")
+		"postgres SET LOCAL lock_timeout per statement (e.g. 10s); zero disables; falls back to the DB_LOCK_TIMEOUT env key ("+projectEnvHint+")")
 	statementTimeout := fs.Duration("statement-timeout", 0,
-		"postgres SET LOCAL statement_timeout per statement (e.g. 30s); zero disables; falls back to db.options.statement_timeout from the config file")
+		"postgres SET LOCAL statement_timeout per statement (e.g. 30s); zero disables; falls back to the DB_STATEMENT_TIMEOUT env key ("+projectEnvHint+")")
 	concurrentIndexes := fs.Bool("concurrent-indexes", false,
 		"build postgres indexes with CREATE INDEX CONCURRENTLY (no write block; each build runs outside a transaction)")
 	// coverageProof: no local -i/--interactive flags (cf. db.go's removed arm).
@@ -341,10 +342,10 @@ func runDBMigrate(args []string) error {
 	cfg := resolveMigrateConfig(adapterVal, dsnVal, nil, *dryRun, *dropColumns,
 		resolveMigrateSafetyOptions(*lint, *lockTimeout, *statementTimeout, *concurrentIndexes))
 
-	// Config-file fallback for timeouts the flags left unset: db.options
-	// lock_timeout/statement_timeout (file or DB_* env) become the plan's
-	// timeouts. Best-effort: no config file, or an unloadable one, keeps the
-	// flag values (zero disables).
+	// Environment fallback for timeouts the flags left unset: the
+	// DB_LOCK_TIMEOUT and DB_STATEMENT_TIMEOUT env keys become the plan's
+	// timeouts. Best-effort: an unreadable .env or an unresolvable value
+	// keeps the flag values (zero disables).
 	applyConfigTimeoutFallback(&cfg)
 
 	result, diags := compile.Compile(files, atlas.New())
@@ -461,8 +462,9 @@ func flagWasSet(fs *flag.FlagSet, name string) bool {
 }
 
 // applyConfigTimeoutFallback fills timeouts the flags left unset from the
-// resolved service config's db options (OUTBOX_* / DB_* env), best-effort:
-// an unresolvable config keeps the flag values (zero disables).
+// environment's db options (DB_LOCK_TIMEOUT / DB_STATEMENT_TIMEOUT),
+// best-effort: an unreadable .env or an unresolvable value keeps the flag
+// values (zero disables).
 func applyConfigTimeoutFallback(cfg *MigrateConfig) {
 	if cfg.LockTimeout != 0 && cfg.StatementTimeout != 0 {
 		return
@@ -472,17 +474,18 @@ func applyConfigTimeoutFallback(cfg *MigrateConfig) {
 	if err != nil {
 		return
 	}
-	fileCfg, loadErr := config.Resolve(env)
-	if loadErr != nil || fileCfg == nil {
+
+	envCfg, resolveErr := config.Resolve(env)
+	if resolveErr != nil || envCfg == nil {
 		return
 	}
 
 	if cfg.LockTimeout == 0 {
-		cfg.LockTimeout = fileCfg.DB.Options.LockTimeout
+		cfg.LockTimeout = envCfg.DB.Options.LockTimeout
 	}
 
 	if cfg.StatementTimeout == 0 {
-		cfg.StatementTimeout = fileCfg.DB.Options.StatementTimeout
+		cfg.StatementTimeout = envCfg.DB.Options.StatementTimeout
 	}
 }
 
