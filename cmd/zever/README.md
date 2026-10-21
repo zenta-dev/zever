@@ -118,6 +118,22 @@ Run & ops, plus the additional commands).
   yet).
 - For the full command list, see `zever --help`.
 
+## Project layout keys
+
+The six `ZEVER_*` keys move the project's layout — where it keeps its `.zen`
+schemas (`ZEVER_SCHEMA_DIR`, default `schema`), its generated code
+(`ZEVER_GENERATED_DIR`, default `generated`), and the entrypoint packages
+the launcher commands shell out to (`ZEVER_SERVER_ENTRY`, default
+`cmd/server`; `ZEVER_WORKER_ENTRY`, default `cmd/worker`;
+`ZEVER_TINKER_ENTRY`, default `cmd/tinker-shim`; `ZEVER_SEED_ENTRY`, default
+`db/seed`).
+
+They resolve with the framework's precedence — defaults < `.env` <
+`.env.local` < the process environment — out of the working directory the
+CLI treats as the project root (the directory holding `go.mod`). A key
+therefore belongs in the `.env` at the project root, or in the `.env.local`
+next to it, or in the process environment; no config file is ever read.
+
 ## `zever new` contributor tooling
 
 Every `zever new` project also ships a `Makefile` (`generate`, `build`,
@@ -179,5 +195,5 @@ command output.
   against a live container, so run it against a development database only.`
   to stderr (see `tinkerDevWarning` in `tinker.go`). The REPL talks
   to the project's real container via the per-project shim
-  (`project.tinker_entry`, default `cmd/tinker-shim` — scaffold it with
+  (`ZEVER_TINKER_ENTRY`, default `cmd/tinker-shim` — scaffold it with
   `zever generate tinker`); never point it at production data.

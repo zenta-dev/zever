@@ -29,6 +29,15 @@ const (
 	EnvSeedEntry = "ZEVER_SEED_ENTRY"
 )
 
+// projectEnvHint names where the ZEVER_* layout keys live: the .env at the
+// project root, or the process environment. The framework resolves them
+// defaults < .env < .env.local < process environment, so a key belongs in
+// the .env the project already keeps its settings in (the .env.local next to
+// it overrides it) unless the shell sets it. Every help text that names one
+// of these keys repeats this hint, so the help cannot promise a file the
+// CLI does not read.
+const projectEnvHint = ".env at the project root, or the process environment"
+
 // ProjectConfig holds CLI-only project layout conventions: where a project
 // keeps its .zen schemas, its generated code, and the entrypoint packages the
 // launcher subcommands (serve, worker, db seed, tinker) shell out to.

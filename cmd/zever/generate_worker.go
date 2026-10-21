@@ -16,8 +16,8 @@ import (
 )
 
 const workerUsageBody = `Scaffolds the background worker entrypoint at <worker_entry>/main.go (default
-cmd/worker, override with the ZEVER_WORKER_ENTRY env key), plus
-internal/app/app.go if the project does not have one yet.
+cmd/worker, override with the ZEVER_WORKER_ENTRY env key in ` + projectEnvHint + `),
+plus internal/app/app.go if the project does not have one yet.
 
 The worker and the scheduler run in one process over one shared queue, which
 is what the in-process memory queue adapter requires; swapping the queue

@@ -141,7 +141,7 @@ func runTinker(args []string) error {
 
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("tinker", flag.ContinueOnError)
-	entry := fs.String("entry", "", "shim package to run (default: the project config's tinker_entry)")
+	entry := fs.String("entry", "", "shim package to run (default: the ZEVER_TINKER_ENTRY key in "+projectEnvHint+", cmd/tinker-shim)")
 	// coverageProof: no local -i/--interactive flags (cf. db.go's removed
 	// arm). peelInteractive strips them before Parse and sets interactiveMode
 	// globally, so the FlagSet could never see them.

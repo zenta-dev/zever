@@ -26,7 +26,7 @@ func resolveServeConfig(project ProjectConfig, args []string) ServeConfig {
 // this shells out instead of serving in-process.
 func runServe(args []string) error {
 	if hasHelpFlag(args) {
-		printLauncherHelp(flag.CommandLine.Output(), "zever serve", "Starts this project's HTTP server by running its server entrypoint package (project.server_entry, default cmd/server). Every argument is passed through untouched to that entrypoint.", "zever serve -addr :9090  # => go run ./cmd/server -addr :9090")
+		printLauncherHelp(flag.CommandLine.Output(), "zever serve", "Starts this project's HTTP server by running its server entrypoint package (ZEVER_SERVER_ENTRY, default cmd/server; set it in "+projectEnvHint+"). Every argument is passed through untouched to that entrypoint.", "zever serve -addr :9090  # => go run ./cmd/server -addr :9090")
 		return nil
 	}
 

@@ -25,8 +25,8 @@ func newServeCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Run server entrypoint (default cmd/server)",
 		Long: `Run this project's server entrypoint package
-(project.server_entry, default cmd/server). Every argument is passed
-through to that package.`,
+(ZEVER_SERVER_ENTRY, default cmd/server; set it in ` + projectEnvHint + `).
+Every argument is passed through to that package.`,
 		Example:            `  zever serve`,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
@@ -86,8 +86,8 @@ func newQueueWorkCmd() *cobra.Command {
 		Use:   "queue:work",
 		Short: "Run worker entrypoint (default cmd/worker)",
 		Long: `Run this project's background worker by running its worker
-entrypoint package (project.worker_entry, default cmd/worker). Every
-argument is passed through to that package.`,
+entrypoint package (ZEVER_WORKER_ENTRY, default cmd/worker; set it in ` + projectEnvHint + `).
+Every argument is passed through to that package.`,
 		Example:            `  zever queue:work`,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,

@@ -123,7 +123,7 @@ func runGenerateTinker(args []string) error {
 	args = peelInteractive(args)
 	fs := flag.NewFlagSet("generate tinker", flag.ContinueOnError)
 	appPkg := fs.String("app", "", "import path of the project's app package (default: <module>/internal/app)")
-	dir := fs.String("dir", "", "output directory (default: the project config's tinker_entry)")
+	dir := fs.String("dir", "", "output directory (default: the ZEVER_TINKER_ENTRY key in "+projectEnvHint+", cmd/tinker-shim)")
 	force := fs.Bool("force", false, "overwrite an existing shim")
 	dryRun := fs.Bool("dry-run", false, "print the planned write without writing files")
 	// coverageProof: no local -i/--interactive flags; peelInteractive
