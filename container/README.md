@@ -4,6 +4,10 @@
 per process. Build it once with explicit typed providers, or fall back to the
 config-based accessors for a quick start.
 
+Service configuration comes only from `.env`, `.env.local` and the process
+environment. A config file left over from an older release is not read at all:
+the framework never looks for it and never warns about it.
+
 ```go
 import (
 	"github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -70,10 +74,11 @@ appliers run. Explicit options win over env. A named instance reads
 `SERVICE__NAME__*` env keys, not `SERVICE_*`.
 
 The process environment is read once, on the first provider build: a
-container built without providers never reads it. The legacy-config
-warning (`zever.yaml found in working directory: ignored`) therefore prints
-when the environment is read, not at `New`; an app that resolves its own
-environment through `config.FromEnv` sees it there instead.
+container built without providers never reads it. A config file left over
+from an older release is inert — the environment is read from `.env`,
+`.env.local` and the process environment only, and the leftover file is
+neither opened nor reported. Translate its stanzas into `.env` and delete
+the file; the migration guide in `config/README.md` shows the mapping.
 
 Graph validation runs at `New`: duplicate refs, missing non-`Optional`
 dependencies, and dependency cycles are recorded per ref and surfaced by

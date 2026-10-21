@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -240,5 +242,34 @@ func TestNewWithoutProvidersIgnoresUnreadableEnvironment(t *testing.T) {
 
 	if _, err := c.DB(); err != nil {
 		t.Fatalf("DB with an unreadable environment = %v, want nil (the legacy path never reads the environment)", err)
+	}
+}
+
+// TestPackageSourceHasNoLegacyConfigNames guards the clean break: no file
+// in this package may name a config file left over from an older release,
+// so the framework can neither stat such a file nor warn about it. The
+// pattern is assembled from parts so this file does not spell a legacy
+// name out either.
+func TestPackageSourceHasNoLegacyConfigNames(t *testing.T) {
+	t.Parallel()
+
+	exts := []string{"json", "yml", "yaml", "toml"}
+	pattern := regexp.MustCompile(`(?i)zever\.(` + strings.Join(exts, "|") + `)`)
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := pattern.FindIndex(data); loc != nil {
+			t.Errorf("%s names a legacy config file at offset %d", entry.Name(), loc[0])
+		}
 	}
 }
