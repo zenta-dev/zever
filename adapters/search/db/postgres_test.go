@@ -574,10 +574,10 @@ func TestClose_idempotent(t *testing.T) {
 	}
 }
 
-func TestOpenRegister_bothNames(t *testing.T) {
+func TestOpenRegister_canonicalName(t *testing.T) {
 	Register()
 
-	for _, adapter := range []search.Adapter{search.DB, search.Postgres, search.SQLite} {
+	for _, adapter := range []search.Adapter{search.DB} {
 		s, err := search.Open(adapter, search.Options{})
 		if err != nil {
 			t.Fatalf("Open(%s) error = %v", adapter, err)

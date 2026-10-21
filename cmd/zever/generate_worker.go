@@ -16,13 +16,13 @@ import (
 )
 
 const workerUsageBody = `Scaffolds the background worker entrypoint at <worker_entry>/main.go (default
-cmd/worker, override with project.worker_entry), plus internal/app/app.go if
-the project does not have one yet.
+cmd/worker, override with the ZEVER_WORKER_ENTRY env key), plus
+internal/app/app.go if the project does not have one yet.
 
 The worker and the scheduler run in one process over one shared queue, which
 is what the in-process memory queue adapter requires; swapping the queue
-adapter for redis/nats in zever.yaml is what makes it distributable, with no
-code change in the generated file.
+adapter for redis/nats (QUEUE_ADAPTER=redis in .env at the project root) is
+what makes it distributable, with no code change in the generated file.
 
 The worker also starts the outbox relay (container.OutboxRelay), which drains
 recorded outbox events onto the configured transport. The API server stays
@@ -525,8 +525,8 @@ const workerTemplate = `// Command worker runs this project's background job wor
 // Scaffolded by ` + "`zever generate worker`" + `. The scheduler dispatches onto the
 // queue and the worker consumes from it, so both must share one queue: with
 // the in-process memory adapter that means one process. Swapping the queue
-// adapter for redis/nats in zever.yaml is what makes this distributable, with
-// no code change here.
+// adapter for redis/nats (QUEUE_ADAPTER=redis in .env at the project root) is
+// what makes this distributable, with no code change here.
 package main
 
 import (

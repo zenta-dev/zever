@@ -774,11 +774,7 @@ func TestRunNewScaffoldsMinimalWiring(t *testing.T) {
 	}
 
 	// Config is env-only: no config files are scaffolded.
-	for _, name := range []string{"zever.yaml", "zever.schema.json"} {
-		if _, err := os.Stat(filepath.Join(workDir, "zeta", name)); !os.IsNotExist(err) {
-			t.Fatalf("%s must not be scaffolded (err = %v)", name, err)
-		}
-	}
+	assertNoConfigFiles(t, filepath.Join(workDir, "zeta"))
 
 	wiring := readFile(t, filepath.Join(workDir, "zeta", "internal", "app", "wiring.go"))
 
@@ -796,8 +792,8 @@ func TestRunNewScaffoldsMinimalWiring(t *testing.T) {
 }
 
 // TestRunNewWritesNoConfigFiles proves `zever new` scaffolds no config
-// files at all: service configuration is env-only, so neither zever.yaml
-// nor zever.schema.json is emitted.
+// files at all: service configuration is env-only, so the project carries
+// .env and .env.example and nothing else that configures a service.
 func TestRunNewWritesNoConfigFiles(t *testing.T) {
 	repoRoot := repoRootAbs(t)
 	workDir := t.TempDir()
@@ -812,11 +808,29 @@ func TestRunNewWritesNoConfigFiles(t *testing.T) {
 		t.Fatalf("runNew: %v", err)
 	}
 
-	out := filepath.Join(workDir, "zeta")
+	assertNoConfigFiles(t, filepath.Join(workDir, "zeta"))
+}
 
-	for _, name := range []string{"zever.yaml", "zever.schema.json"} {
-		if _, err := os.Stat(filepath.Join(out, name)); !os.IsNotExist(err) {
-			t.Fatalf("%s must not be scaffolded (err = %v)", name, err)
+// assertNoConfigFiles fails when the scaffolded project root holds a config
+// file. Since v0.8.0 configuration is env-only: the project carries .env and
+// .env.example, and a yaml/json file in the root would be a file the
+// framework never reads.
+func assertNoConfigFiles(t *testing.T, dir string) {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+
+		switch strings.ToLower(filepath.Ext(e.Name())) {
+		case ".yaml", ".yml", ".json":
+			t.Errorf("%s must not be scaffolded: configuration is env-only", e.Name())
 		}
 	}
 }

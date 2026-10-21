@@ -4,9 +4,12 @@ Env-only service configuration: zero-infrastructure defaults, overlaid by
 environment variables. Later layers win:
 `defaults < .env < .env.local < process env`.
 
-There are no config files for services. A legacy `zever.yaml`/`.yml`/`.json`
-in the working directory is ignored (with a one-line stderr warning); see
-[Migration from zever.yaml](#migration-from-zeveryaml) below.
+There are no config files for services: service configuration comes only
+from `.env`, `.env.local` and the process environment. A config file left
+over from an older release is not read at all — the framework never looks
+for it and never warns about it; see
+[Migration from the legacy config file](#migration-from-the-legacy-config-file)
+below.
 
 ## Precedence
 
@@ -248,13 +251,13 @@ real key (`CRYPTO_KEY`).
 `ZEVER_CONFIG_STRICT`, test-only `ZEVER_CHROMEDP_NO_SANDBOX`): service
 configuration itself is always unprefixed `<SERVICE>_*`.
 
-## Migration from zever.yaml
+## Migration from the legacy config file
 
-Service configuration moved from `zever.yaml`/`.yml`/`.json` files to the
+Service configuration moved from the legacy YAML/JSON config file to the
 environment. Translate each stanza mechanically:
 
 ```yaml
-# before: zever.yaml
+# before: the legacy config file
 db:
   adapter: postgres
   options:
@@ -282,6 +285,11 @@ whether the adapter needs them. Unknown keys that used to fail file
 decoding now fail `Resolve` with a did-you-mean hint when they are close to
 a known field; the rest are ignored as ambient variables (see
 [Ambient-environment safety](#ambient-environment-safety-and-the-typo-rule)).
+
+The legacy file has not been read since v0.8.0, and nothing reads it now:
+the framework never opens it and never reports it, so a leftover copy in
+the working directory is inert. Translate the stanzas, then delete the
+file — the environment is the only source of service configuration.
 
 ## Reload: restart-only, except SIGHUP
 

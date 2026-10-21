@@ -1,8 +1,10 @@
 package config
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -301,39 +303,103 @@ func TestFromEnvProcessValuesStayLiteral(t *testing.T) {
 	}
 }
 
-func TestWarnLegacyConfigFile(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		file string
-	}{
-		{name: "yaml", file: "zever.yaml"},
-		{name: "yml", file: "zever.yml"},
-		{name: "json", file: "zever.json"},
+// legacyConfigFileName returns the name of a config file left over from a
+// release that still had one. The name is assembled from parts so this
+// package never spells a legacy name out: the framework must not know
+// them.
+func legacyConfigFileName(ext string) string {
+	return "zever" + "." + ext
+}
+
+// captureStderr returns everything fn wrote to os.Stderr. The pipe is
+// drained after fn returns, so the caller must not run in parallel with
+// other stderr writers.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	old := os.Stderr
+
+	rd, wr, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+
+	os.Stderr = wr
+
+	fn()
+
+	os.Stderr = old
+	_ = wr.Close()
+
+	b, _ := io.ReadAll(rd)
+	_ = rd.Close()
+
+	return string(b)
+}
+
+// TestFromEnvIgnoresLegacyConfigFiles proves the clean break: a config
+// file left over from an older release is not read, not reported and does
+// not reach the environment. FromEnv returns the dotenv/process
+// environment unchanged and writes nothing to stderr.
+func TestFromEnvIgnoresLegacyConfigFiles(t *testing.T) {
+	// No t.Parallel: the test changes the working directory and replaces
+	// os.Stderr.
+	for _, ext := range []string{"yaml", "yml", "json", "toml"} {
+		t.Run(ext, func(t *testing.T) {
 			dir := t.TempDir()
-			writeDotEnv(t, dir, tt.file, "db:\n  adapter: sqlite\n")
-			var sb strings.Builder
-			warnLegacyConfigFile(&sb, dir)
-			if !strings.Contains(sb.String(), "ignored; see migration guide") {
-				t.Fatalf("got %q", sb.String())
+			name := legacyConfigFileName(ext)
+			if err := os.WriteFile(filepath.Join(dir, name), []byte("db:\n  adapter: postgres\n"), 0o600); err != nil {
+				t.Fatal(err)
 			}
-			if strings.Count(sb.String(), "\n") != 1 {
-				t.Fatalf("want one line, got %q", sb.String())
+			writeDotEnv(t, dir, ".env", "K=from-env\n")
+			t.Chdir(dir)
+
+			var env Env
+			var err error
+			out := captureStderr(t, func() {
+				env, err = FromEnv()
+			})
+			if err != nil {
+				t.Fatalf("FromEnv: %v", err)
+			}
+			if out != "" {
+				t.Fatalf("FromEnv wrote %q, want nothing (the legacy file is not reported)", out)
+			}
+			if env["K"] != "from-env" {
+				t.Fatalf("env[%q] = %q, want %q", "K", env["K"], "from-env")
+			}
+			if _, ok := env["DB_ADAPTER"]; ok {
+				t.Fatal("the legacy file leaked into the environment")
 			}
 		})
 	}
 }
 
-func TestWarnLegacyConfigFileAbsent(t *testing.T) {
+// TestPackageSourceHasNoLegacyConfigNames guards the clean break: no file
+// in this package may name a legacy config file, so the framework can
+// neither stat such a file nor warn about it. The pattern is assembled
+// from parts so this file does not spell a legacy name out either.
+func TestPackageSourceHasNoLegacyConfigNames(t *testing.T) {
 	t.Parallel()
-	var sb strings.Builder
-	warnLegacyConfigFile(&sb, t.TempDir())
-	if sb.String() != "" {
-		t.Fatalf("got %q", sb.String())
+
+	exts := []string{"json", "yml", "yaml", "toml"}
+	pattern := regexp.MustCompile(`(?i)zever\.(` + strings.Join(exts, "|") + `)`)
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := pattern.FindIndex(data); loc != nil {
+			t.Errorf("%s names a legacy config file at offset %d", entry.Name(), loc[0])
+		}
 	}
 }
 

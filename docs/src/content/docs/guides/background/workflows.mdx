@@ -55,7 +55,6 @@ Register the adapter with `workflowmemory.Register()` before resolving through t
 |---|---|---|
 | `memory` | `adapters/workflow/memory` | Default. Local dev and tests. In-process; a run holds at most 100 pending signals, then `Signal` returns `ErrPendingFull` instead of blocking. |
 | `db` | `adapters/workflow/db` | Durable DB-backed runs, lease-reclaimed steps. Set `dsn` to a postgres URL (empty is sqlite). |
-| `postgres` | `adapters/workflow/db` | Legacy alias for `db`. |
 
 `memory` state dies with the process, so two replicas each see only their own runs and a restart loses all of them; anything that must survive a crash needs `db`. Engines with host-registered steps expose them through the separate `StepRegistrar` interface (`RegisterStep`), so engines without the concept are unaffected. Step input and output must be JSON-marshalable; the output becomes queryable state, so keep payloads small and reference-backed.
 

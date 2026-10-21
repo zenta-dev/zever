@@ -14,8 +14,6 @@ func TestAdapter_String_values(t *testing.T) {
 		want    string
 	}{
 		{"db", DB, "db"},
-		{"sqlite", SQLite, "sqlite"},
-		{"pgvector", PGVector, "pgvector"},
 		{"qdrant", Qdrant, "qdrant"},
 		{"unknown", Adapter(""), "unknown"},
 		{"negative", Adapter(""), "unknown"},
@@ -38,8 +36,6 @@ func TestAdapter_Parse_valid_roundtrip(t *testing.T) {
 		want Adapter
 	}{
 		{"db", DB},
-		{"sqlite", SQLite},
-		{"pgvector", PGVector},
 		{"qdrant", Qdrant},
 	}
 	for _, tc := range cases {

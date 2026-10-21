@@ -14,9 +14,9 @@ func TestRunQueueWorkUsesDefaultWorkerEntry(t *testing.T) {
 	assertOneLaunch(t, calls, defaultWorkerEntry, []string{"--concurrency=8"})
 }
 
-func TestRunQueueWorkIgnoresLegacyWorkerEntry(t *testing.T) {
+func TestRunQueueWorkIgnoresStrayWorkerEntry(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  worker_entry: cmd/jobs\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  worker_entry: cmd/jobs\n")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
@@ -53,12 +53,11 @@ func TestResolveWorkerConfig(t *testing.T) {
 	}
 }
 
-// TestRunQueueWorkIgnoresBadLegacyConfig proves a broken legacy project
-// file no longer surfaces: layout is defaults-only, so the default worker
-// launches.
-func TestRunQueueWorkIgnoresBadLegacyConfig(t *testing.T) {
+// TestRunQueueWorkIgnoresBadStrayConfig proves a broken config file no
+// longer surfaces: layout is defaults-only, so the default worker launches.
+func TestRunQueueWorkIgnoresBadStrayConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeZeverFixture(t, dir, "zever.yaml", "project:\n  worker_entry: [unclosed\n")
+	writeZeverFixture(t, dir, strayConfigFile, "project:\n  worker_entry: [unclosed\n")
 	t.Chdir(dir)
 
 	calls := stubLaunch(t, nil)
