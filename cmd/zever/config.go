@@ -113,12 +113,22 @@ func runConfigShow(args []string) error {
 // sensitive field with config.RedactedValue), and named instances through
 // config.Redact over the same JSON-tagged option maps.
 func runConfigShowWith(cfg ConfigConfig) error {
-	out := outOrStdout(cfg.Out)
-
 	env, err := config.FromEnv()
 	if err != nil {
 		return fmt.Errorf("zever config show: resolve env: %w", err)
 	}
+
+	return runConfigShowWithEnv(cfg, env)
+}
+
+// runConfigShowWithEnv is runConfigShowWith with the environment given
+// explicitly: service config is env-only, so the env map is the command's
+// single input. The flag shell resolves that map from .env/.env.local
+// discovery plus the process environment (config.FromEnv); a caller with
+// its own map (a test) resolves the very same command from it, with no
+// dependence on the ambient environment.
+func runConfigShowWithEnv(cfg ConfigConfig, env config.Env) error {
+	out := outOrStdout(cfg.Out)
 
 	resolved, err := config.Resolve(env)
 	if err != nil {

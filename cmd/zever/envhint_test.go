@@ -41,16 +41,23 @@ func TestEnvTypoHintPicksTheSameKeyEveryTime(t *testing.T) {
 // end to end: with ZEVER_CONFIG_STRICT=1 an unrelated variable fails
 // resolution again, and the hint says what to do with it instead of
 // dead-ending.
+//
+// The environment is built explicitly instead of resolved from the process:
+// strict mode rejects every unknown key under a wired service prefix, so a
+// test that read the real environment would fail in any shell that exports
+// an ambient key (AI_AGENT and friends) before the test's own typo is
+// reached.
 func TestEnvTypoHintStrictModeNamesTheRealKeys(t *testing.T) {
 	t.Setenv("ZEVER_NO_HINT", "")
-	t.Setenv("ZEVER_CONFIG_STRICT", "1")
-	t.Setenv("DB_HOST", "localhost")
 
-	t.Chdir(t.TempDir())
+	env := config.Env{
+		config.StrictEnvKey: "1",
+		"DB_HOST":           "localhost",
+	}
 
-	err := runConfigShowWith(ConfigConfig{Out: &bytes.Buffer{}})
+	err := runConfigShowWithEnv(ConfigConfig{Out: &bytes.Buffer{}}, env)
 	if err == nil {
-		t.Fatal("runConfigShowWith strict ambient key: got nil error, want non-nil")
+		t.Fatal("runConfigShowWithEnv strict ambient key: got nil error, want non-nil")
 	}
 
 	msg := err.Error()
