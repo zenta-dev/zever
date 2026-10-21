@@ -13,7 +13,9 @@
     "lint": "node scripts/lint-docs.mjs",
     "lint:self-test": "node scripts/lint-docs.mjs --self-test",
     "check-links": "node scripts/check-links.mjs",
-    "check-links:self-test": "node scripts/check-links.mjs --self-test"
+    "check-links:self-test": "node scripts/check-links.mjs --self-test",
+    "check-legacy-config": "node scripts/no-legacy-config.mjs",
+    "check-legacy-config:self-test": "node scripts/no-legacy-config.mjs --self-test"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",
