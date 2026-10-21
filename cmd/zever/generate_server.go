@@ -385,9 +385,10 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 }
 
 const serverUsageBody = `Scaffolds a thin HTTP+gRPC server entrypoint at <server_entry>/main.go
-(default cmd/server): a flag-parsing wrapper over the serve library (the
-same shape "zever new" writes) that passes the project's Providers and
-the schema modules to serve.Main. All boot behavior -- listeners, TLS,
+(default cmd/server, override with the ZEVER_SERVER_ENTRY env key): a
+flag-parsing wrapper over the serve library (the same shape "zever new"
+writes) that passes the project's Providers and the schema modules to
+serve.Main. All boot behavior -- listeners, TLS,
 health, readiness, rate limiting, reflection, pprof, doctor -- lives in
 serve; project wiring lives in internal/app.
 
@@ -438,7 +439,7 @@ func printServerUsage(fs *flag.FlagSet) {
 
 // GenerateServerConfig is the pure input to GenerateServer: resolved project
 // paths plus the flags. RateLimitEnabled gates the rate-limit wiring (see
-// rateLimitConfigured); callers obtain it from the project config, not flags.
+// rateLimitConfigured); callers obtain it from the environment, not flags.
 type GenerateServerConfig struct {
 	ModulePath       string
 	OutDir           string

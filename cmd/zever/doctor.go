@@ -164,7 +164,7 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 // process's registrations, skipping batteries the project does not enable:
 // a slim `zever build --adapters=...` binary registers only its subset, so
 // validating excluded batteries would fail a binary that is correct for its
-// project. A nil enabled set (no project config found) keeps the strict
+// project. A nil enabled set (nothing narrowed the scope) keeps the strict
 // all-battery check. Enabled-but-unregistered batteries still fail closed.
 func scopedValidateAdapters(resolved *config.Config, enabled map[string]bool, registered func(service string) []string) error {
 	if enabled == nil {
@@ -192,7 +192,7 @@ type doctorRow struct {
 // checks run, and the note explaining the choice to the operator.
 type doctorScope struct {
 	// enabled lists the project's enabled batteries by name. Nil means no
-	// project config was found, so every known battery is checked.
+	// enabled set was resolved, so every known battery is checked.
 	enabled map[string]bool
 	// source names where the checks run: "cli", or "server:<entry>".
 	source string
