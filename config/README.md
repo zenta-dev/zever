@@ -59,14 +59,14 @@ below.
 | resilience    | memory, redis                       |
 | router        | fiber, stdhttp                      |
 | scheduler     | embedded, postgres                  |
-| search        | db, postgres, meilisearch, sqlite   |
+| search        | db, meilisearch                    |
 | secrets       | env, vault                          |
 | session       | memory, redis, db                   |
 | storage       | local, s3, r2                       |
 | tenant        | single, header                      |
-| vectorstore   | db, sqlite, pgvector, qdrant        |
+| vectorstore   | db, qdrant                         |
 | webhook       | http, queue                         |
-| workflow      | memory, db, postgres                |
+| workflow      | memory, db                         |
 
 Two shipped adapters have no registry/config default: `session/cookie`
 and `media/ffmpeg` exist as adapter packages but are absent from the
@@ -191,8 +191,9 @@ SEARCH_DEDICATEDPOOL=false   # default false shares; true opens a private pool
 
 `db` is the canonical DB-backed name for `search`, `vectorstore`, and
 `workflow` (empty DSN selects the embedded sqlite backend, a postgres URL
-selects postgres). The old names (`postgres`, `sqlite`, `pgvector`) stay
-registered as aliases; new configuration should use `db`.
+selects postgres). It is the only name they have: the per-backend names
+(`postgres`, `sqlite`, `pgvector`) were removed with the legacy config
+file format and no longer resolve.
 
 - Matching is the exact DSN string after trim (a URL with and without a
   query string are different pools); sqlite shares by cleaned file path and

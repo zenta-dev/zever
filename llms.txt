@@ -1,6 +1,6 @@
 # zever — llms.txt
 
-Go multi-module monorepo (`go 1.27.0`): schema-driven scaffolding compiler
+Go multi-module monorepo (`go 1.27.3`): schema-driven scaffolding compiler
 (`.zen` DSL) plus swappable backend batteries. Workspace: `go.work` at root.
 Conventions: `AGENTS.md` (repo root).
 

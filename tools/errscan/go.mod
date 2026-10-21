@@ -1,3 +1,3 @@
 module github.com/zenta-dev/zever/tools/errscan
 
-go 1.27
+go 1.27.3

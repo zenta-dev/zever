@@ -146,15 +146,12 @@ type batterySelection struct {
 
 // adapterDirName maps a battery selection to its adapter module directory
 // ("<battery>/<adapter>"), the path segment batteryImportPath builds on.
-// It is mechanical across every pair with five exceptions: the password
+// It is mechanical across every pair with two exceptions: the password
 // adapter string is PHC-canonical "argon2id" while its package directory
-// is "argon2", the resilience "memory" adapter is served by the
-// "resilience/inproc" package directory, and the search/vectorstore/workflow
-// legacy DB-backed adapter names ("postgres", "pgvector", "sqlite") are
-// served by consolidated "db" package directories (empty DSN selects the
-// embedded sqlite backend) since adapters/search/sqlite and
-// adapters/vectorstore/sqlite were folded into them. The canonical "db"
-// name is mechanical (search/db and friends).
+// is "argon2", and the resilience "memory" adapter is served by the
+// "resilience/inproc" package directory. The db-backed batteries
+// (search, vectorstore, workflow) have one adapter each, "db"; the
+// backend follows the DSN, so there is no per-backend name to map.
 func adapterDirName(b batterySelection) string {
 	if b.Battery == "password" && b.Adapter == "argon2id" {
 		return "password/argon2"
@@ -162,18 +159,6 @@ func adapterDirName(b batterySelection) string {
 
 	if b.Battery == "resilience" && b.Adapter == "memory" {
 		return "resilience/inproc"
-	}
-
-	if b.Battery == "search" && (b.Adapter == "db" || b.Adapter == "sqlite" || b.Adapter == "postgres") {
-		return "search/db"
-	}
-
-	if b.Battery == "vectorstore" && (b.Adapter == "db" || b.Adapter == "sqlite" || b.Adapter == "pgvector") {
-		return "vectorstore/db"
-	}
-
-	if b.Battery == "workflow" && (b.Adapter == "db" || b.Adapter == "postgres") {
-		return "workflow/db"
 	}
 
 	return b.Battery + "/" + b.Adapter
@@ -385,9 +370,10 @@ func generateServerDryRun(cfg GenerateServerConfig) (GenerateServerResult, error
 }
 
 const serverUsageBody = `Scaffolds a thin HTTP+gRPC server entrypoint at <server_entry>/main.go
-(default cmd/server): a flag-parsing wrapper over the serve library (the
-same shape "zever new" writes) that passes the project's Providers and
-the schema modules to serve.Main. All boot behavior -- listeners, TLS,
+(default cmd/server, override with the ZEVER_SERVER_ENTRY env key in ` + projectEnvHint + `): a
+flag-parsing wrapper over the serve library (the same shape "zever new"
+writes) that passes the project's Providers and the schema modules to
+serve.Main. All boot behavior -- listeners, TLS,
 health, readiness, rate limiting, reflection, pprof, doctor -- lives in
 serve; project wiring lives in internal/app.
 
@@ -438,7 +424,7 @@ func printServerUsage(fs *flag.FlagSet) {
 
 // GenerateServerConfig is the pure input to GenerateServer: resolved project
 // paths plus the flags. RateLimitEnabled gates the rate-limit wiring (see
-// rateLimitConfigured); callers obtain it from the project config, not flags.
+// rateLimitConfigured); callers obtain it from the environment, not flags.
 type GenerateServerConfig struct {
 	ModulePath       string
 	OutDir           string

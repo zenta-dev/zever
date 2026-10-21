@@ -222,10 +222,10 @@ func TestProviderEnvironmentReadOnce(t *testing.T) {
 	}
 }
 
-// TestNewWithoutProvidersIgnoresUnreadableEnvironment proves the legacy
-// path keeps working when the environment cannot be read: a broken .env
-// fails the provider builds, and the zero-provider container still resolves
-// its services from the config it was given.
+// TestNewWithoutProvidersIgnoresUnreadableEnvironment proves the
+// config-based path keeps working when the environment cannot be read: a
+// broken .env fails the provider builds, and the zero-provider container
+// still resolves its services from the config it was given.
 func TestNewWithoutProvidersIgnoresUnreadableEnvironment(t *testing.T) {
 	// No t.Parallel: the test changes the working directory.
 	registerTestAdapters()
@@ -241,7 +241,7 @@ func TestNewWithoutProvidersIgnoresUnreadableEnvironment(t *testing.T) {
 	mustCloseContainer(t, c)
 
 	if _, err := c.DB(); err != nil {
-		t.Fatalf("DB with an unreadable environment = %v, want nil (the legacy path never reads the environment)", err)
+		t.Fatalf("DB with an unreadable environment = %v, want nil (the config-based path never reads the environment)", err)
 	}
 }
 

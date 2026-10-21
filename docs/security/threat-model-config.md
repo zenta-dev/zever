@@ -17,8 +17,8 @@ Audited against `config/` (`default.go`, `dotenv.go`, `env.go`, `redact.go`,
   **untrusted input** at load time. `FromEnv()` parses the files fail-closed:
   a malformed line is an error naming the file and line, never the value
   (`dotenv.go`). There is no service config file: a legacy
-  `zever.yaml`/`.yml`/`.json` in the cwd is ignored (never read) and only
-  triggers a one-line warning, so it is not a config input path.
+  `zever.yaml`/`.yml`/`.json` in the cwd is never read, and nothing warns
+  about it either, so it is not a config input path.
 - Env overlay is **best-effort** for unknown variables: unknown heads and
   bare names are silently ignored so a hostile/noisy environment cannot
   break startup; only keys that resolve under a wired service prefix and

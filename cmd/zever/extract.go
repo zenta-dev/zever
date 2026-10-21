@@ -26,11 +26,12 @@ never cross a module boundary, so a module's declarations genuinely do not
 reference another module's data. Extraction relocates schema-derived
 scaffolding, it does not rewrite any code.
 
-Every .zen file under <schema_dir> is compiled first, so the target module is
-resolved in the context of the whole workspace. The schema file(s) that
-declare it are then copied byte for byte -- there is no .zen printer, and
-re-serializing from the AST would lose comments and formatting. A file that
-declares two different modules therefore cannot be extracted; split it first.
+Every .zen file under <schema_dir> (the ZEVER_SCHEMA_DIR env key in
+` + projectEnvHint + `) is compiled first, so the target module is resolved
+in the context of the whole workspace. The schema file(s) that declare it are
+then copied byte for byte -- there is no .zen printer, and re-serializing
+from the AST would lose comments and formatting. A file that declares two
+different modules therefore cannot be extracted; split it first.
 
 Not automated, exactly as with ` + "`zever generate server`" + ` and
 ` + "`zever generate worker`" + `: route registration and handler bodies, and job

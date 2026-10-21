@@ -298,7 +298,7 @@ func printBoxedUsage(fs *flag.FlagSet, header, usage, body string, examples []us
 
 // parseEntrypointFlags parses the --force/--interactive preamble both
 // runGenerateSeed and runGenerateWorker share: peel -i, define the flags,
-// set interactiveMode, load the project config and module path, and confirm
+// set interactiveMode, load the project layout and module path, and confirm
 // overwriting an existing entrypoint. entryFile selects the entry directory
 // (SeedEntry vs WorkerEntry) and confirm is the matching prompt seam.
 // Identical to the inlined originals it replaces.
@@ -530,14 +530,14 @@ func runGenerateModule(args []string) error {
 		}
 	}
 
-	schemaDir := defaultSchemaDir
-	if pc, err := loadProjectConfig(); err == nil && pc.SchemaDir != "" {
-		schemaDir = pc.SchemaDir
+	pc, err := loadProjectConfig()
+	if err != nil {
+		return err
 	}
 
-	_, err := GenerateModule(GenerateModuleConfig{
+	_, err = GenerateModule(GenerateModuleConfig{
 		Name:      name,
-		SchemaDir: schemaDir,
+		SchemaDir: pc.SchemaDir,
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,
 		DryRun:    *dryRun || moduleDryRun,

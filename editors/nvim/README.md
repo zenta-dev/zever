@@ -99,15 +99,17 @@ vim.lsp.config('zever_lsp', {
   cmd = { 'zever-lsp' },
   filetypes = { 'zen' },
   root_dir = function(bufnr, on_dir)
-    -- .git first (a normal zever checkout); zever.yaml/go.mod next, so a
-    -- scaffolded project with no git repo of its own yet still finds its
-    -- real root. Falling back to the process's cwd (rather than the
-    -- buffer's own directory) points the workspace scan at whatever
-    -- directory Neovim happened to be launched from -- often unrelated to
-    -- the file being edited -- which silently breaks cross-file features
-    -- like go-to-definition into another .zen file.
+    -- .git first (a normal zever checkout); go.mod next, so a scaffolded
+    -- project with no git repo of its own yet still finds its real root.
+    -- (A Zever project has no config file: the framework reads the
+    -- environment, and `zever new` writes go.mod.) Falling back to the
+    -- process's cwd (rather than the buffer's own directory) points the
+    -- workspace scan at whatever directory Neovim happened to be launched
+    -- from -- often unrelated to the file being edited -- which silently
+    -- breaks cross-file features like go-to-definition into another .zen
+    -- file.
     local root = vim.fs.root(bufnr, { '.git' })
-      or vim.fs.root(bufnr, { 'zever.yaml', 'zever.yml', 'zever.json', 'go.mod' })
+      or vim.fs.root(bufnr, { 'go.mod' })
       or vim.fs.dirname(vim.api.nvim_buf_get_name(bufnr))
 
     on_dir(root)

@@ -66,7 +66,12 @@ jobs:
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       HAS_SYNC_TOKEN: ${{ secrets.DEPS_SYNC_TOKEN != '' }}
-      GOTOOLCHAIN: local
+      # `auto` (the Go default) lets the go command switch to the toolchain
+      # the workspace's `go` directive requires. `local` pins the runner's
+      # bundled toolchain and makes the go command refuse a workspace whose
+      # floor is newer ("go.work requires go >= 1.27.3"), so a floor bump
+      # would break this job instead of resolving it.
+      GOTOOLCHAIN: auto
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

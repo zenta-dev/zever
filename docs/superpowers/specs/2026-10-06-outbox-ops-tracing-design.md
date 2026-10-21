@@ -1,5 +1,12 @@
 # Outbox/Relay Ops + Cross-Service Trace Convention — Design Spec
 
+> **Historical (predates v0.8.0).** This spec was written when `zever.yaml`
+> was still a configuration file. Since v0.8.0 the framework is env-only: a
+> `zever.yaml`/`.yml`/`.json`/`.toml` file is never read (no probe, no
+> discovery step, no warning), so the DSN and table the CLI design below took
+> from "flags or `zever.yaml`" now come from flags or the environment. The
+> spec is the record of the design as it stood then.
+
 **Date:** 2026-10-06
 **Status:** Implemented — all work shipped (metrics, zever outbox CLI, stalled-relay readiness, inbound extraction + outbound injection, baggage, semconv migration).
 **Owner:** @erhahahaa

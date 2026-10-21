@@ -16,8 +16,8 @@ import (
 )
 
 const workerUsageBody = `Scaffolds the background worker entrypoint at <worker_entry>/main.go (default
-cmd/worker, override with the ZEVER_WORKER_ENTRY env key), plus
-internal/app/app.go if the project does not have one yet.
+cmd/worker, override with the ZEVER_WORKER_ENTRY env key in ` + projectEnvHint + `),
+plus internal/app/app.go if the project does not have one yet.
 
 The worker and the scheduler run in one process over one shared queue, which
 is what the in-process memory queue adapter requires; swapping the queue
@@ -265,7 +265,7 @@ func collectZenFiles(tag, dir string) (map[string]string, error) {
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("%s: schema_dir %q is not a directory", tag, dir)
+		return nil, fmt.Errorf("%s: schema dir %q is not a directory (the ZEVER_SCHEMA_DIR env key)", tag, dir)
 	}
 
 	paths, walkErr := walkZenFiles(dir)

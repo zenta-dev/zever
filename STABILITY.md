@@ -64,8 +64,8 @@ release-note docs.
 | `storage` | Facade (`local`, `s3`, `r2`). |
 | `media` | Facade (`local`, `s3`). |
 | `document` | Facade (`local`, `remote`, `latex`). |
-| `search` | Facade (`db`, `postgres`, `meilisearch`). |
-| `vectorstore` | Facade (`db`, `pgvector`, `qdrant`). |
+| `search` | Facade (`db`, `meilisearch`). |
+| `vectorstore` | Facade (`db`, `qdrant`). |
 | `notification` | Facade (`log`, `twilio`, `fcm`). |
 | `geo` | Facade (`google`, `static`, `osm`). |
 | `flag` | Facade (`static`, `firebase`). |
@@ -103,7 +103,7 @@ release-note docs.
 
 ## Go version policy
 
-Only the latest Go toolchain is supported (`go 1.27.2` today, pinned in
+Only the latest Go toolchain is supported (`go 1.27.3` today, pinned in
 `go.work` and every module's `go.mod`; CI tests that version). New language
 features may be used as soon as the floor moves — including generic methods
 such as `orm`'s `Column[T, V].EqOuter[U any]` (`orm/column.go`), which

@@ -24,7 +24,7 @@ Thanks for contributing to zever. This guide explains how to set up the project,
 
 Required:
 
-- Go 1.27 or newer (this project uses `go 1.27.2` in each module's `go.mod`)
+- Go 1.27 or newer (this project uses `go 1.27.3` in each module's `go.mod`)
 
 Install the pinned development tools (`golangci-lint`, `govulncheck`, and `cyclonedx-gomod`):
 

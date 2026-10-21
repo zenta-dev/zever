@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/core/media
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/zenta-dev/zever/shared/ref v0.8.0

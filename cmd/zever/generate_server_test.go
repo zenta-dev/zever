@@ -322,7 +322,7 @@ func TestRunGenerateServerIgnoresStrayProjectConfig(t *testing.T) {
 	readGenerated(t, filepath.Join(dir, "cmd", "server", "main.go"))
 
 	if _, err := os.Stat(filepath.Join(dir, "cmd", "api", "main.go")); !os.IsNotExist(err) {
-		t.Fatalf("scaffold honoured a stray project.server_entry")
+		t.Fatalf("scaffold honoured a stray server_entry key from a config file")
 	}
 }
 
@@ -636,8 +636,9 @@ func TestCoreBatterySelectionsMatchDefaults(t *testing.T) {
 }
 
 // TestAdapterDirNameDBCanonical pins the consolidated db dirs: the
-// canonical "db" name is mechanical, and every legacy alias routes to the
-// same dir so old --adapters picks scaffold identical module graphs.
+// canonical "db" name is mechanical, and the per-backend names that only
+// existed for the legacy file-based config format are gone, so they no
+// longer resolve to a module dir.
 func TestAdapterDirNameDBCanonical(t *testing.T) {
 	t.Parallel()
 
@@ -647,15 +648,10 @@ func TestAdapterDirNameDBCanonical(t *testing.T) {
 		want    string
 	}{
 		{"search", "db", "search/db"},
-		{"search", "postgres", "search/db"},
-		{"search", "sqlite", "search/db"},
 		{"search", "meilisearch", "search/meilisearch"},
 		{"vectorstore", "db", "vectorstore/db"},
-		{"vectorstore", "pgvector", "vectorstore/db"},
-		{"vectorstore", "sqlite", "vectorstore/db"},
 		{"vectorstore", "qdrant", "vectorstore/qdrant"},
 		{"workflow", "db", "workflow/db"},
-		{"workflow", "postgres", "workflow/db"},
 		{"workflow", "memory", "workflow/memory"},
 	}
 	for _, tc := range cases {

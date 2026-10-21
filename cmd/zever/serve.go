@@ -9,7 +9,8 @@ import (
 // ServeConfig is the resolved configuration for one `zever serve` run: the
 // entrypoint package to launch and the flags to pass through untouched.
 type ServeConfig struct {
-	// Entry is the server entrypoint package directory (project.server_entry).
+	// Entry is the server entrypoint package directory (the
+	// ZEVER_SERVER_ENTRY env key).
 	Entry string
 	// Args are passed through untouched to the entrypoint.
 	Args []string
@@ -26,7 +27,7 @@ func resolveServeConfig(project ProjectConfig, args []string) ServeConfig {
 // this shells out instead of serving in-process.
 func runServe(args []string) error {
 	if hasHelpFlag(args) {
-		printLauncherHelp(flag.CommandLine.Output(), "zever serve", "Starts this project's HTTP server by running its server entrypoint package (project.server_entry, default cmd/server). Every argument is passed through untouched to that entrypoint.", "zever serve -addr :9090  # => go run ./cmd/server -addr :9090")
+		printLauncherHelp(flag.CommandLine.Output(), "zever serve", "Starts this project's HTTP server by running its server entrypoint package (override with the ZEVER_SERVER_ENTRY env key in "+projectEnvHint+", default cmd/server). Every argument is passed through untouched to that entrypoint.", "zever serve -addr :9090  # => go run ./cmd/server -addr :9090")
 		return nil
 	}
 

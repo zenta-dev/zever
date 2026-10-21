@@ -1,0 +1,3 @@
+- fix(cli): `zever serve --help`, `zever worker --help`, `zever queue:work --help` and `zever db seed --help` name the env key that moves the entrypoint (`ZEVER_SERVER_ENTRY`, `ZEVER_WORKER_ENTRY`, `ZEVER_SEED_ENTRY`). They named a project-layout key v0.8.0 no longer reads, so following the help steered nothing.
+- fix(cli): `zever generate server --help`, `zever generate seed --help`, `zever generate tinker --help` and `zever extract --help` name the env key of the layout knob they document (`ZEVER_SERVER_ENTRY`, `ZEVER_SEED_ENTRY`, `ZEVER_TINKER_ENTRY`, `ZEVER_SCHEMA_DIR`).
+- fix(cli): a test fails the build when a source file of the CLI package names a removed project-layout key again.

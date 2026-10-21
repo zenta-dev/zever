@@ -145,8 +145,8 @@ func resolveEnvConfig(o options) (*config.Config, error) {
 
 // guardDevKey refuses the deterministic dev crypto key outside a dev
 // ZEVER_ENV. It inspects config only, opening nothing, and only for the
-// legacy path: provider-wired crypto owns its own key via WithOptions and
-// is enforced by the crypto adapter at open time.
+// config-based path: provider-wired crypto owns its own key via WithOptions
+// and is enforced by the crypto adapter at open time.
 func guardDevKey(c *container.Container, cfg *config.Config) error {
 	for _, wired := range c.Wired() {
 		if wired == "crypto" {

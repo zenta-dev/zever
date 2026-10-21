@@ -365,10 +365,12 @@ func compileSchemaWithDefaults(files map[string]string, schemaDir, backendsSpec,
 	backendsSpec, defaulted := resolveBackendSpec(backendsSpec)
 
 	if schemaDir == "" {
-		schemaDir = defaultSchemaDir
-		if pc, err := loadProjectConfig(); err == nil {
-			schemaDir = pc.SchemaDir
+		pc, pcErr := loadProjectConfig()
+		if pcErr != nil {
+			return nil, backendsSpec, nil, pcErr
 		}
+
+		schemaDir = pc.SchemaDir
 	}
 
 	backends, err := resolveBackends(backendsSpec, computeBackendRoots(outDir))
@@ -435,10 +437,12 @@ func runCompileWith(cfg CompileConfig) error {
 		return fmt.Errorf("zever compile: %w", err)
 	}
 
-	schemaDir := defaultSchemaDir
-	if pc, pcErr := loadProjectConfig(); pcErr == nil {
-		schemaDir = pc.SchemaDir
+	pc, err := loadProjectConfig()
+	if err != nil {
+		return err
 	}
+
+	schemaDir := pc.SchemaDir
 
 	result, backendsSpec, diags, err := compileSchemaWithDefaults(files, schemaDir, cfg.Backends, outDir)
 	if err != nil {
