@@ -5,7 +5,7 @@ description: Service configuration via environment variables (no config files)
 
 import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever reads all service configuration from **environment variables only**. There are **no config files** (`zever.yaml`, `.yml`, `.json` are ignored).
+Zever reads all service configuration from **environment variables only**. There are **no config files**: `zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read, so a stale one in the working directory contributes nothing.
 
 ## Quick start
 
@@ -71,6 +71,9 @@ Durations accept `"5s"` strings in env; there is no integer form.
 
 ## Migration from v0.7
 
+The map below is the upgrade path, not a runtime fallback: v0.8 reads `.env`,
+`.env.local`, and the process environment, and nothing else.
+
 | v0.7 | v0.8 |
 |------|------|
 | `zever.yaml` | `.env` + `wiring.go` |
@@ -80,15 +83,16 @@ Durations accept `"5s"` strings in env; there is no integer form.
 | `DB__ANALYTICS__DSN` | `DB__ANALYTICS__DSN` (same format) |
 | `zever doctor --config` | `zever doctor` (no flag) |
 
-## Legacy file warning
+## Legacy config files
 
-If `zever.yaml`/`.yml`/`.json` exists in the working directory, `config.FromEnv()` prints a one-line warning:
+`zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are **never read**.
+The framework does not look for them: no probe, no discovery step, no warning.
+A stale file in the working directory is simply ignored, so the values in it are
+lost without a word.
 
-```
-config: zever.yaml found in working directory: ignored; see migration guide in config/README.md
-```
-
-The file is **ignored entirely**: no values are read from it.
+Upgrading from v0.7? Move every stanza into `.env` (or the process environment)
+and into the typed `container.Provide` wiring yourself, then delete the file.
+The [migration guide](../migration/) carries the key-by-key map.
 
 ## Generated env template
 
