@@ -9,7 +9,7 @@ import (
 // ServeConfig is the resolved configuration for one `zever serve` run: the
 // entrypoint package to launch and the flags to pass through untouched.
 type ServeConfig struct {
-	// Entry is the server entrypoint package directory (project.server_entry).
+	// Entry is the server entrypoint package directory (ZEVER_SERVER_ENTRY).
 	Entry string
 	// Args are passed through untouched to the entrypoint.
 	Args []string

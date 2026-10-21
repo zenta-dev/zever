@@ -4,7 +4,7 @@ import "flag"
 
 // SeedConfig is the resolved configuration for one `zever db seed` run.
 type SeedConfig struct {
-	// Entry is the seed entrypoint package directory (project.seed_entry).
+	// Entry is the seed entrypoint package directory (ZEVER_SEED_ENTRY).
 	Entry string
 	// Args are passed through untouched to the entrypoint.
 	Args []string

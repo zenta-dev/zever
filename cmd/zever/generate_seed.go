@@ -181,7 +181,7 @@ const seedStubRoot = "internal/service/seed"
 // shutdown — no HTTP and no queue wiring, since a seeder neither serves nor
 // consumes anything. The actual seed rows live in seedStubTemplate's
 // skip-if-exists output instead of inline here, so re-running
-// `zever generate seed --force` (e.g. after project.seed_entry changes)
+// `zever generate seed --force` (e.g. after ZEVER_SEED_ENTRY changes)
 // never clobbers hand-written seed logic.
 const seedTemplate = `// Command seed populates this project's database with development data.
 //

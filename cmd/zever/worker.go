@@ -9,7 +9,7 @@ import (
 
 // WorkerConfig is the resolved configuration for one `zever worker` run.
 type WorkerConfig struct {
-	// Entry is the worker entrypoint package directory (project.worker_entry).
+	// Entry is the worker entrypoint package directory (ZEVER_WORKER_ENTRY).
 	Entry string
 	// Args are passed through untouched to the entrypoint.
 	Args []string
@@ -22,7 +22,7 @@ func resolveWorkerConfig(project ProjectConfig, args []string) WorkerConfig {
 }
 
 // newWorkerCmd returns the canonical `worker` command: run the project's
-// background worker entrypoint (project.worker_entry, default cmd/worker).
+// background worker entrypoint (ZEVER_WORKER_ENTRY, default cmd/worker).
 // The legacy `queue:work` top-level command stays registered but hidden
 // (see root.go), so existing scripts keep working while --help shows only
 // `worker`.
@@ -31,8 +31,8 @@ func newWorkerCmd() *cobra.Command {
 		Use:   "worker",
 		Short: "Run worker entrypoint (default cmd/worker)",
 		Long: `Run this project's background worker by running its worker
-entrypoint package (project.worker_entry, default cmd/worker). Every
-argument is passed through to that package.`,
+entrypoint package (ZEVER_WORKER_ENTRY, default cmd/worker; set it in ` + projectEnvHint + `).
+Every argument is passed through to that package.`,
 		Example:            `  zever worker`,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
