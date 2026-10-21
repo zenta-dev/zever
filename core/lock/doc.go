@@ -10,8 +10,10 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
 // zero-infra defaults for tests: empty Options falls back to DefaultTTL and
-// DefaultRetryInterval, and the memory adapter needs no server. Config file
-// plus env LOCK_<FIELD> (no prefix, e.g. LOCK_ADAPTER). See config/README.md.
+// DefaultRetryInterval, and the memory adapter needs no server. Configuration
+// comes from the environment only: .env, .env.local, and the process
+// environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g.
+// LOCK_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Lock(). Lazy per-service singleton,
 // retry on error. See container/README.md.

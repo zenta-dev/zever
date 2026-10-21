@@ -9,7 +9,7 @@
 // Bool constructors, bounded by MaxKeyLen 256, MaxValueLen 4096, and MaxAttrs
 // 32. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env OBSERVABILITY_<FIELD> (no prefix, e.g. OBSERVABILITY_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. OBSERVABILITY_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Observability(). Lazy per-service singleton, retry on error. See container/README.md.
 //

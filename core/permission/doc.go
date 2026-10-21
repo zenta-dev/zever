@@ -8,7 +8,7 @@
 // Subject, Resource, and Decision are typed, Effect is Allow or Deny, and roles
 // map to inherited roles. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env PERMISSION_<FIELD> (no prefix, e.g. PERMISSION_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. PERMISSION_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Permission(). Lazy per-service singleton, retry on error. See container/README.md.
 //

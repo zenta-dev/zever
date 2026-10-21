@@ -10,8 +10,9 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
 // zero-infra defaults for tests, with the local adapter using the filesystem
-// only. Config file plus env MEDIA_ADAPTER (no prefix, e.g. MEDIA_ADAPTER).
-// See config/README.md.
+// only. Configuration comes from the environment only: .env, .env.local, and
+// the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g.
+// MEDIA_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Media(). Lazy per-service singleton,
 // retry on error. See container/README.md.
