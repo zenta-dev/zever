@@ -2,9 +2,8 @@
 # check-doc-snippets.sh — guard against stale Go import paths / symbols in docs.
 #
 # Extracts ```go blocks from all *.md/*.mdx files (excluding node_modules,
-# .git, any CHANGELOG.md, and
-# docs/src/content/docs/getting-started/migration.mdx — old paths there are
-# intentional history) and, per block:
+# .git, any CHANGELOG.md, and the internal agent working docs under
+# docs/superpowers) and, per block:
 #   1. every quoted import path starting with github.com/zenta-dev/zever
 #      must resolve via `go list` (workspace mode from repo root);
 #   2. every `pkg.Symbol` reference where pkg maps to a zever import in the
@@ -302,19 +301,61 @@ if (($# > 0)); then
   exit 2
 fi
 
+# SKIP_PATTERNS lists the path patterns whose Go blocks are exempt from the
+# check. Every pattern must match at least one file in the tree: a pattern
+# that matches nothing is a stale exemption (the migration guide moved from
+# docs/src/content/docs/getting-started/ to docs/src/content/docs/guides/operate/),
+# and the script fails on it instead of quietly exempting nothing. The
+# migration guide itself is covered: its historical snippets live in
+# ```diff blocks, which the checker never reads.
+SKIP_PATTERNS=(
+  '*/CHANGELOG.md'
+  # Internal agent working docs (specs/plans) may reference not-yet-existing
+  # packages by design; they are not published documentation.
+  '*docs/superpowers/*'
+)
+
 skip_file() {
-  case "$1" in
-    */CHANGELOG.md|CHANGELOG.md) return 0 ;;
-    *docs/src/content/docs/getting-started/migration.mdx) return 0 ;;
-    # Internal agent working docs (specs/plans) may reference not-yet-existing
-    # packages by design; they are not published documentation.
-    *docs/superpowers/*) return 0 ;;
-  esac
+  local f="$1" p
+  for p in "${SKIP_PATTERNS[@]}"; do
+    # The pattern is expanded by case, not by the shell.
+    # shellcheck disable=SC2254
+    case "$f" in
+      $p) return 0 ;;
+    esac
+  done
   return 1
 }
 
-fail=0
+# check_skip_patterns fails when a skip pattern matches no file: the
+# exemption then covers nothing and only hides drift.
+check_skip_patterns() {
+  local p f n
+  for p in "${SKIP_PATTERNS[@]}"; do
+    n=0
+    for f in "${DOC_FILES[@]}"; do
+      # shellcheck disable=SC2254
+      case "$f" in
+        $p) n=$((n + 1)) ;;
+      esac
+    done
+    if ((n == 0)); then
+      err "stale skip pattern \"$p\": it matches no file in the tree"
+      return 1
+    fi
+  done
+  return 0
+}
+
+DOC_FILES=()
 while IFS= read -r f; do
+  DOC_FILES+=("$f")
+done < <(cd "$ROOT" && find . -type d \( -name node_modules -o -name .git \) -prune -o -type f \( -name '*.md' -o -name '*.mdx' \) -print | sort)
+
+check_skip_patterns || exit 1
+
+fail=0
+for f in "${DOC_FILES[@]}"; do
   if skip_file "$f"; then
     continue
   fi
@@ -322,7 +363,7 @@ while IFS= read -r f; do
     fail=1
     break
   fi
-done < <(cd "$ROOT" && find . -type d \( -name node_modules -o -name .git \) -prune -o -type f \( -name '*.md' -o -name '*.mdx' \) -print | sort)
+done
 
 if ((fail == 1)); then
   exit 1
