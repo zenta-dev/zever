@@ -1,6 +1,6 @@
 ---
 title: Upgrade
-description: Bump a pre-1.0 Zever version safely, read breaking changes, and fix the common breaks.
+description: Bump a pre-1.0 Zever version safely, migrate the v0.8.0 config break, read breaking changes, and fix the common breaks.
 ---
 
 import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
@@ -49,10 +49,35 @@ Public API changes (new exports, config struct or default changes, serialization
 
 Pin the CLI to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior and the TUI does not skew from the backend.
 
+## Upgrade to v0.8.0
+
+**v0.8.0 is env-only: configuration moved from a config file to `.env`.**
+
+A v0.7.x project keeps its service configuration in `zever.yaml` (or `.yml`, `.json`, `.toml`). v0.8.0 does not read that file: there is no probe, no discovery step, and no warning. A leftover file is inert, so every service falls back to its built-in default adapter and the old values are gone without a word. Translate them by hand and delete the file.
+
+| v0.7.x | v0.8.0 |
+|---|---|
+| `zever.yaml` (or `.yml`, `.json`, `.toml`) | `.env`, `.env.local`, or the process environment |
+| `config.Load("zever.yaml")` | `config.FromEnv()` then `config.Resolve(env)` |
+| `project.server_entry` | `ZEVER_SERVER_ENTRY` |
+| `project.worker_entry` | `ZEVER_WORKER_ENTRY` |
+| `project.generated_dir` | `ZEVER_GENERATED_DIR` |
+| `project.tinker_entry` | `ZEVER_TINKER_ENTRY` |
+| `project.seed_entry` | `ZEVER_SEED_ENTRY` |
+| `search.Postgres`, `search.SQLite` | `db` (the DSN picks postgres or sqlite) |
+| `vectorstore.PGVector`, `vectorstore.SQLite` | `db` (the DSN picks postgres or sqlite) |
+| `workflow.Postgres` | `db` (the DSN picks postgres or sqlite) |
+| the `--config` file flag | gone from every command |
+
+Env keys carry no prefix: `<SERVICE>_<FIELD>` for the default instance, `<SERVICE>__<NAME>__<FIELD>` for a named one. So `db.adapter` becomes `DB_ADAPTER`, `db.options.dsn` becomes `DB_DSN`, `ai.options.api_key` becomes `AI_API_KEY`, and `auth.options.jwt.secret` becomes `AUTH_JWT_SECRET`.
+
+Two commands prove the migration is done: `zever config show` prints the resolved values per service, and `zever doctor` resolves every wired battery and exits non-zero when one fails. A wrong value is loud: a removed adapter alias fails with `unknown adapter`, and a misspelled key fails with a did-you-mean hint. The [migration guide](../migration/) has the key-by-key map, a before and after example, and the exact messages a wrong value produces.
+
 ## Fix known breaking changes
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| The app boots but your old values are gone | The v0.8.0 config file is not read, and nothing warns about it. | Translate every stanza into `.env`, then delete the file. See [Upgrade to v0.8.0](#upgrade-to-v080). |
 | `Load` rejects a previously valid key | Config rename in the bump (`maxconns`, `apikey`, `secretkey`). | Rename to `max_conns`, `api_key`, `secret_key`. Env names are unaffected. See [Configuration](../configuration/) for the full rename table. |
 | `CreateCustomer` no longer compiles | `billing.Billing.CreateCustomer` gained a required idempotency key. | Pass `""` for the old non-idempotent behavior, or a real key for safe retries. |
 | `zen/migrate` import fails | The migration engine moved to `orm/migrate`. | Import `github.com/zenta-dev/zever/orm/migrate`. |
@@ -66,7 +91,7 @@ cust, err := b.CreateCustomer(ctx, name, email)
 cust, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 ```
 
-For the multi-module import changes see [Migrate to the multi-module layout](../migration/).
+For the multi-module import changes see [Migrate from v0.7 to v0.8](../migration/).
 
 ## Know what each gate catches
 
@@ -88,7 +113,8 @@ Releases bump every version pin together (the file list is in the `.github/CONTR
 ## Related
 
 <CardGrid>
-  <LinkCard title="Migrate to the multi-module layout" href="../migration/" description="Old flat imports to core and adapters." />
+  <LinkCard title="Migrate from v0.7 to v0.8" href="../migration/" description="Config file to .env, adapter wiring, and the new server entrypoint." />
+  <LinkCard title="Configuration" href="../configuration/" description="Env layering, precedence, and the fail-closed rules." />
   <LinkCard title="Deployment" href="../deployment/" description="Roll a bumped binary to production." />
   <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Interface stability rules." />
   <LinkCard title="Compiler boundary" href="../../../concepts/compiler-boundary/" description="What bumps never move into runtime." />
