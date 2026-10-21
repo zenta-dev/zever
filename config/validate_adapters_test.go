@@ -160,6 +160,41 @@ func TestValidateEnabledAdaptersCustomRegisteredPasses(t *testing.T) {
 	}
 }
 
+// TestValidateAdaptersMessageCarriesOnePrefix pins the error convention on
+// the failure the doctor row prints: the message names the package exactly
+// once ("config: unknown adapter ..."), never twice ("config: config:
+// unknown adapter ..."), and the sentinel still matches through the joined
+// error.
+func TestValidateAdaptersMessageCarriesOnePrefix(t *testing.T) {
+	t.Parallel()
+
+	cfg := Default()
+	cfg.Cache.Adapter = "memmory"
+
+	stub := knownStub(cfg)
+	registered := func(service string) []string {
+		if service == "cache" {
+			return []string{"memory"}
+		}
+
+		return stub(service)
+	}
+
+	err := cfg.ValidateAdapters(registered)
+	if err == nil {
+		t.Fatal("ValidateAdapters with unknown cache adapter = nil, want error")
+	}
+
+	want := `config: unknown adapter "memmory" for service "cache" (did you mean "memory"?)`
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
+	}
+
+	if !errors.Is(err, ErrUnknownAdapter) {
+		t.Errorf("errors.Is(%v, ErrUnknownAdapter) = false, want true", err)
+	}
+}
+
 func TestUnknownAdapterErrorMessage(t *testing.T) {
 	t.Parallel()
 
