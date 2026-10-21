@@ -9,7 +9,7 @@ v0.8 changes how a project configures and boots. Service config is environment-o
 
 ## Service config is env-only
 
-`zever.yaml`, `zever.yml`, and `zever.json` are gone. `config.Load` is gone. `config.FromEnv()` plus `config.Resolve(env)` replace them. A legacy file in the working directory is ignored, and `config.FromEnv` prints a one-line warning naming the file.
+`zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read. `config.Load` is gone. `config.FromEnv()` plus `config.Resolve(env)` replace them. The framework does not look for a legacy file at all: no probe, no discovery step, no warning. A file left in the working directory is simply ignored, so its values are lost without a word. Move them yourself using the table below.
 
 Translate each `adapter:` and `options:` key to an uppercase env variable. Every service uses `<SERVICE>_<FIELD>`; named instances use `<SERVICE>__<NAME>__<FIELD>`.
 
@@ -183,7 +183,7 @@ Project layout is defaults-only, overridable by six `ZEVER_*` variables (no file
 ## Migration checklist
 
 1. Move every `zever.yaml` stanza to `.env` or the process environment using the table above.
-2. Delete `zever.yaml`; `config.FromEnv` warns if one remains in the working directory.
+2. Delete `zever.yaml`; nothing reads it, so a leftover file is ignored and its values are lost.
 3. Replace `config.Load(...)` with `config.FromEnv()` plus `config.Resolve(env)`.
 4. Replace adapter `Register()` wiring with `container.Provide` entries in `internal/app/wiring.go`.
 5. Replace `--profile` with `--with` in scripts and CI.
