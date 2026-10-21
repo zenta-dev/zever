@@ -1,35 +1,82 @@
 package main
 
 import (
+	"bytes"
 	"io"
+	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
-// TestHelpStartupBudget asserts root --help executes in-process under
-// 200ms. No network, no randomness, deterministic. Uses a fresh root (not
-// the shared rootCmd global) and stays sequential: Cobra command state is
-// not safe for concurrent Execute.
-func TestHelpStartupBudget(t *testing.T) {
-	root := newRootCmd()
-	root.SetArgs([]string{"--help"})
-	root.SetOut(io.Discard)
-	root.SetErr(io.Discard)
+// TestHelpStartupDoesNotBlock is the deterministic replacement for the
+// old 200ms wall-clock budget. Inside a synctest bubble the clock is
+// virtual: it only moves when every goroutine in the bubble is durably
+// blocked. A help path that waits on a timer, a file, or the network
+// advances it; a help path that renders the in-memory command tree and
+// returns synchronously leaves it untouched.
+//
+// That is the "the help path is fast enough" property without a
+// wall-clock assertion: a loaded or cold CI runner can no longer fail it,
+// while a help path that starts blocking still fails on the spot.
+//
+// Wall-clock startup is measured, not asserted: see BenchmarkHelpStartup
+// (cmd/zever/bench_test.go). The deterministic work bound for the same
+// path is TestHelpStartupAllocs.
+func TestHelpStartupDoesNotBlock(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		start := time.Now()
 
-	start := time.Now()
-	if err := root.Execute(); err != nil {
-		t.Fatalf("root --help Execute: %v", err)
+		root := newRootCmd()
+		root.SetArgs([]string{"--help"})
+
+		var out bytes.Buffer
+		root.SetOut(&out)
+		root.SetErr(&out)
+
+		if err := root.Execute(); err != nil {
+			t.Fatalf("root --help Execute: %v", err)
+		}
+		if elapsed := time.Since(start); elapsed != 0 {
+			t.Fatalf("--help blocked for %v of virtual time, the help path must not wait", elapsed)
+		}
+
+		// The help still renders the tree: the budget guarded a working
+		// help path, and the render contract stays pinned.
+		help := out.String()
+		for _, want := range []string{"Usage:", "Flags:"} {
+			if !strings.Contains(help, want) {
+				t.Fatalf("--help output missing %q:\n%s", want, help)
+			}
+		}
+		for _, c := range root.Commands() {
+			if c.Hidden {
+				continue
+			}
+			if !helpListsCommand(help, c.Name()) {
+				t.Fatalf("--help output does not list the %q command:\n%s", c.Name(), help)
+			}
+		}
+	})
+}
+
+// helpListsCommand reports whether the rendered help lists a command under
+// its own name: a line whose first field is the command name.
+func helpListsCommand(help, name string) bool {
+	for line := range strings.SplitSeq(help, "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == name {
+			return true
+		}
 	}
-	if elapsed := time.Since(start); elapsed >= 200*time.Millisecond {
-		t.Fatalf("--help took %v, budget 200ms", elapsed)
-	}
+
+	return false
 }
 
 // TestHelpStartupAllocs caps the heap allocations of one in-process root
-// --help run. Wall-clock startup is covered by TestHelpStartupBudget (and
-// varies by machine); allocations are deterministic and catch accidental
-// cold-path bloat (new per-invocation maps, template re-parses, registry
-// copies). The bound is generous headroom over the measured 2026-10-14
+// --help run. Allocations are deterministic and catch accidental cold-path
+// bloat (new per-invocation maps, template re-parses, registry copies),
+// which is the deterministic half of what the old wall-clock budget
+// guarded. The bound is generous headroom over the measured 2026-10-14
 // value (625 allocs/op), not a ratchet: tighten it only with a measured
 // before/after.
 func TestHelpStartupAllocs(t *testing.T) {
