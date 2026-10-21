@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/shared/providersclient
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1

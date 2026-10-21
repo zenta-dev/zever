@@ -1,3 +1,3 @@
 module github.com/zenta-dev/zever/tools/modgraph
 
-go 1.27.2
+go 1.27.3

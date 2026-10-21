@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/analytics/posthog
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/posthog/posthog-go v1.35.1

@@ -1,6 +1,6 @@
 module github.com/zenta-dev/zever/adapters/notification/fcm
 
-go 1.27.2
+go 1.27.3
 
 require (
 	firebase.google.com/go/v4 v4.22.0

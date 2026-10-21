@@ -9,7 +9,7 @@ Install the `zever` CLI with the one-line installer, then add the Zever modules 
 
 | Requirement | Version | Notes |
 |---|---|---|
-| Go | 1.27.0+ | `go 1.27.0` in `go.mod`; required but not installed by the script |
+| Go | 1.27.3+ | `go 1.27.3` in `go.mod`; required but not installed by the script |
 | Git | any recent | needed for `go get` and scaffolding |
 | Node.js | 18+ | docs site only (`docs/`), not needed for backend work |
 
@@ -17,7 +17,7 @@ Install the `zever` CLI with the one-line installer, then add the Zever modules 
 
 <Steps>
 
-1. Check your toolchain. The installer does not install Go: you need `go1.27` or newer, otherwise install it from [go.dev/dl](https://go.dev/dl/).
+1. Check your toolchain. The installer does not install Go: you need `go1.27.3` or newer, otherwise install it from [go.dev/dl](https://go.dev/dl/).
 
    ```sh
    go version
@@ -181,9 +181,9 @@ go test -race ./config/...
 ## Troubleshooting
 
 <details>
-<summary>`go version` reports older than 1.27</summary>
+<summary>`go version` reports older than 1.27.3</summary>
 
-Cause: a stale toolchain is first on `PATH`. Fix: install Go 1.27+ from go.dev/dl and run `go version` again.
+Cause: a stale toolchain is first on `PATH`. Fix: install Go 1.27.3+ from go.dev/dl and run `go version` again.
 </details>
 
 <details>
