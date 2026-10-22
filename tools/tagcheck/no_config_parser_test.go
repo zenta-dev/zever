@@ -59,6 +59,22 @@ func TestScanNoConfigParserTomlImport(t *testing.T) {
 	}
 }
 
+func TestScanNoConfigParserIniImport(t *testing.T) {
+	t.Parallel()
+
+	vs := parserViolations(t, map[string]string{
+		"pkg/parser.go": "ini_import.txt",
+	}, "")
+
+	if len(vs) != 1 {
+		t.Fatalf("got %v, want exactly one no-config-parser violation", vs)
+	}
+
+	if !strings.Contains(vs[0].msg, "gopkg.in/ini.v1") {
+		t.Errorf("message %q does not name the import", vs[0].msg)
+	}
+}
+
 func TestScanNoConfigParserSkipsTestFiles(t *testing.T) {
 	t.Parallel()
 
@@ -134,9 +150,16 @@ func TestConfigParserImport(t *testing.T) {
 		{name: "yaml v3 legacy", path: "github.com/gopkg.in/yaml.v3", ok: true},
 		{name: "burnt sushi toml", path: "github.com/BurntSushi/toml", ok: true},
 		{name: "pelletier toml v2", path: "github.com/pelletier/go-toml/v2", ok: true},
+		{name: "ini v1", path: "gopkg.in/ini.v1", ok: true},
+		{name: "ini subpackage", path: "gopkg.in/ini.v1/token", ok: true},
+		{name: "go-ini", path: "github.com/go-ini/ini", ok: true},
+		{name: "go-ini subpackage", path: "github.com/go-ini/ini/v1", ok: true},
+		{name: "properties", path: "github.com/magiconair/properties", ok: true},
+		{name: "properties subpackage", path: "github.com/magiconair/properties/assert", ok: true},
 		{name: "unrelated package", path: "github.com/zenta-dev/zever/config", ok: false},
 		{name: "unrelated yaml name", path: "example.com/yamlx", ok: false},
 		{name: "unrelated toml name", path: "example.com/tomlx", ok: false},
+		{name: "unrelated ini name", path: "example.com/ini", ok: false},
 	}
 
 	for _, test := range tests {

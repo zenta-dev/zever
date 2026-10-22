@@ -1,0 +1,10 @@
+package pkg
+
+import (
+	"gopkg.in/ini.v1"
+)
+
+// parse reads an INI document.
+func parse(raw []byte) (*ini.File, error) {
+	return ini.Load(raw)
+}

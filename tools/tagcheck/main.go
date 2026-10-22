@@ -35,8 +35,8 @@
 //     in a comment. The v0.8.0 env-only break removed those formats for
 //     good: a stale file is ignored silently, so every mention of it in
 //     the source is a leftover of the removed formats.
-//   - no-config-parser: a non-test Go file imports a YAML or TOML parser.
-//     Config is env-only since v0.8.0, so the framework parses no config
+//   - no-config-parser: a non-test Go file imports a YAML, TOML, INI or
+//     properties parser. Config is env-only since v0.8.0, so the framework parses no config
 //     file; a parser in shipped code is either dead weight or the first
 //     step back to file-based configuration. A test file may parse one: a
 //     test reads a file it does not ship.

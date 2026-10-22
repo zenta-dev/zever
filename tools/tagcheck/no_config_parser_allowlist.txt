@@ -1,5 +1,5 @@
-# (tagcheck rule no-config-parser). The permitted imports of a YAML or TOML
-# parser in a non-test Go file: one entry per line, either a bare
+# (tagcheck rule no-config-parser). The permitted imports of a YAML, TOML,
+# INI or properties parser in a non-test Go file: one entry per line, either a bare
 # repo-relative path (the whole file) or path:line (1-based).
 #
 # The list starts empty. An entry is justified only when the module really
