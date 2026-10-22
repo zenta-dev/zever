@@ -4,7 +4,7 @@
 //
 // Type safety: I18n plus typed Options plus Adapter enum plus Factory. EmbedOptions and RemoteOptions carry per-backend settings; BaseLocale and LocaleChain compute typed lookup chains. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Config file plus env I18N_<FIELD> (no prefix, e.g. I18N_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. I18N_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.I18n(). Lazy per-service singleton, retry on error. See container/README.md.
 //
