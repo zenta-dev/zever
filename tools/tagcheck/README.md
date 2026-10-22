@@ -23,6 +23,7 @@ payload read a key that no longer existed. The tags were restored in
 | `unregistered-wire` | a struct that exposes json keys but is not registered as a wire struct |
 | `golden-removed` | a registered wire struct that disappeared from the tree |
 | `no-config-file` | a non-test Go file names a retired project config file (`zever.json`, `zever.yaml`, `zever.yml`, `zever.toml`) — in a string literal, in a constant expression that builds the name, or in a comment |
+| `no-config-parser` | a non-test Go file imports a YAML or TOML parser — config is env-only, so the framework parses no config file |
 
 Files that are skipped: `_test.go` files, generated files (a `DO NOT EDIT`
 marker in a leading comment), and the `.git`, `.worktrees`, `.claude`,
@@ -37,6 +38,7 @@ marker in a leading comment), and the `.git`, `.worktrees`, `.claude`,
 | `golden_wire_exceptions.txt` | `dir<TAB>struct<TAB>reason` | structs that expose json keys but are deliberately not pinned |
 | `tag_allowlist.txt` | `path` or `path:line` | the permitted `yaml:`/`toml:` tag locations |
 | `no_config_file_allowlist.txt` | `path` or `path:line` | the permitted mentions of a retired config file name |
+| `no_config_parser_allowlist.txt` | `path` or `path:line` | the permitted imports of a YAML or TOML parser in a non-test file |
 
 `golden_wire_fields.txt` is generated, never hand-edited.
 
@@ -199,6 +201,43 @@ root markdown, the module, example and editor READMEs, the shell scripts
 and the Go source, and fails when any of them sends a reader to a retired
 config file. Run it with `make docs-legacy-config`; its self-test
 (`make docs-legacy-config-self-test`) proves it still bites.
+
+## The config-parser rule (`no-config-parser`)
+
+v0.8.0 made the configuration env-only, so the framework parses no
+configuration file. A YAML or TOML parser in shipped code is therefore
+either dead weight or the first step back to file-based configuration, and
+the `no-config-parser` rule fails the gate when a **non-test Go file
+imports one**.
+
+### Why a rule on the import, not on the go.mod
+
+A test-only dependency is a *direct* requirement, and it cannot be
+anything else. `go mod tidy` loads "all of the packages in the main
+module, all of its tools, and all of the packages they import,
+recursively. This includes packages imported by tests"
+(<https://go.dev/ref/mod#go-mod-tidy>), and the `// indirect` marker means
+"no package from the required module is directly imported by any package
+in the main module" (<https://go.dev/ref/mod#go-mod-file-go>). A `_test.go`
+file is a package in the main module, so a test-only import keeps the
+requirement direct: `go mod tidy` turns an `// indirect` marker on such a
+requirement back into a direct one.
+
+So the go.mod file cannot express "this dependency is test-only", and
+`go mod tidy` will not object when a contributor imports the parser in
+shipped code. The import is what makes the dependency load-bearing, so
+the import is what the rule watches. The CLI module carries the YAML
+parser for its tests (they parse the GitHub-Actions workflow the
+scaffolder writes) and says so in `cmd/zever/go.mod`.
+
+### Exceptions
+
+`no_config_parser_allowlist.txt` holds the exceptions: one entry per line,
+either a bare repo-relative path (the whole file) or `path:line` (one
+line). The list starts empty. An entry is justified only when the module
+really parses a configuration file at runtime, which the v0.8.0 env-only
+break removed. A test file needs no entry: the rule skips `_test.go`
+files, like every other rule of this guard.
 
 ### Why this shape
 
