@@ -46,8 +46,11 @@ const docs = path.join(here, '..');
 
 // The legacy config file names. The pattern matches the full name only, so
 // a group like "`zever.yaml`/`.yml`/`.json`" is caught by its first name.
-const LEGACY_FILE = /\bzever\.(?:ya?ml|json|toml)\b/i;
-const legacyNames = (text) => [...text.matchAll(/\bzever\.(?:ya?ml|json|toml)\b/gi)].map((m) => m[0]);
+// The extensions are an explicit list, never a "zever.<word>" wildcard:
+// the tree already holds zever.v1, zever.schema, zever.new and
+// zever.shop, so a wildcard would false-positive on every one of them.
+const LEGACY_FILE = /\bzever\.(?:ya?ml|json|toml|conf|ini|cfg|properties)\b/i;
+const legacyNames = (text) => [...text.matchAll(/\bzever\.(?:ya?ml|json|toml|conf|ini|cfg|properties)\b/gi)].map((m) => m[0]);
 
 // The wordings a section may use to say the file is not read. A section
 // carrying one of them may name the file.
@@ -365,6 +368,26 @@ function selfTest() {
       expect: 1,
     },
     {
+      name: 'a page that tells the reader to configure through a conf file is rejected',
+      run: () => legacyConfigProblems(page('Put your database DSN in `zever.conf` before you start.')),
+      expect: 1,
+    },
+    {
+      name: 'a page that tells the reader to configure through an ini file is rejected',
+      run: () => legacyConfigProblems(page('Put your database DSN in `zever.ini` before you start.')),
+      expect: 1,
+    },
+    {
+      name: 'a page that says a cfg file is never read passes',
+      run: () => legacyConfigProblems(page('There are no config files: `zever.cfg` is never read.')),
+      expect: 0,
+    },
+    {
+      name: 'a page that says a properties file is never looked for passes',
+      run: () => legacyConfigProblems(page('`zever.properties` is never looked for, so a stale one contributes nothing.')),
+      expect: 0,
+    },
+    {
       name: 'a yaml block that shows the file content is rejected',
       run: () => legacyConfigProblems(page('Create the file:\n\n```yaml\ndb:\n  adapter: postgres\n```')),
       expect: 1,
@@ -387,6 +410,11 @@ function selfTest() {
     {
       name: 'a historical record without the banner is rejected',
       run: () => legacyConfigProblems(page('Existing `zever.yaml` files keep working unchanged.'), { historical: true }),
+      expect: 1,
+    },
+    {
+      name: 'a historical record naming an ini file without the banner is rejected',
+      run: () => legacyConfigProblems(page('Existing `zever.ini` files keep working unchanged.'), { historical: true }),
       expect: 1,
     },
     {
