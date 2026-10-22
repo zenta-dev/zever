@@ -7,7 +7,7 @@
 // tells a reader to put configuration into such a file sends them to a
 // dead end, and that is the drift this check stops.
 //
-// Two rules:
+// Three rules:
 //
 // 1. Current prose (the published site, the repo-level contributor docs,
 //    the module READMEs, the editor and example READMEs, the shell
@@ -19,9 +19,14 @@
 //    docs/adrs): a dated record may describe the old mechanism, but it
 //    must carry the banner that says it predates v0.8.0, so a reader
 //    cannot mistake the record for current behaviour.
+// 3. The phrasing (every current prose file, the Go source): a document
+//    that says service configuration comes from a "config file" is the
+//    same drift as rule 1, only without the file name. A name-based scan
+//    cannot see it, so this rule reads the prose: a "config file" in a
+//    service-configuration context, without a denial, is a finding.
 //
-// The migration and upgrade guides are exempt from rule 1: naming the
-// old format is their job. The release notes (CHANGELOG.md and the
+// The migration and upgrade guides are exempt from rules 1 and 3: naming
+// the old format is their job. The release notes (CHANGELOG.md and the
 // unreleased changelog fragments) are records of what a release did, so
 // they are not scanned: the v0.8.0 note is the record of the removal.
 // This guard's own documentation (the AST guard's README) is exempt for
@@ -75,8 +80,55 @@ const configBlocks = (text) =>
 // The banner a historical record must carry.
 const BANNER = 'predates v0.8.0';
 
-// Rule 1 scope: the published site, the repo-level contributor docs, and
-// the editor setup docs.
+// --- rule 3: the phrasing ---------------------------------------------
+
+// The banned phrase: a document that calls the source of service
+// configuration a "file" sends the reader to a file nobody opens.
+const CONFIG_FILE = /\bconfig(?:uration)?[- ]files?\b/gi;
+
+// A service-configuration context. The phrase alone is not a finding: a
+// "config file" next to a policy document, a TLS certificate or a k8s
+// manifest is a different file, and one that is not read.
+const SERVICE_CONTEXT = [
+  /\bservices?\b/i,
+  /\badapters?\b/i,
+  /\bbatter(?:y|ies)\b/i,
+  /\boptions?\b/i,
+  /\bdsn\b/i,
+  /\benv\b/i,
+  /\benvironment/i,
+  /\bconfigur/i,
+  /\bconfig\./,
+  /\bFromEnv\b/,
+  /\bResolve\b/,
+  /\bZEVER_/,
+  // an env key shape: DB_ADAPTER, AUTH_JWT_SECRET
+  /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/,
+  /\bapp\b/i,
+  /\bserver\b/i,
+  /\bproject\b/i,
+];
+const SERVICE_CONTEXT_RE = new RegExp(SERVICE_CONTEXT.map((r) => r.source).join('|'));
+
+// A denial: a wording that says the file is not there or not read. The
+// denial has to sit next to the phrase, so a denial about a different file
+// does not excuse this one.
+const DENIAL = /\b(?:no|not|never|none|nothing|neither|nor|without|cannot|can't|isn't|aren't|doesn't|don't|inert|ignored|ignores|unsupported|removed|absent|unused)\b/i;
+const DENIAL_WINDOW = 60;
+
+// The artefacts that are not service configuration. The artefact has to
+// name the file itself ("the policy config file", "a config file with the
+// secret token"), so "a config file with two secrets" (env keys, not a
+// token file) stays a finding.
+const ARTEFACTS = 'policy|manifest|kubernetes|k8s|pem|certificate|cert|tls|token|secret|credential|flag|lint|golangci|editorconfig|gitignore|dockerignore|lockfile|lock file|licence|license';
+const NON_SERVICE = new RegExp(
+  `(?:\\b(?:${ARTEFACTS})\\s+config(?:uration)?[- ]files?\\b)` +
+    `|(?:\\bconfig(?:uration)?[- ]files?\\s+(?:for|with|of|holding|containing)\\s+(?:the|a|an)\\s+(?:${ARTEFACTS})\\b)`,
+  'i',
+);
+
+// Rule 1 and rule 3 scope: the published site, the repo-level
+// contributor docs, and the editor setup docs.
 const CURRENT_DIRS = [path.join(docs, 'src'), path.join(docs, 'security')];
 const CURRENT_FILES = [
   ...fs.readdirSync(docs).filter((f) => f.endsWith('.md')).map((f) => path.join(docs, f)),
@@ -121,6 +173,25 @@ export function sections(raw) {
   return out.filter((s) => s.heading || s.lines.join('\n').trim());
 }
 
+// chunks splits a file into the paragraphs a reader sees: blank lines end
+// a paragraph, a fenced code block stays with the text around it.
+export function chunks(raw) {
+  const out = [];
+  let cur = [];
+  let fence = false;
+  for (const line of raw.split('\n')) {
+    if (/^\s*(?:```|~~~)/.test(line)) fence = !fence;
+    if (!fence && line.trim() === '') {
+      if (cur.length) out.push(cur.join('\n'));
+      cur = [];
+      continue;
+    }
+    cur.push(line);
+  }
+  if (cur.length) out.push(cur.join('\n'));
+  return out;
+}
+
 // legacyConfigProblems returns the findings for one page. `historical`
 // selects rule 2, `exempt` waives rule 1 for a page whose job is to name
 // the old format. It is exported so the self-test can plant the mistakes
@@ -155,6 +226,42 @@ export function legacyConfigProblems(raw, opts = {}) {
   return problems;
 }
 
+// phrasingProblems returns the findings of rule 3 for one file. A "config
+// file" in a service-configuration context, with no denial next to it, is
+// a claim that the framework reads a configuration file. It is exported so
+// the self-test can plant the mistake and assert that it is rejected.
+//
+// The unit is the section, then the paragraph inside it: a section that
+// says the file is never read may name it (the same wording rule 1 uses),
+// and a migration section may describe the old format.
+export function phrasingProblems(raw, opts = {}) {
+  const { exempt = false } = opts;
+  if (exempt) return [];
+
+  const problems = [];
+
+  for (const sec of sections(raw)) {
+    const text = sec.lines.join('\n');
+    if (MIGRATION_HEADING.test(sec.heading)) continue;
+    if (NOT_READ.some((p) => text.toLowerCase().includes(p))) continue;
+
+    for (const chunk of chunks(text)) {
+      for (const m of chunk.matchAll(CONFIG_FILE)) {
+        const before = chunk.slice(Math.max(0, m.index - DENIAL_WINDOW), m.index);
+        const after = chunk.slice(m.index + m[0].length, m.index + m[0].length + DENIAL_WINDOW);
+        if (DENIAL.test(before) || DENIAL.test(after)) continue;
+        if (NON_SERVICE.test(chunk)) continue;
+        if (!SERVICE_CONTEXT_RE.test(chunk)) continue;
+        problems.push(
+          `calls service configuration a "${m[0]}"; v0.8.0 is env-only and no service config file is read`,
+        );
+      }
+    }
+  }
+
+  return problems;
+}
+
 // --- the scanned set --------------------------------------------------
 
 const walk = (d) =>
@@ -182,8 +289,8 @@ const isGuardDoc = (rel) => rel.startsWith('tools/tagcheck/');
 
 // scannedFiles returns the files the guard reads, bucketed by scope:
 //
-//   prose      -- markdown and shell: rule 1
-//   go         -- Go source: rule 1
+//   prose      -- markdown and shell: rules 1 and 3
+//   go         -- Go source: rules 1 and 3
 //   historical -- the dated records: rule 2
 //
 // The paths are repo-relative and sorted, so the self-test can assert that
@@ -301,6 +408,61 @@ function selfTest() {
       run: () => legacyConfigProblems('#!/bin/sh\n# Read the DSN from zever.yaml\ncat zever.yaml\n'),
       expect: 1,
     },
+    {
+      name: 'the phrasing rule rejects a config file in a service context',
+      run: () => phrasingProblems('Service configuration comes from a config file.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file plus env',
+      run: () => phrasingProblems('Config file plus env: the adapter comes from the file.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file naming an env key',
+      run: () => phrasingProblems('- A local config file with two secrets: `AUTH_JWT_SECRET` and `CRYPTO_KEY`.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file in a Go doc comment',
+      run: () => phrasingProblems('// On SIGHUP a server re-reads its config file and swaps the log level.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule accepts a denial',
+      run: () => phrasingProblems('There are no service config files: the environment is the only source.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a policy document',
+      run: () => phrasingProblems('UnmarshalJSON keeps the flat policy config file shape.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a k8s manifest',
+      run: () => phrasingProblems('Mount the config file for the k8s manifest into the pod.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a secret token file',
+      run: () => phrasingProblems('Read the config file with the secret token from the vault.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a TLS PEM file',
+      run: () => phrasingProblems('The TLS config file holds the certificate chain.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a flag file',
+      run: () => phrasingProblems('The feature flags come from the config file for the flag file.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a config file that is not read',
+      run: () => phrasingProblems('A config file left over from an older release is inert.'),
+      expect: 0,
+    },
   ];
 
   let failed = 0;
@@ -371,12 +533,14 @@ if (isEntryPoint) {
     // The migration and upgrade guides name the old format on purpose.
     const exempt = isExempt(file);
     for (const p of legacyConfigProblems(raw, { exempt })) problems.push(`${rel}: ${p}`);
+    for (const p of phrasingProblems(raw, { exempt })) problems.push(`${rel}: ${p}`);
   }
   for (const rel of scanned.go) {
     current++;
     const file = path.join(repo, rel);
     const raw = read(file);
     for (const p of legacyConfigProblems(raw)) problems.push(`${rel}: ${p}`);
+    for (const p of phrasingProblems(raw)) problems.push(`${rel}: ${p}`);
   }
   for (const rel of scanned.historical) {
     historical++;

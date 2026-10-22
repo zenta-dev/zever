@@ -75,8 +75,8 @@ func prompts() []promptDef {
 					return "", fmt.Errorf("zever-mcp: prompt argument %q is required", "doctor_json")
 				}
 
-				return "Triage these `zever doctor --json` rows into config-file and " +
-					"environment fixes, marking expected secret failures as such:\n\n" + rows, nil
+				return "Triage these `zever doctor --json` rows into environment " +
+					"fixes, marking expected secret failures as such:\n\n" + rows, nil
 			},
 		},
 		{

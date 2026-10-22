@@ -18,7 +18,7 @@ import (
 // SIGHUP reload.
 //
 // Process configuration is restart-only, except the three batteries below:
-// on SIGHUP a server re-reads its config file and atomically swaps the log
+// on SIGHUP a server re-reads its environment and atomically swaps the log
 // level, the flag client, and the rate limiter. Everything else (adapters,
 // DSNs, credentials, TLS material, listen addresses) needs a process
 // restart. The swap is all-or-nothing per battery and never blocks request
