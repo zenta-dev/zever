@@ -22,8 +22,8 @@ payload read a key that no longer existed. The tags were restored in
 | `golden-nofields` | a registered wire struct whose keys are not pinned: the golden field data was not regenerated |
 | `unregistered-wire` | a struct that exposes json keys but is not registered as a wire struct |
 | `golden-removed` | a registered wire struct that disappeared from the tree |
-| `no-config-file` | a non-test Go file names a retired project config file (`zever.json`, `zever.yaml`, `zever.yml`, `zever.toml`) — in a string literal, in a constant expression that builds the name, or in a comment |
-| `no-config-parser` | a non-test Go file imports a YAML or TOML parser — config is env-only, so the framework parses no config file |
+| `no-config-file` | a non-test Go file names a retired project config file (the project name plus a retired extension: json, yaml, yml, toml, cfg, conf, ini, properties) — in a string literal, in a constant expression that builds the name, or in a comment |
+| `no-config-parser` | a non-test Go file imports a YAML, TOML, INI or properties parser — config is env-only, so the framework parses no config file |
 
 Files that are skipped: `_test.go` files, generated files (a `DO NOT EDIT`
 marker in a leading comment), and the `.git`, `.worktrees`, `.claude`,

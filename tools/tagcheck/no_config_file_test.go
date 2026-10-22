@@ -168,6 +168,40 @@ func TestScanNoConfigFileClean(t *testing.T) {
 	}
 }
 
+func TestScanNoConfigFileNewExtension(t *testing.T) {
+	t.Parallel()
+
+	vs := legacyViolations(t, map[string]string{
+		"pkg/legacy.go": "legacy_ini.txt",
+	}, "")
+
+	if len(vs) != 1 {
+		t.Fatalf("got %v, want exactly one no-config-file violation", vs)
+	}
+
+	if !strings.Contains(vs[0].msg, "zever.ini") {
+		t.Errorf("message %q does not name the retired file", vs[0].msg)
+	}
+}
+
+func TestLegacyConfigRuleNames(t *testing.T) {
+	t.Parallel()
+
+	rule := newLegacyConfigRule()
+
+	wantExts := []string{"json", "yaml", "yml", "toml", "cfg", "conf", "ini", "properties"}
+
+	if len(rule.names) != len(wantExts) {
+		t.Fatalf("rule names %q, want one per retired extension %q", rule.names, wantExts)
+	}
+
+	for i, ext := range wantExts {
+		if want := legacyConfigPrefix + ext; rule.names[i] != want {
+			t.Errorf("rule names[%d] = %q, want %q", i, rule.names[i], want)
+		}
+	}
+}
+
 func TestScanNoConfigFileIgnoresOtherNames(t *testing.T) {
 	t.Parallel()
 
@@ -285,11 +319,20 @@ func TestLegacyConfigRuleMatch(t *testing.T) {
 		{name: "upper case", value: "Zever.YAML", want: "Zever.YAML"},
 		{name: "json", value: "zever.json", want: "zever.json"},
 		{name: "toml", value: "zever.toml", want: "zever.toml"},
-		{name: "sentence", value: "the zever.yaml file is ignored", want: "zever.yaml"},
+		{name: "cfg", value: "zever.cfg", want: "zever.cfg"},
+		{name: "conf", value: "zever.conf", want: "zever.conf"},
+		{name: "ini", value: "zever.ini", want: "zever.ini"},
+		{name: "properties", value: "zever.properties", want: "zever.properties"},
+		{name: "sentence", value: "the zever.ini file is ignored", want: "zever.ini"},
+		{name: "upper case", value: "Zever.CONF", want: "Zever.CONF"},
 		{name: "longer name", value: "zever.yaml.bak", want: "zever.yaml"},
 		{name: "other schema", value: "zever.schema.json", want: ""},
 		{name: "other prefix", value: "foozever.yaml", want: ""},
 		{name: "other package", value: "zever.annotations.v1.auth", want: ""},
+		{name: "versioned api package", value: "zever.v1", want: ""},
+		{name: "schema helper", value: "zever.schema", want: ""},
+		{name: "shop helper", value: "zever.shop", want: ""},
+		{name: "new helper", value: "zever.new", want: ""},
 		{name: "unrelated", value: "yaml", want: ""},
 	}
 

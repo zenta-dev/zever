@@ -1,6 +1,6 @@
 # no_config_file_allowlist.txt — allowlist for the retired-config-file rule
 # (tagcheck rule no-config-file). The v0.8.0 env-only config break removed
-# the zever.{json,yaml,yml,toml} formats for good, and the rule fails the
+# the zever.{json,yaml,yml,toml,cfg,conf,ini,properties} formats for good, and the rule fails the
 # gate on every mention of one of those names in a non-test Go file. The
 # allowlist starts EMPTY: the current tree has zero such mentions once the
 # env-only break PRs land.

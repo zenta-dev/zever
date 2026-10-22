@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// configParserModules are the module roots of the YAML and TOML parsers the
-// framework must not pull into shipped code.
+// configParserModules are the module roots of the YAML, TOML, INI and
+// Java-properties parsers the framework must not pull into shipped code.
 //
 // Config is env-only since v0.8.0: there is no config file to parse, so a
 // parser in a non-test file is either dead weight or the first step back
@@ -20,7 +20,10 @@ import (
 // reads a file it does not ship.
 //
 // The list is a deny-list of module roots, matched as a path prefix: a
-// package of a denied module is denied too.
+// package of a denied module is denied too. The extensions stay an
+// explicit list, never a wildcard: keep it in sync with the retired
+// extension set in newLegacyConfigRule and with the depguard no-yaml
+// rule in .golangci.yml (denylist_drift_test.go fails when they drift).
 var configParserModules = []string{
 	"go.yaml.in/yaml/v3",
 	"go.yaml.in/yaml/v4",
@@ -31,6 +34,9 @@ var configParserModules = []string{
 	"github.com/gopkg.in/yaml.v3",
 	"github.com/BurntSushi/toml",
 	"github.com/pelletier/go-toml",
+	"gopkg.in/ini.v1",
+	"github.com/go-ini/ini",
+	"github.com/magiconair/properties",
 }
 
 // configParserImport reports whether the import path names a YAML or TOML
@@ -73,8 +79,8 @@ func loadNoConfigParserAllowlist(dir string) (allowlist, error) {
 	return a, nil
 }
 
-// checkConfigParserImports reports every import of a YAML or TOML parser in
-// a non-test, non-generated Go file.
+// checkConfigParserImports reports every import of a YAML, TOML, INI or
+// properties parser in a non-test, non-generated Go file.
 //
 // The rule exists because a direct requirement is not a promise: a
 // test-only dependency is a direct requirement (go mod tidy keeps it
@@ -105,7 +111,7 @@ func checkConfigParserImports(rel string, fset *token.FileSet, f *ast.File, r ru
 			path: rel,
 			line: line,
 			rule: "no-config-parser",
-			msg:  fmt.Sprintf("imports %s from the denied module %s; v0.8.0 is env-only and the framework parses no config file, so a YAML or TOML parser belongs in a test", path, mod),
+			msg:  fmt.Sprintf("imports %s from the denied module %s; v0.8.0 is env-only and the framework parses no config file, so a YAML, TOML, INI or properties parser belongs in a test", path, mod),
 		})
 	}
 
