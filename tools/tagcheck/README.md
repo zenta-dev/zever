@@ -22,12 +22,14 @@ payload read a key that no longer existed. The tags were restored in
 | `golden-nofields` | a registered wire struct whose keys are not pinned: the golden field data was not regenerated |
 | `unregistered-wire` | a struct that exposes json keys but is not registered as a wire struct |
 | `golden-removed` | a registered wire struct that disappeared from the tree |
-| `no-config-file` | a non-test Go file names a retired project config file (the project name plus a retired extension: json, yaml, yml, toml, cfg, conf, ini, properties) — in a string literal, in a constant expression that builds the name, or in a comment |
+| `no-config-file` | a non-test Go file (generated files included) names a retired project config file (the project name plus a retired extension: json, yaml, yml, toml, cfg, conf, ini, properties) — in a string literal, in a constant expression that builds the name, or in a comment |
 | `no-config-parser` | a non-test Go file imports a YAML, TOML, INI or properties parser — config is env-only, so the framework parses no config file |
 
-Files that are skipped: `_test.go` files, generated files (a `DO NOT EDIT`
-marker in a leading comment), and the `.git`, `.worktrees`, `.claude`,
-`vendor`, `node_modules` and `generated` directories.
+Files that are skipped: `_test.go` files; generated files (a `DO NOT EDIT`
+marker in a leading comment) for every rule except `no-config-file`, which
+covers generated files too — a generator emitting a retired name is fixed
+at the generator, never in the output; and the `.git`, `.worktrees`,
+`.claude`, `vendor`, `node_modules` and `generated` directories.
 
 ## Data files
 
@@ -133,12 +135,17 @@ v0.8.0 made the configuration env-only and removed the
 `zever.json`/`zever.yaml`/`zever.yml`/`zever.toml` project files for good.
 The framework does not know those names any more: a stale file is ignored
 silently, there is no probe and no warning. The `no-config-file` rule makes
-that break permanent by failing the gate when a **non-test, non-generated Go
-file names one of the retired formats**.
+that break permanent by failing the gate when a **non-test Go file —
+generated files included — names one of the retired formats**.
 
 ### The contract
 
-> No non-test Go file may name a retired project config file.
+> No non-test Go file — generated files included — may name a retired project config file.
+
+A generator emitting a retired name is the first step back to file-based
+configuration, and the fix belongs to the generator, never to the output:
+that is why the generated-file skip every other rule of this guard keeps
+does not apply here.
 
 A "name" is any of:
 

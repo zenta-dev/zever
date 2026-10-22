@@ -28,22 +28,26 @@
 //   - golden-nofields: a registered wire struct with no pinned keys: the
 //     golden field data was not regenerated after the struct was
 //     registered.
-//   - no-config-file: a non-test Go file names a retired project config
-//     file (the project name plus a retired extension:
-//     json/yaml/yml/toml/cfg/conf/ini/properties), in a
+//   - no-config-file: a non-test Go file (generated files included) names
+//     a retired project config file (the project name plus a retired
+//     extension: json/yaml/yml/toml/cfg/conf/ini/properties), in a
 //     string literal, in a constant expression that builds such a name, or
 //     in a comment. The v0.8.0 env-only break removed those formats for
 //     good: a stale file is ignored silently, so every mention of it in
-//     the source is a leftover of the removed formats.
+//     the source is a leftover of the removed formats. Generated files are
+//     covered too: a generator emitting a retired name is the first step
+//     back to file-based configuration, and the fix belongs to the
+//     generator, never to the output.
 //   - no-config-parser: a non-test Go file imports a YAML, TOML, INI or
 //     properties parser. Config is env-only since v0.8.0, so the framework parses no config
 //     file; a parser in shipped code is either dead weight or the first
 //     step back to file-based configuration. A test file may parse one: a
 //     test reads a file it does not ship.
 //
-// Skipped: _test.go files, generated files (a "DO NOT EDIT" marker in a
-// leading comment), and the .git/.worktrees/.claude/vendor/node_modules/
-// generated directories.
+// Skipped: _test.go files; generated files (a "DO NOT EDIT" marker in a
+// leading comment) for every rule except no-config-file, which covers
+// generated files too; and the .git/.worktrees/.claude/vendor/
+// node_modules/generated directories.
 //
 // Usage: tagcheck [root] (default "."). Prints one "path:line: rule: message"
 // line per violation to stdout and exits 1 if any are found, 2 on scan
@@ -397,9 +401,10 @@ func eachDataLine(r io.Reader, origin string, fn func(string) error) error {
 	return sc.Err()
 }
 
-// scan walks root, checking every non-test, non-generated Go file against
-// the tag rules. seen records golden (dir, struct) pairs found in the tree
-// so checkGoldenPresent can report vanished golden structs.
+// scan walks root, checking every non-test Go file against the rules:
+// generated files skip every rule except the retired-config-file rule.
+// seen records golden (dir, struct) pairs found in the tree so
+// checkGoldenPresent can report vanished golden structs.
 func scan(root string, r rules) ([]violation, error) {
 	var vs []violation
 
@@ -590,10 +595,14 @@ type structDecl struct {
 }
 
 // checkFile parses one Go file and returns its rule violations (the struct
-// tag rules and the retired-config-file rule). The second result reports
-// whether the file is generated (DO NOT EDIT marker in a leading comment),
-// in which case it is skipped entirely. The third result lists the struct
-// types the file declares.
+// tag rules, the config-parser rule, and the retired-config-file rule).
+// The second result reports whether the file is generated (DO NOT EDIT
+// marker in a leading comment), in which case every rule except the
+// retired-config-file rule is skipped: a tag the generator's template must
+// emit is fixed in the template, never in the output, while a retired name
+// the generator emits is fixed at the generator too, and skipping the file
+// would hide exactly that. The third result lists the struct types the file
+// declares (nil for generated files).
 func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls []structDecl, err error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
@@ -606,6 +615,8 @@ func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls
 		return nil, false, nil, err
 	}
 
+	isGenerated := false
+
 	for _, cg := range f.Comments {
 		if fset.Position(cg.Pos()).Line > 10 {
 			break
@@ -613,14 +624,28 @@ func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls
 
 		for _, c := range cg.List {
 			if strings.Contains(c.Text, "DO NOT EDIT") {
-				return nil, true, nil, nil
+				isGenerated = true
+
+				break
 			}
+		}
+
+		if isGenerated {
+			break
 		}
 	}
 
 	dir := filepath.ToSlash(filepath.Dir(rel))
 
+	// The retired-config-file rule covers generated files too: a generator
+	// emitting a retired name is the first step back to file-based
+	// configuration, and the fix belongs to the generator, never to the
+	// output. Every other rule keeps skipping generated files.
 	vs = append(vs, checkLegacyConfigNames(rel, fset, f, r)...)
+	if isGenerated {
+		return vs, true, nil, nil
+	}
+
 	vs = append(vs, checkConfigParserImports(rel, fset, f, r)...)
 
 	for _, decl := range f.Decls {

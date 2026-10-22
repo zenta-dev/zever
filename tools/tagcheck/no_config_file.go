@@ -129,7 +129,8 @@ func loadNoConfigAllowlist(dir string) (allowlist, error) {
 // project config file: a string literal (a path, a message, a constant), a
 // constant string expression that builds such a name, or a comment. One
 // violation is reported per line: the line names the first retired file the
-// rule found on it.
+// rule found on it. Generated files are covered too: a generator emitting a
+// retired name is fixed at the generator, never in the output.
 //
 // The rule covers the file name forms, the format names and the shapes that
 // build a name at runtime, because the break means the framework does not
