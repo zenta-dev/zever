@@ -34,6 +34,11 @@
 //     in a comment. The v0.8.0 env-only break removed those formats for
 //     good: a stale file is ignored silently, so every mention of it in
 //     the source is a leftover of the removed formats.
+//   - no-config-parser: a non-test Go file imports a YAML or TOML parser.
+//     Config is env-only since v0.8.0, so the framework parses no config
+//     file; a parser in shipped code is either dead weight or the first
+//     step back to file-based configuration. A test file may parse one: a
+//     test reads a file it does not ship.
 //
 // Skipped: _test.go files, generated files (a "DO NOT EDIT" marker in a
 // leading comment), and the .git/.worktrees/.claude/vendor/node_modules/
@@ -99,6 +104,10 @@ type rules struct {
 	// allows one line).
 	legacy          *legacyConfigRule
 	noConfigAllowed allowlist
+
+	// parserAllowed holds the exception list of the no-config-parser rule
+	// (bare paths allow a whole file, path:line allows one line).
+	parserAllowed allowlist
 }
 
 // structInfo summarizes one struct type found in the tree.
@@ -160,6 +169,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	parserAllowed, err := loadNoConfigParserAllowlist(toolDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "tagcheck: load no-config-parser allowlist: %v\n", err)
+		return 2
+	}
+
 	vs, err := scan(root, rules{
 		structs:         structs,
 		fields:          fields,
@@ -167,6 +182,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		allowed:         allowed,
 		legacy:          newLegacyConfigRule(),
 		noConfigAllowed: noConfigAllowed,
+		parserAllowed:   parserAllowed,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: %v\n", err)
@@ -604,6 +620,7 @@ func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls
 	dir := filepath.ToSlash(filepath.Dir(rel))
 
 	vs = append(vs, checkLegacyConfigNames(rel, fset, f, r)...)
+	vs = append(vs, checkConfigParserImports(rel, fset, f, r)...)
 
 	for _, decl := range f.Decls {
 		gd, ok := decl.(*ast.GenDecl)

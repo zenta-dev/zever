@@ -137,6 +137,10 @@ require (
 	github.com/zenta-dev/zever/orm v0.8.0
 	github.com/zenta-dev/zever/serve v0.8.0
 	github.com/zenta-dev/zever/shared/codec v0.8.0
+	// test-only: the YAML parser reads the GitHub-Actions workflow the
+	// tests check. Shipped code parses no configuration file (v0.8.0 is
+	// env-only), so no non-test file may import a YAML or TOML parser;
+	// the no-config-parser rule of tools/tagcheck enforces that.
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/mod v0.42.0
 )

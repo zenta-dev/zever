@@ -1,0 +1,14 @@
+package pkg
+
+import (
+	"github.com/BurntSushi/toml"
+)
+
+// parse reads a TOML document.
+func parse(raw []byte) (map[string]any, error) {
+	var out map[string]any
+
+	_, err := toml.Decode(string(raw), &out)
+
+	return out, err
+}

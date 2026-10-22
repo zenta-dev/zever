@@ -60,8 +60,10 @@ jobs:
       # Legacy config file guard: the docs must never send a reader to a
       # `zever.yaml`-style config file. Config is env-only since v0.8.0,
       # so a file left in the working directory is inert and its values
-      # are dropped in silence.
-      - name: Check the docs never configure through a config file
+      # are dropped in silence. The check reads the whole repo, not only
+      # the site: the root markdown, the module, example and editor
+      # READMEs, the shell scripts and the Go source.
+      - name: Check the repo never configures through a legacy config file
         run: npm run check-legacy-config
         working-directory: docs
       - name: Prove the legacy config file check rejects the mistakes it guards against

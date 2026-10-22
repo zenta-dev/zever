@@ -1,0 +1,1 @@
+- fix(docs): the container README no longer shows a yaml block shaped like the retired config file. The shared-pool example shows the env form (`SEARCH_ADAPTER`, `SEARCH_DSN`, `SEARCH_DEDICATEDPOOL`) instead, so the page cannot be read as an instruction to configure through a file.

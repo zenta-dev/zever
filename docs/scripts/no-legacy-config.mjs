@@ -7,26 +7,36 @@
 // tells a reader to put configuration into such a file sends them to a
 // dead end, and that is the drift this check stops.
 //
-// Two rules:
+// Three rules:
 //
-// 1. Current docs (the published site under docs/src, the repo-level
-//    contributor docs, the editor setup docs): every mention of a legacy
-//    file name must sit in a section that says the file is never read, or
-//    in a section about migrating away from it. A mention anywhere else is
-//    an instruction to configure through the file, and it fails.
+// 1. Current prose (the published site, the repo-level contributor docs,
+//    the module READMEs, the editor and example READMEs, the shell
+//    scripts, the Go source): every mention of a legacy file name must sit
+//    in a section that says the file is never read, or in a section about
+//    migrating away from it. A mention anywhere else is an instruction to
+//    configure through the file, and it fails.
 // 2. Historical docs (docs/designs, docs/plans, docs/superpowers,
 //    docs/adrs): a dated record may describe the old mechanism, but it
 //    must carry the banner that says it predates v0.8.0, so a reader
 //    cannot mistake the record for current behaviour.
+// 3. The phrasing (every current prose file, the Go source): a document
+//    that says service configuration comes from a "config file" is the
+//    same drift as rule 1, only without the file name. A name-based scan
+//    cannot see it, so this rule reads the prose: a "config file" in a
+//    service-configuration context, without a denial, is a finding.
 //
-// The migration and upgrade guides are exempt from rule 1: naming the old
-// format is their job.
+// The migration and upgrade guides are exempt from rules 1 and 3: naming
+// the old format is their job. The release notes (CHANGELOG.md and the
+// unreleased changelog fragments) are records of what a release did, so
+// they are not scanned: the v0.8.0 note is the record of the removal.
+// This guard's own documentation (the AST guard's README) is exempt for
+// the same reason: it names the retired formats to describe the rule.
 //
 // The wording of the rules is mechanical on purpose. A finding is never a
 // judgement call, so this can gate a build.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // The script resolves its own paths, so it runs from the repo root
 // (node docs/scripts/no-legacy-config.mjs) and from docs/ alike.
@@ -70,8 +80,55 @@ const configBlocks = (text) =>
 // The banner a historical record must carry.
 const BANNER = 'predates v0.8.0';
 
-// Rule 1 scope: the published site, the repo-level contributor docs, and
-// the editor setup docs.
+// --- rule 3: the phrasing ---------------------------------------------
+
+// The banned phrase: a document that calls the source of service
+// configuration a "file" sends the reader to a file nobody opens.
+const CONFIG_FILE = /\bconfig(?:uration)?[- ]files?\b/gi;
+
+// A service-configuration context. The phrase alone is not a finding: a
+// "config file" next to a policy document, a TLS certificate or a k8s
+// manifest is a different file, and one that is not read.
+const SERVICE_CONTEXT = [
+  /\bservices?\b/i,
+  /\badapters?\b/i,
+  /\bbatter(?:y|ies)\b/i,
+  /\boptions?\b/i,
+  /\bdsn\b/i,
+  /\benv\b/i,
+  /\benvironment/i,
+  /\bconfigur/i,
+  /\bconfig\./,
+  /\bFromEnv\b/,
+  /\bResolve\b/,
+  /\bZEVER_/,
+  // an env key shape: DB_ADAPTER, AUTH_JWT_SECRET
+  /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/,
+  /\bapp\b/i,
+  /\bserver\b/i,
+  /\bproject\b/i,
+];
+const SERVICE_CONTEXT_RE = new RegExp(SERVICE_CONTEXT.map((r) => r.source).join('|'));
+
+// A denial: a wording that says the file is not there or not read. The
+// denial has to sit next to the phrase, so a denial about a different file
+// does not excuse this one.
+const DENIAL = /\b(?:no|not|never|none|nothing|neither|nor|without|cannot|can't|isn't|aren't|doesn't|don't|inert|ignored|ignores|unsupported|removed|absent|unused)\b/i;
+const DENIAL_WINDOW = 60;
+
+// The artefacts that are not service configuration. The artefact has to
+// name the file itself ("the policy config file", "a config file with the
+// secret token"), so "a config file with two secrets" (env keys, not a
+// token file) stays a finding.
+const ARTEFACTS = 'policy|manifest|kubernetes|k8s|pem|certificate|cert|tls|token|secret|credential|flag|lint|golangci|editorconfig|gitignore|dockerignore|lockfile|lock file|licence|license';
+const NON_SERVICE = new RegExp(
+  `(?:\\b(?:${ARTEFACTS})\\s+config(?:uration)?[- ]files?\\b)` +
+    `|(?:\\bconfig(?:uration)?[- ]files?\\s+(?:for|with|of|holding|containing)\\s+(?:the|a|an)\\s+(?:${ARTEFACTS})\\b)`,
+  'i',
+);
+
+// Rule 1 and rule 3 scope: the published site, the repo-level
+// contributor docs, and the editor setup docs.
 const CURRENT_DIRS = [path.join(docs, 'src'), path.join(docs, 'security')];
 const CURRENT_FILES = [
   ...fs.readdirSync(docs).filter((f) => f.endsWith('.md')).map((f) => path.join(docs, f)),
@@ -92,7 +149,7 @@ const CONTENT = path.join(docs, 'src', 'content', 'docs');
 const EXEMPT = ['guides/operate/migration.mdx', 'guides/operate/upgrade.mdx'];
 const isExempt = (file) => EXEMPT.includes(path.relative(CONTENT, file));
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.worktrees', 'vendor']);
 
 // sections splits a page into { heading, text } blocks. A heading opens a
 // section, and the text before the first heading is the lead section. Code
@@ -114,6 +171,25 @@ export function sections(raw) {
   }
   out.push(cur);
   return out.filter((s) => s.heading || s.lines.join('\n').trim());
+}
+
+// chunks splits a file into the paragraphs a reader sees: blank lines end
+// a paragraph, a fenced code block stays with the text around it.
+export function chunks(raw) {
+  const out = [];
+  let cur = [];
+  let fence = false;
+  for (const line of raw.split('\n')) {
+    if (/^\s*(?:```|~~~)/.test(line)) fence = !fence;
+    if (!fence && line.trim() === '') {
+      if (cur.length) out.push(cur.join('\n'));
+      cur = [];
+      continue;
+    }
+    cur.push(line);
+  }
+  if (cur.length) out.push(cur.join('\n'));
+  return out;
 }
 
 // legacyConfigProblems returns the findings for one page. `historical`
@@ -149,6 +225,118 @@ export function legacyConfigProblems(raw, opts = {}) {
 
   return problems;
 }
+
+// phrasingProblems returns the findings of rule 3 for one file. A "config
+// file" in a service-configuration context, with no denial next to it, is
+// a claim that the framework reads a configuration file. It is exported so
+// the self-test can plant the mistake and assert that it is rejected.
+//
+// The unit is the section, then the paragraph inside it: a section that
+// says the file is never read may name it (the same wording rule 1 uses),
+// and a migration section may describe the old format.
+export function phrasingProblems(raw, opts = {}) {
+  const { exempt = false } = opts;
+  if (exempt) return [];
+
+  const problems = [];
+
+  for (const sec of sections(raw)) {
+    const text = sec.lines.join('\n');
+    if (MIGRATION_HEADING.test(sec.heading)) continue;
+    if (NOT_READ.some((p) => text.toLowerCase().includes(p))) continue;
+
+    for (const chunk of chunks(text)) {
+      for (const m of chunk.matchAll(CONFIG_FILE)) {
+        const before = chunk.slice(Math.max(0, m.index - DENIAL_WINDOW), m.index);
+        const after = chunk.slice(m.index + m[0].length, m.index + m[0].length + DENIAL_WINDOW);
+        if (DENIAL.test(before) || DENIAL.test(after)) continue;
+        if (NON_SERVICE.test(chunk)) continue;
+        if (!SERVICE_CONTEXT_RE.test(chunk)) continue;
+        problems.push(
+          `calls service configuration a "${m[0]}"; v0.8.0 is env-only and no service config file is read`,
+        );
+      }
+    }
+  }
+
+  return problems;
+}
+
+// --- the scanned set --------------------------------------------------
+
+const walk = (d) =>
+  fs.readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? (SKIP_DIRS.has(e.name) ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)],
+  );
+const md = (f) => /\.(?:md|mdx)$/.test(f);
+const read = (f) => fs.readFileSync(f, 'utf8');
+
+// A generated Go file is not the repo's prose: it carries a "DO NOT EDIT"
+// marker, so a contributor cannot fix it there.
+const isGenerated = (f) => {
+  const head = read(f).slice(0, 400);
+  return /DO NOT EDIT|Code generated by/.test(head);
+};
+
+// The release notes record what a release did. The v0.8.0 note is the
+// record of the removal, so the notes are not scanned for the rules that
+// police current prose.
+const isReleaseNote = (rel) => rel === 'CHANGELOG.md' || rel.startsWith('.changelog/');
+
+// The AST guard's own documentation names the retired formats to describe
+// the rule that forbids them.
+const isGuardDoc = (rel) => rel.startsWith('tools/tagcheck/');
+
+// scannedFiles returns the files the guard reads, bucketed by scope:
+//
+//   prose      -- markdown and shell: rules 1 and 3
+//   go         -- Go source: rules 1 and 3
+//   historical -- the dated records: rule 2
+//
+// The paths are repo-relative and sorted, so the self-test can assert that
+// the newly covered files are in the set.
+export function scannedFiles() {
+  const prose = [];
+  const go = [];
+  const historical = [];
+
+  for (const dir of CURRENT_DIRS) {
+    if (!fs.existsSync(dir)) continue;
+    for (const file of walk(dir).filter(md)) prose.push(path.relative(repo, file));
+  }
+  for (const file of CURRENT_FILES) {
+    if (!fs.existsSync(file)) continue;
+    prose.push(path.relative(repo, file));
+  }
+  for (const dir of HISTORICAL_DIRS) {
+    if (!fs.existsSync(dir)) continue;
+    for (const file of walk(dir).filter(md)) historical.push(path.relative(repo, file));
+  }
+
+  for (const file of walk(repo)) {
+    const rel = path.relative(repo, file);
+    if (isReleaseNote(rel) || isGuardDoc(rel)) continue;
+    if (md(file)) {
+      // The dated records are rule 2's scope, not rule 1's.
+      if (historical.includes(rel)) continue;
+      prose.push(rel);
+      continue;
+    }
+    if (file.endsWith('.sh')) {
+      prose.push(rel);
+      continue;
+    }
+    if (file.endsWith('.go') && !file.endsWith('_test.go') && !isGenerated(file)) go.push(rel);
+  }
+
+  return {
+    prose: [...new Set(prose)].sort(),
+    go: [...new Set(go)].sort(),
+    historical: [...new Set(historical)].sort(),
+  };
+}
+
+// --- the self-test ----------------------------------------------------
 
 // selfTest plants the mistakes this checker exists to catch and asserts it
 // rejects them, and that the correct wordings pass. It proves the guard
@@ -210,6 +398,71 @@ function selfTest() {
         ),
       expect: 0,
     },
+    {
+      name: 'a module README that names the retired file is rejected',
+      run: () => legacyConfigProblems('# db\n\nPut the DSN in `zever.yaml`.\n'),
+      expect: 1,
+    },
+    {
+      name: 'a shell script that names the retired file is rejected',
+      run: () => legacyConfigProblems('#!/bin/sh\n# Read the DSN from zever.yaml\ncat zever.yaml\n'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file in a service context',
+      run: () => phrasingProblems('Service configuration comes from a config file.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file plus env',
+      run: () => phrasingProblems('Config file plus env: the adapter comes from the file.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file naming an env key',
+      run: () => phrasingProblems('- A local config file with two secrets: `AUTH_JWT_SECRET` and `CRYPTO_KEY`.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule rejects a config file in a Go doc comment',
+      run: () => phrasingProblems('// On SIGHUP a server re-reads its config file and swaps the log level.'),
+      expect: 1,
+    },
+    {
+      name: 'the phrasing rule accepts a denial',
+      run: () => phrasingProblems('There are no service config files: the environment is the only source.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a policy document',
+      run: () => phrasingProblems('UnmarshalJSON keeps the flat policy config file shape.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a k8s manifest',
+      run: () => phrasingProblems('Mount the config file for the k8s manifest into the pod.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a secret token file',
+      run: () => phrasingProblems('Read the config file with the secret token from the vault.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a TLS PEM file',
+      run: () => phrasingProblems('The TLS config file holds the certificate chain.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a flag file',
+      run: () => phrasingProblems('The feature flags come from the config file for the flag file.'),
+      expect: 0,
+    },
+    {
+      name: 'the phrasing rule accepts a config file that is not read',
+      run: () => phrasingProblems('A config file left over from an older release is inert.'),
+      expect: 0,
+    },
   ];
 
   let failed = 0;
@@ -222,6 +475,35 @@ function selfTest() {
       console.log(`self-test ok: ${c.name}`);
     }
   }
+
+  // The scope cases: the files that used to be unscanned must be in the
+  // scanned set, or a mention in them would pass CI again.
+  const scanned = scannedFiles();
+  const prose = new Set(scanned.prose);
+  const go = new Set(scanned.go);
+  const scopeCases = [
+    { name: 'the root README is scanned', ok: prose.has('README.md') },
+    { name: 'the contributor guide is scanned', ok: prose.has('AGENTS.md') },
+    { name: 'the stability note is scanned', ok: prose.has('STABILITY.md') },
+    { name: 'the config package README is scanned', ok: prose.has(path.join('config', 'README.md')) },
+    { name: 'the container package README is scanned', ok: prose.has(path.join('container', 'README.md')) },
+    { name: 'the CLI package README is scanned', ok: prose.has(path.join('cmd', 'zever', 'README.md')) },
+    { name: 'a battery README is scanned', ok: prose.has(path.join('core', 'db', 'README.md')) },
+    { name: 'an editor README is scanned', ok: prose.has(path.join('editors', 'vscode', 'README.md')) },
+    { name: 'an example README is scanned', ok: prose.has(path.join('examples', 'todo', 'README.md')) },
+    { name: 'a shell script is scanned', ok: prose.has(path.join('tools', 'changelog-lint.sh')) },
+    { name: 'a battery doc.go is scanned', ok: go.has(path.join('core', 'db', 'doc.go')) },
+    { name: 'a Go source file is scanned', ok: go.has(path.join('config', 'dotenv.go')) },
+  ];
+  for (const c of scopeCases) {
+    if (!c.ok) {
+      failed++;
+      console.error(`self-test FAIL: ${c.name}`);
+    } else {
+      console.log(`self-test ok: ${c.name}`);
+    }
+  }
+
   if (failed) {
     console.error(`self-test FAIL: ${failed} case(s) wrong`);
 
@@ -236,39 +518,39 @@ if (process.argv.includes('--self-test')) {
   process.exit(selfTest());
 }
 
-const walk = (d) =>
-  fs.readdirSync(d, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? (SKIP_DIRS.has(e.name) ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)],
-  );
-const md = (f) => /\.(?:md|mdx)$/.test(f);
-const read = (f) => fs.readFileSync(f, 'utf8');
+const isEntryPoint =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
-const problems = [];
-let current = 0, historical = 0;
+if (isEntryPoint) {
+  const scanned = scannedFiles();
+  const problems = [];
+  let current = 0, historical = 0;
 
-for (const dir of CURRENT_DIRS) {
-  if (!fs.existsSync(dir)) continue;
-  for (const file of walk(dir).filter(md)) {
+  for (const rel of scanned.prose) {
     current++;
-    const found = legacyConfigProblems(read(file), { exempt: isExempt(file) });
-    for (const p of found) problems.push(`${path.relative(repo, file)}: ${p}`);
+    const file = path.join(repo, rel);
+    const raw = read(file);
+    // The migration and upgrade guides name the old format on purpose.
+    const exempt = isExempt(file);
+    for (const p of legacyConfigProblems(raw, { exempt })) problems.push(`${rel}: ${p}`);
+    for (const p of phrasingProblems(raw, { exempt })) problems.push(`${rel}: ${p}`);
   }
-}
-for (const file of CURRENT_FILES) {
-  if (!fs.existsSync(file)) continue;
-  current++;
-  const found = legacyConfigProblems(read(file), { exempt: isExempt(file) });
-  for (const p of found) problems.push(`${path.relative(repo, file)}: ${p}`);
-}
-for (const dir of HISTORICAL_DIRS) {
-  if (!fs.existsSync(dir)) continue;
-  for (const file of walk(dir).filter(md)) {
+  for (const rel of scanned.go) {
+    current++;
+    const file = path.join(repo, rel);
+    const raw = read(file);
+    for (const p of legacyConfigProblems(raw)) problems.push(`${rel}: ${p}`);
+    for (const p of phrasingProblems(raw)) problems.push(`${rel}: ${p}`);
+  }
+  for (const rel of scanned.historical) {
     historical++;
-    const found = legacyConfigProblems(read(file), { historical: true });
-    for (const p of found) problems.push(`${path.relative(repo, file)}: ${p}`);
+    const file = path.join(repo, rel);
+    for (const p of legacyConfigProblems(read(file), { historical: true })) problems.push(`${rel}: ${p}`);
   }
-}
 
-for (const p of problems) console.log(`ERROR ${p}`);
-console.log(`checked ${current} current pages and ${historical} historical records, ${problems.length} problems`);
-process.exit(problems.length ? 1 : 0);
+  for (const p of problems) console.log(`ERROR ${p}`);
+  console.log(
+    `checked ${current} current files and ${historical} historical records, ${problems.length} problems`,
+  );
+  process.exit(problems.length ? 1 : 0);
+}
