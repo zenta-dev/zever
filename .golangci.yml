@@ -78,6 +78,30 @@ linters:
               desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
             - pkg: "io/ioutil"
               desc: "Deprecated since Go 1.16: use io or os instead"
+        # The framework has no config-file parser on purpose: v0.8.0 is
+        # env-only. A test may parse a generated YAML document (the CLI
+        # tests parse the GitHub Actions workflow it scaffolds), but no
+        # non-test file may import a YAML or TOML package. That import would
+        # be the first step back to file-based configuration, so the gate
+        # stops it there. The rule covers the whole tree; the same deny-list
+        # lives in tools/tagcheck as the no_config_parser rule, which fails
+        # `make check-tags` with file and line.
+        no-yaml:
+          files:
+            - "!$test"
+          deny:
+            - pkg: "go.yaml.in/yaml"
+              desc: "The framework is env-only: no non-test file may parse YAML"
+            - pkg: "gopkg.in/yaml.v2"
+              desc: "The framework is env-only: no non-test file may parse YAML"
+            - pkg: "gopkg.in/yaml.v3"
+              desc: "The framework is env-only: no non-test file may parse YAML"
+            - pkg: "sigs.k8s.io/yaml"
+              desc: "The framework is env-only: no non-test file may parse YAML"
+            - pkg: "github.com/BurntSushi/toml"
+              desc: "The framework is env-only: no non-test file may parse TOML"
+            - pkg: "github.com/pelletier/go-toml"
+              desc: "The framework is env-only: no non-test file may parse TOML"
     errorlint:
       errorf: true
     exhaustive:
