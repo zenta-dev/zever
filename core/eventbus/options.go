@@ -48,7 +48,7 @@ type Options struct {
 	OnPanic func(topic string, msg Message, r any) `json:"-"`
 	// Provider emits the producer span an adapter opens for every publish and
 	// the consumer span it opens for every delivery. Nil disables telemetry.
-	// It is Go-API-only: never decoded from configuration files.
+	// It is Go-API-only: never set from the environment.
 	Provider observability.Provider `json:"-"`
 	// Redis holds Redis-specific connection configuration.
 	Redis RedisOptions `json:"redis"`

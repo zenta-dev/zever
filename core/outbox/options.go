@@ -85,7 +85,7 @@ type Options struct {
 	// container reads this flag, adapters ignore it.
 	StallReadiness bool `json:"stall_readiness"`
 	// Provider emits relay metrics and spans. Nil disables telemetry. It is
-	// Go-API-only: never decoded from configuration files.
+	// Go-API-only: never set from the environment.
 	Provider observability.Provider `json:"-"`
 }
 

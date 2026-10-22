@@ -65,7 +65,7 @@ func prompts() []promptDef {
 		},
 		{
 			Name:        "debug-doctor",
-			Description: "Triage doctor FAIL rows into config and env fixes.",
+			Description: "Triage doctor FAIL rows into environment fixes.",
 			Args: []promptArg{
 				{Name: "doctor_json", Description: "Pasted `zever doctor --json` rows.", Required: true},
 			},

@@ -3,7 +3,7 @@ title: Config reference
 description: Every Zever config service, adapter, option key, default, and environment variable, plus the layering and strictness rules.
 ---
 
-Zever config is one block per service, shaped `{ adapter, options }`. This page lists all 37 services and every option each one accepts.
+Zever config is one block per service, shaped `{ adapter, options }`: the adapter name sits beside the option map, never inside it. This page lists all 37 services and every option each one accepts.
 
 ## Layering and rules
 
@@ -17,7 +17,7 @@ Zever config is one block per service, shaped `{ adapter, options }`. This page 
 | Options replace defaults | Env variables overlay one field at a time and do not replace the block. |
 | Unset values | A zero value (`0`, `""`, `false`) means unset: the adapter applies its own default, shown in the Default column when known. |
 | Redaction | Raw option maps can hold secrets. Log only through `RedactedServices` or `Redact`. Error text names services and fields, never values. |
-| Plugins | A top-level `plugins` map holds third-party services as `{adapter, options}` envelopes. The envelope is strict, but the options pass through raw and the plugin validates them. Env can override only `<PLUGIN>__<NAME>__ADAPTER`. |
+| Plugins | A top-level `plugins` map holds third-party services as `{adapter, options}` envelopes. The envelope is strict, but the options pass through raw and the plugin validates them. Env can override only `<PLUGIN>_ADAPTER`. |
 | Exceptions | The `secrets` env adapter reads secrets with a non-empty `prefix` (default `ZEVER`, so `ZEVER_FOO` is secret `FOO`). CLI switches use `ZEVER_INTERACTIVE` and `ZEVER_NO_HINT`. |
 
 ```sh
@@ -154,7 +154,7 @@ DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, 
 - Set `dedicated_pool: true` to open a private pool. Use it with a separate database for `queue`, `workflow`, and `scheduler` under sustained load.
 - `dedicated_pool` is ignored on `db` itself, which owns the pool.
 - Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
-- Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so remove those lines before a downgrade.
+- Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so drop those keys before a downgrade.
 
 ```sh
 SEARCH_ADAPTER=db
@@ -164,7 +164,7 @@ SEARCH_DEDICATED_POOL=false
 
 ## Service reference
 
-Each service lists its adapters, accessor, and every option key. Options form a union across adapters: an adapter reads only the keys it needs and ignores the rest. Keys such as `jwt.secret` are nested under `options`.
+Each service lists its adapters, accessor, and every option key. Options form a union across adapters: an adapter reads only the keys it needs and ignores the rest. Keys such as `jwt.secret` are nested under `options`. The adapter is not an option key: `<SERVICE>_ADAPTER` selects it, and a named instance uses `<SERVICE>__<NAME>__ADAPTER`.
 
 ### `ai`
 
@@ -300,7 +300,7 @@ Key/value cache with TTL. `db` selects postgres or sqlite by DSN.
 
 Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`, `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, `max_conn_lifetime`.
 
-The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The `adapter` field inside `options` is a legacy duplicate and is omitted here; use the outer `adapter` string.
+The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The adapter is not one of the options: `<SERVICE>_ADAPTER` selects it, and it lands on the service envelope beside `options` (`{"adapter": "...", "options": {...}}` in the `zever config show --json` output). `cache` is the one service whose typed options still carry a legacy `adapter` field; nothing reads it to pick the backend, and the config path leaves it empty.
 
 ```sh
 CACHE_ADAPTER=redis
@@ -353,7 +353,7 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 | `use_envelope` | boolean | `false` | Selects KMS envelope encryption |
 | `allow_dev_key` | boolean | `false` | Permits the deterministic public dev key for local development; when false, the local adapter rejects that key unless `ZEVER_ENV` is `dev`, `test`, or `development` |
 
-The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not a file option. Use `local` for file-only setups.
+The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not an option. Use `local` for file-only setups.
 
 ```sh
 CRYPTO_ADAPTER=local
@@ -817,7 +817,7 @@ Payment intents and webhooks. The `stub` adapter performs no webhook verificatio
 | `auto_approve` | boolean | `false` | Marks new payments as succeeded instead of pending |
 | `max_webhook_bytes` | integer | `1 MiB` | Bounds the webhook payload size |
 
-The refund idempotency store (`Idempotency`) is injected from Go and is not a file option.
+The refund idempotency store (`Idempotency`) is injected from Go and is not an option.
 
 ```sh
 PAYMENT_ADAPTER=stripe
@@ -995,7 +995,7 @@ Cron-style scheduler. It resolves the job dispatcher, so it shares the process-w
 | `dsn` | string | `""` | Postgres connection string or sqlite path for the postgres adapter |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-`scheduler.Options.Dispatcher` is required and is injected in code, so a file `options` block replaces it with nil and `Load` fails with `dispatcher_is_required`. Leave `options` out of the file and set `close_timeout`, `dsn`, and `dedicated_pool` with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
+`scheduler.Options.Dispatcher` is required and is injected in code: it carries the `json:"-"` tag, so no env key sets it, and `scheduler.Options.Validate` fails with `dispatcher_is_required` when it is missing. Set the remaining keys with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
 
 ```sh
 SCHEDULER_ADAPTER=postgres
@@ -1200,7 +1200,7 @@ Signed webhook delivery with retries, directly over HTTP or through the queue.
 
 **`queue_opts`** carries the queue settings for the `queue` adapter. It accepts every [queue](#queue) option (`visibility_timeout`, `poll_timeout`, `buffer`, `addr`, `url`, `prefix`, `dsn`, `table`, `dedicated_pool`, and the Redis connection keys) under the `queue_opts.` prefix.
 
-`Logger` is injected from Go and is not a file option.
+`Logger` is injected from Go and is not an option.
 
 ```sh
 WEBHOOK_ADAPTER=http

@@ -63,7 +63,7 @@ type Options struct {
 	// Buffer caps buffered ready messages per topic. <= 0 is unbounded.
 	Buffer int `json:"buffer"`
 	// Provider emits the producer span opened for every push. Nil disables
-	// telemetry. It is Go-API-only: never decoded from configuration files.
+	// telemetry. It is Go-API-only: never set from the environment.
 	Provider observability.Provider `json:"-"`
 }
 

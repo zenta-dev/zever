@@ -44,7 +44,7 @@ func (a Adapter) String() string {
 }
 
 // ParseAdapter parses an adapter name. Any non-empty name is accepted so
-// custom backends round-trip through the environment.
+// custom backends round-trip through env selection.
 func ParseAdapter(s string) (Adapter, error) {
 	if s == "" {
 		return Adapter(""), &InvalidAdapterError{Adapter: s}

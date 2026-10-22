@@ -61,7 +61,7 @@ type Options struct {
 	// through, mirroring core outbox.Options.Publisher: outbox.PublisherEventBus,
 	// outbox.PublisherQueue, or "" (unset). It is reported as the
 	// messaging.system span attribute and falls back to the adapter name when
-	// empty. Go-API-only: never decoded from configuration files.
+	// empty. Go-API-only: never set from the environment.
 	Transport string `json:"-"`
 	// PollInterval is the relay poll cadence. Default DefaultPollInterval.
 	PollInterval time.Duration `json:"poll_interval"`
@@ -76,7 +76,7 @@ type Options struct {
 	// LockSeconds is the claim lease in seconds. Default DefaultLockSeconds.
 	LockSeconds int `json:"lock_seconds"`
 	// Provider emits relay metrics and spans. Nil disables telemetry. It is
-	// Go-API-only: never decoded from configuration files.
+	// Go-API-only: never set from the environment.
 	Provider observability.Provider `json:"-"`
 }
 

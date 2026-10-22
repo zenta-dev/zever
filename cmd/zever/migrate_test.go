@@ -421,6 +421,32 @@ func TestRunDBMigrateHelp(t *testing.T) {
 	}
 }
 
+// TestRunDBMigrateHelpNamesTheTimeoutEnvKeys pins the wording the timeout
+// fallback carries: the help must name the env key that sets it and the
+// file it belongs in. Service configuration has been env-only since v0.8.0,
+// so a help that points at a config file sends the user to a file the
+// framework never reads.
+func TestRunDBMigrateHelpNamesTheTimeoutEnvKeys(t *testing.T) {
+	output := captureZeverStderr(t, func() {
+		_ = runDBMigrate([]string{"-h"})
+	})
+
+	for _, want := range []string{
+		"DB_LOCK_TIMEOUT and DB_STATEMENT_TIMEOUT env keys",
+		"the DB_LOCK_TIMEOUT env key",
+		"the DB_STATEMENT_TIMEOUT env key",
+		".env at the project root",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("db migrate help must name %q:\n%s", want, output)
+		}
+	}
+
+	if strings.Contains(output, "config file") {
+		t.Errorf("db migrate help still calls an env-sourced value a config file:\n%s", output)
+	}
+}
+
 // TestRunDBMigrateBadFlag proves unknown flags surface as errors.
 func TestRunDBMigrateBadFlag(t *testing.T) {
 	dir := t.TempDir()
