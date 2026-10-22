@@ -27,8 +27,13 @@ type legacyConfigRule struct {
 
 // newLegacyConfigRule builds the rule data: the retired file names and the
 // case-insensitive pattern that matches one of them inside a string.
+//
+// The extensions are an explicit list, never a "zever.<word>" wildcard: the
+// tree already holds zever.v1 (versioned API packages), zever.schema,
+// zever.new and zever.shop, so a wildcard would false-positive on every
+// one of them and train contributors to ignore the gate.
 func newLegacyConfigRule() *legacyConfigRule {
-	exts := []string{"json", "yaml", "yml", "toml"}
+	exts := []string{"json", "yaml", "yml", "toml", "cfg", "conf", "ini", "properties"}
 
 	names := make([]string, 0, len(exts))
 	for _, ext := range exts {

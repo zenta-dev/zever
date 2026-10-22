@@ -1,0 +1,8 @@
+package pkg
+
+import "os"
+
+// readLegacy reads a retired config file.
+func readLegacy() {
+	_, _ = os.ReadFile("zever.ini")
+}

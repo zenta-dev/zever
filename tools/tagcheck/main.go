@@ -29,7 +29,8 @@
 //     golden field data was not regenerated after the struct was
 //     registered.
 //   - no-config-file: a non-test Go file names a retired project config
-//     file (the project name plus a json/yaml/yml/toml extension), in a
+//     file (the project name plus a retired extension:
+//     json/yaml/yml/toml/cfg/conf/ini/properties), in a
 //     string literal, in a constant expression that builds such a name, or
 //     in a comment. The v0.8.0 env-only break removed those formats for
 //     good: a stale file is ignored silently, so every mention of it in
