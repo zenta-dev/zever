@@ -4,7 +4,7 @@
 //
 // Type safety: Tenant plus typed Options plus Adapter enum plus Factory. Options carry Header plus SubdomainRegex plus ID with MaxRegexLength 500; defaults are DefaultHeader and DefaultSingleID. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: TENANT_<FIELD> (no prefix, e.g. TENANT_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. TENANT_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Tenant(). Lazy per-service singleton, retry on error. See container/README.md.
 //

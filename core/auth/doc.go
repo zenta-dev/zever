@@ -10,8 +10,9 @@
 // fail closed with ErrNotSupported.
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
-// zero-infra defaults for tests. Env only: AUTH_<FIELD> (no prefix, e.g.
-// AUTH_ADAPTER). See config/README.md.
+// zero-infra defaults for tests. Configuration comes from the environment
+// only: .env, .env.local, and the process environment, with keys named
+// <SERVICE>_<FIELD> (no prefix, e.g. AUTH_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Auth(). Lazy per-service singleton,
 // retry on error. See container/README.md.

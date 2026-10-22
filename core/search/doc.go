@@ -4,7 +4,7 @@
 //
 // Type safety: Search plus typed Options plus Adapter enum plus Factory. Document plus QueryOptions plus Result plus Hit are typed; Limit <= 0 selects DefaultLimit 10. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: SEARCH_<FIELD> (no prefix, e.g. SEARCH_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. SEARCH_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Search(). Lazy per-service singleton, retry on error. See container/README.md.
 //

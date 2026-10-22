@@ -4,7 +4,7 @@
 //
 // Type safety: Storage plus typed Options plus Adapter enum plus Factory. Options embed LocalOptions plus S3Options plus R2Options with URLBase and Policy; bucket and key are validated. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: STORAGE_<FIELD> (no prefix, e.g. STORAGE_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. STORAGE_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Storage(). Lazy per-service singleton, retry on error. See container/README.md.
 //

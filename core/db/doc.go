@@ -4,7 +4,7 @@
 //
 // Type safety: DB plus Rows plus Stmt plus Preparer plus Tx plus Transactor plus typed Options plus Adapter enum plus Factory. Options is a union of DSN, pool bounds, lifetimes, and Path; Dialect reports the SQL dialect per call. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: DB_<FIELD> (no prefix, e.g. DB_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. DB_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.DB(). Lazy per-service singleton, retry on error. See container/README.md.
 //

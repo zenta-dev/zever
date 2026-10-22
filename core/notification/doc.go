@@ -11,8 +11,9 @@
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
 // zero-infra defaults for tests, with the log adapter writing instead of
-// sending. Env only: NOTIFICATION_ADAPTER (no prefix, e.g.
-// NOTIFICATION_ADAPTER). See config/README.md.
+// sending. Configuration comes from the environment only: .env, .env.local,
+// and the process environment, with keys named <SERVICE>_<FIELD> (no prefix,
+// e.g. NOTIFICATION_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Notification(). Lazy per-service
 // singleton, retry on error. See container/README.md.

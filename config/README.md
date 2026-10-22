@@ -247,10 +247,34 @@ allowed: set `CRYPTO_ALLOW_DEV_KEY=true` in the env, or run with
 `ZEVER_ENV=dev|test|development`. Anything else must supply a
 real key (`CRYPTO_KEY`).
 
-`ZEVER_*` names are CLI/test switches only (`ZEVER_INTERACTIVE`,
-`ZEVER_NO_HINT`, `ZEVER_JSON`, `ZEVER_ENV`, `ZEVER_DEBUG`,
-`ZEVER_CONFIG_STRICT`, test-only `ZEVER_CHROMEDP_NO_SANDBOX`): service
-configuration itself is always unprefixed `<SERVICE>_*`.
+`ZEVER_*` names are CLI/test switches and project-layout keys only
+(`ZEVER_INTERACTIVE`, `ZEVER_NO_HINT`, `ZEVER_JSON`, `ZEVER_ENV`,
+`ZEVER_DEBUG`, `ZEVER_CONFIG_STRICT`, test-only
+`ZEVER_CHROMEDP_NO_SANDBOX`, plus the six
+[project-layout](#project-layout) keys): service configuration itself is
+always unprefixed `<SERVICE>_*`.
+
+## Project layout
+
+Project layout is compiled-in defaults, overridable per field by six
+`ZEVER_*` variables: there is no config file for it and no `--config` flag.
+They resolve with the same precedence as the rest of the framework —
+`defaults < .env < .env.local < process env` — out of the working directory
+the CLI treats as the project root, so a key belongs in the `.env` at the
+project root, in the `.env.local` next to it, or in the process environment.
+The v0.7.x `project` stanza moved key by key:
+
+| v0.7.x file key | v0.8.0 env variable | Overrides | Default |
+|---|---|---|---|
+| `project.schema_dir` | `ZEVER_SCHEMA_DIR` | `.zen` schema directory | `schema` |
+| `project.generated_dir` | `ZEVER_GENERATED_DIR` | generated-code directory | `generated` |
+| `project.server_entry` | `ZEVER_SERVER_ENTRY` | server entrypoint package | `cmd/server` |
+| `project.worker_entry` | `ZEVER_WORKER_ENTRY` | worker entrypoint package | `cmd/worker` |
+| `project.tinker_entry` | `ZEVER_TINKER_ENTRY` | tinker shim entrypoint | `cmd/tinker-shim` |
+| `project.seed_entry` | `ZEVER_SEED_ENTRY` | seed entrypoint package | `db/seed` |
+
+An unset or blank variable falls back to the default, and `zever tinker
+--entry` overrides the tinker shim path for one run.
 
 ## Migration from the legacy config file
 
@@ -279,12 +303,13 @@ LOG_ADAPTER=slog
 Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes
 `<SERVICE>_<KEY>` uppercased (`max_conns` → `DB_MAX_CONNS`); one nesting
 level flattens with a single `_` (`jwt: {secret: ...}` under auth →
-`AUTH_JWT_SECRET`); the `project:` table (if any) is dropped — project
-layout is defaults-only for now. Option values that are maps, lists, or
-other complex shapes have no string form and cannot move to env: re-check
-whether the adapter needs them. Unknown keys that used to fail file
-decoding now fail `Resolve` with a did-you-mean hint when they are close to
-a known field; the rest are ignored as ambient variables (see
+`AUTH_JWT_SECRET`); the `project:` table moves key by key to the six
+`ZEVER_*` variables listed in [Project layout](#project-layout). Option
+values that are maps, lists, or other complex shapes have no string form and
+cannot move to env: re-check whether the adapter needs them. Unknown keys
+that used to fail file decoding now fail `Resolve` with a did-you-mean hint
+when they are close to a known field; the rest are ignored as ambient
+variables (see
 [Ambient-environment safety](#ambient-environment-safety-and-the-typo-rule)).
 
 The legacy file has not been read since v0.8.0, and nothing reads it now:

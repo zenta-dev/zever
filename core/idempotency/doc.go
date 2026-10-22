@@ -4,7 +4,7 @@
 //
 // Type safety: Store plus BeginOptions plus Outcome plus typed Options plus Adapter enum plus Factory. Keys are capped at 255 bytes and fingerprints match under FingerprintMatches semantics. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Env only: IDEMPOTENCY_<FIELD> (no prefix, e.g. IDEMPOTENCY_ADAPTER). See config/README.md.
+// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. IDEMPOTENCY_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Idempotency(). Lazy per-service singleton, retry on error. See container/README.md.
 //

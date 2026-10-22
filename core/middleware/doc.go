@@ -2,10 +2,9 @@
 //
 // It ships recovery, structured access logging, rate limiting, timeouts,
 // CORS, security headers, and tracing as HTTP plus unary-gRPC pairs with
-// matching semantics (CORS and security headers are HTTP-only: gRPC has
-// no preflight or header concept). It does not
-// own an adapter registry or config section, it wraps already-resolved
-// instances.
+// matching semantics (CORS and security headers are HTTP-only: gRPC has no
+// preflight or header concept). It does not own an adapter registry or
+// configuration of its own, it wraps already-resolved instances.
 //
 // Type safety: plain constructor functions over resolved log, ratelimit, and
 // observability instances plus FailMode enum plus Option. There is no Adapter
@@ -17,8 +16,7 @@
 // SecurityHeaders plus their UnaryServerInterceptor counterparts (except
 // CORS and SecurityHeaders, which are HTTP-only),
 // with RemoteAddrKey and PeerAddrKey for keying. No adapter name to parse
-// and no middleware section in the environment.
-// See config/README.md.
+// and no middleware settings in the environment. See config/README.md.
 //
 // Chain order: CORS outermost, so preflights short-circuit before logging
 // or rate limiting; Recover next, so it catches panics from every other

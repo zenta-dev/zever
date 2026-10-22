@@ -10,8 +10,10 @@
 // values. Unsupported features fail closed.
 //
 // DX: Open with Open, custom backends with Register. Options are typed with
-// zero-infra defaults for tests, with Noop discarding all events. Config file
-// plus env LOG_ADAPTER (no prefix, e.g. LOG_ADAPTER). See config/README.md.
+// zero-infra defaults for tests, with Noop discarding all events.
+// Configuration comes from the environment only: .env, .env.local, and the
+// process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g.
+// LOG_ADAPTER). See config/README.md.
 //
 // Container: container.New(cfg) then c.Log(). Lazy per-service singleton,
 // retry on error. See container/README.md.
