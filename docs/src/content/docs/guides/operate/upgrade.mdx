@@ -77,7 +77,7 @@ Two commands prove the migration is done: `zever config show` prints the resolve
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The app boots but your old values are gone | The v0.8.0 config file is not read, and nothing warns about it. | Translate every stanza into `.env`, then delete the file. See [Upgrade to v0.8.0](#upgrade-to-v080). |
+| The app boots but your old values are gone | A leftover v0.7.x file is never read by v0.8.0, and nothing warns about it. | Translate every stanza into `.env`, then delete the file. See [Upgrade to v0.8.0](#upgrade-to-v080). |
 | `Load` rejects a previously valid key | Config rename in the bump (`maxconns`, `apikey`, `secretkey`). | Rename to `max_conns`, `api_key`, `secret_key`. Env names are unaffected. See [Configuration](../configuration/) for the full rename table. |
 | `CreateCustomer` no longer compiles | `billing.Billing.CreateCustomer` gained a required idempotency key. | Pass `""` for the old non-idempotent behavior, or a real key for safe retries. |
 | `zen/migrate` import fails | The migration engine moved to `orm/migrate`. | Import `github.com/zenta-dev/zever/orm/migrate`. |
