@@ -10,8 +10,8 @@ import (
 // MaxIDLen is the maximum allowed message ID length in bytes.
 const MaxIDLen = 255
 
-// Message is one outbox event. It is a wire type: every field carries
-// json/toml/yaml tags so it round-trips through file configuration and JSON.
+// Message is one outbox event. It is a wire type: every field carries a
+// json tag, so it round-trips through the JSON wire format.
 type Message struct {
 	// ID uniquely identifies the message. Required, at most MaxIDLen bytes.
 	ID string `json:"id"`

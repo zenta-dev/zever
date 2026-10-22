@@ -46,8 +46,7 @@ type Options struct {
 
 	// Provider emits the producer span an adapter opens for every push and
 	// the consumer span the job dispatcher opens for every delivery. Nil
-	// disables telemetry. It is Go-API-only: never decoded from
-	// configuration files.
+	// disables telemetry. It is Go-API-only: never set from the environment.
 	Provider observability.Provider `json:"-"`
 
 	// RedisOptions holds Redis-specific connection configuration.

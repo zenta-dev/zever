@@ -135,7 +135,7 @@ go build -o zever-mcp ./tools/zever-mcp
 
 ## Production checklist
 
-- Keep keys in file config or env (`AI_API_KEY`), never in code. Display config through `config.RedactedServices`. `APIKey` never appears in logs or error values.
+- Keep keys in the environment (`AI_API_KEY`), never in code. Display config through `config.RedactedServices`. `APIKey` never appears in logs or error values.
 - Set `timeout` explicitly per deploy. Zero falls back to the adapter default, which may exceed your handler deadline.
 - Pin `model` so a provider-side default change does not move you to a model with different pricing.
 - Unsupported features fail closed with `ErrNotSupported` at the call site instead of silently dropping a tool call or stream flag.

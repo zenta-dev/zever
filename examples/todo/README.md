@@ -7,7 +7,7 @@ Run every command from `examples/todo/` so `data/` and `schema/` resolve.
 ## Prereqs
 
 - Go 1.27
-- A local config file with two secrets: `AUTH_JWT_SECRET` (at least 32
+- A local `.env` file with two secrets: `AUTH_JWT_SECRET` (at least 32
   bytes) and `CRYPTO_KEY` (at least 32 bytes). Copy the template and fill
   them in:
 

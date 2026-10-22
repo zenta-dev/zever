@@ -278,7 +278,7 @@ func (c *PolicyConfig) Resolve() (map[BucketName]Policy, Policy, bool, error) {
 	return buckets, def, configured, nil
 }
 
-// UnmarshalJSON keeps the flat config-file shape:
+// UnmarshalJSON keeps the flat JSON wire shape:
 //
 //	{"default": {...}, "bucketA": {...}}
 //
