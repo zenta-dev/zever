@@ -1,28 +1,28 @@
 ---
 title: Providers and adapters
-description: How small interfaces, self-registering adapters, and the container make backend swaps a config change.
+description: How small interfaces, typed providers, and the container make backend swaps a wiring and env change.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every backend concern is one small interface with several adapters, resolved only by the container. Changing `sqlite` to `postgres` or `memory` to `redis` stays a config edit, never a handler rewrite.
+Every backend concern is one small interface with several adapters, resolved only by the container. Changing `sqlite` to `postgres` or `memory` to `redis` stays a wiring and env edit, never a handler rewrite.
 
 ## The mental model
 
 | Role | Rule |
 |---|---|
 | Interface | Stays small. Never add methods (it breaks implementers); add a new interface instead. |
-| Adapter | Self-registers; one subdirectory per backend. |
+| Adapter | One subdirectory per backend, bound to a `Ref` by `container.Provide`. |
 | Container | Sole resolver; owns construction, caching, retry, and close. |
-| Config | Selects the adapter (`DB_ADAPTER=postgres`) plus options. |
+| Config | Feeds the options (`DB_MAX_CONNS=20`), and names the adapter on the config-based path (`DB_ADAPTER=postgres`). |
 
-Application code speaks the interface; the container speaks the registry:
+Application code speaks the interface; the container speaks the typed providers:
 
 ```go
-conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
+conn, err := c.DB() // the wired db instance, built once and cached
 ```
 
-Each package follows one pattern:
+Each battery still keeps a `Register`/`Open` registry, which the config-based path resolves an adapter name against:
 
 ```go
 // Package db: one small interface.
@@ -39,26 +39,23 @@ type DB interface {
 func Register() { _ = db.Register(db.SQLite, New) }
 ```
 
-## Swap an adapter with config
+## Swap an adapter
 
-Development uses zero infrastructure; production changes names only:
+Development uses zero infrastructure; production changes the wiring and the env, never the call sites:
 
 ```sh
-DB_ADAPTER=sqlite
-DB_PATH=data/app.db
-CACHE_ADAPTER=memory
-QUEUE_ADAPTER=memory
+zever add cache/redis
 ```
 
+That edits `internal/app/wiring.go`: the `cache` `Ref` binds the redis adapter now, and `.env.example` gains the keys the new adapter reads. The env then carries that adapter's options:
+
 ```sh
-DB_ADAPTER=postgres
 DB_DSN=postgres://app:secret@db:5432/app
 DB_MAX_CONNS=20
-CACHE_ADAPTER=redis
 CACHE_ADDR=redis:6379
 ```
 
-Env equivalents carry no prefix: the default instance reads `<SERVICE>_<FIELD>` (`DB_ADAPTER=postgres`, `CACHE_ADAPTER=redis`), and a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAXCONNS=20`) but only reaches the container through a matching named Ref such as `db.Ref("primary")`. Handlers keep calling `c.DB()` and `c.Cache()`; register the adapter module for the name you choose. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
+Env names carry no prefix: the default instance reads `<SERVICE>_<FIELD>` (`DB_MAX_CONNS=20`), and a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAX_CONNS=20`) but only reaches the container through a matching named Ref such as `db.Ref("primary")`. `<SERVICE>_ADAPTER` names the adapter on the config-based path, the one a container built with a config and no providers takes; a wired instance opens the adapter its `container.Provide` call binds. Handlers keep calling `c.DB()` and `c.Cache()`. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
 
 Most swaps are invisible to handlers: placeholders stay `?` on both `db` drivers (postgres rewrites to `$n` before pgx) and route params read through `router.Param`. Where backends differ, the adapter fails fast or documents the gap. Two known gaps:
 
@@ -106,13 +103,13 @@ Unexported adapter structs are named `driver` with receiver `d`; timeouts are `t
 <details>
 <summary>The swap changes nothing at runtime</summary>
 
-Cause: an env override (`CACHE_ADAPTER`) beats the default. Fix: unset or correct the env variable.
+Cause: the wiring still binds the old adapter, or an env override (`CACHE_ADAPTER`) beats the default on the config-based path. Fix: check the `container.Provide` line in `internal/app/wiring.go`, then unset or correct the env variable.
 </details>
 
 <details>
 <summary>An accessor fails with `UnknownAdapterError`</summary>
 
-Cause: a typo in the adapter name (config accepts any non-empty name), or its `Register()` was never called. Fix: match the matrix spelling (`postgres`, not `postgresql`) and register the adapter module before resolving.
+Cause: on the config-based path, a typo in the adapter name (config accepts any non-empty name), or its `Register()` was never called. Fix: match the matrix spelling (`postgres`, not `postgresql`) and register the adapter module before resolving.
 </details>
 
 <details>

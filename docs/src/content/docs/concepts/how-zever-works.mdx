@@ -14,12 +14,12 @@ Zever turns a `.zen` schema into typed code at compile time, then wires every ba
  ------------                              --------
  schema.zen -> compiler -> generated/      config -> container -> adapters
    (dsl)       lexer          ORM, routes,   defaults   lazy        db, cache,
-               parser         OpenAPI, DDL   < file     accessors   queue, ...
-               resolver                      < env      Close(ctx)
-               backends
+               parser         OpenAPI, DDL   < .env     accessors   queue, ...
+               resolver                      < .env.local
+               backends                      < process env
 ```
 
-The two halves meet at generated code only. Your running service imports generated output, `config`, `container`, and adapters. It never imports the compiler.
+The two halves meet at generated code only. Your running service imports generated output, `config`, `container`, and adapters. It never imports the compiler. Config is env-only: it layers as `defaults < .env < .env.local < process env`, and no config file is read.
 
 ## How the pieces fit
 
@@ -29,15 +29,15 @@ The two halves meet at generated code only. Your running service imports generat
 | Compiler | Lexer, parser, and resolver turn source into one `ir.Schema`, reporting every problem in a single run. | [Resolver and IR](../resolver-ir/) |
 | Backends | Each backend reads the IR and writes files: ORM bindings, protobuf, OpenAPI, Atlas HCL. | [Backends](../backends/) |
 | Boundary | Compiler packages are compile-time only; runtime packages never import `dsl`. | [Compiler boundary](../compiler-boundary/) |
-| Config | Strict, layered `defaults < file < env` selects an adapter per service. | [Configuration](../../guides/operate/configuration/) |
+| Config | Strict, layered `defaults < .env < .env.local < process env`. No config file is read. | [Configuration](../../guides/operate/configuration/) |
 | Container | One per process; each service resolves lazily on first use and closes in dependency order. | [Container](../container/) |
-| Adapters | Small interfaces with swappable, explicitly registered adapters. | [Providers and adapters](../providers-adapters/) |
+| Adapters | Small interfaces with swappable adapters, bound to a `Ref` by `container.Provide`. | [Providers and adapters](../providers-adapters/) |
 | Process | Load, build, resolve on first use, close. | [Lifecycle](../lifecycle/) |
 
 ## Why it works this way
 
-- **Swapping is config.** Changing `sqlite` to `postgres` or `memory` to `redis` edits config, never call sites.
-- **No hidden wiring.** There are no globals and no `init()` registration: you call each adapter's `Register()` yourself.
+- **Swapping is wiring plus env.** Changing `sqlite` to `postgres` or `memory` to `redis` edits `internal/app/wiring.go` and the env, never call sites.
+- **No hidden wiring.** There are no globals and no `init()` registration: you wire every instance yourself with `container.Provide`, and an adapter you register by hand does it with a `Register()` call.
 - **Compile-time cost, run-time speed.** Parsing and resolving happen once, ahead of time, so request-time code stays plain Go.
 
 ## Related
