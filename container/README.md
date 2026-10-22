@@ -288,12 +288,10 @@ string are different pools. SQLite file paths share after
 battery must run with the same CWD); `:memory:` (including
 `file::memory:?cache=shared`) never shares.
 
-```yaml
-search:
-  adapter: db
-  options:
-    dsn: "postgres://app:secret@db:5432/app?sslmode=require"
-    dedicated_pool: false   # default false shares; true restores a private pool
+```sh
+SEARCH_ADAPTER=db
+SEARCH_DSN="postgres://app:secret@db:5432/app?sslmode=require"
+SEARCH_DEDICATEDPOOL=false   # default false shares; true restores a private pool
 ```
 
 - Share-by-default: two identical DSNs are unambiguous operator intent, so

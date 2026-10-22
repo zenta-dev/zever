@@ -191,6 +191,15 @@ load-bearing and unavoidable — a code generator that has to write the name
 into a legacy project, or a migration tool that must still clean one up. The
 framework itself must never name a retired config file.
 
+### The prose guard
+
+This rule covers the Go source. The prose is covered by its sibling,
+`docs/scripts/no-legacy-config.mjs`, which reads the published docs, the
+root markdown, the module, example and editor READMEs, the shell scripts
+and the Go source, and fails when any of them sends a reader to a retired
+config file. Run it with `make docs-legacy-config`; its self-test
+(`make docs-legacy-config-self-test`) proves it still bites.
+
 ### Why this shape
 
 The rule follows the compatibility contracts other ecosystems enforce:

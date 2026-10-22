@@ -342,7 +342,7 @@ docs-links-self-test: ## Prove the docs link check rejects the mistakes it guard
 	cd docs && node scripts/check-links.mjs --self-test
 
 .PHONY: docs-legacy-config
-docs-legacy-config: ## Check the docs never configure Zever through a legacy config file
+docs-legacy-config: ## Check the repo never configures Zever through a legacy config file
 	cd docs && node scripts/no-legacy-config.mjs
 
 .PHONY: docs-legacy-config-self-test
