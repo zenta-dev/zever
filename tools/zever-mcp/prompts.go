@@ -1,9 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // promptArg describes one prompt argument.
@@ -132,7 +133,7 @@ type promptGetParams struct {
 // getPrompt renders one prompt template.
 func getPrompt(req rpcRequest) rpcResponse {
 	var p promptGetParams
-	if err := json.Unmarshal(req.Params, &p); err != nil {
+	if err := codec.Unmarshal(req.Params, &p); err != nil {
 		return errorResponse(req.ID, codeInvalidParams, "zever-mcp: invalid prompts/get params")
 	}
 

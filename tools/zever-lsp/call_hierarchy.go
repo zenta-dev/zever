@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	"go.lsp.dev/protocol"
 
 	"github.com/zenta-dev/zever/dsl/ast"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // callHierarchyData is the payload stored on a CallHierarchyItem's Data field
@@ -31,13 +32,13 @@ const (
 func callHierarchyDataFromAny(data any) (string, string, bool) {
 	if raw, ok := data.(protocol.LSPAny); ok {
 		var payload callHierarchyData
-		if err := json.Unmarshal(raw, &payload); err == nil &&
+		if err := codec.Unmarshal(raw, &payload); err == nil &&
 			(payload.Service != "" || payload.RPC != "") {
 			return payload.Service, payload.RPC, true
 		}
 
 		var m map[string]any
-		if err := json.Unmarshal(raw, &m); err == nil {
+		if err := codec.Unmarshal(raw, &m); err == nil {
 			svc, _ := m[callHierarchyServiceKey].(string)
 			rpc, _ := m[callHierarchyRPCKey].(string)
 			if svc != "" || rpc != "" {
@@ -122,7 +123,7 @@ func prepareCallHierarchyItems(s *Server, params *protocol.CallHierarchyPrepareP
 			SelectionRange: identRange(target.Pos, target.Name),
 		}
 
-		if raw, err := json.Marshal(callHierarchyData{Service: target.Owner, RPC: target.Name}); err == nil {
+		if raw, err := codec.Marshal(callHierarchyData{Service: target.Owner, RPC: target.Name}); err == nil {
 			item.Data = protocol.LSPAny(raw)
 		}
 
@@ -157,7 +158,7 @@ func prepareCallHierarchyItems(s *Server, params *protocol.CallHierarchyPrepareP
 				SelectionRange: identRange(rpc.NamePos, rpc.Name),
 			}
 
-			if raw, err := json.Marshal(callHierarchyData{Service: svc.Name, RPC: rpc.Name}); err == nil {
+			if raw, err := codec.Marshal(callHierarchyData{Service: svc.Name, RPC: rpc.Name}); err == nil {
 				item.Data = protocol.LSPAny(raw)
 			}
 

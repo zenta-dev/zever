@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/zenta-dev/zever/dsl v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	go.lsp.dev/jsonrpc2 v1.0.1
 	go.lsp.dev/protocol v1.0.1
 	go.lsp.dev/uri v1.0.1

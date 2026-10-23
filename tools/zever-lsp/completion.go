@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +14,8 @@ import (
 	"github.com/zenta-dev/zever/dsl/lexer"
 	"github.com/zenta-dev/zever/dsl/resolver"
 	"github.com/zenta-dev/zever/dsl/token"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // completionContext names the syntactic slot the cursor sits in. Each one
@@ -596,7 +597,7 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) [
 			detail := cand.detail
 			item.LabelDetails = &protocol.CompletionItemLabelDetails{Detail: &detail}
 
-			if raw, err := json.Marshal(completionResolveData{Detail: cand.detail}); err == nil {
+			if raw, err := codec.Marshal(completionResolveData{Detail: cand.detail}); err == nil {
 				item.Data = protocol.LSPAny(raw)
 			}
 		}
@@ -628,7 +629,7 @@ func completionGroup(kind protocol.CompletionItemKind, cand candidate) int {
 // completionResolveDataKey is the map key completionResolveData round-trips
 // under once a CompletionItem's Data field has gone through JSON (either an
 // actual client round trip, or a Go map[string]any produced by
-// json.Unmarshal into an `any`).
+// codec.Unmarshal into an `any`).
 const completionResolveDataKey = "detail"
 
 // completionResolveData is what completionAt attaches to a CompletionItem's
@@ -648,12 +649,12 @@ type completionResolveData struct {
 func completionResolveDetail(data any) (string, bool) {
 	if raw, ok := data.(protocol.LSPAny); ok {
 		var payload completionResolveData
-		if err := json.Unmarshal(raw, &payload); err == nil {
+		if err := codec.Unmarshal(raw, &payload); err == nil {
 			return payload.Detail, payload.Detail != ""
 		}
 
 		var m map[string]any
-		if err := json.Unmarshal(raw, &m); err == nil {
+		if err := codec.Unmarshal(raw, &m); err == nil {
 			detail, ok := m[completionResolveDataKey].(string)
 
 			return detail, ok && detail != ""

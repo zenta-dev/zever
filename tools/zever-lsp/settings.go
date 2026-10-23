@@ -1,11 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"math"
 	"time"
 
 	"go.lsp.dev/protocol"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Settings is the server's resolved editing configuration, parsed from the
@@ -67,7 +68,11 @@ func parseSettings(raw protocol.LSPAny) (parsed Settings, ok bool) {
 		return Settings{}, false
 	}
 
-	if err := json.Unmarshal(raw, &obj); err != nil {
+	if !codec.IsValid(raw) {
+		return Settings{}, false
+	}
+
+	if err := codec.Unmarshal(raw, &obj); err != nil {
 		return Settings{}, false
 	}
 

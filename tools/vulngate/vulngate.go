@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // finding is one govulncheck -json finding object, reduced to the fields the
@@ -33,11 +35,11 @@ type finding struct {
 // allowEntry is one accepted-risk record in the allowlist file.
 type allowEntry struct {
 	// ID is the GO-... advisory identifier.
-	ID string
+	ID string `json:"id"`
 	// Reason explains why the risk is accepted.
-	Reason string
+	Reason string `json:"reason"`
 	// Expires is the re-triage date (YYYY-MM-DD).
-	Expires string
+	Expires string `json:"expires"`
 }
 
 // verdict groups evaluated findings by gate outcome.
@@ -67,17 +69,17 @@ type findingMsg struct {
 // skipped; malformed JSON fails closed.
 func parseFindings(r io.Reader) ([]finding, error) {
 	var findings []finding
-	dec := json.NewDecoder(r)
+	dec := jsontext.NewDecoder(r)
 	for {
-		var raw json.RawMessage
-		if err := dec.Decode(&raw); err != nil {
-			if err == io.EOF {
+		var raw jsontext.Value
+		if err := codec.UnmarshalDecode(dec, &raw); err != nil {
+			if errors.Is(err, io.EOF) {
 				return findings, nil
 			}
 			return nil, fmt.Errorf("vulngate: decode govulncheck output: %w", err)
 		}
 		var msg findingMsg
-		if err := json.Unmarshal(raw, &msg); err != nil {
+		if err := codec.Unmarshal(raw, &msg); err != nil {
 			return nil, fmt.Errorf("vulngate: decode govulncheck output: %w", err)
 		}
 		if msg.Finding.OSV == "" {
@@ -106,12 +108,8 @@ type allowFile struct {
 // parseAllowlist decodes and validates the allowlist document: every entry
 // needs an id, a reason, and a YYYY-MM-DD expiry; duplicate ids fail.
 func parseAllowlist(r io.Reader) (map[string]allowEntry, error) {
-	raw, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("vulngate: read allowlist: %w", err)
-	}
 	var doc allowFile
-	if err := json.Unmarshal(raw, &doc); err != nil {
+	if err := codec.UnmarshalRead(r, &doc); err != nil {
 		return nil, fmt.Errorf("vulngate: parse allowlist: %w", err)
 	}
 	allow := make(map[string]allowEntry, len(doc.Allowlist))

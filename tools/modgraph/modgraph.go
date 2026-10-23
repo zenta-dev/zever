@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go/parser"
@@ -15,6 +14,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // zeverPrefix is the module-path prefix shared by every repo module.
@@ -187,7 +188,7 @@ func findModules(ctx context.Context, root string) (map[string]string, error) {
 			return fmt.Errorf("modgraph: go mod edit -json in %s: %w", filepath.Dir(p), errors.Join(ErrGoModEdit, err))
 		}
 		var v modEditJSON
-		if err := json.Unmarshal(out, &v); err != nil {
+		if err := codec.Unmarshal(out, &v); err != nil {
 			return fmt.Errorf("modgraph: parse go mod edit output in %s: %w", filepath.Dir(p), errors.Join(ErrParseGoMod, err))
 		}
 		if v.Module.Path == "" {

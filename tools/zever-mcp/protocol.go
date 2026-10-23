@@ -1,13 +1,13 @@
 package main
 
-import "encoding/json"
+import "encoding/json/jsontext"
 
 // rpcRequest is a JSON-RPC 2.0 request or notification.
 type rpcRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
+	JSONRPC string         `json:"jsonrpc"`
+	ID      jsontext.Value `json:"id,omitempty"`
+	Method  string         `json:"method"`
+	Params  jsontext.Value `json:"params,omitempty"`
 }
 
 // isNotification reports whether the request is a notification (no id member).
@@ -17,10 +17,10 @@ func (r rpcRequest) isNotification() bool {
 
 // rpcResponse is a JSON-RPC 2.0 response.
 type rpcResponse struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Result  any             `json:"result,omitempty"`
-	Error   *rpcError       `json:"error,omitempty"`
+	JSONRPC string         `json:"jsonrpc"`
+	ID      jsontext.Value `json:"id,omitempty"`
+	Result  any            `json:"result,omitempty"`
+	Error   *rpcError      `json:"error,omitempty"`
 }
 
 // rpcError is a JSON-RPC 2.0 error object.
