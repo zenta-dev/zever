@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,24 +80,14 @@ func stampGeneratedFile(backend, path string, content []byte, hash string) []byt
 	return stamped.Bytes()
 }
 
-// stampJSONOpts renders pretty JSON byte-identical to the previous
-// encoding/json MarshalIndent (sorted keys, two-space indent, HTML/JS
-// escaping). codec.MarshalIndent leaves map order unspecified, which would
-// make `zever generate` rewrite .json outputs on every run and break --check
-// idempotency, so the stamp path marshals with these options directly.
-var stampJSONOpts = json.JoinOptions(
-	json.Deterministic(true),
-	jsontext.Multiline(true),
-	jsontext.WithIndent("  "),
-	jsontext.EscapeForHTML(true),
-	jsontext.EscapeForJS(true),
-)
-
 // marshalStampJSON renders doc as pretty-printed JSON with two-space indent
 // plus no trailing newline (the caller appends it), matching the backends'
-// own encoding.
+// own encoding. It uses codec.MarshalIndentCompat (Deterministic + 2-space +
+// HTML/JS escaping), byte-identical to the previous encoding/json
+// MarshalIndent output, so `zever generate` stays idempotent and --check
+// passes unchanged.
 func marshalStampJSON(doc map[string]any) ([]byte, error) {
-	return json.Marshal(doc, stampJSONOpts)
+	return codec.MarshalIndentCompat(doc)
 }
 
 // stampGeneratedJSON embeds the provenance block into a JSON generated file
