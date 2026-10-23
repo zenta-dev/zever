@@ -131,6 +131,7 @@ func TestInitialize_capabilities(t *testing.T) {
 		{"FoldingRangeProvider", caps.FoldingRangeProvider},
 		{"DocumentHighlightProvider", caps.DocumentHighlightProvider},
 		{"InlayHintProvider", caps.InlayHintProvider},
+		{"SelectionRangeProvider", caps.SelectionRangeProvider},
 	} {
 		b, capOK := tc.got.(protocol.Boolean)
 		if !capOK || !bool(b) {
@@ -201,6 +202,15 @@ func TestInitialize_capabilities(t *testing.T) {
 
 	if rng, ok := sem.Range.(protocol.Boolean); !ok || !bool(rng) {
 		t.Errorf("SemanticTokensProvider.Range = %#v, want Boolean(true)", sem.Range)
+	}
+
+	link := caps.DocumentLinkProvider
+	if link == nil {
+		t.Fatal("DocumentLinkProvider is nil")
+	}
+
+	if link.ResolveProvider == nil || !*link.ResolveProvider {
+		t.Error("DocumentLinkProvider.ResolveProvider not enabled")
 	}
 }
 

@@ -68,18 +68,40 @@ func TestHighlightsAtEntityDeclaredAndReferencedInSameFile(t *testing.T) {
 	}
 
 	for _, h := range got {
-		if h.Kind != protocol.DocumentHighlightKindText {
-			t.Errorf("highlight kind = %v, want DocumentHighlightKindText", h.Kind)
+		if rangeContainsLine(h.Range, 0) && h.Kind != protocol.DocumentHighlightKindWrite {
+			t.Errorf("declaration highlight kind = %v, want DocumentHighlightKindWrite", h.Kind)
+		}
+
+		if rangeContainsLine(h.Range, 7) && h.Kind != protocol.DocumentHighlightKindRead {
+			t.Errorf("reference highlight kind = %v, want DocumentHighlightKindRead", h.Kind)
 		}
 	}
 
-	// Cursor on the reference itself must resolve to the same set.
+	// Cursor on the reference itself must resolve to the same set, with the
+	// kinds flipped: the occurrence under the cursor is the Write one and
+	// the declaration further up is a Read occurrence.
 	gotFromRef := highlightsAt(file, protocol.Position{Line: 7, Character: 20})
 	sortHighlights(gotFromRef)
 
 	if len(gotFromRef) != 2 {
 		t.Fatalf("highlightsAt() from reference = %d highlights, want 2", len(gotFromRef))
 	}
+
+	for _, h := range gotFromRef {
+		if rangeContainsLine(h.Range, 0) && h.Kind != protocol.DocumentHighlightKindRead {
+			t.Errorf("declaration highlight kind = %v, want DocumentHighlightKindRead (cursor sits on the reference)", h.Kind)
+		}
+
+		if rangeContainsLine(h.Range, 7) && h.Kind != protocol.DocumentHighlightKindWrite {
+			t.Errorf("reference highlight kind = %v, want DocumentHighlightKindWrite (cursor sits on it)", h.Kind)
+		}
+	}
+}
+
+// rangeContainsLine reports whether rng covers line, for asserting on
+// highlight kinds by the line an occurrence sits on.
+func rangeContainsLine(rng protocol.Range, line uint32) bool {
+	return rng.Start.Line <= line && rng.End.Line >= line
 }
 
 func TestHighlightsAtLocalOccurrencesWithoutDeclaration(t *testing.T) {
@@ -104,6 +126,12 @@ func TestHighlightsAtLocalOccurrencesWithoutDeclaration(t *testing.T) {
 	if got[0].Range.Start.Line != 3 {
 		t.Errorf("highlight on line %d, want 3", got[0].Range.Start.Line)
 	}
+
+	// The only occurrence is the resolved target itself, a Write occurrence
+	// by the positional rule highlightsAt resolves kinds with.
+	if got[0].Kind != protocol.DocumentHighlightKindWrite {
+		t.Errorf("highlight kind = %v, want DocumentHighlightKindWrite", got[0].Kind)
+	}
 }
 
 func TestHighlightsAtFieldDoesNotBleedAcrossEntities(t *testing.T) {
@@ -126,6 +154,16 @@ func TestHighlightsAtFieldDoesNotBleedAcrossEntities(t *testing.T) {
 
 	if len(got) != 2 {
 		t.Fatalf("highlightsAt() = %d highlights, want 2 (User.email declaration + index column): %+v", len(got), got)
+	}
+
+	for _, h := range got {
+		if rangeContainsLine(h.Range, 2) && h.Kind != protocol.DocumentHighlightKindWrite {
+			t.Errorf("field declaration highlight kind = %v, want DocumentHighlightKindWrite", h.Kind)
+		}
+
+		if rangeContainsLine(h.Range, 3) && h.Kind != protocol.DocumentHighlightKindRead {
+			t.Errorf("index column highlight kind = %v, want DocumentHighlightKindRead", h.Kind)
+		}
 	}
 
 	for _, h := range got {
@@ -197,8 +235,12 @@ func TestHighlightsAtJobHighlightsDeclarationAndDispatch(t *testing.T) {
 	}
 
 	for _, h := range got {
-		if h.Kind != protocol.DocumentHighlightKindText {
-			t.Errorf("highlight kind = %v, want DocumentHighlightKindText", h.Kind)
+		if rangeContainsLine(h.Range, 6) && h.Kind != protocol.DocumentHighlightKindWrite {
+			t.Errorf("declaration highlight kind = %v, want DocumentHighlightKindWrite", h.Kind)
+		}
+
+		if rangeContainsLine(h.Range, 12) && h.Kind != protocol.DocumentHighlightKindRead {
+			t.Errorf("dispatch highlight kind = %v, want DocumentHighlightKindRead", h.Kind)
 		}
 	}
 }

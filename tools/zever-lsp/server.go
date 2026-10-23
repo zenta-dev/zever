@@ -48,6 +48,11 @@ type Server struct {
 	// instead of recomputing from scratch. Guarded by mu.
 	semTokCache   map[string]semTokCacheEntry
 	semTokCounter uint64
+
+	// docLinkTooltip records whether the initialize negotiation advertised
+	// the client's textDocument/didOpen documentLink.tooltipSupport, so
+	// documentLink/resolve knows whether to fill Tooltip. Guarded by mu.
+	docLinkTooltip bool
 }
 
 // NewServer returns a server with an empty workspace and no client yet.
@@ -116,6 +121,18 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.ws.SetRoot(root)
 	}
 
+	// textDocument/documentLink.tooltipSupport is the one client capability
+	// a handler needs to behave differently (resolve fills Tooltip only for
+	// a client that asked for tooltips), so it is the only one this server
+	// records. Like trace, it is per-server state on the struct, under mu.
+	if params != nil && params.Capabilities.TextDocument != nil &&
+		params.Capabilities.TextDocument.DocumentLink != nil &&
+		params.Capabilities.TextDocument.DocumentLink.TooltipSupport != nil {
+		s.mu.Lock()
+		s.docLinkTooltip = *params.Capabilities.TextDocument.DocumentLink.TooltipSupport
+		s.mu.Unlock()
+	}
+
 	syncKind := protocol.TextDocumentSyncKindFull
 	enabled := true
 
@@ -174,6 +191,14 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 				Full:   &protocol.SemanticTokensFullDelta{Delta: boolPtr(true)},
 			},
 			InlayHintProvider: protocol.Boolean(true),
+			// The selection-range provider is a bare boolean: unlike
+			// completion/signature help there are no per-request options,
+			// so the bool form both implements and declares the feature.
+			SelectionRangeProvider: protocol.Boolean(true),
+			// Same options-struct shape as CompletionProvider above, for the
+			// same reason: resolveProvider is part of the documentLink
+			// capability itself.
+			DocumentLinkProvider: &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
 		},
 		ServerInfo: protocol.ServerInfo{
 			Name:    serverName,
@@ -537,6 +562,77 @@ func (s *Server) DocumentHighlight(ctx context.Context, params *protocol.Documen
 	file := s.parseDoc(string(params.TextDocument.URI))
 
 	return highlightsAt(file, params.Position), nil
+}
+
+// SelectionRange resolves each requested position into the chain of ranges
+// a client can climb outward through .Parent: token -> declaration head
+// line -> enclosing brace block -> whole document. Like FoldingRanges it is
+// purely lexical -- no resolved schema is needed, so selection keeps
+// working mid-edit. An unknown document yields an empty result per
+// position: the spec-honest degenerate range each result must fall back to
+// is anchored at the requested position itself, which selectionRangeAt
+// builds.
+func (s *Server) SelectionRange(ctx context.Context, params *protocol.SelectionRangeParams) ([]protocol.SelectionRange, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return []protocol.SelectionRange{}, nil
+	}
+
+	path, _ := uriToPath(uriStr)
+
+	tokens, _ := lexAll(path, []byte(content))
+
+	result := make([]protocol.SelectionRange, 0, len(params.Positions))
+
+	for _, pos := range params.Positions {
+		result = append(result, selectionRangeAt(tokens, content, pos))
+	}
+
+	return result, nil
+}
+
+// DocumentLink turns every URL written in a `//` comment of the document
+// into a clickable link. Like FoldingRanges it needs no resolved schema:
+// comments exist only in the source, not in any token stream the parser
+// records. An unknown document yields an empty list, not an error, per the
+// "no links for this document" reading DocumentSymbol and InlayHint share.
+func (s *Server) DocumentLink(ctx context.Context, params *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return []protocol.DocumentLink{}, nil
+	}
+
+	return documentLinksFor(content), nil
+}
+
+// DocumentLinkResolve fills a link's Tooltip with its target URL, when the
+// client negotiated tooltipSupport at Initialize. The scan itself leaves
+// Tooltip empty (the resolve round-trip is exactly what the protocol docs
+// use it for), so a client that never asked never sees one. A link that
+// already carries a Tooltip, or points nowhere, round-trips unchanged.
+func (s *Server) DocumentLinkResolve(ctx context.Context, params *protocol.DocumentLink) (*protocol.DocumentLink, error) {
+	s.captureClient(ctx)
+
+	s.mu.Lock()
+	tooltipWanted := s.docLinkTooltip
+	s.mu.Unlock()
+
+	if !tooltipWanted || params == nil || params.Target == nil {
+		return params, nil
+	}
+
+	tooltip := string(*params.Target)
+	params.Tooltip = &tooltip
+
+	return params, nil
 }
 
 // SemanticTokensFull classifies a whole document into delta-encoded
