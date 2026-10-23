@@ -35,6 +35,18 @@ func hoverAt(schema *ir.Schema, file *ast.File, cursor protocol.Position) *proto
 		return markdownHover(errorCaseHoverMarkdown(name), identRange(pos, name))
 	}
 
+	if msg := messageNameAt(file, cursor); msg != nil {
+		return markdownHover(messageDeclHoverMarkdown(msg), identRange(msg.NamePos, msg.Name))
+	}
+
+	if enum := enumNameAt(file, cursor); enum != nil {
+		return markdownHover(enumDeclHoverMarkdown(enum), identRange(enum.NamePos, enum.Name))
+	}
+
+	if saga := sagaNameAt(file, cursor); saga != nil {
+		return markdownHover(sagaDeclHoverMarkdown(saga), identRange(saga.NamePos, saga.Name))
+	}
+
 	return nil
 }
 
@@ -160,6 +172,139 @@ func entityDeclHoverMarkdown(entity *ast.EntityDecl) string {
 		entity.Name, len(entity.Fields), len(entity.Relations))
 
 	return base + docCommentParagraph(entity.DocComment)
+}
+
+// messageDeclHoverMarkdown summarises a message declaration under the
+// cursor: its field count and doc comment, then one bullet per field in the
+// same rendered shape a relation target's hover lists an entity's fields.
+func messageDeclHoverMarkdown(message *ast.MessageDecl) string {
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "```zen\nmessage %s\n```\n\n%d field(s).",
+		message.Name, len(message.Fields))
+
+	sb.WriteString(docCommentParagraph(message.DocComment))
+
+	sb.WriteString(cappedNamedList(
+		renderFieldBullets(message.Fields), len(message.Fields)))
+
+	return sb.String()
+}
+
+// enumDeclHoverMarkdown summarises a named enum declaration under the
+// cursor: its value list capped at hoverFieldLimit, same as a field listing.
+func enumDeclHoverMarkdown(enum *ast.EnumDecl) string {
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "```zen\nenum %s\n```", enum.Name)
+
+	sb.WriteString(docCommentParagraph(enum.DocComment))
+
+	bullets := make([]string, 0, len(enum.Values))
+
+	for _, val := range enum.Values {
+		bullets = append(bullets, "- `"+val+"`")
+	}
+
+	sb.WriteString(cappedNamedList(bullets, len(enum.Values)))
+
+	return sb.String()
+}
+
+// sagaDeclHoverMarkdown summarises a saga declaration under the cursor with
+// one line per step: the step name, its forward and optional compensating
+// Service.RPC references, and the pivot marker.
+func sagaDeclHoverMarkdown(saga *ast.SagaDecl) string {
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "```zen\nsaga %s\n```", saga.Name)
+
+	sb.WriteString(docCommentParagraph(saga.DocComment))
+
+	bullets := make([]string, 0, len(saga.Steps))
+
+	for _, step := range saga.Steps {
+		if step == nil {
+			continue
+		}
+
+		var execute, compensate string
+		if step.Execute != nil {
+			execute = step.Execute.Service + "." + step.Execute.RPC
+		}
+
+		if step.Compensate != nil {
+			compensate = step.Compensate.Service + "." + step.Compensate.RPC
+		}
+
+		line := fmt.Sprintf("- `%s`: execute `%s`", step.Name, execute)
+		if compensate != "" {
+			line += ", compensate `" + compensate + "`"
+		}
+
+		if step.Pivot {
+			line += " (pivot)"
+		}
+
+		bullets = append(bullets, line)
+	}
+
+	sb.WriteString(cappedNamedList(bullets, len(saga.Steps)))
+
+	return sb.String()
+}
+
+// renderFieldBullets renders one Markdown bullet per field in the shared
+// field-list shape (`name: type`). Attributes are deliberately left out:
+// the list mirrors the relation-target hover, which shows bare signatures
+// only, and a field's own hover covers the attributes one by one.
+func renderFieldBullets(fields []*ast.FieldDecl) []string {
+	bullets := make([]string, 0, len(fields))
+
+	for _, field := range fields {
+		if field == nil {
+			continue
+		}
+
+		typeName := "?"
+		if field.Type != nil {
+			typeName = renderTypeExpr(field.Type)
+		}
+
+		bullets = append(bullets, fmt.Sprintf("- `%s: %s`", field.Name, typeName))
+	}
+
+	return bullets
+}
+
+// cappedNamedList renders bullets under hoverFieldLimit and appends the
+// "… N more" tail when the source list was longer, the same convention
+// relationHoverMarkdown applies to an entity's field list. count is the
+// uncapped total, and nil bullets render as the explicit empty-list marker.
+func cappedNamedList(bullets []string, count int) string {
+	if count == 0 {
+		return "\n\n_none_"
+	}
+
+	shown := bullets
+	if len(shown) > hoverFieldLimit {
+		shown = shown[:hoverFieldLimit]
+	}
+
+	var sb strings.Builder
+
+	sb.WriteString("\n")
+
+	for _, bullet := range shown {
+		sb.WriteString("\n")
+		sb.WriteString(bullet)
+	}
+
+	if remaining := count - len(shown); remaining > 0 {
+		fmt.Fprintf(&sb, "\n- _… %d more_", remaining)
+	}
+
+	return sb.String()
 }
 
 // docCommentParagraph renders doc as its own trailing Markdown paragraph

@@ -552,3 +552,142 @@ func TestHoverFieldIncludesTypeHintForValidate(t *testing.T) {
 		t.Errorf("hover markdown missing Type hint line:\n%s", got)
 	}
 }
+
+// hoverVisionDeclSrc exercises the message/enum/saga hover anchors. None of
+// them needs a resolved schema, so these tests hover against a bare parse.
+const hoverVisionDeclSrc = `// A named value set for state columns.
+enum Status {
+	active, dormant
+}
+
+// A non-persistent payload.
+message CartInput {
+	// Where to ship.
+	email: string
+}
+
+// Two-phase capture with a pivot.
+saga Checkout {
+	step reserve {
+		execute: InventoryService.Reserve
+		compensate: InventoryService.Release
+	}
+	step charge {
+		execute: PaymentService.Charge
+		pivot: true
+	}
+}
+`
+
+// hoverDeclText renders hover from a parse-only fixture, the way mid-edit
+// anchors work: none of the new decl anchors consult the resolved schema.
+func hoverDeclText(t *testing.T, src string, cursor protocol.Position) string {
+	t.Helper()
+
+	file, _ := parser.New("decl.zen", []byte(src)).ParseFile()
+	if file == nil {
+		t.Fatal("parser returned no file")
+	}
+
+	h := hoverAt(nil, file, cursor)
+	if h == nil {
+		return ""
+	}
+
+	content, ok := h.Contents.(*protocol.MarkupContent)
+	if !ok {
+		t.Fatalf("hover contents = %T, want *MarkupContent", h.Contents)
+	}
+
+	return content.Value
+}
+
+func TestHoverOnMessageDecl(t *testing.T) {
+	got := hoverDeclText(t, hoverVisionDeclSrc, cursorOn(t, hoverVisionDeclSrc, 6, "CartInput"))
+
+	wantSubstrings := []string{
+		"```zen\nmessage CartInput\n```",
+		"1 field(s).",
+		"A non-persistent payload.",
+		"- `email: string`",
+	}
+
+	for _, want := range wantSubstrings {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestHoverOnEnumDecl(t *testing.T) {
+	got := hoverDeclText(t, hoverVisionDeclSrc, cursorOn(t, hoverVisionDeclSrc, 1, "Status"))
+
+	wantSubstrings := []string{
+		"```zen\nenum Status\n```",
+		"A named value set for state columns.",
+		"- `active`",
+		"- `dormant`",
+	}
+
+	for _, want := range wantSubstrings {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestHoverOnSagaDecl(t *testing.T) {
+	got := hoverDeclText(t, hoverVisionDeclSrc, cursorOn(t, hoverVisionDeclSrc, 12, "Checkout"))
+
+	wantSubstrings := []string{
+		"```zen\nsaga Checkout\n```",
+		"Two-phase capture with a pivot.",
+		"- `reserve`: execute `InventoryService.Reserve`, compensate `InventoryService.Release`",
+		"- `charge`: execute `PaymentService.Charge` (pivot)",
+	}
+
+	for _, want := range wantSubstrings {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestHoverOnEnumDeclCapsValueList proves the value list uses the same
+// hoverFieldLimit convention with the "… N more" tail as the field lists.
+func TestHoverOnEnumDeclCapsValueList(t *testing.T) {
+	var src strings.Builder
+
+	src.WriteString("enum Wide {\n")
+	src.WriteString("\tv0")
+
+	for i := 1; i < 13; i++ {
+		fmt.Fprintf(&src, ", v%d", i)
+	}
+
+	src.WriteString("\n}\n")
+
+	got := hoverDeclText(t, src.String(), cursorOn(t, src.String(), 0, "Wide"))
+
+	if !strings.Contains(got, "`v9`") {
+		t.Errorf("hover should show the first %d values:\n%s", hoverFieldLimit, got)
+	}
+
+	if strings.Contains(got, "`v10`") {
+		t.Errorf("hover should stop at %d values:\n%s", hoverFieldLimit, got)
+	}
+
+	if !strings.Contains(got, "… 3 more") {
+		t.Errorf("hover should end with the three-more tail:\n%s", got)
+	}
+}
+
+func TestHoverOnEmptyMessageDecl(t *testing.T) {
+	src := "message Empty {\n}\n"
+
+	got := hoverDeclText(t, src, cursorOn(t, src, 0, "Empty"))
+
+	if !strings.Contains(got, "0 field(s).") || !strings.Contains(got, "_none_") {
+		t.Errorf("hover markdown missing the empty field marker:\n%s", got)
+	}
+}

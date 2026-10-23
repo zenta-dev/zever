@@ -11,6 +11,21 @@ import (
 	"github.com/zenta-dev/zever/dsl/diag"
 )
 
+// isScalarTypeName reports whether name is the DSL spelling of a scalar
+// type, mirroring the keys of symbols.go's scalarNames map: a scalar has no
+// declaration, so a cursor resting on one is never a rename candidate. The
+// bare `enum` of an inline enum(...) type reads as a scalar here too,
+// because its argument values are what carry identity, not the type slot.
+func isScalarTypeName(name string) bool {
+	switch name {
+	case "uuid", "string", "int32", "int64", "float32", "float64",
+		"bool", "timestamp", "date", "bytes", "json", "enum":
+		return true
+	default:
+		return false
+	}
+}
+
 // ErrRenameEmptyName rejects a blank new name before any edit is built.
 var ErrRenameEmptyName = errors.New("zever-lsp: rename requires a non-empty new name")
 
@@ -65,6 +80,9 @@ const (
 	jobKind     symbolKind = "job"
 	serviceKind symbolKind = "service"
 	rpcKind     symbolKind = "rpc"
+	messageKind symbolKind = "message"
+	enumKind    symbolKind = "enum"
+	sagaKind    symbolKind = "saga"
 )
 
 // symbolRef is one textual occurrence of a symbol name in a position that
@@ -337,6 +355,213 @@ func rpcRefsIn(file *ast.File, serviceName string) []symbolRef {
 	return refs
 }
 
+// enumDeclByNameInFile is the named-enum counterpart used by typeRefKind
+// when a bare type name under a field or parameter is being classified.
+func enumDeclByNameInFile(file *ast.File, name string) *ast.EnumDecl {
+	for _, decl := range flattenDecls(file) {
+		if enum, ok := decl.(*ast.EnumDecl); ok && enum.Name == name {
+			return enum
+		}
+	}
+
+	return nil
+}
+
+// typeRefKind resolves the rename kind for a bare type name under a cursor
+// that position.go's field-type helpers reported as part of a message field
+// or an rpc/job parameter (the one position whose bare name may bind to an
+// entity, a message, a named enum or a scalar). Returns ok=false -- no
+// rename offered -- for scalars (no declaration to rename) and for names an
+// entity already claims, matching findTypeDeclPos's entity-first precedence
+// and keeping those positions exactly as (un)renameable as they were before
+// messages and enums became renameable. Otherwise priority mirrors the
+// resolver's: a named enum visible in this file wins, and everything else
+// defaults to message as the most common payload-type spelling. Everything
+// is filtered by spelling again inside the per-kind walks, so a defaulted
+// kind still names every workspace-wide reference the spans carry.
+func typeRefKind(file *ast.File, name string) (symbolKind, bool) {
+	if isScalarTypeName(name) {
+		return "", false
+	}
+
+	for _, decl := range flattenDecls(file) {
+		if entity, ok := decl.(*ast.EntityDecl); ok && entity.Name == name {
+			return "", false
+		}
+	}
+
+	if enumDeclByNameInFile(file, name) != nil {
+		return enumKind, true
+	}
+
+	return messageKind, true
+}
+
+// fieldTypeRefsIn returns one type-naming span per field: each field's type
+// name plus its position, whenever the type is a named reference rather than
+// an inline enum(...) argument list, whose values are not type names.
+func fieldTypeRefsIn(fields []*ast.FieldDecl) []symbolRef {
+	var refs []symbolRef
+
+	for _, field := range fields {
+		if field == nil || field.Type == nil || field.Type.Name == "" || len(field.Type.Args) > 0 {
+			continue
+		}
+
+		refs = append(refs, symbolRef{Name: field.Type.Name, Pos: field.Type.NamePos})
+	}
+
+	return refs
+}
+
+// paramTypeRefsIn returns every rpc/job parameter's type-name span, the
+// reference positions message and named-enum renames share (a parameter's
+// type may bind to either).
+func paramTypeRefsIn(file *ast.File) []symbolRef {
+	var refs []symbolRef
+
+	for _, decl := range flattenDecls(file) {
+		switch d := decl.(type) {
+		case *ast.ServiceDecl:
+			for _, rpc := range d.RPCs {
+				if rpc == nil {
+					continue
+				}
+
+				refs = append(refs, paramTypeRefs(rpc.Params)...)
+			}
+		case *ast.JobDecl:
+			refs = append(refs, paramTypeRefs(d.Params)...)
+		}
+	}
+
+	return refs
+}
+
+// paramTypeRefs collects the type-name spans of one parameter list.
+func paramTypeRefs(params []*ast.ParamDecl) []symbolRef {
+	var refs []symbolRef
+
+	for _, param := range params {
+		if param == nil || param.Type == nil || param.Type.Name == "" {
+			continue
+		}
+
+		refs = append(refs, symbolRef{Name: param.Type.Name, Pos: param.Type.NamePos})
+	}
+
+	return refs
+}
+
+// messageRefsIn returns every message-naming span in one parsed file: each
+// message's own declaration, each message field's type name, and every
+// rpc/job parameter's type name. The reference spans are name-based, not
+// resolution-based (the AST does not know what a type name binds to), so
+// renameSymbolEdits' oldName filter is what keeps a message rename from
+// touching an enum of a different name.
+func messageRefsIn(file *ast.File) []symbolRef {
+	var refs []symbolRef
+
+	for _, decl := range flattenDecls(file) {
+		msg, ok := decl.(*ast.MessageDecl)
+		if !ok {
+			continue
+		}
+
+		if msg.Name != "" {
+			refs = append(refs, symbolRef{Name: msg.Name, Pos: msg.NamePos})
+		}
+
+		refs = append(refs, fieldTypeRefsIn(msg.Fields)...)
+	}
+
+	return append(refs, paramTypeRefsIn(file)...)
+}
+
+// enumRefsIn returns every enum-naming span in one parsed file: each named
+// enum's declaration, every entity and message field's type name, and every
+// rpc/job parameter's type name. Entity field types bind only to scalars or
+// named enums, message fields and parameters additionally to messages -- the
+// same name-based spans as messageRefsIn collects, so the per-kind oldName
+// filter partially overlaps and each walk stays self-sufficient.
+func enumRefsIn(file *ast.File) []symbolRef {
+	var refs []symbolRef
+
+	for _, decl := range flattenDecls(file) {
+		switch d := decl.(type) {
+		case *ast.EnumDecl:
+			if d.Name != "" {
+				refs = append(refs, symbolRef{Name: d.Name, Pos: d.NamePos})
+			}
+		case *ast.EntityDecl:
+			refs = append(refs, fieldTypeRefsIn(d.Fields)...)
+		case *ast.MessageDecl:
+			refs = append(refs, fieldTypeRefsIn(d.Fields)...)
+		}
+	}
+
+	return append(refs, paramTypeRefsIn(file)...)
+}
+
+// sagaRefsIn returns every saga's own declaration in one parsed file.
+// Nothing in the resolver looks a saga up by name (unlike jobs, which
+// schedules dispatch), so this is declaration-only, mirroring
+// serviceRefsIn's rationale: a step's execute/compensate options name
+// services and rpcs, and those identifiers belong to the service and rpc
+// symbol kinds, not the saga.
+func sagaRefsIn(file *ast.File) []symbolRef {
+	var refs []symbolRef
+
+	for _, decl := range flattenDecls(file) {
+		saga, ok := decl.(*ast.SagaDecl)
+		if !ok {
+			continue
+		}
+
+		if saga.Name != "" {
+			refs = append(refs, symbolRef{Name: saga.Name, Pos: saga.NamePos})
+		}
+	}
+
+	return refs
+}
+
+// sagaStepRefAt resolves a cursor over one service or rpc identifier inside
+// a saga step's execute or compensate option to the symbol it names: the
+// service identifier to a service target, the rpc identifier to an rpc
+// target owned by that service (rpcRefPos derives the rpc identifier's
+// column, which ast.RPCRef does not record). Renaming then behaves like a
+// rename issued from the declaration itself -- the service/rpc reference
+// walks are unchanged and declaration-scoped.
+func sagaStepRefAt(file *ast.File, cursor protocol.Position) (renameTarget, bool) {
+	for _, decl := range flattenDecls(file) {
+		saga, ok := decl.(*ast.SagaDecl)
+		if !ok {
+			continue
+		}
+
+		for _, step := range saga.Steps {
+			for _, ref := range []*ast.RPCRef{step.Execute, step.Compensate} {
+				if ref == nil {
+					continue
+				}
+
+				if coversIdent(ref.Pos, ref.Service, cursor) {
+					return renameTarget{Kind: serviceKind, Name: ref.Service, Pos: ref.Pos}, true
+				}
+
+				if ref.RPC != "" && coversIdent(rpcRefPos(ref), ref.RPC, cursor) {
+					return renameTarget{
+						Kind: rpcKind, Name: ref.RPC, Owner: ref.Service, Pos: rpcRefPos(ref),
+					}, true
+				}
+			}
+		}
+	}
+
+	return renameTarget{}, false
+}
+
 // entityReferenceAt finds an entity-name identifier under the cursor in a
 // position position.go's existing helpers do not cover: an rpc's return
 // type, or a permission block's resource reference.
@@ -409,9 +634,11 @@ func ownerFieldAt(file *ast.File, cursor protocol.Position) (string, symbolRef, 
 // renameTargetAt resolves the cursor to the symbol it refers to, trying
 // each kind in turn: entity name, relation target, entity reference
 // (rpc-return/permission-resource), field name or type, index column,
-// owner_field reference, job name, dispatch target, service name, then rpc
-// name. First match wins. Anything else (a relation's own field name, a
-// type-argument value, an rpc parameter name) is not renameable.
+// owner_field reference, message name, named-enum name, saga name, job
+// name, dispatch target, service name, rpc name, message/enum-typed field
+// or parameter position, then saga step references. First match wins.
+// Anything else (a relation's own field name, a type-argument value, an rpc
+// parameter name) is not renameable.
 func renameTargetAt(file *ast.File, cursor protocol.Position) (renameTarget, bool) {
 	if entity := entityNameAt(file, cursor); entity != nil {
 		return renameTarget{Kind: entityKind, Name: entity.Name, Pos: entity.NamePos}, true
@@ -437,6 +664,18 @@ func renameTargetAt(file *ast.File, cursor protocol.Position) (renameTarget, boo
 		return renameTarget{Kind: fieldKind, Name: ref.Name, Pos: ref.Pos, Owner: entityName}, true
 	}
 
+	if msg := messageNameAt(file, cursor); msg != nil {
+		return renameTarget{Kind: messageKind, Name: msg.Name, Pos: msg.NamePos}, true
+	}
+
+	if enum := enumNameAt(file, cursor); enum != nil {
+		return renameTarget{Kind: enumKind, Name: enum.Name, Pos: enum.NamePos}, true
+	}
+
+	if saga := sagaNameAt(file, cursor); saga != nil {
+		return renameTarget{Kind: sagaKind, Name: saga.Name, Pos: saga.NamePos}, true
+	}
+
 	if job := jobNameAt(file, cursor); job != nil {
 		return renameTarget{Kind: jobKind, Name: job.Name, Pos: job.NamePos}, true
 	}
@@ -453,6 +692,24 @@ func renameTargetAt(file *ast.File, cursor protocol.Position) (renameTarget, boo
 
 	if service, rpc := rpcNameAt(file, cursor); rpc != nil {
 		return renameTarget{Kind: rpcKind, Name: rpc.Name, Pos: rpc.NamePos, Owner: service.Name}, true
+	}
+
+	if target, ok := sagaStepRefAt(file, cursor); ok {
+		return target, true
+	}
+
+	if _, field := messageFieldAt(file, cursor); field != nil && field.Type != nil &&
+		coversIdent(field.Type.NamePos, field.Type.Name, cursor) {
+		if kind, ok := typeRefKind(file, field.Type.Name); ok {
+			return renameTarget{Kind: kind, Name: field.Type.Name, Pos: field.Type.NamePos}, true
+		}
+	}
+
+	if param := paramTypeAt(file, cursor); param != nil &&
+		coversIdent(param.Type.NamePos, param.Type.Name, cursor) {
+		if kind, ok := typeRefKind(file, param.Type.Name); ok {
+			return renameTarget{Kind: kind, Name: param.Type.Name, Pos: param.Type.NamePos}, true
+		}
 	}
 
 	return renameTarget{}, false
@@ -568,6 +825,33 @@ func renameRPCEdits(
 	return renameSymbolEdits(parsedFiles, oldName, newName, func(file *ast.File) []symbolRef {
 		return rpcRefsIn(file, serviceName)
 	})
+}
+
+// renameMessageEdits finds every textual reference to the message named
+// oldName across every file in parsedFiles and returns the WorkspaceEdit
+// that renames every occurrence to newName. Scope: the message's own
+// declaration, every message field type naming it, and every rpc/job
+// parameter type naming it -- the same name-based walk messageRefsIn builds.
+func renameMessageEdits(parsedFiles map[string]*ast.File, oldName, newName string) (*protocol.WorkspaceEdit, error) {
+	return renameSymbolEdits(parsedFiles, oldName, newName, messageRefsIn)
+}
+
+// renameEnumEdits finds every textual reference to the named enum called
+// oldName across every file in parsedFiles and returns the WorkspaceEdit
+// that renames every occurrence to newName. Scope: the enum's own
+// declaration, every entity/message field type naming it, and every rpc/job
+// parameter type naming it.
+func renameEnumEdits(parsedFiles map[string]*ast.File, oldName, newName string) (*protocol.WorkspaceEdit, error) {
+	return renameSymbolEdits(parsedFiles, oldName, newName, enumRefsIn)
+}
+
+// renameSagaEdits finds every textual reference to the saga named oldName
+// across every file in parsedFiles and returns the WorkspaceEdit that
+// renames every occurrence to newName. Scope: the saga's own declaration
+// only -- a step's execute/compensate options name services and rpcs, which
+// keep their own unmodified reference walks.
+func renameSagaEdits(parsedFiles map[string]*ast.File, oldName, newName string) (*protocol.WorkspaceEdit, error) {
+	return renameSymbolEdits(parsedFiles, oldName, newName, sagaRefsIn)
 }
 
 // sortTextEdits orders edits by position so the result is deterministic

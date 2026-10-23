@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -55,9 +56,12 @@ func (c *fakeClient) count() int {
 	return len(c.calls)
 }
 
-// fakeTimer is a manually-fired stopper: no wall clock, no sleeps.
+// fakeTimer is a manually-fired stopper: no wall clock, no sleeps. It
+// records the delay it was created with so tests can assert the settings
+// drive the debounce, not just that a timer exists.
 type fakeTimer struct {
 	mu      sync.Mutex
+	d       time.Duration
 	fn      func()
 	stopped bool
 	fired   bool
@@ -98,14 +102,31 @@ type fakeClock struct {
 	timers []*fakeTimer
 }
 
-func (c *fakeClock) afterFunc(_ time.Duration, fn func()) stopper {
-	t := &fakeTimer{fn: fn}
+func (c *fakeClock) afterFunc(d time.Duration, fn func()) stopper {
+	t := &fakeTimer{d: d, fn: fn}
 
 	c.mu.Lock()
 	c.timers = append(c.timers, t)
 	c.mu.Unlock()
 
 	return t
+}
+
+// lastDelay returns the duration the most recently created timer was given.
+func (c *fakeClock) lastDelay() time.Duration {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.timers) == 0 {
+		return 0
+	}
+
+	t := c.timers[len(c.timers)-1]
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	return t.d
 }
 
 func (c *fakeClock) fireAll() {
@@ -681,5 +702,104 @@ func TestPublishSkipsFileRecordedClean(t *testing.T) {
 
 	if got := client.count(); got != 0 {
 		t.Errorf("publish sent %d notifications, want 0 (already clean)", got)
+	}
+}
+
+// TestDiagnosticCodeClassification pins the classification of real compiler
+// messages: one representative per class, all substrings of messages the
+// resolver and parser actually emit, plus messages matching nothing (which
+// must stay code-less rather than inventing a class).
+func TestDiagnosticCodeClassification(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		msg  string
+		want string
+	}{
+		{`unknown field type "strnig" (declare relations with has_many/has_one/belongs_to/many_to_many, not as a field)`, diagCodeUnknownFieldType},
+		{`relation Order.items references unknown entity "Item"`, diagCodeUnknownRelationTarget},
+		{`duplicate top-level declaration "User" (first declared at a.zen:1:1)`, diagCodeDuplicateDeclaration},
+		{`duplicate value "A" in enum "Color"`, diagCodeDuplicateDeclaration},
+		{`duplicate error code "not_found" in errors: set`, diagCodeDuplicateDeclaration},
+		{`saga Ship has duplicate step name "charge"; step names must be unique within a saga`, diagCodeDuplicateDeclaration},
+		{`rpc OrderService.placeOrder param Item is from a different module (app -> billing); expose it via that module's own service instead`, diagCodeCrossModuleReference},
+		{`relation Order.items -> OrderLine crosses module boundary (app -> billing); cross-module access must go through a service RPC, not a direct relation`, diagCodeCrossModuleReference},
+		{`unknown field attribute @bogus`, diagCodeUnknownAttribute},
+		{`unknown entity attribute @bogus`, diagCodeUnknownAttribute},
+		{`unknown message field attribute @bogus`, diagCodeUnknownAttribute},
+		{`unknown index attribute @bogus`, diagCodeUnknownAttribute},
+		{`unknown default function "nowish"`, diagCodeUnknownName},
+		{`unknown validate kind "len"`, diagCodeUnknownName},
+		{`saga Ship references unknown service "Nope"`, diagCodeUnknownName},
+		{`expected field declaration, got IDENT "x"`, diagCodeSyntaxError},
+		{`integer literal "999999999999999999999" out of range: strconv...`, diagCodeInvalidValue},
+		{`invalid cron expression "not cron": ...`, diagCodeInvalidValue},
+		{`max nesting depth exceeded (32) while parsing value`, diagCodeInvalidValue},
+		{"no class here", ""},
+		{"", ""},
+	}
+
+	for _, tc := range tests {
+		if got := diagnosticCode(tc.msg); got != tc.want {
+			t.Errorf("diagnosticCode(%q) = %q, want %q", tc.msg, got, tc.want)
+		}
+	}
+}
+
+// TestDiagToLSPDiagnosticCarriesCode proves a classified diagnostic carries
+// its code (as the protocol's String union arm, the string case of the code
+// union) plus a CodeDescription, and an unclassified one carries neither.
+func TestDiagToLSPDiagnosticCarriesCode(t *testing.T) {
+	t.Parallel()
+
+	classified := diagToLSPDiagnostic(&diag.Diagnostic{
+		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
+		Msg: `unknown field type "strnig"`,
+	}, "")
+
+	code, ok := classified.Code.(protocol.String)
+	if !ok || string(code) != diagCodeUnknownFieldType {
+		t.Errorf("Code = %#v, want protocol.String(%q)", classified.Code, diagCodeUnknownFieldType)
+	}
+
+	href := string(classified.CodeDescription.Href)
+
+	if !strings.HasPrefix(href, "https://") {
+		t.Errorf("CodeDescription.Href = %q, want the https doc URL", href)
+	}
+
+	unclassified := diagToLSPDiagnostic(&diag.Diagnostic{
+		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
+		Msg: "no class here",
+	}, "")
+
+	if unclassified.Code != nil {
+		t.Errorf("unclassified Code = %#v, want nil", unclassified.Code)
+	}
+
+	if unclassified.CodeDescription.Href != "" {
+		t.Errorf("unclassified CodeDescription = %+v, want zero", unclassified.CodeDescription)
+	}
+}
+
+// TestScheduleUsesSettingsDebounce proves the publisher's delay hook drives
+// the debounce delay the settings set, falling back to the package default
+// when no hook is wired.
+func TestScheduleUsesSettingsDebounce(t *testing.T) {
+	p := newDiagnosticPublisher()
+	clock := withFakeClock(p)
+
+	p.schedule("/w/a.zen", func() {})
+
+	if got, want := clock.lastDelay(), debounceDelay; got != want {
+		t.Errorf("hookless delay = %v, want the default %v", got, want)
+	}
+
+	p.delayHook = func() time.Duration { return 5 * time.Second }
+
+	p.schedule("/w/b.zen", func() {})
+
+	if got := clock.lastDelay(); got != 5*time.Second {
+		t.Errorf("hooked delay = %v, want 5s", got)
 	}
 }

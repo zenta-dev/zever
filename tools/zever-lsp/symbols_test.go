@@ -613,3 +613,227 @@ func TestWorkspaceSymbolsFullSchemaIncludesJobsSchedulesAndRelations(t *testing.
 		t.Errorf("user containerName = %v, want Task", rel.ContainerName)
 	}
 }
+
+// symbolsVisibilitySrc adds the three previously invisible declaration kinds
+// -- a named enum, a message, and a saga -- to the resolved-schema surface.
+const symbolsVisibilitySrc = `enum Status { active, dormant }
+
+entity User {
+	id: uuid @primary
+	status: Status
+}
+
+message CreateUserInput {
+	email: string @validate(format: "email")
+}
+
+service UserService {
+	rpc CreateUser(input: CreateUserInput) -> User {
+		http: POST "/users"
+		auth: required
+	}
+
+	rpc Charge(id: uuid) -> User {
+		http: POST "/users/{id}/charge"
+		auth: required
+	}
+
+	rpc Refund(id: uuid) -> User {
+		http: POST "/users/{id}/refund"
+		auth: required
+	}
+}
+
+saga Checkout {
+	step reserve {
+		execute: UserService.CreateUser
+		compensate: UserService.Refund
+	}
+	step charge {
+		execute: UserService.Charge
+		pivot: true
+	}
+}
+`
+
+func compileSymbolsVisibilityFixture(t *testing.T) protocol.DocumentSymbolSlice {
+	t.Helper()
+
+	result, diags := compile.Compile(map[string]string{"main.zen": symbolsVisibilitySrc})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	return symbolsFromSchema(result.Schema, "main.zen")
+}
+
+// TestSymbolsFromSchemaIncludesMessagesSagasEnums proves the outline now
+// covers the message (with field children), the saga (with step children)
+// and the named enum under the resolved-schema path.
+func TestSymbolsFromSchemaIncludesMessagesSagasEnums(t *testing.T) {
+	symbols := compileSymbolsVisibilityFixture(t)
+
+	msg := findSymbol(symbols, "CreateUserInput")
+	if msg == nil {
+		t.Fatal("CreateUserInput symbol missing")
+	}
+
+	if msg.Kind != protocol.SymbolKindStruct {
+		t.Errorf("CreateUserInput kind = %d, want %d", msg.Kind, protocol.SymbolKindStruct)
+	}
+
+	if got := childNames(msg); len(got) != 1 || got[0] != "email" {
+		t.Errorf("message children = %v, want [email]", got)
+	}
+
+	saga := findSymbol(symbols, "Checkout")
+	if saga == nil {
+		t.Fatal("Checkout symbol missing")
+	}
+
+	if saga.Kind != protocol.SymbolKindEvent {
+		t.Errorf("Checkout kind = %d, want %d", saga.Kind, protocol.SymbolKindEvent)
+	}
+
+	if got := childNames(saga); len(got) != 2 || got[0] != "reserve" || got[1] != "charge" {
+		t.Errorf("saga children = %v, want [reserve charge]", got)
+	}
+
+	enum := findSymbol(symbols, "Status")
+	if enum == nil {
+		t.Fatal("Status symbol missing")
+	}
+
+	if enum.Kind != protocol.SymbolKindEnum {
+		t.Errorf("Status kind = %d, want %d", enum.Kind, protocol.SymbolKindEnum)
+	}
+}
+
+// TestSagaStepSymbolDetailCarriesReferences proves a step's outline detail
+// names its forward and reverse references, so the RPC pair survives
+// collapse without opening the file.
+func TestSagaStepSymbolDetailCarriesReferences(t *testing.T) {
+	symbols := compileSymbolsVisibilityFixture(t)
+
+	saga := findSymbol(symbols, "Checkout")
+	if saga == nil {
+		t.Fatal("Checkout symbol missing")
+	}
+
+	reserve := saga.Children[0]
+	if reserve.Detail == nil || *reserve.Detail != "execute UserService.CreateUser, compensate UserService.Refund" {
+		t.Errorf("reserve detail = %v, want the execute/compensate pair", reserve.Detail)
+	}
+
+	charge := saga.Children[1]
+	if charge.Detail == nil || *charge.Detail != "execute UserService.Charge (pivot)" {
+		t.Errorf("charge detail = %v, want the pivot-marked execute", charge.Detail)
+	}
+}
+
+func TestFlatSymbolsFromSchemaIncludesMessagesSagasEnums(t *testing.T) {
+	result, diags := compile.Compile(map[string]string{"main.zen": symbolsVisibilitySrc})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	symbols := flatSymbolsFromSchema(result.Schema)
+
+	msg := findWorkspaceSymbol(symbols, "CreateUserInput")
+	if msg == nil || msg.Kind != protocol.SymbolKindStruct {
+		t.Fatalf("message symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+
+	field := findWorkspaceSymbol(symbols, "email")
+	if field == nil || field.Kind != protocol.SymbolKindField {
+		t.Errorf("message field symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+
+	if field.ContainerName == nil || *field.ContainerName != "CreateUserInput" {
+		t.Errorf("email containerName = %v, want CreateUserInput", field.ContainerName)
+	}
+
+	step := findWorkspaceSymbol(symbols, "reserve")
+	if step == nil || step.Kind != protocol.SymbolKindFunction {
+		t.Fatalf("saga step symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+
+	if step.ContainerName == nil || *step.ContainerName != "Checkout" {
+		t.Errorf("reserve containerName = %v, want Checkout", step.ContainerName)
+	}
+
+	if enum := findWorkspaceSymbol(symbols, "Status"); enum == nil || enum.Kind != protocol.SymbolKindEnum {
+		t.Errorf("enum symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+}
+
+func TestSymbolsFromASTIncludesMessageEnumSagaDecl(t *testing.T) {
+	file, _ := parser.New("main.zen", []byte(symbolsVisibilitySrc)).ParseFile()
+	if file == nil {
+		t.Fatal("failed to parse fixture")
+	}
+
+	symbols := symbolsFromAST(file)
+
+	if len(symbols) != 5 {
+		t.Fatalf("got %d symbols, want 5 (enum entity message service saga): %v", len(symbols), symbols)
+	}
+
+	enum := findSymbol(symbols, "Status")
+	if enum == nil {
+		t.Fatal("Status symbol missing")
+	}
+
+	if enum.Kind != protocol.SymbolKindEnum {
+		t.Errorf("Status kind = %d, want %d", enum.Kind, protocol.SymbolKindEnum)
+	}
+
+	// The AST fallback knows each value's position, so values are children.
+	if got := childNames(enum); len(got) != 2 || got[0] != "active" || got[1] != "dormant" {
+		t.Errorf("enum children = %v, want [active dormant]", got)
+	}
+
+	if enum.Children[0].Kind != protocol.SymbolKindEnumMember {
+		t.Errorf("active kind = %d, want %d", enum.Children[0].Kind, protocol.SymbolKindEnumMember)
+	}
+
+	saga := findSymbol(symbols, "Checkout")
+	if saga == nil {
+		t.Fatal("Checkout symbol missing")
+	}
+
+	if got := childNames(saga); len(got) != 2 || got[0] != "reserve" || got[1] != "charge" {
+		t.Errorf("saga children = %v, want [reserve charge]", got)
+	}
+}
+
+func TestFlatSymbolsFromASTIncludesMessageEnumSagaDecl(t *testing.T) {
+	file, _ := parser.New("main.zen", []byte(symbolsVisibilitySrc)).ParseFile()
+	if file == nil {
+		t.Fatal("failed to parse fixture")
+	}
+
+	symbols := flatSymbolsFromAST("main.zen", file)
+
+	enum := findWorkspaceSymbol(symbols, "Status")
+	if enum == nil || enum.Kind != protocol.SymbolKindEnum {
+		t.Fatalf("enum symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+
+	value := findWorkspaceSymbol(symbols, "dormant")
+	if value == nil || value.Kind != protocol.SymbolKindEnumMember {
+		t.Errorf("enum value symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+
+	if value.ContainerName == nil || *value.ContainerName != "Status" {
+		t.Errorf("dormant containerName = %v, want Status", value.ContainerName)
+	}
+
+	if msg := findWorkspaceSymbol(symbols, "CreateUserInput"); msg == nil || msg.Kind != protocol.SymbolKindStruct {
+		t.Errorf("message symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+
+	if step := findWorkspaceSymbol(symbols, "charge"); step == nil || step.Kind != protocol.SymbolKindFunction {
+		t.Errorf("saga step symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+}

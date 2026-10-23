@@ -37,18 +37,78 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Area | Methods |
 | --- | --- |
 | Sync | `textDocument/didOpen`, `textDocument/didChange` (full), `textDocument/didSave`, `textDocument/didClose`, `workspace/didChangeWatchedFiles` |
-| Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array) |
+| Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array; each diagnostic carries a stable `zen-###` code — see [Diagnostic codes](#diagnostic-codes) below) |
 | Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback) |
-| Navigation | `textDocument/definition`, `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange` |
+| Navigation | `textDocument/definition`, `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
 | Hover | `textDocument/hover` |
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
 | Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |
 | Formatting | `textDocument/formatting`, `textDocument/rangeFormatting` |
 | Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets) |
 | Rename | `textDocument/prepareRename`, `textDocument/rename` (entities, fields, jobs, services, RPCs) |
-| Semantic tokens | `textDocument/semanticTokens/full` (full only, no delta/range) |
-| Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module and `errors:`-case annotations) |
+| Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` |
+| Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module and `errors:`-case annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
+| Configuration | `workspace/didChangeConfiguration` (`zever.*` settings, see [Configuration](#configuration) below) |
 | Lifecycle | `initialize`, `initialized`, `shutdown`, `exit`, `$/setTrace` |
+
+### Position encoding
+
+The server computes LSP character offsets as UTF-8 byte offsets, so in
+`initialize` it picks `utf-8` exactly when the client offers it in
+`general.positionEncodings` and then echoes `capabilities.positionEncoding:
+"utf-8"`. When the client does not offer it, the capability is omitted and
+the protocol's implicit `utf-16` default stays in place (semantic tokens
+are UTF-16-exact regardless, per spec construction). Identifiers in `.zen`
+schemata are ASCII, so both encodings agree on every position the server
+hands out.
+
+## Configuration
+
+Read from `workspace/didChangeConfiguration`, nested under the sole `zever`
+section. A well-formed payload is a whole replacement (families absent from
+it fall back to their defaults); a malformed or non-object payload leaves
+the current settings untouched. Per-key values of the wrong type are
+ignored and keep their default.
+
+```json
+{
+  "zever": {
+    "inlayHints": {
+      "implicitModule": true,
+      "errorCases": true
+    },
+    "diagnostics": {
+      "debounceMs": 250
+    }
+  }
+}
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `zever.inlayHints.implicitModule` | `true` | `(module: public)` hints on declarations resolving to the implicit public module (shown only when the schema mixes public and named modules) |
+| `zever.inlayHints.errorCases` | `true` | status/gRPC-name annotations on `errors: { ... }` case names |
+| `zever.diagnostics.debounceMs` | `250` | how long an edit burst must settle before recompiling (values ≤ 0 keep the default) |
+
+## Diagnostic codes
+
+Every published diagnostic that matches a known class carries a stable
+`code` (plus a `codeDescription.href` linking here), classified
+deterministically from the message text (`diagnosticClasses` in
+`diagnostics.go`). Codes never move between classes across releases, so
+editor filters stay meaningful. A message matching nothing carries no code
+rather than an invented one.
+
+| Code | Class |
+| --- | --- |
+| `zen-001` | unknown field type (`unknown field type`) |
+| `zen-002` | unknown relation target (`references unknown entity`) |
+| `zen-003` | duplicate declaration (`duplicate ...`) |
+| `zen-004` | cross-module reference (`... different module ...`, `crosses module boundary`) |
+| `zen-005` | unknown `@attribute` |
+| `zen-006` | unknown identifier outside its vocabulary (`unknown ...`) |
+| `zen-007` | parse syntax error (`expected ...`) |
+| `zen-008` | invalid literal or value (`invalid ...`, `out of range`, `nesting depth exceeded`) |
 
 ## Editor wiring
 

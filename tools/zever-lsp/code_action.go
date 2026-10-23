@@ -208,9 +208,12 @@ func fixUnresolvedRelationTarget(
 }
 
 // codeActionsAt returns quick fixes applicable at the diagnostics present
-// in params.Context.Diagnostics -- there is no structured diagnostic
-// code in this codebase, so dispatch is by matching known message
-// patterns, a deliberately narrow approach, not a general framework.
+// in params.Context.Diagnostics. Each diagnostic now carries a structured
+// code (diagnosticCode in diagnostics.go), but dispatch still matches the
+// message patterns directly: mirrored diagnostics are built through the
+// same matcher table, so matching messages keeps the two paths coupled to
+// one list of classes -- a deliberately narrow approach, not a general
+// framework.
 //
 // The result uses the server handler's []CommandOrCodeAction shape with
 // *CodeAction arms; a literal nil means no fix applies.

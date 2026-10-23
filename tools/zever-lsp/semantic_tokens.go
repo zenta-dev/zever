@@ -210,6 +210,10 @@ func (c *spanCollector) declList(decls []ast.Decl) {
 			c.job(d)
 		case *ast.ScheduleDecl:
 			c.schedule(d)
+		case *ast.EnumDecl:
+			c.enumDecl(d)
+		case *ast.SagaDecl:
+			c.saga(d)
 		}
 	}
 }
@@ -262,6 +266,58 @@ func (c *spanCollector) message(decl *ast.MessageDecl) {
 		c.add(field.NamePos, field.Name, semTokProperty)
 		c.typeExpr(field.Type)
 		c.attributes(field.Attributes)
+	}
+}
+
+// enumDecl classifies a named enum declaration: the enum's name takes the
+// class category (the same slot another named type's declaration occupies,
+// since a named enum is a type the field-type grammar references) and each
+// of its values an enum member, exactly like the inline `enum(a, b)` form's
+// arguments in typeExpr. The `enum` keyword itself is reserved, so the token
+// tier already labels it; the value identifiers are the first tier's to
+// claim.
+func (c *spanCollector) enumDecl(decl *ast.EnumDecl) {
+	if decl == nil {
+		return
+	}
+
+	c.add(decl.NamePos, decl.Name, semTokClass)
+
+	for i, val := range decl.Values {
+		if i >= len(decl.ValuePos) {
+			break
+		}
+
+		c.add(decl.ValuePos[i], val, semTokEnumMember)
+	}
+}
+
+// saga classifies a saga declaration: the saga name is an invocable unit
+// (function, the same category a job takes), and each step's
+// execute/compensate options name a Service.RPC pair -- the service
+// identifier reads as the callable being invoked, the rpc identifier as the
+// method chosen on it. A step carries no separate recorded position for its
+// own name (the parser accepts the ident without storing it), so steps add
+// nothing of their own; only the references they carry are classified.
+func (c *spanCollector) saga(decl *ast.SagaDecl) {
+	if decl == nil {
+		return
+	}
+
+	c.add(decl.NamePos, decl.Name, semTokFunction)
+
+	for _, step := range decl.Steps {
+		for _, ref := range []*ast.RPCRef{step.Execute, step.Compensate} {
+			if ref == nil {
+				continue
+			}
+
+			c.add(ref.Pos, ref.Service, semTokFunction)
+
+			if ref.RPC != "" {
+				c.add(rpcRefPos(ref), ref.RPC, semTokMethod)
+			}
+		}
 	}
 }
 

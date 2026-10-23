@@ -27,7 +27,7 @@ func referencesAt(
 		return nil
 	}
 
-	// Proof: renameTargetAt yields only the five kinds refsFnForKind handles,
+	// Proof: renameTargetAt yields only the eight kinds refsFnForKind handles,
 	// so refsFn is non-nil on every reachable path; the old nil guard was
 	// dead (the unknown-kind arm stays pinned by TestRefsFnForKindUnknownKindReturnsNil).
 	refsFn := refsFnForKind(target)
@@ -82,6 +82,12 @@ func refsFnForKind(target renameTarget) func(*ast.File) []symbolRef {
 		return serviceRefsIn
 	case rpcKind:
 		return func(f *ast.File) []symbolRef { return rpcRefsIn(f, target.Owner) }
+	case messageKind:
+		return messageRefsIn
+	case enumKind:
+		return enumRefsIn
+	case sagaKind:
+		return sagaRefsIn
 	default:
 		return nil
 	}

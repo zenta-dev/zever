@@ -5,6 +5,8 @@ import (
 	"log"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"go.lsp.dev/protocol"
 
@@ -48,9 +50,28 @@ type Server struct {
 	// instead of recomputing from scratch. Guarded by mu.
 	semTokCache   map[string]semTokCacheEntry
 	semTokCounter uint64
+
+	// docLinkTooltip records whether the initialize negotiation advertised
+	// the client's textDocument/didOpen documentLink.tooltipSupport, so
+	// documentLink/resolve knows whether to fill Tooltip. Guarded by mu.
+	docLinkTooltip bool
+
+	// settings is the current editing configuration, swapped whole by
+	// workspace/didChangeConfiguration and read by every handler. Atomic
+	// (rather than mu-guarded) so the diagnostics publisher's delay hook can
+	// read it while holding the publisher's own lock.
+	settings atomic.Pointer[Settings]
+
+	// encoding is the position encoding negotiated at initialize. It is ""
+	// when UTF-16, the protocol's implicit default, was left in place.
+	// Stored information only today: every hand-computed offset in this
+	// server is byte-based (which is why utf-8 is negotiated when offered),
+	// and semantic tokens are UTF-16-exact regardless. Guarded by mu.
+	encoding protocol.PositionEncodingKind
 }
 
-// NewServer returns a server with an empty workspace and no client yet.
+// NewServer returns a server with an empty workspace and no client yet. The
+// settings snapshot starts at the defaults.
 func NewServer() *Server {
 	ws := NewWorkspace()
 	publisher := newDiagnosticPublisher()
@@ -58,12 +79,19 @@ func NewServer() *Server {
 	// identifier using each file's live source.
 	publisher.srcFor = ws.ContentForPath
 
-	return &Server{
+	s := &Server{
 		ws:          ws,
 		publisher:   publisher,
 		trace:       protocol.TraceValueOff,
 		semTokCache: make(map[string]semTokCacheEntry),
 	}
+
+	// The publisher consults the settings atomically on each schedule, so a
+	// didChangeConfiguration between edit bursts is honored by the next one
+	// without any cross-lock dance.
+	publisher.delayHook = func() time.Duration { return s.currentSettings().DebounceDelay }
+
+	return s
 }
 
 // setClient installs the peer client, typically once at startup.
@@ -116,11 +144,36 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.ws.SetRoot(root)
 	}
 
+	// textDocument/documentLink.tooltipSupport is the one client capability
+	// a handler needs to behave differently (resolve fills Tooltip only for
+	// a client that asked for tooltips), so it is the only one this server
+	// records. Like trace, it is per-server state on the struct, under mu.
+	if params != nil && params.Capabilities.TextDocument != nil &&
+		params.Capabilities.TextDocument.DocumentLink != nil &&
+		params.Capabilities.TextDocument.DocumentLink.TooltipSupport != nil {
+		s.mu.Lock()
+		s.docLinkTooltip = *params.Capabilities.TextDocument.DocumentLink.TooltipSupport
+		s.mu.Unlock()
+	}
+
+	// Position encoding negotiation: this server computes all LSP character
+	// offsets as byte offsets (semantics tokens aside, which the token
+	// encoder builds UTF-16-exact itself), so UTF-8 is picked exactly when
+	// the client offers it; otherwise the protocol's implicit UTF-16 default
+	// applies by omitting the capability entirely.
+	encoding := negotiatePositionEncoding(params)
+	if encoding != "" {
+		s.mu.Lock()
+		s.encoding = encoding
+		s.mu.Unlock()
+	}
+
 	syncKind := protocol.TextDocumentSyncKindFull
 	enabled := true
 
 	return &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
+			PositionEncoding: encoding,
 			// A bare sync-kind value (rather than this options struct)
 			// declares open/close/change support only -- no "save" key at
 			// all -- yet clients may send textDocument/didSave
@@ -174,12 +227,39 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 				Full:   &protocol.SemanticTokensFullDelta{Delta: boolPtr(true)},
 			},
 			InlayHintProvider: protocol.Boolean(true),
+			// The selection-range provider is a bare boolean: unlike
+			// completion/signature help there are no per-request options,
+			// so the bool form both implements and declares the feature.
+			SelectionRangeProvider: protocol.Boolean(true),
+			// Same options-struct shape as CompletionProvider above, for the
+			// same reason: resolveProvider is part of the documentLink
+			// capability itself.
+			DocumentLinkProvider: &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
 		},
 		ServerInfo: protocol.ServerInfo{
 			Name:    serverName,
 			Version: protocol.NewOptional(serverVersion),
 		},
 	}, nil
+}
+
+// negotiatePositionEncoding picks the position encoding to answer an
+// initialize request with, from the client's general.positionEncodings
+// announcement. It returns the UTF-8 kind when the client offers it and ""
+// otherwise, which is mapped to the protocol's implicit UTF-16 default by
+// omitting the positionEncoding capability (the spec's mandatory fallback).
+func negotiatePositionEncoding(params *protocol.InitializeParams) protocol.PositionEncodingKind {
+	if params == nil || params.Capabilities.General == nil {
+		return ""
+	}
+
+	for _, kind := range params.Capabilities.General.PositionEncodings {
+		if kind == protocol.PositionEncodingKindUTF8 {
+			return protocol.PositionEncodingKindUTF8
+		}
+	}
+
+	return ""
 }
 
 // Initialized handles the initialized notification by publishing the first
@@ -189,6 +269,35 @@ func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams)
 	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil
+}
+
+// DidChangeConfiguration stores the settings the client pushes over
+// workspace/didChangeConfiguration, under the sole `zever` section (see
+// settings.go for the shape). An empty or non-object payload leaves the
+// current settings untouched; everything else is a whole replacement.
+func (s *Server) DidChangeConfiguration(ctx context.Context, params *protocol.DidChangeConfigurationParams) error {
+	s.captureClient(ctx)
+
+	if params == nil {
+		return nil
+	}
+
+	if parsed, ok := parseSettings(params.Settings); ok {
+		s.settings.Store(&parsed)
+	}
+
+	return nil
+}
+
+// currentSettings returns the settings snapshot in effect. NewServer always
+// installs one; the defaults are the answer for a zero-value Server, of the
+// kind direct struct literals in tests can produce.
+func (s *Server) currentSettings() Settings {
+	if st := s.settings.Load(); st != nil {
+		return *st
+	}
+
+	return defaultSettings()
 }
 
 // Shutdown is a no-op: there is no background state to tear down.
@@ -478,8 +587,14 @@ func (s *Server) Rename(ctx context.Context, params *protocol.RenameParams) (*pr
 		return renameServiceEdits(parsedFiles, target.Name, params.NewName)
 	case rpcKind:
 		return renameRPCEdits(parsedFiles, target.Owner, target.Name, params.NewName)
+	case messageKind:
+		return renameMessageEdits(parsedFiles, target.Name, params.NewName)
+	case enumKind:
+		return renameEnumEdits(parsedFiles, target.Name, params.NewName)
+	case sagaKind:
+		return renameSagaEdits(parsedFiles, target.Name, params.NewName)
 	}
-	// Proof: renameTargetAt yields only the five kinds dispatched here and
+	// Proof: renameTargetAt yields only the eight kinds dispatched here and
 	// below; rpcKind is the sole remaining reachable kind, so control reaches
 	// here only for rpc renames (the live rpc subtest in TestRename covers
 	// this return).
@@ -531,6 +646,77 @@ func (s *Server) DocumentHighlight(ctx context.Context, params *protocol.Documen
 	file := s.parseDoc(string(params.TextDocument.URI))
 
 	return highlightsAt(file, params.Position), nil
+}
+
+// SelectionRange resolves each requested position into the chain of ranges
+// a client can climb outward through .Parent: token -> declaration head
+// line -> enclosing brace block -> whole document. Like FoldingRanges it is
+// purely lexical -- no resolved schema is needed, so selection keeps
+// working mid-edit. An unknown document yields an empty result per
+// position: the spec-honest degenerate range each result must fall back to
+// is anchored at the requested position itself, which selectionRangeAt
+// builds.
+func (s *Server) SelectionRange(ctx context.Context, params *protocol.SelectionRangeParams) ([]protocol.SelectionRange, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return []protocol.SelectionRange{}, nil
+	}
+
+	path, _ := uriToPath(uriStr)
+
+	tokens, _ := lexAll(path, []byte(content))
+
+	result := make([]protocol.SelectionRange, 0, len(params.Positions))
+
+	for _, pos := range params.Positions {
+		result = append(result, selectionRangeAt(tokens, content, pos))
+	}
+
+	return result, nil
+}
+
+// DocumentLink turns every URL written in a `//` comment of the document
+// into a clickable link. Like FoldingRanges it needs no resolved schema:
+// comments exist only in the source, not in any token stream the parser
+// records. An unknown document yields an empty list, not an error, per the
+// "no links for this document" reading DocumentSymbol and InlayHint share.
+func (s *Server) DocumentLink(ctx context.Context, params *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return []protocol.DocumentLink{}, nil
+	}
+
+	return documentLinksFor(content), nil
+}
+
+// DocumentLinkResolve fills a link's Tooltip with its target URL, when the
+// client negotiated tooltipSupport at Initialize. The scan itself leaves
+// Tooltip empty (the resolve round-trip is exactly what the protocol docs
+// use it for), so a client that never asked never sees one. A link that
+// already carries a Tooltip, or points nowhere, round-trips unchanged.
+func (s *Server) DocumentLinkResolve(ctx context.Context, params *protocol.DocumentLink) (*protocol.DocumentLink, error) {
+	s.captureClient(ctx)
+
+	s.mu.Lock()
+	tooltipWanted := s.docLinkTooltip
+	s.mu.Unlock()
+
+	if !tooltipWanted || params == nil || params.Target == nil {
+		return params, nil
+	}
+
+	tooltip := string(*params.Target)
+	params.Tooltip = &tooltip
+
+	return params, nil
 }
 
 // SemanticTokensFull classifies a whole document into delta-encoded
@@ -623,13 +809,14 @@ func (s *Server) SemanticTokensFullDelta(ctx context.Context, params *protocol.S
 }
 
 // InlayHint returns every inlay hint for one document, computed natively via
-// inlayHintsAt. A nil slice encodes LSP null for unknown documents.
+// inlayHintsFor under the server's current settings. A nil slice encodes LSP
+// null for unknown documents.
 func (s *Server) InlayHint(ctx context.Context, params *protocol.InlayHintParams) ([]protocol.InlayHint, error) {
 	s.captureClient(ctx)
 
 	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
 
-	return inlayHintsAt(schema, file), nil
+	return inlayHintsFor(schema, file, s.currentSettings()), nil
 }
 
 // InlayHintResolve is best-effort by design: hints already carry their full

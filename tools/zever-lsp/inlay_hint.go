@@ -42,17 +42,28 @@ import (
 // every single declaration, which is noise rather than information. So it
 // is suppressed entirely unless the compiled schema has at least one named
 // (non-public) module -- see schemaHasNamedModule. This gate applies to the
-// module-hint pass only; errorCaseHints below is unconditional -- it is not
-// module-structure noise, it applies regardless of how many modules a
-// schema has.
+// module-hint pass only; errorCaseHints below is not module-structure
+// noise, it applies regardless of how many modules a schema has. Each
+// family can still be switched off via Settings -- see inlayHintsFor.
+// inlayHintsAt returns every inlay hint for one file under the default
+// settings -- the settings-free entry point the tests (and any caller that
+// knows no configuration) use. The settings-aware computation lives in
+// inlayHintsFor.
 func inlayHintsAt(schema *ir.Schema, file *ast.File) []protocol.InlayHint {
+	return inlayHintsFor(schema, file, defaultSettings())
+}
+
+// inlayHintsFor is inlayHintsAt with the settings applied: each hint family
+// can be switched off individually, with Settings.ImplicitModuleHints
+// removing the module pass and Settings.ErrorCaseHints the error-case pass.
+func inlayHintsFor(schema *ir.Schema, file *ast.File, settings Settings) []protocol.InlayHint {
 	if file == nil {
 		return nil
 	}
 
 	var hints []protocol.InlayHint
 
-	if schemaHasNamedModule(schema) {
+	if settings.ImplicitModuleHints && schemaHasNamedModule(schema) {
 		for _, decl := range flattenDecls(file) {
 			switch d := decl.(type) {
 			case *ast.EntityDecl:
@@ -72,15 +83,18 @@ func inlayHintsAt(schema *ir.Schema, file *ast.File) []protocol.InlayHint {
 		}
 	}
 
-	hints = append(hints, errorCaseHints(file)...)
+	if settings.ErrorCaseHints {
+		hints = append(hints, errorCaseHints(file)...)
+	}
 
 	return hints
 }
 
 // errorCaseHints annotates every declared errors: {...} case name with its
 // resolved HTTP status and gRPC name (resolver.ValidErrorCodes, the same
-// fixed vocabulary the resolver validates against) -- unconditional, unlike
-// the module hint above, since it is useful regardless of module structure.
+// fixed vocabulary the resolver validates against) -- unlike the module hint
+// above, useful regardless of module structure; Settings.ErrorCaseHints can
+// switch the whole family off.
 // A name the resolver would reject as unrecognized is silently skipped: the
 // resolver's own diagnostic already covers that, and there is no resolved
 // code to annotate it with.

@@ -1092,3 +1092,325 @@ func TestSortTextEdits_ordersByLineThenCharacter(t *testing.T) {
 		t.Errorf("edits[2] = %+v, want line 3", edits[2].Range.Start)
 	}
 }
+
+const (
+	renameVisionEnumOnlySrc = "enum Status { active, dormant }\n"
+
+	renameVisionEnumFileSrc = "enum Status { active, dormant }\n\n" +
+		"message Draft {\n" +
+		"\tstate: Status\n" +
+		"}\n"
+
+	renameVisionMixedSrc = "enum Status { active, dormant }\n" +
+		"message Inner {\n" +
+		"\tvalue: string\n" +
+		"}\n" +
+		"message Outer {\n" +
+		"\tinner: Inner\n" +
+		"}\n" +
+		"message Draft {\n" +
+		"\tstate: Status\n" +
+		"}\n" +
+		"service FilterService {\n" +
+		"\trpc List(state: Status) -> Draft {\n" +
+		"\t\tauth: none\n" +
+		"\t}\n" +
+		"}\n"
+
+	renameVisionEntityParamSrc = "entity User {\n" +
+		"\tid: uuid @primary\n" +
+		"}\n" +
+		"service Svc {\n" +
+		"\trpc Get(req: User) -> User {\n" +
+		"\t\tauth: none\n" +
+		"\t}\n" +
+		"}\n"
+
+	renameVisionSagaSrc = "saga Checkout {\n" +
+		"\tstep reserve {\n" +
+		"\t\texecute: InventoryService.Reserve\n" +
+		"\t\tcompensate: InventoryService.Release\n" +
+		"\t}\n" +
+		"\tstep charge {\n" +
+		"\t\texecute: PaymentService.Charge\n" +
+		"\t\tpivot: true\n" +
+		"\t}\n" +
+		"}\n"
+)
+
+// TestRenameTargetAt_declNames_resolveNewKinds pins the three new
+// prepareRename candidates: a message, a named enum, and a saga, each on
+// its own declaration.
+func TestRenameTargetAt_declNames_resolveNewKinds(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{
+		"e.zen": renameVisionEnumOnlySrc,
+		"s.zen": renameVisionSagaSrc,
+	})
+
+	renameTargetMustResolve(t, parsed["e.zen"], cursorOn(t, renameVisionEnumOnlySrc, 0, "Status"), enumKind, "Status", "")
+
+	if _, ok := renameTargetAt(parsed["s.zen"], cursorOn(t, renameVisionSagaSrc, 0, "Checkout")); !ok {
+		t.Fatalf("renameTargetAt() = not found, want saga Checkout")
+	}
+
+	target, _ := renameTargetAt(parsed["s.zen"], cursorOn(t, renameVisionSagaSrc, 0, "Checkout"))
+	if target.Kind != sagaKind || target.Name != "Checkout" {
+		t.Fatalf("renameTargetAt() = %+v, want saga Checkout", target)
+	}
+}
+
+// TestRenameTargetAt_messageDeclAndTypePositions pins the message kind on
+// both its declaration and the bare type-name positions a message may be
+// referenced from, and the enum kind on the same positions when a named
+// enum claims the identifier.
+func TestRenameTargetAt_typePositions(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{
+		"m.zen": renameVisionMixedSrc,
+		"d.zen": renameVisionEnumFileSrc,
+	})
+
+	// Inner's declaration: messageKind on the decl name.
+	renameTargetMustResolve(t, parsed["m.zen"], cursorOn(t, renameVisionMixedSrc, 1, "Inner"), messageKind, "Inner", "")
+
+	// Outer's field typed by Inner (line 5): messageKind on the type span.
+	renameTargetMustResolve(t, parsed["m.zen"], cursorOn(t, renameVisionMixedSrc, 5, "Inner"), messageKind, "Inner", "")
+
+	// Draft's field typed by Status (line 8): enumKind on the type span.
+	renameTargetMustResolve(t, parsed["m.zen"], cursorOn(t, renameVisionMixedSrc, 8, "Status"), enumKind, "Status", "")
+
+	// The rpc param typed by Status: enumKind again, in-file.
+	renameTargetMustResolve(t, parsed["m.zen"], cursorOn(t, renameVisionMixedSrc, 11, "Status"), enumKind, "Status", "")
+
+	// Across files with only the enum present: the enum declaration lives in
+	// this file too, so the type position resolves as an enum.
+	renameTargetMustResolve(t, parsed["d.zen"], cursorOn(t, renameVisionEnumFileSrc, 3, "Status"), enumKind, "Status", "")
+}
+
+// TestRenameTargetAt_scalarAndEntityTypedPositions_notNewlyRenameable pins
+// the guards: a scalar type name and a name an entity claims (an
+// entity-typed rpc param) stay not-found, exactly as before this change.
+func TestRenameTargetAt_scalarAndEntityTypedPositions_notNewlyRenameable(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"u.zen": renameVisionEntityParamSrc})
+
+	// `req: User` where User is an entity: entity first, so no message kind
+	// is offered on that type position.
+	if _, ok := renameTargetAt(parsed["u.zen"], cursorOn(t, renameVisionEntityParamSrc, 4, "User")); ok {
+		t.Fatalf("renameTargetAt on an entity-typed param = found, want not found")
+	}
+}
+
+func TestRenameTargetAt_scalarTypeName_notRenameable(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"c.zen": renameServiceSrc})
+
+	// `rpc GetUser(id: uuid)`: a scalar param type has no declaration to
+	// rename, so the position is refused entirely.
+	if _, ok := renameTargetAt(parsed["c.zen"], cursorOn(t, renameServiceSrc, 1, "uuid")); ok {
+		t.Fatalf("renameTargetAt on a scalar param type = found, want not found")
+	}
+}
+
+// TestRenameTargetAt_sagaStepRefs pins the per-identifier resolution inside
+// a step's execute/compensate options: the service identifier to a service
+// target, the rpc identifier to an rpc target owned by that service.
+func TestRenameTargetAt_sagaStepRefs(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"s.zen": renameVisionSagaSrc})
+
+	// Execute option line 2: `\t\texecute: InventoryService.Reserve`.
+	cursor := cursorOn(t, renameVisionSagaSrc, 2, "InventoryService.Reserve")
+	renameTargetMustResolve(t, parsed["s.zen"], cursor, serviceKind, "InventoryService", "")
+
+	cursor = cursorOn(t, renameVisionSagaSrc, 2, "InventoryService.Reserve")
+	cursor.Character += uint32(len("InventoryService."))
+	renameTargetMustResolve(t, parsed["s.zen"], cursor, rpcKind, "Reserve", "InventoryService")
+
+	// The compensation line's rpc identifier.
+	cursor = cursorOn(t, renameVisionSagaSrc, 3, "Release")
+	renameTargetMustResolve(t, parsed["s.zen"], cursor, rpcKind, "Release", "InventoryService")
+}
+
+// TestRenameTargetAt_sagaStepNameAndLabels_notFound pins that a step's own
+// name and its option labels stay unclaimed (no recorded position, and
+// renaming them has no resolver meaning).
+func TestRenameTargetAt_sagaStepNameAndLabels_notFound(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"s.zen": renameVisionSagaSrc})
+
+	for _, tc := range []struct {
+		name   string
+		line   int
+		needle string
+	}{
+		{"step keyword", 1, "step"},
+		{"step name", 1, "reserve"},
+		{"option label", 2, "execute"},
+	} {
+		if _, ok := renameTargetAt(parsed["s.zen"], cursorOn(t, renameVisionSagaSrc, tc.line, tc.needle)); ok {
+			t.Errorf("%s: renameTargetAt() = found, want not found", tc.name)
+		}
+	}
+}
+
+// TestRenameEnumEdits_rewritesDeclarationAndTypeSpans proves an enum rename
+// touches its declaration plus every field/param type spelling it across
+// three files.
+func TestRenameEnumEdits_rewritesDeclarationAndTypeSpans(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{
+		"enum.zen":  renameVisionEnumOnlySrc,
+		"mixed.zen": renameVisionMixedSrc,
+		"other.zen": renameVisionEnumFileSrc,
+	})
+
+	edit, err := renameEnumEdits(parsed, "Status", "State")
+	if err != nil {
+		t.Fatalf("renameEnumEdits() error = %v, want nil", err)
+	}
+
+	// enum.zen: the declaration edit at `enum Status` col 5.
+	declEdits := renameEditsFor(t, edit, pathToURI("enum.zen"))
+	if len(declEdits) != 1 {
+		t.Fatalf("enum.zen edit count = %d, want 1", len(declEdits))
+	}
+
+	if declEdits[0].Range.Start.Character != 5 || declEdits[0].NewText != "State" {
+		t.Errorf("decl edit = %+v, want col 5 -> State", declEdits[0])
+	}
+
+	// mixed.zen contains the declaration plus both reference kinds: three
+	// edits (enum decl on line 0, Draft's field type on line 8, the rpc
+	// param type on line 11).
+	mixedEdits := renameEditsFor(t, edit, pathToURI("mixed.zen"))
+	if len(mixedEdits) != 3 {
+		t.Fatalf("mixed.zen edit count = %d, want 3: %+v", len(mixedEdits), mixedEdits)
+	}
+
+	if mixedEdits[0].Range.Start.Line != 0 || mixedEdits[1].Range.Start.Line != 8 ||
+		mixedEdits[2].Range.Start.Line != 11 {
+		t.Errorf("mixed.zen edits = %v, want lines 0/8/11", mixedEdits)
+	}
+
+	// other.zen holds its own enum declaration plus Draft's field type
+	// spelling: two edits there too.
+	otherEdits := renameEditsFor(t, edit, pathToURI("other.zen"))
+	if len(otherEdits) != 2 {
+		t.Fatalf("other.zen edit count = %d, want 2 (decl + field type)", len(otherEdits))
+	}
+
+	if otherEdits[0].Range.Start.Line != 0 || otherEdits[1].Range.Start.Line != 3 {
+		t.Errorf("other.zen edits = %v, want lines 0/3", otherEdits)
+	}
+}
+
+// TestRenameMessageEdits_rewritesDeclarationAndParamType proves a message
+// rename covers its declaration and every rpc param type reference, across
+// files (refs* fixtures are shared with the references tests).
+func TestRenameMessageEdits_rewritesDeclarationAndParamType(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{
+		"msg.zen": refsMsgSrc,
+		"use.zen": refsMsgUseSrc,
+	})
+
+	edit, err := renameMessageEdits(parsed, "Greeting", "Salute")
+	if err != nil {
+		t.Fatalf("renameMessageEdits() error = %v, want nil", err)
+	}
+
+	declEdits := renameEditsFor(t, edit, pathToURI("msg.zen"))
+	if len(declEdits) != 1 || declEdits[0].Range.Start.Character != 8 || declEdits[0].NewText != "Salute" {
+		t.Errorf("msg.zen edits = %+v, want one decl edit at col 8 -> Salute", declEdits)
+	}
+
+	useEdits := renameEditsFor(t, edit, pathToURI("use.zen"))
+	if len(useEdits) != 1 || useEdits[0].Range.Start.Line != 1 {
+		t.Errorf("use.zen edits = %+v, want one param type edit on line 1", useEdits)
+	}
+}
+
+// TestRenameMessageEdits_includesParamTypeAcrossFilesForDeclRename proves
+// the rpc param reference is picked up by the message rename itself: the
+// Inner rename covers Inner's declaration and Outer's message-field type
+// reference; the param type on line 11 belongs to the Status enum instead.
+func TestRenameMessageEdits_includesParamTypeAcrossFilesForDeclRename(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"m.zen": renameVisionMixedSrc})
+
+	edit, err := renameMessageEdits(parsed, "Inner", "InnerShape")
+	if err != nil {
+		t.Fatalf("renameMessageEdits() error = %v, want nil", err)
+	}
+
+	edits := renameEditsFor(t, edit, pathToURI("m.zen"))
+	if len(edits) != 2 {
+		t.Fatalf("m.zen edit count = %d, want 2 (decl + Outer's field type): %+v", len(edits), edits)
+	}
+
+	if edits[0].Range.Start.Line != 1 || edits[0].NewText != "InnerShape" {
+		t.Errorf("decl edit = %+v, want line 1 -> InnerShape", edits[0])
+	}
+
+	if edits[1].Range.Start.Line != 5 {
+		t.Errorf("field type edit line = %d, want 5: %+v", edits[1].Range.Start.Line, edits[1])
+	}
+}
+
+// TestRenameSagaEdits_onlyDeclaration pins the saga kind's scope: only the
+// declaration is rewritten; a step's execute/compensate text stays put.
+func TestRenameSagaEdits_onlyDeclaration(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"s.zen": renameVisionSagaSrc})
+
+	edit, err := renameSagaEdits(parsed, "Checkout", "Buyout")
+	if err != nil {
+		t.Fatalf("renameSagaEdits() error = %v, want nil", err)
+	}
+
+	edits := renameEditsFor(t, edit, pathToURI("s.zen"))
+	if len(edits) != 1 {
+		t.Fatalf("s.zen edit count = %d, want 1: %+v", len(edits), edits)
+	}
+
+	if edits[0].Range.Start.Character != 5 || edits[0].NewText != "Buyout" {
+		t.Errorf("decl edit = %+v, want col 5 -> Buyout", edits[0])
+	}
+}
+
+// TestRenameSagaStepRef_isDeclScopedRename proves the refs the step
+// identifiers resolve to are the unchanged declaration-scoped walks.
+func TestRenameSagaStepRef_isDeclScopedRename(t *testing.T) {
+	t.Parallel()
+
+	parsed := parseRenameFiles(t, map[string]string{"s.zen": renameVisionSagaSrc})
+
+	target, ok := renameTargetAt(parsed["s.zen"], cursorOn(t, renameVisionSagaSrc, 6, "PaymentService.Charge"))
+	if !ok || target.Kind != serviceKind || target.Name != "PaymentService" {
+		t.Fatalf("renameTargetAt() = %+v/%v, want serviceKind PaymentService", target, ok)
+	}
+
+	// Missing decl: the service was never declared, so the decl-only walk
+	// produces no edits and the rename is a silent no-op -- the same
+	// behavior a service rename has anywhere else.
+	edit, err := renameServiceEdits(parsed, "PaymentService", "Pay")
+	if err != nil {
+		t.Fatalf("renameServiceEdits() error = %v, want nil", err)
+	}
+
+	if got := len(edit.Changes); got != 0 {
+		t.Errorf("changes = %d files, want 0", got)
+	}
+}
