@@ -6,6 +6,8 @@ import (
 
 	"go.lsp.dev/protocol"
 
+	"github.com/zenta-dev/zever/dsl/ast"
+	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/dsl/token"
 )
 
@@ -79,9 +81,17 @@ func (s *Server) signatureHelp(
 ) (*protocol.SignatureHelp, error) {
 	s.captureClient(ctx)
 
-	content, ok := s.ws.DocContent(string(params.TextDocument.URI))
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
 	if !ok {
 		return nil, nil //nolint:nilnil // LSP encodes "no signature help" as a null result
+	}
+
+	schema, _ := s.schemaAndFile(uriStr)
+
+	if help := dispatchSignatureHelp(schema, content, params.Position); help != nil {
+		return help, nil
 	}
 
 	return signatureHelpAt(content, params.Position), nil
@@ -143,6 +153,161 @@ func signatureHelpAt(src string, cursor protocol.Position) *protocol.SignatureHe
 		ActiveSignature: &activeSig,
 		ActiveParameter: active,
 	}
+}
+
+// dispatchSignatureHelp answers signature help for a cursor inside a
+// schedule's `dispatch: JobName(` unclosed call, with the signature drawn
+// from the resolved job's parameters: the label spells out every parameter
+// with its type (`Job(p1: T1, p2: T2)`), and each parameter's documentation
+// carries its type plus its @validate rules. Active-parameter tracking
+// reuses activeArgument's nesting-aware comma counter with the same
+// named-argument remap the attribute-call path uses.
+//
+// A nil schema or an unknown job name yields nil rather than a guess: the
+// static-attribute path cannot match a job name either, so the request
+// stays an honest null either way.
+//
+// There is deliberately no `execute:` arm: a saga step's execute/compensate
+// options are bare `Service.RPC` references (parseRPCRef parses `ident "."
+// ident` only, and a `(` there is a parse error), so the grammar has no
+// call site there to complete -- the same deliberate absence paramNameHints
+// documents in inlay_hint.go.
+func dispatchSignatureHelp(schema *ir.Schema, src string, cursor protocol.Position) *protocol.SignatureHelp {
+	toks := lexPrefix(sourceBefore(src, cursor))
+
+	open := openParenIndex(toks)
+	if open < 3 {
+		return nil
+	}
+
+	if toks[open-1].Kind != token.IDENT ||
+		toks[open-2].Kind != token.COLON ||
+		toks[open-3].Kind != token.IDENT || toks[open-3].Lit != "dispatch" ||
+		enclosingBlockKind(toks) != token.SCHEDULE {
+		return nil
+	}
+
+	job := findJob(schema, toks[open-1].Lit)
+	if job == nil {
+		return nil
+	}
+
+	spec, displays := dispatchSigSpec(job)
+
+	sig := protocol.SignatureInformation{
+		Label:      job.Name + "(" + strings.Join(displays, ", ") + ")",
+		Parameters: dispatchParameters(spec),
+	}
+
+	if len(spec.params) == 0 {
+		activeSig := uint32(0)
+
+		return &protocol.SignatureHelp{
+			Signatures:      []protocol.SignatureInformation{sig},
+			ActiveSignature: &activeSig,
+		}
+	}
+
+	index, name := activeArgument(toks[open+1:])
+
+	if name != "" {
+		if i := paramIndexByName(spec.params, name); i >= 0 {
+			index = i
+		}
+	}
+
+	if index >= len(spec.params) {
+		index = len(spec.params) - 1
+	}
+
+	// Proof: index comes from activeArgument (starts at 0, only incremented)
+	// and is only reassigned from paramIndexByName when the result is >= 0,
+	// so index < 0 is impossible and no clamp is needed beyond the
+	// past-the-end case above.
+	active := protocol.NewNullable(uint32(index)) //nolint:gosec // proven non-negative above
+
+	sig.ActiveParameter = active
+
+	activeSig := uint32(0)
+
+	return &protocol.SignatureHelp{
+		Signatures:      []protocol.SignatureInformation{sig},
+		ActiveSignature: &activeSig,
+		ActiveParameter: active,
+	}
+}
+
+// dispatchSigSpec renders one job's resolved parameters as a signature
+// spec, plus the `name: type` display fragment per parameter the signature
+// label joins. Both slices are built in one loop so they stay aligned.
+// Each parameter's doc is its type plus its @validate rules, re-rendered
+// through renderArgs the way hover renders attribute arguments.
+func dispatchSigSpec(job *ir.Job) (sigSpec, []string) {
+	spec := sigSpec{params: make([]sigParam, 0, len(job.Params))}
+	displays := make([]string, 0, len(job.Params))
+
+	for _, param := range job.Params {
+		if param == nil {
+			continue
+		}
+
+		typeName := paramTypeName(param)
+
+		doc := typeName
+		if args := validationArgs(param.Validate); len(args) > 0 {
+			doc += " @validate" + renderArgs(args)
+		}
+
+		spec.params = append(spec.params, sigParam{name: param.Name, doc: doc})
+		displays = append(displays, param.Name+": "+typeName)
+	}
+
+	return spec, displays
+}
+
+// dispatchParameters renders one protocol parameter per spec entry, using
+// the native union arms the static-attribute path uses.
+func dispatchParameters(spec sigSpec) []protocol.ParameterInformation {
+	params := make([]protocol.ParameterInformation, len(spec.params))
+
+	for i, p := range spec.params {
+		params[i] = protocol.ParameterInformation{Label: protocol.String(p.name), Documentation: protocol.String(p.doc)}
+	}
+
+	return params
+}
+
+// validationArgs converts resolved @validate rules back into AST args so a
+// signature detail re-renders through the same renderArgs path hover uses.
+// Every ir.Validation carries its decoded value under the "value" key (see
+// resolveValidateRules): a string decodes a format name, an int64 or
+// float64 a numeric bound. Anything else is skipped rather than guessed at.
+func validationArgs(vals []ir.Validation) []*ast.Arg {
+	args := make([]*ast.Arg, 0, len(vals))
+
+	for _, val := range vals {
+		raw, ok := val.Args["value"]
+		if !ok {
+			continue
+		}
+
+		var value ast.Value
+
+		switch v := raw.(type) {
+		case string:
+			value = &ast.StringLit{Value: v}
+		case int64:
+			value = &ast.IntLit{Value: v}
+		case float64:
+			value = &ast.FloatLit{Value: v}
+		default:
+			continue
+		}
+
+		args = append(args, &ast.Arg{Name: string(val.Kind), Value: value})
+	}
+
+	return args
 }
 
 // activeArgument scans the tokens already typed inside a call's parens (up

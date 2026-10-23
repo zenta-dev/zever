@@ -39,11 +39,11 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Sync | `textDocument/didOpen`, `textDocument/didChange` (full), `textDocument/didSave`, `textDocument/didClose`, `workspace/didChangeWatchedFiles` |
 | File operations | `workspace/didCreateFiles`, `workspace/didDeleteFiles` (surgical `diskCache` updates with no full rescan; `didChangeWatchedFiles` stays the coarse fallback) |
 | Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array; each diagnostic carries a stable `zen-###` code — see [Diagnostic codes](#diagnostic-codes) below) |
-| Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback) |
+| Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback; rpc/job parameters surface as parameter children) |
 | Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/typeDefinition` (the named type under the cursor: a scalar or unknown type is honestly null), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
 | Hover | `textDocument/hover` |
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
-| Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |
+| Signature help | `textDocument/signatureHelp` (triggers `(`, `,`; attribute calls plus `dispatch: Job(...)` job-parameter signatures) |
 | Formatting | `textDocument/formatting`, `textDocument/rangeFormatting`, `textDocument/onTypeFormatting` |
 | Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets), `codeAction/resolve`, `workspace/executeCommand` (`zever.validate` forces a recompile for one document; `zever.fixAll` collects its quickfixes into one edit) |
 | Rename | `textDocument/prepareRename` (answers a placeholder with the identifier text), `textDocument/rename` (entities, fields, jobs, services, RPCs) |

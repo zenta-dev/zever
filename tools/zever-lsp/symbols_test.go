@@ -137,6 +137,22 @@ func TestSymbolsFromSchema(t *testing.T) {
 	if svc.Children[0].Kind != protocol.SymbolKindMethod {
 		t.Errorf("ListTasks kind = %d, want %d", svc.Children[0].Kind, protocol.SymbolKindMethod)
 	}
+
+	rpc := svc.Children[0]
+	if got := childNames(&rpc); len(got) != 1 || got[0] != "user_id" {
+		t.Errorf("ListTasks children = %v, want [user_id]", got)
+	}
+
+	if len(rpc.Children) == 1 {
+		param := rpc.Children[0]
+		if param.Kind != symbolKindParameter {
+			t.Errorf("user_id kind = %d, want parameter kind %d", param.Kind, symbolKindParameter)
+		}
+
+		if param.Detail == nil || *param.Detail != "uuid" {
+			t.Errorf("user_id detail = %v, want \"uuid\"", param.Detail)
+		}
+	}
 }
 
 // TestSymbolsFromSchemaFiltersByFile checks that only symbols declared in the
@@ -522,6 +538,22 @@ func TestSymbolsFromASTFallbackAllDeclKinds(t *testing.T) {
 		t.Errorf("ListTasks detail = %v, want \"-> Task\"", svc.Children[0].Detail)
 	}
 
+	rpc := svc.Children[0]
+	if got := childNames(&rpc); len(got) != 1 || got[0] != "user_id" {
+		t.Errorf("ListTasks children = %v, want [user_id]", got)
+	}
+
+	if len(rpc.Children) == 1 {
+		param := rpc.Children[0]
+		if param.Kind != symbolKindParameter {
+			t.Errorf("user_id kind = %d, want parameter kind %d", param.Kind, symbolKindParameter)
+		}
+
+		if param.Detail == nil || *param.Detail != "uuid" {
+			t.Errorf("user_id detail = %v, want \"uuid\"", param.Detail)
+		}
+	}
+
 	if job := findSymbol(symbols, "SendDigest"); job == nil || job.Kind != protocol.SymbolKindFunction {
 		t.Errorf("SendDigest job symbol missing or wrong kind: %v", job)
 	}
@@ -835,5 +867,226 @@ func TestFlatSymbolsFromASTIncludesMessageEnumSagaDecl(t *testing.T) {
 
 	if step := findWorkspaceSymbol(symbols, "charge"); step == nil || step.Kind != protocol.SymbolKindFunction {
 		t.Errorf("saga step symbol missing or wrong kind: %v", workspaceSymbolNames(symbols))
+	}
+}
+
+// paramsSymbolsSrc exercises parameter children on both carriers: rpcs with
+// a message-ref param, a scalar param and a validated param, plus a job
+// with params and a parameterless job that must stay a leaf.
+const paramsSymbolsSrc = `entity User {
+	id: uuid @primary
+}
+
+message CreateUserInput {
+	email: string @validate(format: "email")
+}
+
+service UserService {
+	rpc CreateUser(input: CreateUserInput) -> User {
+		http: POST "/users"
+		auth: required
+	}
+
+	rpc Rename(id: uuid, name: string @validate(min_len: 1)) -> User {
+		http: POST "/users/{id}/rename"
+		auth: required
+	}
+}
+
+job SendDigest(target: string, batch: int64) {
+	queue: low
+}
+
+job Flush() {
+	queue: low
+}
+`
+
+// compileParamsSymbolsFixture compiles paramsSymbolsSrc and returns its
+// document symbols, failing the test on diagnostics.
+func compileParamsSymbolsFixture(t *testing.T) protocol.DocumentSymbolSlice {
+	t.Helper()
+
+	result, diags := compile.Compile(map[string]string{"main.zen": paramsSymbolsSrc})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	return symbolsFromSchema(result.Schema, "main.zen")
+}
+
+// checkParamChild asserts one parameter child by name, kind and detail.
+func checkParamChild(t *testing.T, parent *protocol.DocumentSymbol, name, detail string) {
+	t.Helper()
+
+	var found *protocol.DocumentSymbol
+
+	for i := range parent.Children {
+		if parent.Children[i].Name == name {
+			found = &parent.Children[i]
+
+			break
+		}
+	}
+
+	if found == nil {
+		t.Fatalf("%s children = %v, want a %q parameter", parent.Name, childNames(parent), name)
+	}
+
+	if found.Kind != symbolKindParameter {
+		t.Errorf("%s.%s kind = %d, want parameter kind %d", parent.Name, name, found.Kind, symbolKindParameter)
+	}
+
+	if found.Detail == nil || *found.Detail != detail {
+		t.Errorf("%s.%s detail = %v, want %q", parent.Name, name, found.Detail, detail)
+	}
+}
+
+// TestSymbolsFromSchemaIncludesParamChildren proves resolved rpc and job
+// symbols carry their parameters as children, with the referenced type name
+// for a message-ref param (the `u: User` shape) and the scalar spelling
+// otherwise.
+func TestSymbolsFromSchemaIncludesParamChildren(t *testing.T) {
+	symbols := compileParamsSymbolsFixture(t)
+
+	svc := findSymbol(symbols, "UserService")
+	if svc == nil {
+		t.Fatal("UserService symbol missing")
+	}
+
+	create := findSymbol(svc.Children, "CreateUser")
+	if create == nil {
+		t.Fatal("CreateUser symbol missing")
+	}
+
+	checkParamChild(t, create, "input", "CreateUserInput")
+
+	rename := findSymbol(svc.Children, "Rename")
+	if rename == nil {
+		t.Fatal("Rename symbol missing")
+	}
+
+	if got := childNames(rename); len(got) != 2 || got[0] != "id" || got[1] != "name" {
+		t.Errorf("Rename children = %v, want [id name]", got)
+	}
+
+	checkParamChild(t, rename, "id", "uuid")
+	checkParamChild(t, rename, "name", "string")
+
+	job := findSymbol(symbols, "SendDigest")
+	if job == nil {
+		t.Fatal("SendDigest symbol missing")
+	}
+
+	if got := childNames(job); len(got) != 2 || got[0] != "target" || got[1] != "batch" {
+		t.Errorf("SendDigest children = %v, want [target batch]", got)
+	}
+
+	checkParamChild(t, job, "target", "string")
+	checkParamChild(t, job, "batch", "int64")
+
+	// A parameterless job stays a leaf, the same shape it had before
+	// parameters surfaced.
+	flush := findSymbol(symbols, "Flush")
+	if flush == nil {
+		t.Fatal("Flush symbol missing")
+	}
+
+	if len(flush.Children) != 0 {
+		t.Errorf("Flush children = %v, want none", childNames(flush))
+	}
+}
+
+// TestSymbolsFromASTIncludesParamChildren proves the mid-edit fallback
+// recovers the same parameter children from the parser alone.
+func TestSymbolsFromASTIncludesParamChildren(t *testing.T) {
+	file, _ := parser.New("main.zen", []byte(paramsSymbolsSrc)).ParseFile()
+	if file == nil {
+		t.Fatal("failed to parse fixture")
+	}
+
+	symbols := symbolsFromAST(file)
+
+	svc := findSymbol(symbols, "UserService")
+	if svc == nil {
+		t.Fatal("UserService symbol missing")
+	}
+
+	create := findSymbol(svc.Children, "CreateUser")
+	if create == nil {
+		t.Fatal("CreateUser symbol missing")
+	}
+
+	checkParamChild(t, create, "input", "CreateUserInput")
+
+	job := findSymbol(symbols, "SendDigest")
+	if job == nil {
+		t.Fatal("SendDigest symbol missing")
+	}
+
+	if got := childNames(job); len(got) != 2 || got[0] != "target" || got[1] != "batch" {
+		t.Errorf("SendDigest children = %v, want [target batch]", got)
+	}
+
+	flush := findSymbol(symbols, "Flush")
+	if flush == nil {
+		t.Fatal("Flush symbol missing")
+	}
+
+	if len(flush.Children) != 0 {
+		t.Errorf("Flush children = %v, want none", childNames(flush))
+	}
+}
+
+// TestSymbolKindParameterIsVariable pins the LSP mapping compromise: the
+// protocol defines no Parameter kind, so parameter children surface as
+// Variable, the kind for a named value binding.
+func TestSymbolKindParameterIsVariable(t *testing.T) {
+	if symbolKindParameter != protocol.SymbolKindVariable {
+		t.Errorf("symbolKindParameter = %d, want Variable %d", symbolKindParameter, protocol.SymbolKindVariable)
+	}
+}
+
+func TestParamTypeName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   *ir.Param
+		want string
+	}{
+		{"nil", nil, ""},
+		{"scalar", &ir.Param{Name: "id", Type: ir.FieldType{Scalar: ir.TUUID}}, "uuid"},
+		{
+			"ref",
+			&ir.Param{Name: "u", Ref: &ir.TypeRef{Entity: &ir.Entity{Name: "User"}}},
+			"User",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := paramTypeName(tc.in); got != tc.want {
+				t.Errorf("paramTypeName() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAstParamTypeName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   *ast.ParamDecl
+		want string
+	}{
+		{"nil", nil, ""},
+		{"nil type", &ast.ParamDecl{Name: "id"}, ""},
+		{"named", &ast.ParamDecl{Name: "u", Type: &ast.TypeExpr{Name: "User"}}, "User"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := astParamTypeName(tc.in); got != tc.want {
+				t.Errorf("astParamTypeName() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
