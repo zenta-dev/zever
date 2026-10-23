@@ -2,7 +2,7 @@ package stripe
 
 import (
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +16,7 @@ import (
 	"github.com/stripe/stripe-go/v82/webhook"
 
 	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // fakeStripe is scriptable state for the fake Stripe v1 API.
@@ -122,7 +123,7 @@ func newFake(t *testing.T, f *fakeStripe) *httptest.Server {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 
-	raw, _ := json.Marshal(v)
+	raw, _ := codec.Marshal(v)
 	_, _ = w.Write(raw)
 }
 
@@ -170,7 +171,7 @@ func sign(payload []byte, secret string) string {
 
 // eventPayload builds a Stripe event envelope with the SDK API version.
 func eventPayload(typ string, obj any) []byte {
-	raw, _ := json.Marshal(obj)
+	raw, _ := codec.Marshal(obj)
 
 	env := map[string]any{
 		"id":          "evt_test_1",
@@ -178,11 +179,11 @@ func eventPayload(typ string, obj any) []byte {
 		"api_version": stripe.APIVersion,
 		"type":        typ,
 		"data": map[string]any{
-			"object": json.RawMessage(raw),
+			"object": jsontext.Value(raw),
 		},
 	}
 
-	out, _ := json.Marshal(env)
+	out, _ := codec.Marshal(env)
 
 	return out
 }

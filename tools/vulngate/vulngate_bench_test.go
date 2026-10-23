@@ -1,13 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // BenchmarkParseFindings measures the govulncheck JSON stream parsing.
@@ -30,17 +33,17 @@ func BenchmarkParseFindings(b *testing.B) {
 // parseFindingsFromString is a copy for benchmarking.
 func parseFindingsFromString(s string) ([]finding, error) {
 	var findings []finding
-	dec := json.NewDecoder(strings.NewReader(s))
+	dec := jsontext.NewDecoder(strings.NewReader(s))
 	for {
-		var raw json.RawMessage
-		if err := dec.Decode(&raw); err != nil {
-			if err == io.EOF {
+		var raw jsontext.Value
+		if err := codec.UnmarshalDecode(dec, &raw); err != nil {
+			if errors.Is(err, io.EOF) {
 				return findings, nil
 			}
 			return nil, fmt.Errorf("vulngate: decode govulncheck output: %w", err)
 		}
 		var msg findingMsg
-		if err := json.Unmarshal(raw, &msg); err != nil {
+		if err := codec.Unmarshal(raw, &msg); err != nil {
 			return nil, fmt.Errorf("vulngate: decode govulncheck output: %w", err)
 		}
 		if msg.Finding.OSV == "" {
@@ -170,7 +173,7 @@ func BenchmarkJSONUnmarshal(b *testing.B) {
 
 	for b.Loop() {
 		var msg findingMsg
-		_ = json.Unmarshal([]byte(msgs[i%len(msgs)]), &msg)
+		_ = codec.Unmarshal([]byte(msgs[i%len(msgs)]), &msg)
 		i++
 	}
 }

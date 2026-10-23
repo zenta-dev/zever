@@ -2,7 +2,6 @@ package slog
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	stdslog "log/slog"
 
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var (
@@ -126,8 +126,8 @@ func TestEvent_enabled_emitsJSON(t *testing.T) {
 		Msg("hello")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["msg"] != "hello" {
@@ -152,8 +152,8 @@ func TestEvent_nilErrors_skipped(t *testing.T) {
 	l.Info().Err(nil).AnErr("cause", nil).Msg("m")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if _, ok := got["error"]; ok {
@@ -185,8 +185,8 @@ func TestEvent_msgf_formats(t *testing.T) {
 	l.Info().Msgf("hi %s", "there")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["msg"] != "hi there" {
@@ -201,8 +201,8 @@ func TestEvent_send_emptyMessage(t *testing.T) {
 	l.Info().Str("k", "v").Send()
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["msg"] != "" {
@@ -217,8 +217,8 @@ func TestEvent_fatal_rendersErrorPlusFour(t *testing.T) {
 	l.Fatal().Msg("fatal")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["level"] != "ERROR+4" {
@@ -247,8 +247,8 @@ func TestContext_chain_buildsLogger(t *testing.T) {
 	child.Info().Msg("child")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["base"] != "v" {

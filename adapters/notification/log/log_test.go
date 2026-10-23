@@ -3,7 +3,6 @@ package log_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -12,6 +11,7 @@ import (
 
 	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
 	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func validNotification() *notification.Notification {
@@ -106,7 +106,7 @@ func TestNotify_emitsValidJSON(t *testing.T) {
 		Priority  string            `json:"priority"`
 		TTLSecond float64           `json:"ttl_seconds"`
 	}
-	if err := json.Unmarshal([]byte(line), &decoded); err != nil {
+	if err := codec.Unmarshal([]byte(line), &decoded); err != nil {
 		t.Fatalf("output not valid JSON: %v\n%s", err, line)
 	}
 	if decoded.Channel != string(want.Channel) {
@@ -180,7 +180,7 @@ func TestConcurrentSends(t *testing.T) {
 	}
 	for i, line := range lines {
 		var v map[string]any
-		if err := json.Unmarshal([]byte(line), &v); err != nil {
+		if err := codec.Unmarshal([]byte(line), &v); err != nil {
 			t.Fatalf("line %d not valid JSON: %v", i, err)
 		}
 	}

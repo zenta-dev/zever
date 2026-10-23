@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestRunBuildOverlayWiring pins the full non-compiler path: resolve →
@@ -58,7 +59,7 @@ func TestRunBuildOverlayWiring(t *testing.T) {
 						Replace map[string]string `json:"Replace"`
 					}
 
-					if err := json.Unmarshal(raw, &overlay); err != nil {
+					if err := codec.Unmarshal(raw, &overlay); err != nil {
 						t.Error(err)
 					} else {
 						for _, slimPath := range overlay.Replace {
@@ -98,7 +99,7 @@ func TestRunBuildOverlayWiring(t *testing.T) {
 		Replace map[string]string `json:"Replace"`
 	}
 
-	if err := json.Unmarshal(raw, &overlay); err != nil {
+	if err := codec.Unmarshal(raw, &overlay); err != nil {
 		t.Fatalf("overlay JSON invalid: %v\n%s", err, raw)
 	}
 

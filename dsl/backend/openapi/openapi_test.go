@@ -1,7 +1,6 @@
 package openapi
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/dsl/parser"
 	"github.com/zenta-dev/zever/dsl/resolver"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // compileSchema runs a .zen source string through the parser and resolver,
@@ -67,7 +67,7 @@ func decodeDoc(t *testing.T, content []byte) map[string]any {
 	t.Helper()
 
 	var doc map[string]any
-	if err := json.Unmarshal(content, &doc); err != nil {
+	if err := codec.Unmarshal(content, &doc); err != nil {
 		t.Fatalf("unmarshal spec: %v\n%s", err, content)
 	}
 

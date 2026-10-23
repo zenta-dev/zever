@@ -1,11 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"io"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // mustTempFile returns a fresh temp file usable as a run/emit sink.
@@ -72,7 +73,7 @@ func TestEmitNilGroups(t *testing.T) {
 	}
 
 	var got output
-	if err := json.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
+	if err := codec.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
 		t.Fatal(err)
 	}
 	mustEqual(t, "groups", got.Groups, [][]string{})
@@ -93,7 +94,7 @@ func TestFallbackNilModules(t *testing.T) {
 	}
 
 	var got output
-	if err := json.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
+	if err := codec.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
 		t.Fatal(err)
 	}
 	mustEqual(t, "groups", got.Groups, [][]string{{}})

@@ -1,14 +1,21 @@
 package sms_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"errors"
 	"strings"
 	"testing"
 
 	sms "github.com/example/zever-sms"
+
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 )
+
+// errVersionMismatchBuild is the unreachable build-func error for the
+// version-mismatch registration probe: the version check fails before the
+// func runs, so this value only satisfies the (value, error) contract.
+var errVersionMismatchBuild = errors.New("sms: version mismatch probe build")
 
 func TestEndToEnd(t *testing.T) {
 	t.Parallel()
@@ -17,10 +24,10 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	cfg := config.Default()
-	cfg.Plugins = map[string]config.Service[json.RawMessage]{
+	cfg.Plugins = map[string]config.Service[jsontext.Value]{
 		"sms": {
 			Adapter: "stub",
-			Options: json.RawMessage(`{"from":"+15550000"}`),
+			Options: jsontext.Value(`{"from":"+15550000"}`),
 		},
 	}
 	if err := cfg.Validate(); err != nil {
@@ -32,8 +39,8 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if err := svc.Send(t.Context(), "+15550001", "hello from external sms"); err != nil {
-		t.Fatalf("Send: %v", err)
+	if sendErr := svc.Send(t.Context(), "+15550001", "hello from external sms"); sendErr != nil {
+		t.Fatalf("Send: %v", sendErr)
 	}
 
 	senter, ok := svc.(interface{ Sent() []sms.Message })
@@ -65,7 +72,9 @@ func TestVersionMismatch(t *testing.T) {
 	err := container.RegisterPlugin[sms.SMS](
 		"sms-external-version-mismatch",
 		container.PluginAPIVersion+1,
-		func(*config.Config) (sms.SMS, error) { return nil, nil },
+		// The build func never runs (the version check fails first), but it
+		// must still return a sentinel error rather than (nil, nil).
+		func(*config.Config) (sms.SMS, error) { return nil, errVersionMismatchBuild },
 	)
 	if err == nil {
 		t.Fatal("RegisterPlugin bad version: got nil, want error")

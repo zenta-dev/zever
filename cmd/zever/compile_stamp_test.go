@@ -2,9 +2,10 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestSchemaHashDeterministic proves the schema hash is stable for identical
@@ -95,7 +96,7 @@ func TestStampedJSONCarriesProvenance(t *testing.T) {
 	got := stampGeneratedFile("openapi", "openapi.json", raw, hash)
 
 	var doc map[string]any
-	if err := json.Unmarshal(got, &doc); err != nil {
+	if err := codec.Unmarshal(got, &doc); err != nil {
 		t.Fatalf("stamped openapi.json is not valid JSON: %v\n%s", err, got)
 	}
 

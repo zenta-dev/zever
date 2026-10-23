@@ -1,7 +1,6 @@
 package slog
 
 import (
-	"encoding/json"
 	"io"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	stdslog "log/slog"
 
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestEdge_ToSlogLevelAll(t *testing.T) {
@@ -71,8 +71,8 @@ func TestEdge_ContextNilErrorsSkipped(t *testing.T) {
 	l.With().Err(nil).AnErr("cause", nil).Logger().Info().Msg("m")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	for _, key := range []string{"error", "cause"} {
@@ -100,8 +100,8 @@ func TestEdge_SendEmptyMsg(t *testing.T) {
 	l.Info().Str("k", "v").Send()
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["msg"] != "" {

@@ -4,7 +4,6 @@ package remote
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestRenderRoundtripJSON(t *testing.T) {
@@ -31,7 +31,7 @@ func TestRenderRoundtripJSON(t *testing.T) {
 		}
 
 		var req renderRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := codec.UnmarshalRead(r.Body, &req); err != nil {
 			t.Errorf("decode: %v", err)
 		}
 
@@ -40,7 +40,7 @@ func TestRenderRoundtripJSON(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: want})
+		_ = codec.MarshalLine(w, renderResponse{Data: want})
 	}))
 	defer srv.Close()
 
@@ -348,7 +348,7 @@ func TestRenderJSONContentTypeEnvelope(t *testing.T) {
 	for _, ct := range []string{"application/json", "text/json"} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", ct)
-			_ = json.NewEncoder(w).Encode(renderResponse{Data: want})
+			_ = codec.MarshalLine(w, renderResponse{Data: want})
 		}))
 
 		doc, err := New(document.Options{Endpoint: srv.URL, AllowInsecure: true, AllowPrivate: true})
@@ -532,7 +532,7 @@ func TestTrailingSlashEndpoint(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
+		_ = codec.MarshalLine(w, renderResponse{Data: []byte("ok")})
 	}))
 	defer srv.Close()
 
@@ -682,7 +682,7 @@ func TestBearerHeaderAuthed(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
+		_ = codec.MarshalLine(w, renderResponse{Data: []byte("ok")})
 	}))
 	defer srv.Close()
 
@@ -707,7 +707,7 @@ func TestBearerHeaderAnonymous(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
+		_ = codec.MarshalLine(w, renderResponse{Data: []byte("ok")})
 	}))
 	defer srv.Close()
 
@@ -731,7 +731,7 @@ func TestTLSMinVersionEnforced(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotVersion = r.TLS.Version
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
+		_ = codec.MarshalLine(w, renderResponse{Data: []byte("ok")})
 	}))
 	defer srv.Close()
 
@@ -836,7 +836,7 @@ func TestTimeoutDefaultAndCustom(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: []byte("ok")})
+		_ = codec.MarshalLine(w, renderResponse{Data: []byte("ok")})
 	}))
 	defer srv.Close()
 

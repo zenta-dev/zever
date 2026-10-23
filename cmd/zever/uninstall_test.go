@@ -2,12 +2,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func mustWriteUninstallFile(t *testing.T, path string) {
@@ -375,7 +376,7 @@ func TestRunUninstallJSONDryRun(t *testing.T) {
 	}
 
 	var env Envelope
-	if err := json.Unmarshal(bytes.TrimSpace(jbuf.Bytes()), &env); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(jbuf.Bytes()), &env); err != nil {
 		t.Fatalf("envelope is not JSON: %v", err)
 	}
 

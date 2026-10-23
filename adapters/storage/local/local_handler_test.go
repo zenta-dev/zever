@@ -1,7 +1,6 @@
 package local
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var errHandlerBoom = errors.New("handler boom")
@@ -590,7 +590,7 @@ func TestWriteMetaTemp(t *testing.T) {
 	}
 
 	var m objectMeta
-	if err3 := json.Unmarshal(raw, &m); err3 != nil || m.ContentType != "text/plain" {
+	if err3 := codec.Unmarshal(raw, &m); err3 != nil || m.ContentType != "text/plain" {
 		t.Fatalf("meta = %q err %v", string(raw), err3)
 	}
 
@@ -716,7 +716,7 @@ func TestPutBranches(t *testing.T) {
 	}
 
 	var m objectMeta
-	if err3 := json.Unmarshal(mraw, &m); err3 != nil || m.ContentType != "image/png" {
+	if err3 := codec.Unmarshal(mraw, &m); err3 != nil || m.ContentType != "image/png" {
 		t.Fatalf("meta = %q err %v", string(mraw), err3)
 	}
 

@@ -9,7 +9,6 @@
 package editors
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -21,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/gengrammar"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Grammar file locations, relative to the editors package directory (the
@@ -425,7 +425,7 @@ func parseTmGrammar(r reporter, file string, data []byte) (labels, verbs map[str
 		Repository map[string]tmEntry `json:"repository"`
 	}
 
-	if err := json.Unmarshal(data, &grammar); err != nil {
+	if err := codec.Unmarshal(data, &grammar); err != nil {
 		r.Fatalf("%s: malformed tmLanguage JSON: %v (must fail, not skip)", file, err)
 
 		return nil, nil, false
@@ -963,7 +963,7 @@ func tmGrammarJSON(keywords, booleans, types, labels, verbs []string) []byte {
 		repo["verbs"] = alt(verbs)
 	}
 
-	data, _ := json.Marshal(map[string]any{"scopeName": "source.zen", "repository": repo})
+	data, _ := codec.Marshal(map[string]any{"scopeName": "source.zen", "repository": repo})
 
 	return data
 }
@@ -1035,7 +1035,7 @@ func TestParityHelpers_failRed(t *testing.T) {
 			"labels":   {"match": `\b(` + strings.Join(labels, "|") + `)\b`},
 		}
 
-		data, _ := json.Marshal(map[string]any{"scopeName": "source.zen", "repository": repo})
+		data, _ := codec.Marshal(map[string]any{"scopeName": "source.zen", "repository": repo})
 
 		return data
 	}

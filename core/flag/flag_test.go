@@ -2,12 +2,13 @@ package flag
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var freshSeq atomic.Int64
@@ -145,12 +146,12 @@ func (s *jsonStubFlag) JSON(_ context.Context, key string, out any, fallback any
 			return nil
 		}
 
-		b, err := json.Marshal(fallback)
+		b, err := codec.Marshal(fallback)
 		if err != nil {
 			return err
 		}
 
-		return json.Unmarshal(b, out)
+		return codec.Unmarshal(b, out)
 	}
 
 	var b []byte
@@ -158,12 +159,12 @@ func (s *jsonStubFlag) JSON(_ context.Context, key string, out any, fallback any
 		b = []byte(str)
 	} else {
 		var err error
-		if b, err = json.Marshal(v); err != nil {
+		if b, err = codec.Marshal(v); err != nil {
 			return err
 		}
 	}
 
-	return json.Unmarshal(b, out)
+	return codec.Unmarshal(b, out)
 }
 
 func (s *jsonStubFlag) Close() error { return nil }

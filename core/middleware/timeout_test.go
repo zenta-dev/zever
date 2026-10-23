@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestTimeout_FastHandlerUnaffected(t *testing.T) {
@@ -76,7 +77,7 @@ func TestTimeout_SlowHandlerCutOff(t *testing.T) {
 	}
 
 	var body errorBody
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
 	if body.Error != "request timed out" {

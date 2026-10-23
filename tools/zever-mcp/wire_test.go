@@ -1,8 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // These tests pin the JSON key names of the zever-mcp tool payloads
@@ -17,7 +18,7 @@ func TestModuleSummaryWireKeys(t *testing.T) {
 		Version:  "v0.8.0",
 		Entities: []string{"Order", "Invoice"},
 	}
-	out, err := json.Marshal(m)
+	out, err := codec.Marshal(m)
 	if err != nil {
 		t.Fatalf("marshal moduleSummary: %v", err)
 	}
@@ -38,7 +39,7 @@ func TestResourceBundleWireKeys(t *testing.T) {
 		Files map[string]string `json:"files"`
 	}{Dir: "schema", Files: map[string]string{"app.zen": "contents"}}
 
-	out, err := json.Marshal(bundle)
+	out, err := codec.Marshal(bundle)
 	if err != nil {
 		t.Fatalf("marshal resource bundle: %v", err)
 	}

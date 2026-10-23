@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"encoding/json"
 	goparser "go/parser"
 	"go/token"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/dsl/parser"
 	"github.com/zenta-dev/zever/dsl/resolver"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const testFixture = `enum Role { admin, member }
@@ -79,7 +79,7 @@ func decodeManifest(t *testing.T, raw []byte) map[string]any {
 	t.Helper()
 
 	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := codec.Unmarshal(raw, &m); err != nil {
 		t.Fatalf("manifest is not JSON: %v", err)
 	}
 

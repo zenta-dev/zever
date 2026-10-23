@@ -3,7 +3,6 @@ package gemini
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestOpen_APIKeyRequired(t *testing.T) {
@@ -195,7 +195,7 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 
 		// Verify request body contains system instruction and contents
 		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = codec.UnmarshalRead(r.Body, &body)
 
 		resp := map[string]any{
 			"candidates": []any{
@@ -218,7 +218,7 @@ func TestGenerate_SuccessMocked(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = codec.MarshalLine(w, resp)
 	}
 
 	srv := httptest.NewTLSServer(http.HandlerFunc(handler))
@@ -400,7 +400,7 @@ func TestGenerate_WithFunctionCall(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = codec.MarshalLine(w, resp)
 	}))
 	defer srv.Close()
 
@@ -648,7 +648,7 @@ func TestEmbed_Success(t *testing.T) {
 		}
 
 		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = codec.UnmarshalRead(r.Body, &body)
 
 		// Return embeddings
 		resp := map[string]any{
@@ -659,7 +659,7 @@ func TestEmbed_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = codec.MarshalLine(w, resp)
 	}))
 	defer srv.Close()
 
@@ -689,7 +689,7 @@ func TestEmbed_Dimensions(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = codec.MarshalLine(w, resp)
 	}))
 	defer srv.Close()
 
@@ -1181,7 +1181,7 @@ func TestEmbed_NilEmbedding(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = codec.MarshalLine(w, resp)
 	}))
 	defer srv.Close()
 

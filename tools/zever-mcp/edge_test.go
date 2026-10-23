@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"io"
 	"os"
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func mustServer(t *testing.T) *Server {
@@ -24,7 +25,7 @@ func TestEdge_invalidJSONRPCVersion(t *testing.T) {
 
 	s := mustServer(t)
 	for _, v := range []string{"", "1.0", "2.1"} {
-		resp := s.handle(t.Context(), rpcRequest{JSONRPC: v, ID: json.RawMessage("1"), Method: "ping"})
+		resp := s.handle(t.Context(), rpcRequest{JSONRPC: v, ID: jsontext.Value("1"), Method: "ping"})
 		if resp.Error == nil || resp.Error.Code != codeInvalidRequest {
 			t.Errorf("version %q: error = %+v, want invalid request", v, resp.Error)
 		}
@@ -38,7 +39,7 @@ func TestEdge_ping(t *testing.T) {
 	t.Parallel()
 
 	s := mustServer(t)
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("7"), Method: "ping"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("7"), Method: "ping"})
 	if resp.Error != nil {
 		t.Fatalf("ping error = %+v", resp.Error)
 	}
@@ -69,7 +70,7 @@ func TestEdge_initializeFallbacks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			s := mustServer(t)
-			resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "initialize", Params: json.RawMessage(tc.params)})
+			resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "initialize", Params: jsontext.Value(tc.params)})
 			if resp.Error != nil {
 				t.Fatalf("error = %+v", resp.Error)
 			}
@@ -88,7 +89,7 @@ func TestEdge_initializeInvalidParams(t *testing.T) {
 	t.Parallel()
 
 	s := mustServer(t)
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "initialize", Params: json.RawMessage(`{"protocolVersion":`)})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "initialize", Params: jsontext.Value(`{"protocolVersion":`)})
 	if resp.Error == nil || resp.Error.Code != codeInvalidParams {
 		t.Fatalf("error = %+v, want invalid params", resp.Error)
 	}
@@ -98,7 +99,7 @@ func TestEdge_toolsCallMalformedParams(t *testing.T) {
 	t.Parallel()
 
 	s := mustServer(t)
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/call", Params: json.RawMessage(`{oops`)})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "tools/call", Params: jsontext.Value(`{oops`)})
 	if resp.Error == nil || resp.Error.Code != codeInvalidParams {
 		t.Fatalf("error = %+v, want invalid params", resp.Error)
 	}
@@ -108,11 +109,11 @@ func TestEdge_toolsCallEmptyName(t *testing.T) {
 	t.Parallel()
 
 	s := mustServer(t)
-	raw, err := json.Marshal(callParams{Name: "", Arguments: nil})
+	raw, err := codec.Marshal(callParams{Name: "", Arguments: nil})
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/call", Params: raw})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "tools/call", Params: raw})
 	if resp.Error == nil || resp.Error.Code != codeInvalidParams {
 		t.Fatalf("error = %+v, want invalid params for empty tool", resp.Error)
 	}
@@ -133,11 +134,11 @@ func TestEdge_handlerErrorMapsToIsError(t *testing.T) {
 			return "", errors.New("boom: kaput")
 		},
 	})
-	raw, err := json.Marshal(callParams{Name: "boom"})
+	raw, err := codec.Marshal(callParams{Name: "boom"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/call", Params: raw})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "tools/call", Params: raw})
 	if resp.Error != nil {
 		t.Fatalf("handler error must be tool error, not rpc error: %+v", resp.Error)
 	}
@@ -156,13 +157,13 @@ func TestEdge_isNotification(t *testing.T) {
 	if (rpcRequest{ID: nil}).isNotification() != true {
 		t.Error("nil ID should be notification")
 	}
-	if (rpcRequest{ID: json.RawMessage("")}).isNotification() != true {
+	if (rpcRequest{ID: jsontext.Value("")}).isNotification() != true {
 		t.Error("empty ID should be notification")
 	}
-	if (rpcRequest{ID: json.RawMessage("null")}).isNotification() {
+	if (rpcRequest{ID: jsontext.Value("null")}).isNotification() {
 		t.Error("null ID must not be notification (has id member)")
 	}
-	if (rpcRequest{ID: json.RawMessage("1")}).isNotification() {
+	if (rpcRequest{ID: jsontext.Value("1")}).isNotification() {
 		t.Error("numeric ID must not be notification")
 	}
 }
@@ -170,7 +171,7 @@ func TestEdge_isNotification(t *testing.T) {
 func TestEdge_errorResponseShape(t *testing.T) {
 	t.Parallel()
 
-	resp := errorResponse(json.RawMessage("3"), codeMethodNotFound, "zever-mcp: x")
+	resp := errorResponse(jsontext.Value("3"), codeMethodNotFound, "zever-mcp: x")
 	if resp.JSONRPC != "2.0" {
 		t.Errorf("jsonrpc = %q", resp.JSONRPC)
 	}
@@ -191,7 +192,7 @@ func TestEdge_runParseError(t *testing.T) {
 		t.Fatalf("run = %d, want 1", code)
 	}
 	var resp rpcResponse
-	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
 		t.Fatalf("response not JSON: %v", err)
 	}
 	if resp.Error == nil || resp.Error.Code != codeParseError {
@@ -375,7 +376,7 @@ func mustSchema(t *testing.T) *ir.Schema {
 	s := mustServer(t)
 	resp := callToolReq(t, s, "zever_schema", map[string]any{"files": testFiles()})
 	var sum schemaSummary
-	if err := json.Unmarshal([]byte(resultText(t, resp)), &sum); err != nil {
+	if err := codec.Unmarshal([]byte(resultText(t, resp)), &sum); err != nil {
 		t.Fatalf("summary: %v", err)
 	}
 	// Recompile to get resolved IR directly.
@@ -479,7 +480,7 @@ func TestEdge_summarizeEmpty(t *testing.T) {
 	if len(sum.Modules) != 0 {
 		t.Errorf("modules = %d, want 0", len(sum.Modules))
 	}
-	b, err := json.Marshal(sum)
+	b, err := codec.Marshal(sum)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +635,7 @@ func TestEdge_runUnknownMethodResponds(t *testing.T) {
 		t.Fatalf("run = %d", code)
 	}
 	var resp rpcResponse
-	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
 		t.Fatal(err)
 	}
 	if resp.Error == nil || resp.Error.Code != codeMethodNotFound {

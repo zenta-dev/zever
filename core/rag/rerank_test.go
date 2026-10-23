@@ -2,11 +2,11 @@ package rag
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestTermOverlapReranker(t *testing.T) {
@@ -75,7 +75,7 @@ type judgeStubAI struct {
 }
 
 func (s *judgeStubAI) Generate(_ context.Context, _ string, _ []ai.Message, _ ai.GenerateOptions) (ai.Generation, error) {
-	raw, _ := json.Marshal(map[string]any{"score": s.score})
+	raw, _ := codec.Marshal(map[string]any{"score": s.score})
 
 	return ai.Generation{Content: string(raw)}, nil
 }

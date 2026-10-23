@@ -16,7 +16,6 @@ package main
 // test flags. Reuse it via Lookup owning nothing when it is missing.
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -26,6 +25,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // updateCmdFacts owns -update only when no other package in the test binary
@@ -279,7 +280,7 @@ func TestCmdFactsGolden(t *testing.T) {
 		t.Errorf(`check-boundaries facts must carry the check:boundaries alias`)
 	}
 
-	got, err := json.MarshalIndent(facts, "", "  ")
+	got, err := codec.MarshalIndent(facts, "  ")
 	if err != nil {
 		t.Fatalf("marshal facts: %v", err)
 	}

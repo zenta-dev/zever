@@ -2,18 +2,20 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestResourcesList(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "resources/list"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "resources/list"})
 
 	if resp.Error != nil {
 		t.Fatalf("unexpected error: %+v", resp.Error)
@@ -54,8 +56,8 @@ func TestResourcesRead(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{"uri": "zever://cli-reference"})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "resources/read", Params: raw})
+	raw, _ := codec.Marshal(map[string]any{"uri": "zever://cli-reference"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "resources/read", Params: raw})
 
 	m := mustResultMap(t, resp)
 	contents, ok := m["contents"].([]map[string]any)
@@ -73,8 +75,8 @@ func TestResourcesReadUnknown(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{"uri": "zever://nope"})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "resources/read", Params: raw})
+	raw, _ := codec.Marshal(map[string]any{"uri": "zever://nope"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "resources/read", Params: raw})
 
 	if resp.Error == nil {
 		t.Fatal("expected error for unknown resource, got nil")
@@ -85,7 +87,7 @@ func TestPromptsList(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/list"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "prompts/list"})
 
 	m := mustResultMap(t, resp)
 	list, ok := m["prompts"].([]map[string]any)
@@ -103,11 +105,11 @@ func TestPromptsGet(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{
+	raw, _ := codec.Marshal(map[string]any{
 		"name":      "scaffold-feature",
 		"arguments": map[string]string{"description": "a blog"},
 	})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "prompts/get", Params: raw})
 
 	m := mustResultMap(t, resp)
 	msgs, ok := m["messages"].([]promptMessage)
@@ -126,8 +128,8 @@ func TestPromptsGetMissingArg(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{"name": "scaffold-feature", "arguments": map[string]string{}})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+	raw, _ := codec.Marshal(map[string]any{"name": "scaffold-feature", "arguments": map[string]string{}})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "prompts/get", Params: raw})
 
 	if resp.Error == nil {
 		t.Fatal("expected error for missing argument, got nil")
@@ -139,11 +141,11 @@ func TestPromptsGetDebugDoctor(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{
+	raw, _ := codec.Marshal(map[string]any{
 		"name":      "debug-doctor",
 		"arguments": map[string]string{"doctor_json": "auth: FAIL"},
 	})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "prompts/get", Params: raw})
 
 	m := mustResultMap(t, resp)
 	msgs, ok := m["messages"].([]promptMessage)
@@ -162,11 +164,11 @@ func TestPromptsGetFixDiags(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{
+	raw, _ := codec.Marshal(map[string]any{
 		"name":      "fix-diags",
 		"arguments": map[string]string{"diags": "app.zen:3:13: bad"},
 	})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "prompts/get", Params: raw})
 
 	m := mustResultMap(t, resp)
 	msgs, ok := m["messages"].([]promptMessage)
@@ -185,8 +187,8 @@ func TestResourcesReadDoctorGuide(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{"uri": "zever://doctor-guide"})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "resources/read", Params: raw})
+	raw, _ := codec.Marshal(map[string]any{"uri": "zever://doctor-guide"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "resources/read", Params: raw})
 
 	m := mustResultMap(t, resp)
 	contents, ok := m["contents"].([]map[string]any)
@@ -209,8 +211,8 @@ func TestPromptsGetUnknown(t *testing.T) {
 
 	s := newServer()
 
-	raw, _ := json.Marshal(map[string]any{"name": "nope"})
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "prompts/get", Params: raw})
+	raw, _ := codec.Marshal(map[string]any{"name": "nope"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "prompts/get", Params: raw})
 
 	if resp.Error == nil {
 		t.Fatal("expected error for unknown prompt, got nil")

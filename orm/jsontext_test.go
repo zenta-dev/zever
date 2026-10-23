@@ -2,11 +2,11 @@ package orm
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"testing"
 
 	"github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestJSONTextScan(t *testing.T) {
@@ -57,7 +57,7 @@ func TestJSONTextValue(t *testing.T) {
 func TestJSONTextJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	raw, err := json.Marshal(JSONText(`{"a":1}`))
+	raw, err := codec.Marshal(JSONText(`{"a":1}`))
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestJSONTextJSONRoundTrip(t *testing.T) {
 	}
 
 	var j JSONText
-	if err = json.Unmarshal(raw, &j); err != nil {
+	if err = codec.Unmarshal(raw, &j); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestJSONTextJSONRoundTrip(t *testing.T) {
 		t.Fatalf("Unmarshal = %q", j)
 	}
 
-	empty, err := json.Marshal(JSONText(""))
+	empty, err := codec.Marshal(JSONText(""))
 	if err != nil {
 		t.Fatalf("Marshal empty: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestJSONTextJSONRoundTrip(t *testing.T) {
 	}
 
 	var cleared JSONText
-	if err = json.Unmarshal([]byte("null"), &cleared); err != nil {
+	if err = codec.Unmarshal([]byte("null"), &cleared); err != nil {
 		t.Fatalf("Unmarshal null: %v", err)
 	}
 

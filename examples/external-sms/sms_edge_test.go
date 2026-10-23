@@ -1,27 +1,28 @@
 package sms_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"sync"
 	"testing"
 
 	sms "github.com/example/zever-sms"
+
 	"github.com/zenta-dev/zever/config"
 )
 
-// registerOnce and registerErr make RegisterPlugin safe to call from
+// registerOnce and errRegister make RegisterPlugin safe to call from
 // concurrent tests and benchmarks: registration is process-wide, so it must
 // happen exactly once.
 var (
 	registerOnce sync.Once
-	registerErr  error
+	errRegister  error
 )
 
 // ensureRegistered runs sms.RegisterPlugin once and returns its result.
 func ensureRegistered() error {
-	registerOnce.Do(func() { registerErr = sms.RegisterPlugin() })
-	return registerErr
+	registerOnce.Do(func() { errRegister = sms.RegisterPlugin() })
+	return errRegister
 }
 
 // TestStubSendInvalidArgs pins the empty-boundary error path: an empty
@@ -137,16 +138,16 @@ func TestBuildFromConfigErrorPaths(t *testing.T) {
 	}
 
 	corrupt := config.Default()
-	corrupt.Plugins = map[string]config.Service[json.RawMessage]{
-		"sms": {Adapter: "stub", Options: json.RawMessage(`{bad`)},
+	corrupt.Plugins = map[string]config.Service[jsontext.Value]{
+		"sms": {Adapter: "stub", Options: jsontext.Value(`{bad`)},
 	}
 	if _, err := sms.BuildFromConfig(corrupt); err == nil {
 		t.Fatal("corrupt options: want error")
 	}
 
 	unknown := config.Default()
-	unknown.Plugins = map[string]config.Service[json.RawMessage]{
-		"sms": {Adapter: "nope", Options: json.RawMessage(`{"from":"x"}`)},
+	unknown.Plugins = map[string]config.Service[jsontext.Value]{
+		"sms": {Adapter: "nope", Options: jsontext.Value(`{"from":"x"}`)},
 	}
 	if _, err := sms.BuildFromConfig(unknown); !errors.Is(err, sms.ErrUnknownAdapter) {
 		t.Fatalf("unknown adapter = %v, want ErrUnknownAdapter", err)

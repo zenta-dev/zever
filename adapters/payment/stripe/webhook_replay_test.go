@@ -2,7 +2,7 @@ package stripe
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"sync"
 	"testing"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/idempotency"
 	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // webhookStore is a clock-injectable idempotency.Store fake for webhook
@@ -88,18 +89,18 @@ func (s *webhookStore) Close() error { return nil }
 // eventPayloadNoID builds a Stripe event envelope without an id, for the
 // missing-id path that must skip dedupe.
 func eventPayloadNoID(typ string, obj any) []byte {
-	raw, _ := json.Marshal(obj)
+	raw, _ := codec.Marshal(obj)
 
 	env := map[string]any{
 		"object":      "event",
 		"api_version": stripe.APIVersion,
 		"type":        typ,
 		"data": map[string]any{
-			"object": json.RawMessage(raw),
+			"object": jsontext.Value(raw),
 		},
 	}
 
-	out, _ := json.Marshal(env)
+	out, _ := codec.Marshal(env)
 
 	return out
 }

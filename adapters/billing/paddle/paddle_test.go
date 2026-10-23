@@ -1,7 +1,6 @@
 package paddle
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,7 @@ import (
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
 	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func openTest(tb testing.TB, url string) billing.Billing {
@@ -107,7 +107,7 @@ func flowMux(tb testing.TB) *http.ServeMux {
 			Email string  `json:"email"`
 			Name  *string `json:"name"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := codec.UnmarshalRead(r.Body, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -117,13 +117,13 @@ func flowMux(tb testing.TB) *http.ServeMux {
 			data["name"] = *body.Name
 		}
 
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
+		_ = codec.MarshalLine(w, map[string]any{"data": data})
 	})
 
 	mux.HandleFunc("/transactions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
+			_ = codec.MarshalLine(w, map[string]any{"data": map[string]any{
 				"id": "txn_123", "status": "ready", "customer_id": "ctm_123",
 				"currency_code": "USD", "collection_mode": "automatic",
 				"items":   []map[string]any{{"quantity": 1}},
@@ -146,7 +146,7 @@ func flowMux(tb testing.TB) *http.ServeMux {
 				tb.Errorf("expected order_by billed_at[DESC], got %s", got)
 			}
 
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			_ = codec.MarshalLine(w, map[string]any{
 				"data": []map[string]any{{
 					"id": "txn_inv1", "status": "billed", "customer_id": "ctm_123",
 					"currency_code": "USD",
@@ -165,7 +165,7 @@ func flowMux(tb testing.TB) *http.ServeMux {
 			return
 		}
 
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{"data": map[string]any{
 			"id": r.PathValue("id"), "status": "canceled",
 		}})
 	})
@@ -386,7 +386,7 @@ func TestGetInvoice_iterError_returnsZero(t *testing.T) {
 			return
 		}
 
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"data": []map[string]any{},
 			"meta": map[string]any{"pagination": map[string]any{
 				"per_page": 1, "has_more": true,
@@ -410,7 +410,7 @@ func TestGetInvoice_parseTotalError_returnsZero(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"data": []map[string]any{{
 				"id": "txn_bad", "status": "billed", "customer_id": "ctm_1",
 				"currency_code": "USD",
@@ -443,7 +443,7 @@ func TestGetInvoice_noInvoices_returnsNotFound(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"data": []map[string]any{},
 			"meta": map[string]any{"pagination": map[string]any{"per_page": 1}},
 		})

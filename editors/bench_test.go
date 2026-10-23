@@ -1,13 +1,13 @@
 package editors
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/gengrammar"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // benchFixtureDir writes canonical grammar fixtures under a fresh TempDir
@@ -110,7 +110,7 @@ func BenchmarkTmRuleMatch(b *testing.B) {
 		Repository map[string]tmEntry `json:"repository"`
 	}
 
-	if err := json.Unmarshal(canonicalTmGrammar(), &grammar); err != nil {
+	if err := codec.Unmarshal(canonicalTmGrammar(), &grammar); err != nil {
 		b.Fatal(err)
 	}
 

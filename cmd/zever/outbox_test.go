@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // outboxTestTSLayout mirrors the db adapter's fixed-width UTC timestamp
@@ -194,7 +194,7 @@ func TestOutboxStatusJSON(t *testing.T) {
 	}
 
 	var env Envelope
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
 		t.Fatalf("status JSON not an envelope: %v", err)
 	}
 
@@ -202,13 +202,13 @@ func TestOutboxStatusJSON(t *testing.T) {
 		t.Fatalf("envelope = %+v, want ok outbox status", env)
 	}
 
-	raw, err := json.Marshal(env.Data)
+	raw, err := codec.Marshal(env.Data)
 	if err != nil {
 		t.Fatalf("marshal data: %v", err)
 	}
 
 	var st outboxStatusData
-	if err := json.Unmarshal(raw, &st); err != nil {
+	if err := codec.Unmarshal(raw, &st); err != nil {
 		t.Fatalf("data not status shape: %v", err)
 	}
 

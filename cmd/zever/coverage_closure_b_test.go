@@ -532,11 +532,16 @@ func TestCoverNewTinkerInterpPreludeTimeout(t *testing.T) {
 
 // tinkerFakeShim is a stdlib-only shim module speaking just enough protocol
 // for the ping: one framed {"result":{}} per ping, then silence until EOF.
+//
+// The shim is compiled standalone via `go run` with no access to
+// shared/codec, so it stays stdlib-only and decodes with encoding/json/v2
+// plus jsontext directly instead of the codec facade.
 const tinkerFakeShim = `package main
 
 import (
 	"bufio"
-	"encoding/json"
+	"encoding/json/v2"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 	"strings"
@@ -554,7 +559,7 @@ func main() {
 		}
 		var req struct {
 			Verb string          ` + "`json:\"verb\"`" + `
-			Args json.RawMessage ` + "`json:\"args,omitempty\"`" + `
+			Args jsontext.Value ` + "`json:\"args,omitempty\"`" + `
 		}
 		if err := json.Unmarshal([]byte(line), &req); err != nil {
 			continue

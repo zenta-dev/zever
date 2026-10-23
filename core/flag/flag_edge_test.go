@@ -98,8 +98,12 @@ func TestFlagEdge_GetJSONNilFallback(t *testing.T) {
 		t.Fatalf("GetJSON err = %v, want nil", err)
 	}
 
-	if got != nil {
-		t.Fatalf("GetJSON = %v, want nil fallback", got)
+	// shared/codec (encoding/json/v2) renders a nil slice as [] rather than
+	// null, so the missing-key marshal/unmarshal round-trip yields an empty
+	// non-nil slice instead of the v1 nil. The fallback elements are
+	// preserved; only the slice's nil-ness is lost.
+	if got == nil || len(got) != 0 {
+		t.Fatalf("GetJSON = %v, want empty fallback", got)
 	}
 }
 

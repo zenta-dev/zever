@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"math/big"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/auth/oidc"
 	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // NOTE: tests use 2048-bit RSA keys (fast to generate, ~ms) so gosec
@@ -51,7 +51,7 @@ func newFakeIDP(tb testing.TB) *fakeIDP {
 
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"issuer":   idp.srv.URL,
 			"jwks_uri": idp.srv.URL + "/keys",
 		})
@@ -63,7 +63,7 @@ func newFakeIDP(tb testing.TB) *fakeIDP {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"keys": []map[string]any{{
 				"kty": "RSA",
 				"kid": idp.kid,
@@ -84,7 +84,7 @@ func newFakeIDP(tb testing.TB) *fakeIDP {
 func mintToken(tb testing.TB, key *rsa.PrivateKey, kid, iss, aud string, exp time.Time, extra map[string]any) string {
 	tb.Helper()
 
-	header, err := json.Marshal(map[string]any{"alg": "RS256", "kid": kid, "typ": "JWT"})
+	header, err := codec.Marshal(map[string]any{"alg": "RS256", "kid": kid, "typ": "JWT"})
 	if err != nil {
 		tb.Fatalf("marshal header: %s", err)
 	}
@@ -98,7 +98,7 @@ func mintToken(tb testing.TB, key *rsa.PrivateKey, kid, iss, aud string, exp tim
 	for k, v := range extra {
 		payloadMap[k] = v
 	}
-	payload, err := json.Marshal(payloadMap)
+	payload, err := codec.Marshal(payloadMap)
 	if err != nil {
 		tb.Fatalf("marshal payload: %s", err)
 	}

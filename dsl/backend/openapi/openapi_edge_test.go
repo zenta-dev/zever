@@ -1,11 +1,11 @@
 package openapi
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestGenerateEmptySchemaEmitsOnlyMergedDoc(t *testing.T) {
@@ -87,7 +87,7 @@ func TestGenerateOutputIsValidJSON(t *testing.T) {
 
 	for path, content := range out {
 		var doc map[string]any
-		if err := json.Unmarshal(content, &doc); err != nil {
+		if err := codec.Unmarshal(content, &doc); err != nil {
 			t.Fatalf("%s is not valid JSON: %v", path, err)
 		}
 	}

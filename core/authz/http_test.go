@@ -1,7 +1,6 @@
 package authz_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/authz"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestBearerTokenTable(t *testing.T) {
@@ -78,7 +78,7 @@ func TestMiddleware401AndHandlerNotCalled(t *testing.T) {
 		t.Fatalf("WWW-Authenticate = %q, want bare realm (no credentials presented)", got)
 	}
 	var body map[string]string
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+	if err := codec.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("body not JSON: %v", err)
 	}
 	if body["error"] == "" {

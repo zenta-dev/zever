@@ -8,7 +8,7 @@ package sms
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"sync"
@@ -235,7 +235,7 @@ func RegisterStub() error {
 // validatePluginOptions implements config.RegisterPluginValidator: it decodes
 // the plugin's raw options and runs Options.Validate. Unknown fields pass
 // through shared/codec untouched until here.
-func validatePluginOptions(adapter string, opts json.RawMessage) error {
+func validatePluginOptions(adapter string, opts jsontext.Value) error {
 	if _, err := ParseAdapter(adapter); err != nil {
 		return err
 	}

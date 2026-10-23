@@ -1,7 +1,6 @@
 package stdout_test
 
 import (
-	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/observability/stdout"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestSpan_unknownAttrValueType_encodesNull(t *testing.T) {
@@ -101,7 +101,7 @@ func TestMetrics_nilContext_verboseEmits(t *testing.T) {
 	}
 
 	var v map[string]any
-	if err := json.Unmarshal([]byte(strings.TrimSpace(buf.String())), &v); err != nil {
+	if err := codec.Unmarshal([]byte(strings.TrimSpace(buf.String())), &v); err != nil {
 		t.Fatalf("decode metric line: %v", err)
 	}
 	if v["name"] != "c" {
