@@ -2282,12 +2282,12 @@ const helloServiceTemplate = `// Package hello is the sample module mounted by w
 package hello
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Service is the sample module: it carries no state, resolving the logger
@@ -2317,7 +2317,7 @@ func (s *Service) Mount(r router.Router, c *container.Container) error {
 		logger.Info().Str("path", req.URL.Path).Msg("hello")
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"hello": "world"})
+		_ = codec.MarshalLine(w, map[string]string{"hello": "world"})
 	})
 
 	return nil
