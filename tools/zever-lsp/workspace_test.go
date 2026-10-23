@@ -585,3 +585,256 @@ func keysOf(m map[string]string) []string {
 
 	return out
 }
+
+// multiRootEntityDoc is a schema that compiles cleanly on its own; declaring
+// it in two roots at once is only an error when the roots are merged into
+// one compile.
+const multiRootEntityDoc = "entity User {\n\tid: uuid @primary\n}\n"
+
+// TestRecompileIsolatesRootsNoDuplicateDiagnostic is THE isolation proof:
+// the same entity declared in two independent roots must not collide, while
+// merging the same files into one compile still reports the duplicate (so
+// the test cannot pass vacuously if the resolver ever stops flagging it).
+func TestRecompileIsolatesRootsNoDuplicateDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+
+	writeFile(t, rootA, filepath.Join("schema", "user.zen"), multiRootEntityDoc)
+	writeFile(t, rootB, filepath.Join("schema", "user.zen"), multiRootEntityDoc)
+
+	ws := NewWorkspace()
+	ws.SetRoot(string(pathToURI(rootA)))
+	ws.AddRoot(string(pathToURI(rootB)))
+
+	if _, merged := compile.Compile(ws.CollectAllFiles()); !merged.HasErrors() {
+		t.Fatal("merged compile of the two roots is clean; the test cannot prove isolation")
+	}
+
+	result, diags := ws.Recompile()
+	if diags.HasErrors() {
+		t.Fatalf("per-root Recompile reported diagnostics: %v", diags)
+	}
+
+	if result == nil || result.Schema == nil {
+		t.Fatal("per-root Recompile returned no primary schema")
+	}
+}
+
+// TestRecompileAllMergesDiagnosticsAcrossRoots proves the merged list carries
+// every root's diagnostics while the primary result stays usable: root B is
+// broken, so the merged list must err, root A's entry must stay clean, and
+// the primary (root A) schema must still resolve.
+func TestRecompileAllMergesDiagnosticsAcrossRoots(t *testing.T) {
+	t.Parallel()
+
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+
+	writeFile(t, rootA, filepath.Join("schema", "a.zen"), multiRootEntityDoc)
+	writeFile(t, rootB, filepath.Join("schema", "b.zen"), "entity User {\n\tid: strnig\n}\n")
+
+	ws := NewWorkspace()
+	ws.SetRoot(string(pathToURI(rootA)))
+	ws.AddRoot(string(pathToURI(rootB)))
+
+	absA := mustPath(t, string(pathToURI(rootA)))
+	absB := mustPath(t, string(pathToURI(rootB)))
+
+	primary, all, perRoot := ws.RecompileAll()
+	if !all.HasErrors() {
+		t.Fatal("RecompileAll merged diagnostics have no errors, want root B's failure")
+	}
+
+	if len(perRoot) != 2 {
+		t.Fatalf("perRoot has %d entries, want 2", len(perRoot))
+	}
+
+	if got := perRoot[absA]; got.HasErrors() {
+		t.Errorf("primary root diagnostics = %v, want clean", got)
+	}
+
+	if got := perRoot[absB]; !got.HasErrors() {
+		t.Error("non-primary root diagnostics are clean, want root B's failure")
+	}
+
+	if primary == nil || primary.Schema == nil {
+		t.Error("primary result has no schema, want root A's schema despite root B failing")
+	}
+
+	// Recompile delegates: the primary result plus the same merged list.
+	if _, diags := ws.Recompile(); len(diags) != len(all) {
+		t.Errorf("Recompile merged %d diagnostics, want %d like RecompileAll", len(diags), len(all))
+	}
+}
+
+// TestRecompilePerRootCacheSkipsCleanRoots proves the compile cache is keyed
+// per root: editing a file in one root recompiles exactly that root.
+func TestRecompilePerRootCacheSkipsCleanRoots(t *testing.T) {
+	t.Parallel()
+
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+
+	fileA := writeFile(t, rootA, filepath.Join("schema", "a.zen"), "entity Alpha {\n\tid: uuid @primary\n}\n")
+	fileB := writeFile(t, rootB, filepath.Join("schema", "b.zen"), "entity Beta {\n\tid: uuid @primary\n}\n")
+
+	ws := NewWorkspace()
+
+	var mu sync.Mutex
+	calls := 0
+
+	ws.compile = func(files map[string]string) (*compile.Result, diag.List) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+
+		return compile.Compile(files)
+	}
+
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return calls
+	}
+
+	ws.SetRoot(string(pathToURI(rootA)))
+	ws.AddRoot(string(pathToURI(rootB)))
+
+	if _, diags := ws.Recompile(); diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := count(); got != 2 {
+		t.Fatalf("first Recompile ran %d compiles, want 2 (one per root)", got)
+	}
+
+	if got := ws.CompileCount(); got != 2 {
+		t.Fatalf("CompileCount() = %d, want 2", got)
+	}
+
+	// Nothing changed: the next call must be served from cache.
+	if _, diags := ws.Recompile(); diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if got := count(); got != 2 {
+		t.Errorf("clean Recompile ran %d compiles total, want 2 (cache did not skip)", got)
+	}
+
+	// Editing only root A's file must recompile exactly root A.
+	ws.SetDoc(string(pathToURI(fileA)), "entity Alpha {\n\tid: uuid @primary\n\tname: string\n}\n")
+
+	if _, diags := ws.Recompile(); diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics after editing root A: %v", diags)
+	}
+
+	if got := count(); got != 3 {
+		t.Errorf("after editing root A ran %d compiles total, want 3 (only A again)", got)
+	}
+
+	// Editing only root B's file must recompile exactly root B.
+	ws.SetDoc(string(pathToURI(fileB)), "entity Beta {\n\tid: uuid @primary\n\tname: string\n}\n")
+
+	if _, diags := ws.Recompile(); diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics after editing root B: %v", diags)
+	}
+
+	if got := count(); got != 4 {
+		t.Errorf("after editing root B ran %d compiles total, want 4 (only B again)", got)
+	}
+
+	if got := ws.CompileCount(); got != 4 {
+		t.Errorf("CompileCount() = %d, want 4", got)
+	}
+}
+
+// TestPartitionFilesByRootDecisions tables the ownership rules: the longest
+// root prefix wins, a sibling sharing a string prefix does not match, files
+// outside every root fall back to primary, and no roots means one group.
+func TestPartitionFilesByRootDecisions(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	parent := filepath.Join(base, "proj")
+	child := filepath.Join(parent, "sub")
+	sibling := filepath.Join(base, "proj-sibling", "x.zen")
+	inParent := filepath.Join(parent, "a.zen")
+	inChild := filepath.Join(child, "b.zen")
+	outside := filepath.Join(base, "elsewhere", "c.zen")
+
+	tests := []struct {
+		name    string
+		roots   []string
+		primary string
+		files   map[string]string
+		want    map[string][]string
+	}{
+		{
+			name:    "single root owns everything under it",
+			roots:   []string{parent},
+			primary: parent,
+			files:   map[string]string{inParent: "a", inChild: "b"},
+			want:    map[string][]string{parent: {inParent, inChild}},
+		},
+		{
+			name:    "nested root wins over its parent",
+			roots:   []string{parent, child},
+			primary: parent,
+			files:   map[string]string{inParent: "a", inChild: "b"},
+			want:    map[string][]string{parent: {inParent}, child: {inChild}},
+		},
+		{
+			name:    "sibling sharing a string prefix does not match",
+			roots:   []string{parent},
+			primary: parent,
+			files:   map[string]string{sibling: "x"},
+			want:    map[string][]string{parent: {sibling}},
+		},
+		{
+			name:    "outside file falls back to primary",
+			roots:   []string{parent, child},
+			primary: parent,
+			files:   map[string]string{outside: "c"},
+			want:    map[string][]string{parent: {outside}, child: {}},
+		},
+		{
+			name:    "no roots groups everything under primary",
+			roots:   nil,
+			primary: "",
+			files:   map[string]string{inParent: "a", outside: "c"},
+			want:    map[string][]string{"": {inParent, outside}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := partitionFilesByRoot(tc.files, tc.roots, tc.primary)
+			if len(got) != len(tc.want) {
+				t.Fatalf("partitioned into %d groups, want %d: %v", len(got), len(tc.want), got)
+			}
+
+			for root, wantPaths := range tc.want {
+				group, ok := got[root]
+				if !ok {
+					t.Fatalf("missing group for root %q (got %v)", root, got)
+				}
+
+				if len(group) != len(wantPaths) {
+					t.Errorf("root %q owns %d files, want %d: %v", root, len(group), len(wantPaths), keysOf(group))
+					continue
+				}
+
+				for _, path := range wantPaths {
+					if _, ok := group[path]; !ok {
+						t.Errorf("root %q missing file %q (owns %v)", root, path, keysOf(group))
+					}
+				}
+			}
+		})
+	}
+}

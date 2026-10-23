@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -123,6 +124,7 @@ func TestInitialize_capabilities(t *testing.T) {
 		{"DocumentSymbolProvider", caps.DocumentSymbolProvider},
 		{"WorkspaceSymbolProvider", caps.WorkspaceSymbolProvider},
 		{"DefinitionProvider", caps.DefinitionProvider},
+		{"DeclarationProvider", caps.DeclarationProvider},
 		{"HoverProvider", caps.HoverProvider},
 		{"DocumentFormattingProvider", caps.DocumentFormattingProvider},
 		{"DocumentRangeFormattingProvider", caps.DocumentRangeFormattingProvider},
@@ -1670,5 +1672,45 @@ func TestRefreshDiagnostics(t *testing.T) {
 		openDoc(t, s, serverDocA, serverBrokenDoc)
 
 		s.refreshDiagnostics()
+	})
+
+	t.Run("multi-root same entity publishes no errors", func(t *testing.T) {
+		dirA := t.TempDir()
+		dirB := t.TempDir()
+
+		s := NewServer()
+		fake := &fakeClient{}
+		s.setClient(fake)
+		s.ws.SetRoot(string(pathToURI(dirA)))
+		s.ws.AddRoot(string(pathToURI(dirB)))
+
+		const sameEntity = "entity User {\n\tid: uuid @primary\n}\n"
+		uriA := string(pathToURI(filepath.Join(dirA, "a.zen")))
+		uriB := string(pathToURI(filepath.Join(dirB, "b.zen")))
+		openDoc(t, s, uriA, sameEntity)
+		openDoc(t, s, uriB, sameEntity)
+
+		// DidOpen already refreshed twice; force another round for determinism.
+		s.refreshDiagnostics()
+
+		for _, docURI := range []string{uriA, uriB} {
+			if got, ok := fake.published(diagURI(t, docURI)); ok && len(got) != 0 {
+				t.Errorf("multi-root publish for %s has %d diagnostics, want none (same entity in two roots must not collide)", docURI, len(got))
+			}
+		}
+
+		// Breaking the non-primary root must surface only there: the merged
+		// diagnostics still reach the client for every root.
+		s.ws.SetDoc(uriB, "entity User {\n\tid: strnig\n}\n")
+		s.refreshDiagnostics()
+
+		if got, ok := fake.published(diagURI(t, uriA)); ok && len(got) != 0 {
+			t.Errorf("primary root got %d diagnostics from the other root's breakage, want none", len(got))
+		}
+
+		gotB, ok := fake.published(diagURI(t, uriB))
+		if !ok || len(gotB) == 0 {
+			t.Fatal("broken non-primary root published nothing, want its errors")
+		}
 	})
 }

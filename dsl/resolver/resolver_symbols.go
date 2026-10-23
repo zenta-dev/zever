@@ -43,7 +43,8 @@ func resolveSymbols(leafDecls []ast.Decl) (*symbolTable, diag.List) {
 		}
 
 		if prevPos, dup := seen[name]; dup {
-			diags = append(diags, diag.Wrap("resolve", pos, ErrDuplicateDecl,
+			diags = append(diags, diag.WrapRelated("resolve", pos, ErrDuplicateDecl,
+				[]diag.RelatedInfo{{Pos: prevPos, Msg: "first declared here"}},
 				"duplicate top-level declaration %q (first declared at %s)", name, prevPos.String()))
 
 			continue

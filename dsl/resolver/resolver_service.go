@@ -158,7 +158,7 @@ func resolveOperation(
 func resolveErrors(items []ast.Value) ([]*ir.ErrorCase, diag.List) {
 	var diags diag.List
 
-	seen := make(map[ir.ErrorCode]bool, len(items))
+	seen := make(map[ir.ErrorCode]diag.Position, len(items))
 
 	cases := make([]*ir.ErrorCase, 0, len(items))
 
@@ -173,14 +173,15 @@ func resolveErrors(items []ast.Value) ([]*ir.ErrorCase, diag.List) {
 				continue
 			}
 
-			if seen[code] {
-				diags = append(diags, diag.Wrap("resolve", val.Pos, ErrInvalidOption,
+			if prevPos, dup := seen[code]; dup {
+				diags = append(diags, diag.WrapRelated("resolve", val.Pos, ErrInvalidOption,
+					[]diag.RelatedInfo{{Pos: prevPos, Msg: "first declared here"}},
 					"duplicate error code %q in errors: set", val.Name))
 
 				continue
 			}
 
-			seen[code] = true
+			seen[code] = val.Pos
 			cases = append(cases, &ir.ErrorCase{Code: code, Pos: val.Pos})
 		case *ast.CallValue:
 			code, ok := ValidErrorCodes[val.Name]
@@ -198,14 +199,15 @@ func resolveErrors(items []ast.Value) ([]*ir.ErrorCase, diag.List) {
 				continue
 			}
 
-			if seen[code] {
-				diags = append(diags, diag.Wrap("resolve", val.Pos, ErrInvalidOption,
+			if prevPos, dup := seen[code]; dup {
+				diags = append(diags, diag.WrapRelated("resolve", val.Pos, ErrInvalidOption,
+					[]diag.RelatedInfo{{Pos: prevPos, Msg: "first declared here"}},
 					"duplicate error code %q in errors: set", val.Name))
 
 				continue
 			}
 
-			seen[code] = true
+			seen[code] = val.Pos
 			cases = append(cases, &ir.ErrorCase{Code: code, Message: message, Pos: val.Pos})
 		default:
 			diags = append(diags, diag.Wrap("resolve", valuePos(v), ErrInvalidOption,

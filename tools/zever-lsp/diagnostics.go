@@ -106,8 +106,13 @@ type stopper interface {
 // The compiler records a point, not a span; when the document source is
 // available the range is widened to the whole identifier containing that
 // point, so editors underline the token instead of a single caret. With no
-// source it stays a one-character point range.
-func diagToLSPDiagnostic(d *diag.Diagnostic, src string) protocol.Diagnostic {
+// source it stays a one-character point range. Related locations map to
+// RelatedInformation the same way: a related entry in the primary file
+// reuses src, otherwise srcFor supplies that file's source, with a point
+// range fallback when the content is unknown.
+func diagToLSPDiagnostic(
+	d *diag.Diagnostic, src string, srcFor func(path string) (string, bool),
+) protocol.Diagnostic {
 	severity := protocol.DiagnosticSeverityError
 	if d.Severity == diag.SeverityWarning {
 		severity = protocol.DiagnosticSeverityWarning
@@ -118,6 +123,29 @@ func diagToLSPDiagnostic(d *diag.Diagnostic, src string) protocol.Diagnostic {
 		Severity: severity,
 		Source:   protocol.NewOptional("zen"),
 		Message:  protocol.String(d.Msg),
+	}
+
+	for _, rel := range d.Related {
+		if rel.Pos.File == "" {
+			continue
+		}
+
+		relSrc := ""
+		if rel.Pos.File == d.Pos.File {
+			relSrc = src
+		} else if srcFor != nil {
+			if content, ok := srcFor(rel.Pos.File); ok {
+				relSrc = content
+			}
+		}
+
+		out.RelatedInformation = append(out.RelatedInformation, protocol.DiagnosticRelatedInformation{
+			Location: protocol.Location{
+				URI:   pathToURI(rel.Pos.File),
+				Range: diagnosticRange(rel.Pos, relSrc),
+			},
+			Message: rel.Msg,
+		})
 	}
 
 	// Only a message matching a known class carries a code (plus its
@@ -182,7 +210,7 @@ func groupDiagnostics(diags diag.List, srcFor func(path string) (string, bool)) 
 			}
 		}
 
-		grouped[d.Pos.File] = append(grouped[d.Pos.File], diagToLSPDiagnostic(d, src))
+		grouped[d.Pos.File] = append(grouped[d.Pos.File], diagToLSPDiagnostic(d, src, srcFor))
 	}
 
 	return grouped

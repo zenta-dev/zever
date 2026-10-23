@@ -210,7 +210,7 @@ func TestDiagToLSPDiagnostic(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := diagToLSPDiagnostic(tc.in, "")
+			got := diagToLSPDiagnostic(tc.in, "", nil)
 
 			if got.Range != tc.wantRange {
 				t.Errorf("Range = %+v, want %+v", got.Range, tc.wantRange)
@@ -262,7 +262,7 @@ func TestDiagToLSPDiagnosticExtendsToEnclosingIdentifier(t *testing.T) {
 				Pos:      diag.Position{File: "a.zen", Line: 1, Col: tc.col},
 				Severity: diag.SeverityError,
 				Msg:      "boom",
-			}, src)
+			}, src, nil)
 
 			if got.Range != want {
 				t.Errorf("Range = %+v, want %+v", got.Range, want)
@@ -294,7 +294,7 @@ func TestDiagToLSPDiagnosticFallsBackToPoint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := diagToLSPDiagnostic(&diag.Diagnostic{Pos: tc.pos, Msg: "boom"}, tc.src)
+			got := diagToLSPDiagnostic(&diag.Diagnostic{Pos: tc.pos, Msg: "boom"}, tc.src, nil)
 			if want := pointRange(tc.pos); got.Range != want {
 				t.Errorf("Range = %+v, want point range %+v", got.Range, want)
 			}
@@ -755,7 +755,7 @@ func TestDiagToLSPDiagnosticCarriesCode(t *testing.T) {
 	classified := diagToLSPDiagnostic(&diag.Diagnostic{
 		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
 		Msg: `unknown field type "strnig"`,
-	}, "")
+	}, "", nil)
 
 	code, ok := classified.Code.(protocol.String)
 	if !ok || string(code) != diagCodeUnknownFieldType {
@@ -771,7 +771,7 @@ func TestDiagToLSPDiagnosticCarriesCode(t *testing.T) {
 	unclassified := diagToLSPDiagnostic(&diag.Diagnostic{
 		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
 		Msg: "no class here",
-	}, "")
+	}, "", nil)
 
 	if unclassified.Code != nil {
 		t.Errorf("unclassified Code = %#v, want nil", unclassified.Code)
