@@ -107,8 +107,8 @@ func TestInitialize_capabilities(t *testing.T) {
 		t.Error("TextDocumentSync.OpenClose not enabled")
 	}
 
-	if syncOpts.Change == nil || *syncOpts.Change != protocol.TextDocumentSyncKindFull {
-		t.Errorf("TextDocumentSync.Change = %+v, want Full", syncOpts.Change)
+	if syncOpts.Change == nil || *syncOpts.Change != protocol.TextDocumentSyncKindIncremental {
+		t.Errorf("TextDocumentSync.Change = %+v, want Incremental", syncOpts.Change)
 	}
 
 	save, saveOK := syncOpts.Save.(protocol.Boolean)
@@ -390,7 +390,13 @@ func TestDidOpenChangeSaveClose(t *testing.T) {
 	}
 
 	partial := protocol.TextDocumentContentChangeEvent(
-		&protocol.TextDocumentContentChangePartial{Text: "ignored"},
+		&protocol.TextDocumentContentChangePartial{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 999, Character: 0},
+				End:   protocol.Position{Line: 999, Character: 0},
+			},
+			Text: "ignored",
+		},
 	)
 
 	if err := s.DidChange(ctx, &protocol.DidChangeTextDocumentParams{

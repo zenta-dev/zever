@@ -33,6 +33,7 @@ type Workspace struct {
 	mu sync.Mutex
 
 	rootPath  string
+	roots     []string
 	docs      map[string]string
 	diskCache map[string]string
 
@@ -71,7 +72,7 @@ func NewWorkspace() *Workspace {
 	}
 }
 
-// SetRoot records the workspace root and scans it for .zen files on disk.
+// SetRoot replaces the workspace roots with a single root and scans it.
 func (w *Workspace) SetRoot(rootURI string) {
 	root, ok := uriToPath(rootURI)
 	if !ok {
@@ -80,53 +81,122 @@ func (w *Workspace) SetRoot(rootURI string) {
 
 	w.mu.Lock()
 	w.rootPath = root
+	w.roots = []string{root}
 	w.mu.Unlock()
 
 	w.Rescan()
 }
 
-// Rescan walks the workspace root and refreshes diskCache from disk.
-func (w *Workspace) Rescan() {
+// AddRoot adds a workspace root (if not already present) and rescans.
+func (w *Workspace) AddRoot(rootURI string) {
+	root, ok := uriToPath(rootURI)
+	if !ok {
+		return
+	}
+
 	w.mu.Lock()
-	root := w.rootPath
+
+	found := false
+	for _, r := range w.roots {
+		if r == root {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		w.roots = append(w.roots, root)
+	}
+
+	if w.rootPath == "" && len(w.roots) > 0 {
+		w.rootPath = w.roots[0]
+	}
+
 	w.mu.Unlock()
 
-	if root == "" {
+	w.Rescan()
+}
+
+// RemoveRoot drops a workspace root and rescans.
+func (w *Workspace) RemoveRoot(rootURI string) {
+	root, ok := uriToPath(rootURI)
+	if !ok {
+		return
+	}
+
+	w.mu.Lock()
+
+	filtered := make([]string, 0, len(w.roots))
+	for _, r := range w.roots {
+		if r != root {
+			filtered = append(filtered, r)
+		}
+	}
+
+	w.roots = filtered
+
+	if len(w.roots) == 0 {
+		w.rootPath = ""
+	} else if w.rootPath == root {
+		w.rootPath = w.roots[0]
+	}
+
+	w.mu.Unlock()
+
+	w.Rescan()
+}
+
+// Rescan walks every workspace root and refreshes diskCache from disk.
+func (w *Workspace) Rescan() {
+	w.mu.Lock()
+	roots := append([]string(nil), w.roots...)
+	if len(roots) == 0 && w.rootPath != "" {
+		roots = []string{w.rootPath}
+	}
+	w.mu.Unlock()
+
+	if len(roots) == 0 {
 		return
 	}
 
 	found := make(map[string]string)
 
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil //nolint:nilerr // an unreadable subtree must not abort the scan
+	for _, root := range roots {
+		if root == "" {
+			continue
 		}
 
-		name := d.Name()
-
-		if d.IsDir() {
-			if path != root && skipDir(name) {
-				return filepath.SkipDir
+		_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil //nolint:nilerr // an unreadable subtree must not abort the scan
 			}
 
+			name := d.Name()
+
+			if d.IsDir() {
+				if path != root && skipDir(name) {
+					return filepath.SkipDir
+				}
+
+				return nil
+			}
+
+			if filepath.Ext(name) != zenExt {
+				return nil
+			}
+
+			content, readErr := os.ReadFile(path) //nolint:gosec // G122: path comes from walking the user-configured project root; LSP is a dev tool, not a production service
+			if readErr != nil {
+				return nil //nolint:nilerr // skip unreadable files: WalkDirFunc nil means keep walking
+			}
+
+			abs, _ := filepath.Abs(path) // path is absolute: joined from the absolute root, so Abs cannot fail
+
+			found[abs] = string(content)
+
 			return nil
-		}
-
-		if filepath.Ext(name) != zenExt {
-			return nil
-		}
-
-		content, readErr := os.ReadFile(path) //nolint:gosec // G122: path comes from walking the user-configured project root; LSP is a dev tool, not a production service
-		if readErr != nil {
-			return nil //nolint:nilerr // skip unreadable files: WalkDirFunc nil means keep walking
-		}
-
-		abs, _ := filepath.Abs(path) // path is absolute: joined from the absolute root, so Abs cannot fail
-
-		found[abs] = string(content)
-
-		return nil
-	})
+		})
+	}
 
 	w.mu.Lock()
 	w.diskCache = found

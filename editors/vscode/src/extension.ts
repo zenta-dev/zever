@@ -8,9 +8,19 @@ import {
 
 let client: LanguageClient | undefined;
 
-export function activate(_context: vscode.ExtensionContext): void {
+function serverCommand(): string {
+  try {
+    const cfg = vscode.workspace.getConfiguration('zever');
+    const value = cfg.get<string>('serverPath');
+    return value && value.trim() !== '' ? value : 'zever-lsp';
+  } catch {
+    return 'zever-lsp';
+  }
+}
+
+function startClient(): void {
   const serverOptions: ServerOptions = {
-    command: 'zever-lsp',
+    command: serverCommand(),
     transport: TransportKind.stdio,
   };
 
@@ -36,8 +46,28 @@ export function activate(_context: vscode.ExtensionContext): void {
         'go install ./tools/zever-lsp (run inside the clone).'
     );
   });
+}
 
-  _context.subscriptions.push({ dispose: () => client?.stop() });
+export function activate(context: vscode.ExtensionContext): void {
+  startClient();
+
+  const restartDisposable = vscode.commands.registerCommand(
+    'zever.restartServer',
+    async () => {
+      if (client) {
+        await client.stop();
+      }
+      startClient();
+      vscode.window.showInformationMessage('Zever: Language server restarted.');
+    }
+  );
+
+  context.subscriptions.push({
+    dispose: () => {
+      client?.stop();
+      restartDisposable.dispose();
+    },
+  });
 }
 
 export function deactivate(): Thenable<void> | undefined {
