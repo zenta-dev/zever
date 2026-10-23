@@ -55,7 +55,7 @@ func TestMemory_CoverPushClosedRaceHammer(t *testing.T) {
 					}
 				}
 			}
-			<-errCh
+			<-errCh //nolint:errcheck
 		}
 	}
 }

@@ -37,11 +37,11 @@ func BenchmarkMergeGRPCPolicies(b *testing.B) {
 // BenchmarkMaxBodyHandler measures the request-body bounding middleware
 // hot path on the HTTP server.
 func BenchmarkMaxBodyHandler(b *testing.B) {
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	h := maxBodyHandler(next)
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", nil)
 	rec := httptest.NewRecorder()
 
 	b.ReportAllocs()
@@ -75,16 +75,16 @@ func BenchmarkMiddlewareFold(b *testing.B) {
 // benchmarkLogger is a minimal log.Logger implementation for benchmarking.
 type benchmarkLogger struct{}
 
-func (b *benchmarkLogger) Debug() log.Event                           { return nil }
-func (b *benchmarkLogger) Info() log.Event                            { return nil }
-func (b *benchmarkLogger) Warn() log.Event                            { return nil }
-func (b *benchmarkLogger) Error() log.Event                           { return nil }
-func (b *benchmarkLogger) Fatal() log.Event                           { return nil }
-func (b *benchmarkLogger) With() log.Context                          { return nil }
-func (b *benchmarkLogger) WithContext(ctx context.Context) log.Logger { return b }
-func (b *benchmarkLogger) Enabled(log.Level) bool                     { return false }
-func (b *benchmarkLogger) Sync() error                                { return nil }
-func (b *benchmarkLogger) Name() string                               { return "bench" }
+func (b *benchmarkLogger) Debug() log.Event                         { return nil }
+func (b *benchmarkLogger) Info() log.Event                          { return nil }
+func (b *benchmarkLogger) Warn() log.Event                          { return nil }
+func (b *benchmarkLogger) Error() log.Event                         { return nil }
+func (b *benchmarkLogger) Fatal() log.Event                         { return nil }
+func (b *benchmarkLogger) With() log.Context                        { return nil }
+func (b *benchmarkLogger) WithContext(_ context.Context) log.Logger { return b }
+func (b *benchmarkLogger) Enabled(log.Level) bool                   { return false }
+func (b *benchmarkLogger) Sync() error                              { return nil }
+func (b *benchmarkLogger) Name() string                             { return "bench" }
 
 // mockGRPCModule implements GRPCModule for benchmarking.
 type mockGRPCModule struct {
@@ -93,5 +93,5 @@ type mockGRPCModule struct {
 }
 
 func (m *mockGRPCModule) Name() string                                        { return m.name }
-func (m *mockGRPCModule) Mount(r router.Router, c *container.Container) error { return nil }
+func (m *mockGRPCModule) Mount(_ router.Router, _ *container.Container) error { return nil }
 func (m *mockGRPCModule) GRPCPolicies() map[string]authz.Policy               { return m.policies }

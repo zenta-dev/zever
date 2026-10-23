@@ -78,7 +78,7 @@ func New[K comparable, V any](capacity int, opts ...Option[K, V]) *Cache[K, V] {
 func (c *Cache[K, V]) Get(k K) (V, bool) {
 	// Fast path: read lock for miss check
 	c.mu.RLock()
-	el, ok := c.items[k]
+	_, ok := c.items[k]
 	c.mu.RUnlock()
 	if !ok {
 		var zero V
@@ -88,7 +88,7 @@ func (c *Cache[K, V]) Get(k K) (V, bool) {
 	// Hit: upgrade to write lock to update recency
 	c.mu.Lock()
 	// Re-check under write lock in case entry was evicted
-	el, ok = c.items[k]
+	el, ok := c.items[k]
 	if !ok {
 		c.mu.Unlock()
 		var zero V

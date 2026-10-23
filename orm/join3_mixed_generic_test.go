@@ -264,7 +264,10 @@ func TestMixedJoin3Stream(t *testing.T) {
 
 	var streamed int
 
-	for range MixedJoinOn3(From[joinUser](joinUsers), userOrdersRel, orderItemsRel, InnerJoin, LeftJoin).Stream(ctx, conn) {
+	for _, err := range MixedJoinOn3(From[joinUser](joinUsers), userOrdersRel, orderItemsRel, InnerJoin, LeftJoin).Stream(ctx, conn) {
+		if err != nil {
+			t.Fatalf("Stream: %v", err)
+		}
 		streamed++
 	}
 

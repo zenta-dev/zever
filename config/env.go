@@ -69,7 +69,7 @@ var durationType = reflect.TypeOf(time.Duration(0))
 func Resolve(env Env) (*Config, error) {
 	cfg := Default()
 	norm := buildNormalizedEnv(env)
-	overlay := stripAdapterKeysNormalized(env, norm)
+	overlay := stripAdapterKeysNormalized(env)
 	for _, svc := range knownServiceNames() {
 		adapter, opts, ok := serviceRefs(cfg, svc)
 		if !ok {
@@ -89,16 +89,11 @@ func Resolve(env Env) (*Config, error) {
 	return cfg, nil
 }
 
-// stripAdapterKeys copies env minus every `SERVICE_ADAPTER` key: adapter
+// stripAdapterKeysNormalized removes every `SERVICE_ADAPTER` key: adapter
 // selection is applied directly by Resolve, so bare-Options ApplyEnv never
 // sees it (an Options struct with its own adapter-shaped field keeps its
 // default, matching the old file+env layering).
-func stripAdapterKeys(env Env) Env {
-	return stripAdapterKeysNormalized(env, buildNormalizedEnv(env))
-}
-
-// stripAdapterKeysNormalized is the fast path using a pre-built normalizedEnvMap.
-func stripAdapterKeysNormalized(env Env, norm normalizedEnvMap) Env {
+func stripAdapterKeysNormalized(env Env) Env {
 	out := make(Env, len(env))
 	adapters := adapterEnvKeys()
 
@@ -147,13 +142,6 @@ func buildNormalizedEnv(env Env) normalizedEnvMap {
 		}
 	}
 	return m
-}
-
-// lookupEnvKey finds key (already uppercased) in env case-insensitively,
-// reporting the value. When several cases of the same key exist, the last
-// in sorted order wins, keeping multi-case environments deterministic.
-func lookupEnvKey(env Env, key string) (string, bool) {
-	return lookupEnvKeyNormalized(buildNormalizedEnv(env), key)
 }
 
 // lookupEnvKeyNormalized is the fast path using a pre-built normalizedEnvMap.
