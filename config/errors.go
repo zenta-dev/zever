@@ -56,16 +56,25 @@ type UnknownFieldError struct {
 	// Empty when nothing is close, or when no candidate list was known at
 	// the failure site.
 	Suggestion string
+	// Reason carries a caller-supplied explanation appended to the message
+	// after the field naming. It is set instead of Suggestion when the key
+	// is rejected for a reason rather than a typo, for example an
+	// adapter-selection key that the environment no longer accepts.
+	Reason string
 }
 
 // Error describes the unrecognized field and its service, with a "did you
-// mean %q?" hint when Suggestion is set.
+// mean %q?" hint when Suggestion is set and a ": <reason>" suffix when
+// Reason is set.
 func (e *UnknownFieldError) Error() string {
+	msg := fmt.Sprintf("config: unknown field %q for service %q", e.Field, e.Service)
 	if e.Suggestion != "" {
-		return fmt.Sprintf("config: unknown field %q for service %q (did you mean %q?)", e.Field, e.Service, e.Suggestion)
+		msg += fmt.Sprintf(" (did you mean %q?)", e.Suggestion)
 	}
-
-	return fmt.Sprintf("config: unknown field %q for service %q", e.Field, e.Service)
+	if e.Reason != "" {
+		msg += ": " + e.Reason
+	}
+	return msg
 }
 
 // Unwrap exposes ErrUnknownField for errors.Is.

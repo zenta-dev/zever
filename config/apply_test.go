@@ -9,51 +9,83 @@ import (
 func TestApplyEnvDefaultInstance(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	env := Env{"DB_MAXCONNS": "7", "DB_ADAPTER": "postgres", "AUTH_JWT_SECRET": "dummy-secret-value"}
-	if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+	env := Env{"DB_MAXCONNS": "7", "AUTH_JWT_SECRET": "dummy-secret-value"}
+	if err := ApplyEnv(env, "db", "", &cfg.DB.Options); err != nil {
 		t.Fatal(err)
 	}
-	if err := ApplyEnv(env, "auth", "", &cfg.Auth); err != nil {
+	if err := ApplyEnv(env, "auth", "", &cfg.Auth.Options); err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DB.Options.MaxConns != 7 {
 		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
 	}
 	if cfg.Auth.Options.JWT.Secret != "dummy-secret-value" {
 		t.Fatal("nested jwt secret not set")
 	}
 }
 
-func TestApplyEnvBareOptions(t *testing.T) {
+// TestApplyEnvAdapterKeyFails pins the removal: an ADAPTER key under the
+// wired prefix always fails with an UnknownFieldError carrying the
+// removal message, never a suggestion, even for bare Options.
+func TestApplyEnvAdapterKeyFails(t *testing.T) {
+	t.Parallel()
+	for _, env := range []Env{
+		{"DB_ADAPTER": "postgres"},
+		{"db_adapter": "postgres"},
+		{"DB_ADAPTER": ""},
+	} {
+		cfg := Default()
+		err := ApplyEnv(env, "db", "", &cfg.DB.Options)
+		if err == nil {
+			t.Fatalf("%v: want error", env)
+		}
+		var unknown *UnknownFieldError
+		if !errors.As(err, &unknown) {
+			t.Fatalf("%v: want UnknownFieldError, got %T: %v", env, err, err)
+		}
+		if !errors.Is(err, ErrUnknownField) {
+			t.Fatalf("%v: want ErrUnknownField match: %v", env, err)
+		}
+		if unknown.Suggestion != "" {
+			t.Fatalf("%v: suggestion = %q, want empty (a removal, not a typo)", env, unknown.Suggestion)
+		}
+		if !strings.Contains(err.Error(), "adapter selection removed") {
+			t.Fatalf("%v: error = %v, want removal message", env, err)
+		}
+	}
+}
+
+// TestApplyEnvNamedAdapterKeyFails pins the removal for named instances:
+// SERVICE__NAME__ADAPTER fails the same way as the default-instance key.
+func TestApplyEnvNamedAdapterKeyFails(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	env := Env{"DB_MAXCONNS": "7", "DB_ADAPTER": "postgres"}
-	if err := ApplyEnv(env, "db", "", &cfg.DB.Options); err != nil {
-		t.Fatal(err)
+	env := Env{"DB__REPORTING__ADAPTER": "postgres"}
+	err := ApplyEnv(env, "db", "reporting", &cfg.DB.Options)
+	if err == nil {
+		t.Fatal("want error")
 	}
-	if cfg.DB.Options.MaxConns != 7 {
-		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
+	var unknown *UnknownFieldError
+	if !errors.As(err, &unknown) {
+		t.Fatalf("want UnknownFieldError, got %T: %v", err, err)
 	}
-	if cfg.DB.Adapter != "sqlite" {
-		t.Fatalf("adapter must not leak into bare options: %q", cfg.DB.Adapter)
+	if unknown.Suggestion != "" {
+		t.Fatalf("suggestion = %q, want empty", unknown.Suggestion)
+	}
+	if !strings.Contains(err.Error(), "adapter selection removed") {
+		t.Fatalf("error = %v, want removal message", err)
 	}
 }
 
 func TestApplyEnvCaseInsensitive(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	env := Env{"db_maxconns": "9", "Db_Adapter": "postgres"}
-	if err := ApplyEnv(env, "DB", "", &cfg.DB); err != nil {
+	env := Env{"db_maxconns": "9"}
+	if err := ApplyEnv(env, "DB", "", &cfg.DB.Options); err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DB.Options.MaxConns != 9 {
 		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
 	}
 }
 
@@ -65,10 +97,10 @@ func TestApplyEnvIgnoresOtherServices(t *testing.T) {
 		"CONFIGTESTBARE": "hostile", "DB_": "x",
 		"CACHE_MAXENTRIES": "100",
 	}
-	if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+	if err := ApplyEnv(env, "db", "", &cfg.DB.Options); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DB.Options.MaxConns != 0 || cfg.DB.Adapter != "sqlite" {
+	if cfg.DB.Options.MaxConns != 0 {
 		t.Fatal("hostile env leaked into db")
 	}
 	if cfg.Cache.Options.MaxEntries != 0 {
@@ -79,8 +111,8 @@ func TestApplyEnvIgnoresOtherServices(t *testing.T) {
 func TestApplyEnvIgnoresInstanceKeys(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	env := Env{"DB__REPORTING__DSN": "postgres://x", "DB__REPORTING__ADAPTER": "postgres"}
-	if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+	env := Env{"DB__REPORTING__DSN": "postgres://x"}
+	if err := ApplyEnv(env, "db", "", &cfg.DB.Options); err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DB.Options.DSN != "" {
@@ -92,7 +124,7 @@ func TestApplyEnvUnknownKeyErrorsWithSuggestion(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{"DB_MAXCONBNS": "7"}
-	err := ApplyEnv(env, "db", "", &cfg.DB)
+	err := ApplyEnv(env, "db", "", &cfg.DB.Options)
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -113,7 +145,7 @@ func TestApplyEnvTypeErrorScrubbed(t *testing.T) {
 	secret := "super-secret-value-xyz-123"
 	cfg := Default()
 	env := Env{"DB_MAXCONNS": secret}
-	err := ApplyEnv(env, "db", "", &cfg.DB)
+	err := ApplyEnv(env, "db", "", &cfg.DB.Options)
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -129,7 +161,7 @@ func TestApplyEnvTypeErrorScrubbed(t *testing.T) {
 func TestApplyEnvUnknownService(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	err := ApplyEnv(Env{"NOPE_X": "1"}, "nope", "", &cfg.DB)
+	err := ApplyEnv(Env{"NOPE_X": "1"}, "nope", "", &cfg.DB.Options)
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -155,19 +187,15 @@ func TestApplyEnvNamedInstance(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{
-		"DB__REPORTING__DSN":     "postgres://reporting/db",
-		"DB__REPORTING__ADAPTER": "postgres",
-		"DB_DSN":                 "sqlite://default",
+		"DB__REPORTING__DSN": "postgres://reporting/db",
+		"DB_DSN":             "sqlite://default",
 	}
-	reporting := cfg.DB
+	reporting := cfg.DB.Options
 	if err := ApplyEnv(env, "db", "reporting", &reporting); err != nil {
 		t.Fatal(err)
 	}
-	if reporting.Options.DSN != "postgres://reporting/db" {
-		t.Fatalf("got %q", reporting.Options.DSN)
-	}
-	if reporting.Adapter != "postgres" {
-		t.Fatalf("got %q", reporting.Adapter)
+	if reporting.DSN != "postgres://reporting/db" {
+		t.Fatalf("got %q", reporting.DSN)
 	}
 	if cfg.DB.Options.DSN != "" {
 		t.Fatal("named key leaked into default")
@@ -178,12 +206,12 @@ func TestApplyEnvNamedInstanceCaseInsensitive(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{"db__reporting__maxconns": "11"}
-	svc := cfg.DB
+	svc := cfg.DB.Options
 	if err := ApplyEnv(env, "db", "REPORTING", &svc); err != nil {
 		t.Fatal(err)
 	}
-	if svc.Options.MaxConns != 11 {
-		t.Fatalf("got %d", svc.Options.MaxConns)
+	if svc.MaxConns != 11 {
+		t.Fatalf("got %d", svc.MaxConns)
 	}
 }
 
@@ -195,7 +223,7 @@ func TestApplyEnvNamedUnknownKeyIgnored(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{"DB__REPORTING__BOGUS": "1"}
-	if err := ApplyEnv(env, "db", "reporting", &cfg.DB); err != nil {
+	if err := ApplyEnv(env, "db", "reporting", &cfg.DB.Options); err != nil {
 		t.Fatalf("want ignored, got %v", err)
 	}
 	if cfg.DB.Options.DSN != "" {
@@ -209,7 +237,7 @@ func TestApplyEnvNamedNearMissKeyFails(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{"DB__REPORTING__MAXCONBNS": "1"}
-	err := ApplyEnv(env, "db", "reporting", &cfg.DB)
+	err := ApplyEnv(env, "db", "reporting", &cfg.DB.Options)
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -225,7 +253,7 @@ func TestApplyEnvNamedNearMissKeyFails(t *testing.T) {
 func TestApplyEnvDoubleUnderscoreNameRejected(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	if err := ApplyEnv(Env{}, "db", "a__b", &cfg.DB); err == nil {
+	if err := ApplyEnv(Env{}, "db", "a__b", &cfg.DB.Options); err == nil {
 		t.Fatal("want error for name containing __")
 	}
 }
@@ -316,14 +344,13 @@ func TestApplyEnvNestedSegmentSeparatorInsensitive(t *testing.T) {
 func TestInstanceNames(t *testing.T) {
 	t.Parallel()
 	env := Env{
-		"DB__REPORTING__DSN":     "x",
-		"DB__REPORTING__ADAPTER": "postgres",
-		"DB__ANALYTICS__DSN":     "y",
-		"db__lower__dsn":         "z",
-		"DB_DSN":                 "default",
-		"DB__":                   "empty",
-		"DB__NONAME":             "nofield",
-		"CACHE__C1__URL":         "u",
+		"DB__REPORTING__DSN": "x",
+		"DB__ANALYTICS__DSN": "y",
+		"db__lower__dsn":     "z",
+		"DB_DSN":             "default",
+		"DB__":               "empty",
+		"DB__NONAME":         "nofield",
+		"CACHE__C1__URL":     "u",
 	}
 	got := InstanceNames(env, "db")
 	want := []string{"ANALYTICS", "LOWER", "REPORTING"}
@@ -370,13 +397,10 @@ func TestDefaultOptionsFresh(t *testing.T) {
 
 func TestResolveFromEnv(t *testing.T) {
 	t.Parallel()
-	env := Env{"DB_ADAPTER": "postgres", "DB_MAXCONNS": "20", "RATELIMIT_RATE": "2.5"}
+	env := Env{"DB_MAXCONNS": "20", "RATELIMIT_RATE": "2.5"}
 	cfg, err := Resolve(env)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
 	}
 	if cfg.DB.Options.MaxConns != 20 {
 		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
@@ -388,9 +412,9 @@ func TestResolveFromEnv(t *testing.T) {
 
 func TestResolveValidatesFailClosed(t *testing.T) {
 	t.Parallel()
-	env := Env{"DB_ADAPTER": ""}
+	env := Env{"DB_MAXCONNS": "-1"}
 	if _, err := Resolve(env); err == nil {
-		t.Fatal("want validation error for empty adapter")
+		t.Fatal("want validation error for negative max_conns")
 	}
 }
 
@@ -414,8 +438,8 @@ func TestResolveIgnoresAmbient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DB.Adapter != "sqlite" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
+	if cfg.DB.Options.DSN != "" {
+		t.Fatalf("hostile env leaked into db: %q", cfg.DB.Options.DSN)
 	}
 }
 
@@ -437,7 +461,7 @@ func FuzzApplyEnvSecretScrub(f *testing.F) {
 			return
 		}
 		cfg := Default()
-		err := ApplyEnv(Env{key: canary + value}, "db", "", &cfg.DB)
+		err := ApplyEnv(Env{key: canary + value}, "db", "", &cfg.DB.Options)
 		if err == nil {
 			return
 		}

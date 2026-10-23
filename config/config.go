@@ -44,20 +44,17 @@ import (
 	"github.com/zenta-dev/zever/shared/codec"
 )
 
-// Service holds one service's adapter selection and typed options.
-// The adapter names the backend implementation (for example "sqlite");
-// Options carries that backend's typed settings.
+// Service holds one service's typed options. Backend selection is
+// compile-time (container.Provide plus direct imports); the environment
+// only tunes options, never selects backends.
 type Service[T any] struct {
-	Adapter string `json:"adapter"`
-	Options T      `json:"options"`
+	Options T `json:"options"`
 }
 
-// ServiceConfig is the display envelope for a single service: the adapter
-// name plus its redacted option map. It backs RedactedServices, the sole
-// display path for option maps.
+// ServiceConfig is the display envelope for a single service: its redacted
+// option map. It backs RedactedServices, the sole display path for option
+// maps.
 type ServiceConfig struct {
-	// Adapter names the backend implementation (for example "sqlite").
-	Adapter string `json:"adapter"`
 	// Options carries the backend's redacted settings.
 	Options map[string]any `json:"options"`
 }
@@ -102,10 +99,10 @@ type Config struct {
 	Webhook       Service[webhook.Options]       `json:"webhook"`
 	Workflow      Service[workflow.Options]      `json:"workflow"`
 	// Plugins holds third-party plugin services keyed by plugin name. Each
-	// entry carries the plugin's adapter selection plus its raw, untyped
-	// options: unknown option fields pass through untouched because the
-	// plugin validates them itself (see RegisterPluginValidator). Nil by
-	// default; Default leaves it nil and merge initializes it on first use.
+	// entry carries its raw, untyped options: unknown option fields pass
+	// through untouched because the plugin validates them itself (see
+	// RegisterPluginValidator). Nil by default; Default leaves it nil and
+	// merge initializes it on first use.
 	Plugins map[string]Service[jsontext.Value] `json:"plugins"`
 }
 
@@ -157,49 +154,49 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 	// The option maps below are freshly built by serviceToMap and owned
 	// by the result, so redaction runs in place: no deep copy is needed
 	// to keep the Config untouched.
-	put := func(name, adapter string, opts any) {
+	put := func(name string, opts any) {
 		m := serviceToMap(opts)
 		redactMap(m)
 		redactSecretFields(opts, m)
-		out[name] = ServiceConfig{Adapter: adapter, Options: m}
+		out[name] = ServiceConfig{Options: m}
 	}
-	put("ai", c.AI.Adapter, c.AI.Options)
-	put("analytics", c.Analytics.Adapter, c.Analytics.Options)
-	put("auth", c.Auth.Adapter, c.Auth.Options)
-	put("billing", c.Billing.Adapter, c.Billing.Options)
-	put("cache", c.Cache.Adapter, c.Cache.Options)
-	put("cdn", c.CDN.Adapter, c.CDN.Options)
-	put("crypto", c.Crypto.Adapter, c.Crypto.Options)
-	put("db", c.DB.Adapter, c.DB.Options)
-	put("document", c.Document.Adapter, c.Document.Options)
-	put("eventbus", c.EventBus.Adapter, c.EventBus.Options)
-	put("flag", c.Flag.Adapter, c.Flag.Options)
-	put("geo", c.Geo.Adapter, c.Geo.Options)
-	put("i18n", c.I18n.Adapter, c.I18n.Options)
-	put("idempotency", c.Idempotency.Adapter, c.Idempotency.Options)
-	put("lock", c.Lock.Adapter, c.Lock.Options)
-	put("log", c.Log.Adapter, c.Log.Options)
-	put("mailer", c.Mailer.Adapter, c.Mailer.Options)
-	put("media", c.Media.Adapter, c.Media.Options)
-	put("notification", c.Notification.Adapter, c.Notification.Options)
-	put("observability", c.Observability.Adapter, c.Observability.Options)
-	put("outbox", c.Outbox.Adapter, c.Outbox.Options)
-	put("password", c.Password.Adapter, c.Password.Options)
-	put("payment", c.Payment.Adapter, c.Payment.Options)
-	put("permission", c.Permission.Adapter, c.Permission.Options)
-	put("queue", c.Queue.Adapter, c.Queue.Options)
-	put("ratelimit", c.RateLimit.Adapter, c.RateLimit.Options)
-	put("resilience", c.Resilience.Adapter, c.Resilience.Options)
-	put("router", c.Router.Adapter, c.Router.Options)
-	put("scheduler", c.Scheduler.Adapter, c.Scheduler.Options)
-	put("search", c.Search.Adapter, c.Search.Options)
-	put("secrets", c.Secrets.Adapter, c.Secrets.Options)
-	put("session", c.Session.Adapter, c.Session.Options)
-	put("storage", c.Storage.Adapter, c.Storage.Options)
-	put("tenant", c.Tenant.Adapter, c.Tenant.Options)
-	put("vectorstore", c.VectorStore.Adapter, c.VectorStore.Options)
-	put("webhook", c.Webhook.Adapter, c.Webhook.Options)
-	put("workflow", c.Workflow.Adapter, c.Workflow.Options)
+	put("ai", c.AI.Options)
+	put("analytics", c.Analytics.Options)
+	put("auth", c.Auth.Options)
+	put("billing", c.Billing.Options)
+	put("cache", c.Cache.Options)
+	put("cdn", c.CDN.Options)
+	put("crypto", c.Crypto.Options)
+	put("db", c.DB.Options)
+	put("document", c.Document.Options)
+	put("eventbus", c.EventBus.Options)
+	put("flag", c.Flag.Options)
+	put("geo", c.Geo.Options)
+	put("i18n", c.I18n.Options)
+	put("idempotency", c.Idempotency.Options)
+	put("lock", c.Lock.Options)
+	put("log", c.Log.Options)
+	put("mailer", c.Mailer.Options)
+	put("media", c.Media.Options)
+	put("notification", c.Notification.Options)
+	put("observability", c.Observability.Options)
+	put("outbox", c.Outbox.Options)
+	put("password", c.Password.Options)
+	put("payment", c.Payment.Options)
+	put("permission", c.Permission.Options)
+	put("queue", c.Queue.Options)
+	put("ratelimit", c.RateLimit.Options)
+	put("resilience", c.Resilience.Options)
+	put("router", c.Router.Options)
+	put("scheduler", c.Scheduler.Options)
+	put("search", c.Search.Options)
+	put("secrets", c.Secrets.Options)
+	put("session", c.Session.Options)
+	put("storage", c.Storage.Options)
+	put("tenant", c.Tenant.Options)
+	put("vectorstore", c.VectorStore.Options)
+	put("webhook", c.Webhook.Options)
+	put("workflow", c.Workflow.Options)
 	for _, name := range sortedPluginNames(c.Plugins) {
 		svc := c.Plugins[name]
 		var m map[string]any
@@ -214,7 +211,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 			m = map[string]any{}
 		}
 		redactMap(m)
-		out[name] = ServiceConfig{Adapter: svc.Adapter, Options: m}
+		out[name] = ServiceConfig{Options: m}
 	}
 	return out
 }

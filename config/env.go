@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 )
@@ -55,8 +54,8 @@ func strictEnv(env Env) bool {
 var durationType = reflect.TypeOf(time.Duration(0))
 
 // Resolve builds a Config from env: service defaults, overlaid by the
-// default instance of every service (`SERVICE_FIELD`, `SERVICE_ADAPTER`),
-// then validated fail-closed. Unknown service heads and bare names are
+// default instance of every service (`SERVICE_FIELD`), then validated
+// fail-closed. Unknown service heads and bare names are
 // ignored so ambient process environment never breaks startup. Under a
 // wired service prefix an unknown key fails only when it is close to a
 // known field (a typo, reported with a did-you-mean hint); a key that is
@@ -65,91 +64,112 @@ var durationType = reflect.TypeOf(time.Duration(0))
 // instances (`SERVICE__NAME__*`) are left for the caller: enumerate them
 // with InstanceNames and apply each with ApplyEnv.
 //
+// Adapter selection is gone from the environment: any key shaped like an
+// adapter selector (`SERVICE_ADAPTER`, `SERVICE__NAME__ADAPTER`, or an
+// unknown head plus `_ADAPTER` such as `FOO_ADAPTER`) fails with an
+// UnknownFieldError carrying adapterRemovedReason, before any other overlay
+// runs. The only exception is a key that resolves to a real settable option
+// field (for example `WEBHOOK_QUEUE_ADAPTER` sets `queue_adapter`), which
+// applies normally.
+//
 // On ANY failure Resolve returns nil plus the error.
 func Resolve(env Env) (*Config, error) {
 	cfg := Default()
-	norm := buildNormalizedEnv(env)
-	overlay := stripAdapterKeysNormalized(env)
+	if err := rejectAdapterKeys(env, cfg); err != nil {
+		return nil, err
+	}
 	for _, svc := range knownServiceNames() {
-		adapter, opts, ok := serviceRefs(cfg, svc)
+		opts, ok := serviceRefs(cfg, svc)
 		if !ok {
 			continue
 		}
-		if v, ok := lookupEnvKeyNormalized(norm, strings.ToUpper(svc)+"_ADAPTER"); ok {
-			*adapter = v
-		}
-		if err := ApplyEnv(overlay, svc, "", opts); err != nil {
+		if err := ApplyEnv(env, svc, "", opts); err != nil {
 			return nil, err
 		}
 	}
-	applyPluginEnvNormalized(norm, cfg)
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-// stripAdapterKeysNormalized removes every `SERVICE_ADAPTER` key: adapter
-// selection is applied directly by Resolve, so bare-Options ApplyEnv never
-// sees it (an Options struct with its own adapter-shaped field keeps its
-// default, matching the old file+env layering).
-func stripAdapterKeysNormalized(env Env) Env {
-	out := make(Env, len(env))
-	adapters := adapterEnvKeys()
+// adapterRemovedReason explains why any *_ADAPTER key fails: adapter
+// selection no longer comes from the environment. It rides on
+// UnknownFieldError.Reason so the failure keeps its errors.Is match on
+// ErrUnknownField while naming the compile-time replacement. Suggestion
+// stays empty: this is a removal, never a typo.
+const adapterRemovedReason = "adapter selection removed; wire in wiring.go with container.Provide and rebuild"
 
-	for key, value := range env {
+// rejectAdapterKeys fails closed on every adapter-selection key in env: any
+// key whose uppercased form ends in "_ADAPTER" is rejected with an
+// UnknownFieldError carrying adapterRemovedReason, unless the key resolves
+// to a real settable option field under a known service prefix (for example
+// WEBHOOK_QUEUE_ADAPTER sets webhook's queue_adapter option). Suggestion is
+// never set: this is a removal, not a typo. Keys iterate in sorted order so
+// the first rejection is deterministic across map iteration order.
+func rejectAdapterKeys(env Env, cfg *Config) error {
+	for _, key := range sortedEnvKeys(env) {
 		upper := strings.ToUpper(key)
-		skip := false
-		for _, adapter := range adapters {
-			if upper == adapter {
-				skip = true
-				break
+		if !strings.HasSuffix(upper, "_ADAPTER") {
+			continue
+		}
+		stem := upper[:len(upper)-len("_ADAPTER")]
+		switch {
+		case stem == "":
+			return &UnknownFieldError{Service: "", Field: "ADAPTER", Reason: adapterRemovedReason}
+		case strings.Contains(stem, "__"):
+			head, _, _ := strings.Cut(stem, "__")
+			return &UnknownFieldError{Service: canonicalService(head), Field: "ADAPTER", Reason: adapterRemovedReason}
+		case !strings.Contains(stem, "_"):
+			return &UnknownFieldError{Service: canonicalService(stem), Field: "ADAPTER", Reason: adapterRemovedReason}
+		default:
+			if resolvesToRealField(cfg, key) {
+				continue
 			}
-		}
-		if !skip {
-			out[key] = value
+			head, _, _ := strings.Cut(stem, "_")
+			return &UnknownFieldError{Service: canonicalService(head), Field: "ADAPTER", Reason: adapterRemovedReason}
 		}
 	}
-	return out
+	return nil
 }
 
-// adapterEnvKeys returns the uppercased SERVICE_ADAPTER key of every known
-// service. The set is built once via sync.OnceValue: the ambient environment
-// holds hundreds of unrelated keys, and none of them needs the service list
-// rebuilt for every key.
-var adapterEnvKeys = sync.OnceValue(func() []string {
-	names := knownServiceNames()
-	out := make([]string, 0, len(names))
-
-	for _, svc := range names {
-		out = append(out, strings.ToUpper(svc)+"_ADAPTER")
+// canonicalService reports the canonical lowercase service name for an
+// env-var head, or the lowercased head itself when it names no known
+// service. Adapter-shaped keys over unknown heads (FOO_ADAPTER) still fail;
+// they just carry no known service.
+func canonicalService(head string) string {
+	if svc, ok := matchService(head); ok {
+		return svc
 	}
-
-	return out
-})
-
-// normalizedEnvMap maps uppercased env keys to (originalKey, value) pairs.
-// When multiple cases of the same key exist, the last in sorted order wins.
-type normalizedEnvMap map[string][2]string
-
-// buildNormalizedEnv builds a normalizedEnvMap from env.
-func buildNormalizedEnv(env Env) normalizedEnvMap {
-	m := make(normalizedEnvMap, len(env))
-	for k, v := range env {
-		upper := strings.ToUpper(k)
-		if existing, ok := m[upper]; !ok || k > existing[0] {
-			m[upper] = [2]string{k, v}
-		}
-	}
-	return m
+	return strings.ToLower(head)
 }
 
-// lookupEnvKeyNormalized is the fast path using a pre-built normalizedEnvMap.
-func lookupEnvKeyNormalized(norm normalizedEnvMap, key string) (string, bool) {
-	if pair, ok := norm[key]; ok {
-		return pair[1], true
+// resolvesToRealField reports whether key resolves to a settable option
+// field under some known service's default prefix. A key shaped like an
+// adapter selector that is really an option (WEBHOOK_QUEUE_ADAPTER sets
+// webhook's queue_adapter) applies normally instead of failing as a removed
+// adapter key. Ambiguous keys count as real: ApplyEnv reports the collision
+// itself.
+func resolvesToRealField(cfg *Config, key string) bool {
+	for _, svc := range knownServiceNames() {
+		rest, ok := applyPrefixKey(key, strings.ToUpper(svc), false)
+		if !ok {
+			continue
+		}
+		opts, ok := serviceRefs(cfg, svc)
+		if !ok {
+			continue
+		}
+		target := reflect.Indirect(reflect.ValueOf(opts))
+		if !target.IsValid() || target.Kind() != reflect.Struct {
+			continue
+		}
+		match := matchEnvField(target, rest)
+		if match.Path != nil || match.Ambiguous {
+			return true
+		}
 	}
-	return "", false
+	return false
 }
 
 // sortedEnvKeys returns env's keys in sorted order so multi-key application
@@ -193,12 +213,12 @@ func prefixedEnvKeys(env Env, prefix string, named bool) []string {
 // are ignored, as are bare names and other services' keys, so ambient
 // process environment never breaks startup.
 //
-// dst must be a non-nil pointer to a struct, in one of two shapes: a
-// Service envelope (an Adapter string field plus an Options struct field,
-// as in Config) or bare Options. In envelope form a trailing ADAPTER key
-// selects the adapter and every other key descends into Options; in bare
-// form ADAPTER keys resolve like any other field and unresolvable ones are
-// ignored, since adapter selection is the caller's job there.
+// dst must be a non-nil pointer to a struct holding the service's Options:
+// ApplyEnv walks the Options fields directly. Backend selection is
+// compile-time, so an ADAPTER key under the wired prefix always fails with
+// an UnknownFieldError carrying adapterRemovedReason, never a suggestion.
+// (The sole exception is an Options struct with its own adapter-shaped
+// option field: there is no special case, the removal wins.)
 //
 // Field matching reuses the zero-alloc ASCII-fold: case-insensitive with
 // "_" ignored, so MAX_RETRIES matches MaxRetries. One nesting level is
@@ -228,48 +248,21 @@ func ApplyEnv(env Env, service, name string, dst any) error {
 		return &InvalidOptionsError{Service: svc, Reason: "dst must be a non-nil pointer to a struct"}
 	}
 	target := root
-	setDst := dst
-	var adapter reflect.Value
-	var candidates []string
-	envelope := false
-	if opts, ok := findField(root, "options"); ok && opts.Kind() == reflect.Struct {
-		if a, ok := findField(root, "adapter"); ok && a.Kind() == reflect.String && a.CanSet() {
-			target = opts
-			setDst = target.Addr().Interface()
-			adapter = a
-			envelope = true
-			candidates = append([]string{"adapter"}, fieldCandidates(target)...)
-		}
-	}
-	if candidates == nil {
-		candidates = fieldCandidates(root)
-	}
+	candidates := fieldCandidates(root)
 	for _, key := range prefixedEnvKeys(env, prefix, named) {
 		rest, ok := applyPrefixKey(key, prefix, named)
 		if !ok {
 			continue
 		}
-		if envelope && normEqualFold(rest, "adapter") {
-			adapter.SetString(env[key])
-			continue
-		}
-		if !envelope && normEqualFold(rest, "adapter") {
-			// Bare Options with no envelope: adapter selection is the
-			// caller's job, so a bare ADAPTER key sets the field when
-			// the struct has one and is otherwise ignored.
-			if field, ok := findField(target, rest); ok && isScalarField(field) {
-				if err := setOptionField(svc, setDst, []string{rest}, env[key], key); err != nil {
-					return wrapApplyError(svc, err)
-				}
-			}
-			continue
+		if normEqualFold(rest, "adapter") {
+			return &UnknownFieldError{Service: svc, Field: rest, Reason: adapterRemovedReason}
 		}
 		match := matchEnvField(target, rest)
 		if match.Ambiguous {
 			return &InvalidOptionsError{Service: svc, Reason: fmt.Sprintf("ambiguous env %s: matches fields %q and %q", key, strings.ToLower(rest), strings.ToLower(match.OuterName)+"."+strings.ToLower(match.InnerName))}
 		}
 		if match.Path != nil {
-			if err := setOptionField(svc, setDst, match.Path, env[key], key); err != nil {
+			if err := setOptionField(svc, dst, match.Path, env[key], key); err != nil {
 				return wrapApplyError(svc, err)
 			}
 			continue
@@ -509,31 +502,11 @@ func DefaultOptions(service, name string) any {
 	if !ok {
 		return nil
 	}
-	_, opts, ok := serviceRefs(Default(), svc)
+	opts, ok := serviceRefs(Default(), svc)
 	if !ok {
 		return nil
 	}
 	return reflect.Indirect(reflect.ValueOf(opts)).Interface()
-}
-
-// applyPluginEnv overlays `<PLUGIN>_ADAPTER` variables onto cfg.Plugins,
-// one per existing plugin entry (uppercased). Missing or empty variables
-// are ignored. Only the adapter is overridable; plugin options stay raw
-// because they have no typed fields to coerce into.
-func applyPluginEnv(env Env, cfg *Config) {
-	applyPluginEnvNormalized(buildNormalizedEnv(env), cfg)
-}
-
-// applyPluginEnvNormalized is the fast path using a pre-built normalizedEnvMap.
-func applyPluginEnvNormalized(norm normalizedEnvMap, cfg *Config) {
-	for name, svc := range cfg.Plugins {
-		v, ok := lookupEnvKeyNormalized(norm, strings.ToUpper(name)+"_ADAPTER")
-		if !ok || v == "" {
-			continue
-		}
-		svc.Adapter = v
-		cfg.Plugins[name] = svc
-	}
 }
 
 // matchService reports the canonical lowercase service name for an
@@ -613,86 +586,86 @@ func matchName(head string, names ...string) (string, bool) {
 	return "", false
 }
 
-// serviceRefs returns pointers to the named service's adapter and options.
+// serviceRefs returns a pointer to the named service's options.
 // ok is false for unknown names.
-func serviceRefs(cfg *Config, svc string) (adapter *string, opts any, ok bool) {
+func serviceRefs(cfg *Config, svc string) (opts any, ok bool) {
 	switch svc {
 	case "ai":
-		return &cfg.AI.Adapter, &cfg.AI.Options, true
+		return &cfg.AI.Options, true
 	case "analytics":
-		return &cfg.Analytics.Adapter, &cfg.Analytics.Options, true
+		return &cfg.Analytics.Options, true
 	case "auth":
-		return &cfg.Auth.Adapter, &cfg.Auth.Options, true
+		return &cfg.Auth.Options, true
 	case "billing":
-		return &cfg.Billing.Adapter, &cfg.Billing.Options, true
+		return &cfg.Billing.Options, true
 	case "cache":
-		return &cfg.Cache.Adapter, &cfg.Cache.Options, true
+		return &cfg.Cache.Options, true
 	case "cdn":
-		return &cfg.CDN.Adapter, &cfg.CDN.Options, true
+		return &cfg.CDN.Options, true
 	case "crypto":
-		return &cfg.Crypto.Adapter, &cfg.Crypto.Options, true
+		return &cfg.Crypto.Options, true
 	case "db":
-		return &cfg.DB.Adapter, &cfg.DB.Options, true
+		return &cfg.DB.Options, true
 	case "document":
-		return &cfg.Document.Adapter, &cfg.Document.Options, true
+		return &cfg.Document.Options, true
 	case "eventbus":
-		return &cfg.EventBus.Adapter, &cfg.EventBus.Options, true
+		return &cfg.EventBus.Options, true
 	case "flag":
-		return &cfg.Flag.Adapter, &cfg.Flag.Options, true
+		return &cfg.Flag.Options, true
 	case "geo":
-		return &cfg.Geo.Adapter, &cfg.Geo.Options, true
+		return &cfg.Geo.Options, true
 	case "i18n":
-		return &cfg.I18n.Adapter, &cfg.I18n.Options, true
+		return &cfg.I18n.Options, true
 	case "idempotency":
-		return &cfg.Idempotency.Adapter, &cfg.Idempotency.Options, true
+		return &cfg.Idempotency.Options, true
 	case "lock":
-		return &cfg.Lock.Adapter, &cfg.Lock.Options, true
+		return &cfg.Lock.Options, true
 	case "log":
-		return &cfg.Log.Adapter, &cfg.Log.Options, true
+		return &cfg.Log.Options, true
 	case "mailer":
-		return &cfg.Mailer.Adapter, &cfg.Mailer.Options, true
+		return &cfg.Mailer.Options, true
 	case "media":
-		return &cfg.Media.Adapter, &cfg.Media.Options, true
+		return &cfg.Media.Options, true
 	case "notification":
-		return &cfg.Notification.Adapter, &cfg.Notification.Options, true
+		return &cfg.Notification.Options, true
 	case "observability":
-		return &cfg.Observability.Adapter, &cfg.Observability.Options, true
+		return &cfg.Observability.Options, true
 	case "outbox":
-		return &cfg.Outbox.Adapter, &cfg.Outbox.Options, true
+		return &cfg.Outbox.Options, true
 	case "password":
-		return &cfg.Password.Adapter, &cfg.Password.Options, true
+		return &cfg.Password.Options, true
 	case "payment":
-		return &cfg.Payment.Adapter, &cfg.Payment.Options, true
+		return &cfg.Payment.Options, true
 	case "permission":
-		return &cfg.Permission.Adapter, &cfg.Permission.Options, true
+		return &cfg.Permission.Options, true
 	case "queue":
-		return &cfg.Queue.Adapter, &cfg.Queue.Options, true
+		return &cfg.Queue.Options, true
 	case "ratelimit":
-		return &cfg.RateLimit.Adapter, &cfg.RateLimit.Options, true
+		return &cfg.RateLimit.Options, true
 	case "resilience":
-		return &cfg.Resilience.Adapter, &cfg.Resilience.Options, true
+		return &cfg.Resilience.Options, true
 	case "router":
-		return &cfg.Router.Adapter, &cfg.Router.Options, true
+		return &cfg.Router.Options, true
 	case "scheduler":
-		return &cfg.Scheduler.Adapter, &cfg.Scheduler.Options, true
+		return &cfg.Scheduler.Options, true
 	case "search":
-		return &cfg.Search.Adapter, &cfg.Search.Options, true
+		return &cfg.Search.Options, true
 	case "secrets":
-		return &cfg.Secrets.Adapter, &cfg.Secrets.Options, true
+		return &cfg.Secrets.Options, true
 	case "session":
-		return &cfg.Session.Adapter, &cfg.Session.Options, true
+		return &cfg.Session.Options, true
 	case "storage":
-		return &cfg.Storage.Adapter, &cfg.Storage.Options, true
+		return &cfg.Storage.Options, true
 	case "tenant":
-		return &cfg.Tenant.Adapter, &cfg.Tenant.Options, true
+		return &cfg.Tenant.Options, true
 	case "vectorstore":
-		return &cfg.VectorStore.Adapter, &cfg.VectorStore.Options, true
+		return &cfg.VectorStore.Options, true
 	case "webhook":
-		return &cfg.Webhook.Adapter, &cfg.Webhook.Options, true
+		return &cfg.Webhook.Options, true
 	case "workflow":
-		return &cfg.Workflow.Adapter, &cfg.Workflow.Options, true
+		return &cfg.Workflow.Options, true
 	default:
-		return nil, nil, false
+		return nil, false
 	}
 }
 

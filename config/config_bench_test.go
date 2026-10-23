@@ -16,10 +16,9 @@ func ambientEnv() Env {
 		env[fmt.Sprintf("AMBIENT_%03d", i)] = "value"
 	}
 
-	env["DB_ADAPTER"] = "sqlite"
+	env["DB_DSN"] = "/tmp/zever-bench.db"
 	env["DB_MAXCONNS"] = "20"
-	env["DB_PATH"] = "/tmp/zever-bench.db"
-	env["LOG_ADAPTER"] = "slog"
+	env["LOG_MIN_LEVEL"] = "info"
 
 	return env
 }
@@ -34,7 +33,7 @@ func BenchmarkApplyEnvAmbient(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+		if err := ApplyEnv(env, "db", "", &cfg.DB.Options); err != nil {
 			b.Fatalf("ApplyEnv: %v", err)
 		}
 	}
@@ -71,7 +70,7 @@ func BenchmarkDefault(b *testing.B) {
 // BenchmarkResolveEnv measures the full env-only resolution (defaults,
 // env overlay, fail-closed validate) from a small valid Env.
 func BenchmarkResolveEnv(b *testing.B) {
-	env := Env{"DB_ADAPTER": "sqlite", "DB_MAXCONNS": "10", "LOG_ADAPTER": "slog"}
+	env := Env{"DB_MAXCONNS": "10", "LOG_MIN_LEVEL": "info"}
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -145,7 +144,7 @@ func BenchmarkApplyEnv(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if err := ApplyEnv(env, "db", "", &cfg.DB); err != nil {
+		if err := ApplyEnv(env, "db", "", &cfg.DB.Options); err != nil {
 			b.Fatalf("ApplyEnv: %v", err)
 		}
 	}

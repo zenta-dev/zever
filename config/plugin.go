@@ -13,17 +13,19 @@ import (
 // (unknown option fields pass through), and only Validate interprets the
 // options via the registered hook. Access is mutex-guarded so parallel
 // tests registering distinct names stay race-free.
+// Validators take only the raw options: backend selection is compile-time,
+// so there is no adapter to validate.
 var (
 	pluginValidatorsMu sync.RWMutex
-	pluginValidators   = make(map[string]func(string, jsontext.Value) error)
+	pluginValidators   = make(map[string]func(jsontext.Value) error)
 )
 
 // RegisterPluginValidator registers validate as the Validate hook for the
-// named plugin. Validate calls it with the plugin's resolved adapter and
-// raw options; a nil error means the plugin's config is valid. Names must
-// be unique: re-registering a name fails so two plugins can never silently
-// share one validator. A nil validate or empty name also fails.
-func RegisterPluginValidator(name string, validate func(adapter string, opts jsontext.Value) error) error {
+// named plugin. Validate calls it with the plugin's raw options; a nil
+// error means the plugin's config is valid. Names must be unique:
+// re-registering a name fails so two plugins can never silently share one
+// validator. A nil validate or empty name also fails.
+func RegisterPluginValidator(name string, validate func(opts jsontext.Value) error) error {
 	if name == "" {
 		return errors.New("config: plugin validator name must not be empty")
 	}
@@ -42,7 +44,7 @@ func RegisterPluginValidator(name string, validate func(adapter string, opts jso
 // lookupPluginValidator returns the validator registered for name, or false
 // when none is registered. Unregistered plugins skip validation: their
 // options are opaque to this package.
-func lookupPluginValidator(name string) (func(string, jsontext.Value) error, bool) {
+func lookupPluginValidator(name string) (func(jsontext.Value) error, bool) {
 	pluginValidatorsMu.RLock()
 	defer pluginValidatorsMu.RUnlock()
 	validate, ok := pluginValidators[name]

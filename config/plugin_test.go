@@ -9,7 +9,7 @@ import (
 	"github.com/zenta-dev/zever/shared/codec"
 )
 
-func mustRegisterPlugin(t *testing.T, name string, validate func(string, jsontext.Value) error) {
+func mustRegisterPlugin(t *testing.T, name string, validate func(jsontext.Value) error) {
 	t.Helper()
 	if err := RegisterPluginValidator(name, validate); err != nil {
 		t.Fatalf("RegisterPluginValidator(%q): %v", name, err)
@@ -37,7 +37,6 @@ func TestPluginOptionsStayRaw(t *testing.T) {
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_merge": {
-			Adapter: "custom",
 			Options: pluginRaw(t, map[string]any{
 				"anything_goes": 1,
 				"nested":        map[string]any{"a": "b"},
@@ -48,9 +47,6 @@ func TestPluginOptionsStayRaw(t *testing.T) {
 	if !ok {
 		t.Fatal("missing plugintest_merge")
 	}
-	if svc.Adapter != "custom" {
-		t.Fatalf("adapter = %q, want custom", svc.Adapter)
-	}
 	var opts map[string]any
 	if err := codec.Unmarshal(svc.Options, &opts); err != nil {
 		t.Fatalf("unmarshal plugin options: %v", err)
@@ -60,37 +56,32 @@ func TestPluginOptionsStayRaw(t *testing.T) {
 	}
 }
 
-func TestPluginEnvAdapterOverride(t *testing.T) {
+// TestPluginAdapterKeyRejected pins the removal for plugin-shaped keys: a
+// <PLUGIN>_ADAPTER key fails resolution instead of overlaying anything.
+func TestPluginAdapterKeyRejected(t *testing.T) {
 	t.Parallel()
-	cfg := Default()
-	cfg.Plugins = map[string]Service[jsontext.Value]{
-		"plugintest_env": {Adapter: "default-adapter", Options: pluginRaw(t, map[string]any{"k": "v"})},
-	}
-	applyPluginEnv(Env{"PLUGINTEST_ENV_ADAPTER": "env-adapter"}, cfg)
-	if cfg.Plugins["plugintest_env"].Adapter != "env-adapter" {
-		t.Fatalf("adapter = %q, want env-adapter", cfg.Plugins["plugintest_env"].Adapter)
-	}
-	if string(cfg.Plugins["plugintest_env"].Options) != `{"k":"v"}` {
-		t.Fatalf("env wiped options: %s", cfg.Plugins["plugintest_env"].Options)
-	}
-}
-
-func TestPluginEnvNoPluginsNoop(t *testing.T) {
-	t.Parallel()
-	cfg := Default()
-	applyPluginEnv(Env{"PLUGINTEST_MISSING_ADAPTER": "x"}, cfg)
-	if cfg.Plugins != nil {
-		t.Fatalf("env created plugins: %v", cfg.Plugins)
+	for _, key := range []string{"PLUGINTEST_ENV_ADAPTER", "MYPLUGIN_ADAPTER"} {
+		_, err := Resolve(Env{key: "custom"})
+		if err == nil {
+			t.Fatalf("%s: want error", key)
+		}
+		var unknown *UnknownFieldError
+		if !errors.As(err, &unknown) {
+			t.Fatalf("%s: want UnknownFieldError, got %T: %v", key, err, err)
+		}
+		if unknown.Suggestion != "" {
+			t.Fatalf("%s: suggestion = %q, want empty", key, unknown.Suggestion)
+		}
+		if !strings.Contains(err.Error(), "adapter selection removed") {
+			t.Fatalf("%s: error = %v, want removal message", key, err)
+		}
 	}
 }
 
 func TestPluginValidateSuccess(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
-	mustRegisterPlugin(t, "plugintest_valid_ok", func(adapter string, opts jsontext.Value) error {
-		if adapter != "custom" {
-			return errors.New("want adapter custom")
-		}
+	mustRegisterPlugin(t, "plugintest_valid_ok", func(opts jsontext.Value) error {
 		var m map[string]any
 		if err := codec.Unmarshal(opts, &m); err != nil {
 			return err
@@ -102,7 +93,7 @@ func TestPluginValidateSuccess(t *testing.T) {
 	})
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
-		"plugintest_valid_ok": {Adapter: "custom", Options: pluginRaw(t, map[string]any{"k": "v"})},
+		"plugintest_valid_ok": {Options: pluginRaw(t, map[string]any{"k": "v"})},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
@@ -112,12 +103,12 @@ func TestPluginValidateSuccess(t *testing.T) {
 func TestPluginValidateFailure(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
-	mustRegisterPlugin(t, "plugintest_valid_fail", func(string, jsontext.Value) error {
+	mustRegisterPlugin(t, "plugintest_valid_fail", func(jsontext.Value) error {
 		return errors.New("boom")
 	})
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
-		"plugintest_valid_fail": {Adapter: "custom"},
+		"plugintest_valid_fail": {Options: pluginRaw(t, map[string]any{"k": "v"})},
 	}
 	err := cfg.Validate()
 	if err == nil {
@@ -133,7 +124,7 @@ func TestPluginValidateUnregisteredSkips(t *testing.T) {
 	_ = ctx
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
-		"plugintest_unregistered_xyz": {Adapter: "whatever", Options: pluginRaw(t, map[string]any{"any": 1})},
+		"plugintest_unregistered_xyz": {Options: pluginRaw(t, map[string]any{"any": 1})},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("unregistered plugin must skip validation: %v", err)
@@ -143,15 +134,15 @@ func TestPluginValidateUnregisteredSkips(t *testing.T) {
 func TestPluginDuplicateValidator(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
-	mustRegisterPlugin(t, "plugintest_dup", func(string, jsontext.Value) error { return nil })
-	err := RegisterPluginValidator("plugintest_dup", func(string, jsontext.Value) error { return nil })
+	mustRegisterPlugin(t, "plugintest_dup", func(jsontext.Value) error { return nil })
+	err := RegisterPluginValidator("plugintest_dup", func(jsontext.Value) error { return nil })
 	if err == nil {
 		t.Fatal("want duplicate registration error")
 	}
 	if !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("error = %v, want duplicate mention", err)
 	}
-	if err := RegisterPluginValidator("", func(string, jsontext.Value) error { return nil }); err == nil {
+	if err := RegisterPluginValidator("", func(jsontext.Value) error { return nil }); err == nil {
 		t.Fatal("want empty-name error")
 	}
 	if err := RegisterPluginValidator("plugintest_nil", nil); err == nil {
@@ -165,7 +156,6 @@ func TestPluginRedactedServices(t *testing.T) {
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_redact": {
-			Adapter: "custom",
 			Options: pluginRaw(t, map[string]any{"api_key": "s3cret", "endpoint": "https://example.com"}),
 		},
 	}
@@ -177,9 +167,6 @@ func TestPluginRedactedServices(t *testing.T) {
 	if !ok {
 		t.Fatal("missing plugintest_redact")
 	}
-	if sc.Adapter != "custom" {
-		t.Fatalf("adapter = %q", sc.Adapter)
-	}
 	if sc.Options["api_key"] != RedactedValue {
 		t.Fatalf("api_key not redacted: %v", sc.Options["api_key"])
 	}
@@ -190,26 +177,15 @@ func TestPluginRedactedServices(t *testing.T) {
 
 func TestPluginEnvEndToEnd(t *testing.T) {
 	t.Parallel()
-	mustRegisterPlugin(t, "plugintest_load", func(adapter string, _ jsontext.Value) error {
-		if adapter != "custom" {
-			return errors.New("want adapter custom")
-		}
+	mustRegisterPlugin(t, "plugintest_load", func(_ jsontext.Value) error {
 		return nil
 	})
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
-		"plugintest_load": {Adapter: "default", Options: pluginRaw(t, map[string]any{"api_key": "s3cret"})},
+		"plugintest_load": {Options: pluginRaw(t, map[string]any{"api_key": "s3cret"})},
 	}
-	applyPluginEnv(Env{"PLUGINTEST_LOAD_ADAPTER": "custom"}, cfg)
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
-	}
-	svc, ok := cfg.Plugins["plugintest_load"]
-	if !ok {
-		t.Fatal("missing plugintest_load")
-	}
-	if svc.Adapter != "custom" {
-		t.Fatalf("adapter = %q", svc.Adapter)
 	}
 	got := cfg.RedactedServices()["plugintest_load"]
 	if got.Options["api_key"] != RedactedValue {
