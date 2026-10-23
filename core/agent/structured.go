@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // GenerateStructured asks client for a completion constrained to schema and
@@ -42,7 +42,7 @@ func GenerateStructured(
 			return ai.Generation{}, err
 		}
 
-		decodeErr := json.Unmarshal([]byte(gen.Content), out)
+		decodeErr := codec.Unmarshal([]byte(gen.Content), out)
 		if decodeErr == nil {
 			return gen, nil
 		}

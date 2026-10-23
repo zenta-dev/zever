@@ -1,9 +1,10 @@
 package search
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // DefaultLimit is the default search limit applied by all adapters for Limit<=0.
@@ -28,7 +29,7 @@ func (d Document) Validate() error {
 		return nil
 	}
 
-	if _, err := json.Marshal(d.Metadata); err != nil {
+	if _, err := codec.Marshal(d.Metadata); err != nil {
 		return errors.Join(fmt.Errorf("search: %w", ErrInvalidMetadata), err)
 	}
 

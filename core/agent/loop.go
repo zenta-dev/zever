@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Run drives the conversation through a bounded generate/tool loop. It seeds a
@@ -167,7 +167,7 @@ func decodeArgs(raw string) (map[string]any, error) {
 	}
 
 	var args map[string]any
-	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+	if err := codec.Unmarshal([]byte(raw), &args); err != nil {
 		return nil, err
 	}
 

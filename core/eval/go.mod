@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/zenta-dev/zever/core/agent v0.8.0
 	github.com/zenta-dev/zever/core/ai v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 )
 
 require (
@@ -25,3 +26,5 @@ replace github.com/zenta-dev/zever/shared/mcpclient => ../../shared/mcpclient
 replace github.com/zenta-dev/zever/shared/registry => ../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec

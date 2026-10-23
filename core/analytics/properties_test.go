@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
@@ -47,14 +48,17 @@ func TestValidatePropertiesSize_nonPositiveLimit_usesDefault(t *testing.T) {
 	}
 }
 
-func TestValidatePropertiesSize_cyclic_returnsUnsupportedValue(t *testing.T) {
+func TestValidatePropertiesSize_cyclic_returnsError(t *testing.T) {
 	t.Parallel()
 	m := map[string]any{}
 	m["self"] = m
 	err := ValidatePropertiesSize(m, 1024)
-	var uve *json.UnsupportedValueError
-	if !errors.As(err, &uve) {
-		t.Fatalf("err %T is not *json.UnsupportedValueError", err)
+	var se *jsonv2.SemanticError
+	if !errors.As(err, &se) {
+		t.Fatalf("err %T is not *jsonv2.SemanticError", err)
+	}
+	if !strings.Contains(se.Error(), "cycle") {
+		t.Fatalf("err = %v, want cycle complaint", err)
 	}
 }
 
@@ -108,14 +112,17 @@ func TestMarshalValidated_defaultLimit_returnsBytes(t *testing.T) {
 	}
 }
 
-func TestMarshalValidated_cyclic_returnsUnsupportedValue(t *testing.T) {
+func TestMarshalValidated_cyclic_returnsError(t *testing.T) {
 	t.Parallel()
 	m := map[string]any{}
 	m["self"] = m
 	_, err := MarshalValidated(m, 1024)
-	var uve *json.UnsupportedValueError
-	if !errors.As(err, &uve) {
-		t.Fatalf("err %T is not *json.UnsupportedValueError", err)
+	var se *jsonv2.SemanticError
+	if !errors.As(err, &se) {
+		t.Fatalf("err %T is not *jsonv2.SemanticError", err)
+	}
+	if !strings.Contains(se.Error(), "cycle") {
+		t.Fatalf("err = %v, want cycle complaint", err)
 	}
 }
 

@@ -1,9 +1,10 @@
 package eval
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // LoadCases reads a golden dataset of cases from path. The loader lives
@@ -15,7 +16,7 @@ func LoadCases(path string) ([]Case, error) {
 	}
 
 	var cases []Case
-	if err := json.Unmarshal(raw, &cases); err != nil {
+	if err := codec.Unmarshal(raw, &cases); err != nil {
 		return nil, fmt.Errorf("eval: decode cases %q: %w", path, err)
 	}
 

@@ -1,9 +1,10 @@
 package vectorstore
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Vector is a single stored embedding with its identifier and metadata.
@@ -23,7 +24,7 @@ func (v Vector) Validate() error {
 		return nil
 	}
 
-	if _, err := json.Marshal(v.Metadata); err != nil {
+	if _, err := codec.Marshal(v.Metadata); err != nil {
 		return errors.Join(fmt.Errorf("vectorstore: %w", ErrInvalidMetadata), err)
 	}
 

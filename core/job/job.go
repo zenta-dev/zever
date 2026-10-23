@@ -2,10 +2,11 @@ package job
 
 import (
 	"context"
-	"encoding/json/v2"
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var (
@@ -82,7 +83,7 @@ func Register[T any](name string, handle func(ctx context.Context, args T) error
 
 	def.handler = func(ctx context.Context, payload Payload) error {
 		var args T
-		if err := json.Unmarshal(payload, &args); err != nil {
+		if err := codec.Unmarshal(payload, &args); err != nil {
 			return fmt.Errorf("job: %q decode payload: %w", name, err)
 		}
 

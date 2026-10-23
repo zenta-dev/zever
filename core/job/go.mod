@@ -11,6 +11,7 @@ require (
 	github.com/zenta-dev/zever/core/log v0.8.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/msgspan v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0
@@ -23,7 +24,6 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/zenta-dev/zever/core/db v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect

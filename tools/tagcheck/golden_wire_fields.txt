@@ -940,8 +940,8 @@ tools/modgraph	modEditJSON	Module	Module	v0.7.2
 tools/vulngate	allowFile	Allowlist	allowlist	v0.7.2
 tools/vulngate	findingMsg	Finding	finding	v0.7.2
 tools/vulngate	frame	Function	function	v0.7.2
-tools/zever-lsp	callHierarchyData	Service	service	57a2a86580e4
-tools/zever-lsp	callHierarchyData	RPC	rpc	57a2a86580e4
+tools/zever-lsp	callHierarchyData	Service	service	e3b5d9f813a2
+tools/zever-lsp	callHierarchyData	RPC	rpc	e3b5d9f813a2
 tools/zever-lsp	completionResolveData	Detail	detail	v0.7.2
 tools/zever-mcp	callParams	Name	name	v0.7.2
 tools/zever-mcp	callParams	Arguments	arguments	v0.7.2

@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/zenta-dev/zever/adapters/workflow/memory v0.8.0
 	github.com/zenta-dev/zever/core/db v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
 	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
@@ -20,3 +21,5 @@ replace github.com/zenta-dev/zever/adapters/workflow/memory => ../../adapters/wo
 replace github.com/zenta-dev/zever/shared/retry => ../../shared/retry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec

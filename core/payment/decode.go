@@ -2,13 +2,14 @@ package payment
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // LimitDecode decodes JSON data into v, rejecting payloads larger than limit bytes.
-// It intentionally stays on raw encoding/json (not codec.Codec[V]) because it
-// needs an io.LimitReader for size-limited decoding, which codec.Codec[V] cannot express.
+// Size-limited decoding uses an io.LimitReader over the codec facade's
+// single-value reader.
 func LimitDecode(data []byte, v any, limit int) error {
 	if limit <= 0 {
 		return SizeLimitError{Size: len(data), Limit: limit}
@@ -18,5 +19,5 @@ func LimitDecode(data []byte, v any, limit int) error {
 		return SizeLimitError{Size: len(data), Limit: limit}
 	}
 
-	return json.NewDecoder(io.LimitReader(bytes.NewReader(data), int64(limit))).Decode(v)
+	return codec.UnmarshalRead(io.LimitReader(bytes.NewReader(data), int64(limit)), v)
 }
