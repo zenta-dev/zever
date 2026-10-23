@@ -49,6 +49,10 @@ func hoverAt(schema *ir.Schema, file *ast.File, cursor protocol.Position) *proto
 		return markdownHover(sagaDeclHoverMarkdown(saga), identRange(saga.NamePos, saga.Name))
 	}
 
+	if param, kind, ref := paramNameAt(file, cursor); param != nil {
+		return markdownHover(paramHoverMarkdown(kind, ref, param), identRange(param.NamePos, param.Name))
+	}
+
 	return nil
 }
 
@@ -262,6 +266,41 @@ func sagaDeclHoverMarkdown(saga *ast.SagaDecl) string {
 	}
 
 	sb.WriteString(cappedNamedList(bullets, len(saga.Steps)))
+
+	return sb.String()
+}
+
+// paramHoverMarkdown renders one rpc/job parameter's signature, its parent
+// declaration (`rpc Service.Method` or `job Name`), and its @validate
+// rules re-rendered through renderAttributes (and so renderArgs), the same
+// attribute rendering a field's hover uses. Only @validate attributes
+// render: any other attribute on a parameter is rejected by the resolver, so
+// surfacing it would bless invalid syntax. ast.ParamDecl carries no
+// DocComment (unlike fields and the declarations above), so there is no doc
+// paragraph to surface.
+func paramHoverMarkdown(kind, ref string, param *ast.ParamDecl) string {
+	typeName := "?"
+	if param.Type != nil {
+		typeName = renderTypeExpr(param.Type)
+	}
+
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "```zen\n%s: %s\n```", param.Name, typeName)
+	fmt.Fprintf(&sb, "\n\nParam of %s `%s`.", kind, ref)
+
+	var validate []*ast.Attribute
+
+	for _, attr := range param.Attributes {
+		if attr != nil && attr.Name == "validate" {
+			validate = append(validate, attr)
+		}
+	}
+
+	if lines := renderAttributes(validate); len(lines) > 0 {
+		sb.WriteString("\n\n")
+		sb.WriteString(strings.Join(lines, "\n"))
+	}
 
 	return sb.String()
 }

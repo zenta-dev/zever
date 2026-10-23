@@ -836,3 +836,107 @@ func TestDefinedInLine_emptyFile_returnsEmpty(t *testing.T) {
 		t.Errorf("definedInLine(nameless file) = %q, want empty", got)
 	}
 }
+
+// paramsHoverSrc exercises hover on rpc and job parameter names: a
+// two-param rpc with a validated string param, and a two-param job.
+const paramsHoverSrc = `entity User {
+	id: uuid @primary
+}
+
+service UserService {
+	rpc Rename(id: uuid, name: string @validate(min_len: 1, max_len: 64)) -> User {
+		http: POST "/users/{id}/rename"
+		auth: required
+	}
+}
+
+job SendDigest(target: string, batch: int64) {
+	queue: low
+}
+`
+
+func TestHoverOnRPCParamName(t *testing.T) {
+	// Line 5 is the rpc signature; "name: string" pins the cursor to the
+	// parameter rather than the "name" inside "Rename".
+	got := hoverTextForSrc(t, paramsHoverSrc, cursorOn(t, paramsHoverSrc, 5, "name: string"))
+
+	for _, want := range []string{
+		"```zen\nname: string\n```",
+		"Param of rpc `UserService.Rename`.",
+		"- `@validate(min_len: 1, max_len: 64)`",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestHoverOnRPCParamNameWithoutValidate(t *testing.T) {
+	got := hoverTextForSrc(t, paramsHoverSrc, cursorOn(t, paramsHoverSrc, 5, "id: uuid"))
+
+	for _, want := range []string{
+		"```zen\nid: uuid\n```",
+		"Param of rpc `UserService.Rename`.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+
+	if strings.Contains(got, "@validate") {
+		t.Errorf("hover markdown should list no attributes:\n%s", got)
+	}
+}
+
+func TestHoverOnJobParamName(t *testing.T) {
+	got := hoverTextForSrc(t, paramsHoverSrc, cursorOn(t, paramsHoverSrc, 11, "target"))
+
+	for _, want := range []string{
+		"```zen\ntarget: string\n```",
+		"Param of job `SendDigest`.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestHoverOnParamTypeNameReturnsNil pins the anchor to the name slot: a
+// parameter's type name is a definition reference slot, not a hovered
+// parameter, so hovering it stays silent.
+func TestHoverOnParamTypeNameReturnsNil(t *testing.T) {
+	result, diags := compile.Compile(map[string]string{"main.zen": paramsHoverSrc})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	file, _ := parser.New("main.zen", []byte(paramsHoverSrc)).ParseFile()
+
+	// Line 5 `id: uuid`: the cursor sits on the type, not the name.
+	cursor := cursorOn(t, paramsHoverSrc, 5, "uuid")
+
+	if h := hoverAt(result.Schema, file, cursor); h != nil {
+		t.Errorf("hover on a param type name = %+v, want nil", h)
+	}
+}
+
+// TestHoverOnParamNamePrefersParamOverNothing proves the appended-last
+// anchor fires where no earlier anchor matches: the rpc name itself is not
+// otherwise hoverable, while a param name right beside it is.
+func TestHoverOnParamNameRange(t *testing.T) {
+	file, _ := parser.New("main.zen", []byte(paramsHoverSrc)).ParseFile()
+
+	h := hoverAt(nil, file, cursorOn(t, paramsHoverSrc, 5, "name: string"))
+	if h == nil {
+		t.Fatal("expected hover on the rpc param name, got nil")
+	}
+
+	if h.Range == nil {
+		t.Fatal("hover range is nil, want the param name span")
+	}
+
+	// "name" is four characters wide starting at the cursor.
+	if got := h.Range.End.Character - h.Range.Start.Character; got != uint32(len("name")) {
+		t.Errorf("hover range width = %d, want %d", got, len("name"))
+	}
+}

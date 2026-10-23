@@ -6,6 +6,9 @@ import (
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
+
+	"github.com/zenta-dev/zever/dsl/compile"
+	"github.com/zenta-dev/zever/dsl/ir"
 )
 
 // posAfter returns the LSP position immediately after marker's last
@@ -379,5 +382,306 @@ func TestSignatureHelpNestedCallParensIgnored(t *testing.T) {
 func TestParamIndexByNameUnknown(t *testing.T) {
 	if got := paramIndexByName(signatureSpecs["validate"].params, "bogus"); got != -1 {
 		t.Errorf("paramIndexByName() = %d, want -1", got)
+	}
+}
+
+// dispatchSigSchemaSrc is the workspace schema behind the dispatch
+// signature tests: a validated-param job, a message/entity-ref job and a
+// parameterless job, plus a schedule whose dispatch passes matching arity
+// (resolveDispatch rejects arity mismatches, so the fixture itself must be
+// valid to compile cleanly).
+const dispatchSigSchemaSrc = `entity User {
+	id: uuid @primary
+}
+
+job SendDigest(target: string @validate(min_len: 1), batch: int64) {
+	queue: low
+}
+
+job Invite(u: User) {
+	queue: mail
+}
+
+job Flush() {
+	queue: low
+}
+
+schedule Nightly {
+	cron: "0 0 * * *"
+	dispatch: SendDigest("a", 1)
+}
+`
+
+// compileDispatchSigSchema compiles dispatchSigSchemaSrc and returns the
+// resolved schema, failing the test on diagnostics.
+func compileDispatchSigSchema(t *testing.T) *ir.Schema {
+	t.Helper()
+
+	result, diags := compile.Compile(map[string]string{"main.zen": dispatchSigSchemaSrc})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	return result.Schema
+}
+
+// dispatchCursor returns the cursor at the end of the line ending in
+// marker in a multi-line src, the mid-edit position right after an
+// unclosed `(`.
+func dispatchCursor(t *testing.T, src, marker string) protocol.Position {
+	t.Helper()
+
+	for i, line := range strings.Split(src, "\n") {
+		if strings.HasSuffix(line, marker) {
+			return protocol.Position{Line: uint32(i), Character: uint32(len(line))} //nolint:gosec // test fixture
+		}
+	}
+
+	t.Fatalf("line ending in %q not found in %q", marker, src)
+
+	return protocol.Position{}
+}
+
+// dispatchParamDoc extracts the documentation string of one signature
+// parameter, failing the test when it is not a native protocol.String arm.
+func dispatchParamDoc(t *testing.T, param protocol.ParameterInformation) string {
+	t.Helper()
+
+	doc, ok := param.Documentation.(protocol.String)
+	if !ok {
+		t.Fatalf("parameter Documentation = %T, want protocol.String", param.Documentation)
+	}
+
+	return string(doc)
+}
+
+func TestDispatchSignatureHelpBasic(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest("
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest("))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	if len(got.Signatures) != 1 {
+		t.Fatalf("Signatures = %d, want 1", len(got.Signatures))
+	}
+
+	if want := "SendDigest(target: string, batch: int64)"; got.Signatures[0].Label != want {
+		t.Errorf("Label = %q, want %q", got.Signatures[0].Label, want)
+	}
+
+	if len(got.Signatures[0].Parameters) != 2 {
+		t.Fatalf("Parameters = %d, want 2", len(got.Signatures[0].Parameters))
+	}
+
+	if active := activeParamOf(t, got); active != 0 {
+		t.Errorf("ActiveParameter = %d, want 0", active)
+	}
+}
+
+func TestDispatchSignatureHelpActiveParameterAdvance(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest(\"a\", "
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest(\"a\", "))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	if active := activeParamOf(t, got); active != 1 {
+		t.Errorf("ActiveParameter = %d, want 1", active)
+	}
+}
+
+func TestDispatchSignatureHelpNamedArgRemap(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest(batch: "
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest(batch: "))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	// batch: is named out of order, so the cursor remaps to its declared
+	// slot rather than staying positional.
+	if active := activeParamOf(t, got); active != 1 {
+		t.Errorf("ActiveParameter = %d, want 1", active)
+	}
+}
+
+func TestDispatchSignatureHelpValidateDetail(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest("
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest("))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	doc := dispatchParamDoc(t, got.Signatures[0].Parameters[0])
+
+	for _, want := range []string{"string", "@validate(min_len: 1)"} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("parameter doc = %q, want it to contain %q", doc, want)
+		}
+	}
+}
+
+func TestDispatchSignatureHelpRefParam(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: Invite("
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: Invite("))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	if want := "Invite(u: User)"; got.Signatures[0].Label != want {
+		t.Errorf("Label = %q, want %q", got.Signatures[0].Label, want)
+	}
+}
+
+func TestDispatchSignatureHelpZeroParams(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: Flush("
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: Flush("))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	if want := "Flush()"; got.Signatures[0].Label != want {
+		t.Errorf("Label = %q, want %q", got.Signatures[0].Label, want)
+	}
+
+	if len(got.Signatures[0].Parameters) != 0 {
+		t.Errorf("Parameters = %d, want 0", len(got.Signatures[0].Parameters))
+	}
+
+	if _, ok := got.ActiveParameter.Get(); ok {
+		t.Errorf("ActiveParameter is set, want absent for a parameterless job")
+	}
+}
+
+func TestDispatchSignatureHelpUnknownJob(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: Missing("
+
+	if got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: Missing(")); got != nil {
+		t.Errorf("dispatchSignatureHelp() = %+v, want nil for an unknown job", got)
+	}
+}
+
+func TestDispatchSignatureHelpNilSchema(t *testing.T) {
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest("
+
+	if got := dispatchSignatureHelp(nil, src, dispatchCursor(t, src, "dispatch: SendDigest(")); got != nil {
+		t.Errorf("dispatchSignatureHelp() = %+v, want nil for a nil schema", got)
+	}
+}
+
+func TestDispatchSignatureHelpNotInSchedule(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "job X {\n\tqueue: low\n\tdispatch: SendDigest("
+
+	if got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest(")); got != nil {
+		t.Errorf("dispatchSignatureHelp() = %+v, want nil outside a schedule block", got)
+	}
+}
+
+func TestDispatchSignatureHelpNestedCallIgnored(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest(warmup("
+
+	if got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest(warmup(")); got != nil {
+		t.Errorf("dispatchSignatureHelp() = %+v, want nil inside a nested call", got)
+	}
+}
+
+// TestDispatchSignatureHelpExecuteTakesNoSignature pins the deliberate
+// absence of an `execute:` arm: a saga step's execute option is a bare
+// `Service.RPC` reference (a `(` there is a parse error), so there is no
+// call site and the cursor gets no signature.
+func TestDispatchSignatureHelpExecuteTakesNoSignature(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "saga Checkout {\n\tstep reserve {\n\t\texecute: UserService.CreateUser("
+
+	if got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "execute: UserService.CreateUser(")); got != nil {
+		t.Errorf("dispatchSignatureHelp() = %+v, want nil for an execute: reference", got)
+	}
+}
+
+func TestDispatchSignatureHelpClampsPastLastParameter(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest(\"a\", 1, \"extra\""
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest(\"a\", 1, \"extra\""))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	if active := activeParamOf(t, got); active != 1 {
+		t.Errorf("ActiveParameter = %d, want the last parameter", active)
+	}
+}
+
+// TestDispatchSignatureHelpParameterLabelsAreNativeArms proves the dispatch
+// signature uses the protocol's native union arms, like the
+// static-attribute path does.
+func TestDispatchSignatureHelpParameterLabelsAreNativeArms(t *testing.T) {
+	schema := compileDispatchSigSchema(t)
+	src := "schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: SendDigest("
+
+	got := dispatchSignatureHelp(schema, src, dispatchCursor(t, src, "dispatch: SendDigest("))
+	if got == nil {
+		t.Fatal("dispatchSignatureHelp returned nil")
+	}
+
+	for _, param := range got.Signatures[0].Parameters {
+		if _, ok := param.Label.(protocol.String); !ok {
+			t.Errorf("parameter Label = %T, want protocol.String", param.Label)
+		}
+	}
+}
+
+// TestServerDispatchSignatureHelp exercises the textDocument/signatureHelp
+// handler end to end for a dispatch call: the open paren is unclosed, so
+// the document carries a parse diagnostic, but the job itself still
+// resolves.
+func TestServerDispatchSignatureHelp(t *testing.T) {
+	s := NewServer()
+
+	rawURI := "file:///dispatch.zen"
+	src := "job SendDigest(target: string, batch: int64) {\n" +
+		"\tqueue: low\n" +
+		"}\n" +
+		"\n" +
+		"schedule Nightly {\n" +
+		"\tcron: \"0 0 * * *\"\n" +
+		"\tdispatch: SendDigest(\n" +
+		"}\n"
+	s.ws.SetDoc(rawURI, src)
+
+	cursor := cursorOn(t, src, 6, "dispatch: SendDigest(")
+	cursor.Character += uint32(len("dispatch: SendDigest("))
+
+	got, err := s.signatureHelp(t.Context(), &protocol.SignatureHelpParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(rawURI)},
+			Position:     cursor,
+		},
+	})
+	if err != nil {
+		t.Fatalf("signatureHelp error: %v", err)
+	}
+
+	if got == nil {
+		t.Fatal("signatureHelp returned nil")
+	}
+
+	if want := "SendDigest(target: string, batch: int64)"; got.Signatures[0].Label != want {
+		t.Errorf("Label = %q, want %q", got.Signatures[0].Label, want)
 	}
 }

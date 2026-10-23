@@ -99,7 +99,7 @@ func TestFoldingRangesForMultiLineRolesLiteral(t *testing.T) {
 	}
 }
 
-func TestFoldingRangesForParensNeverFold(t *testing.T) {
+func TestFoldingRangesForMultiLineParensFold(t *testing.T) {
 	src := `entity Status {
 	kind: enum(
 		Active,
@@ -110,18 +110,24 @@ func TestFoldingRangesForParensNeverFold(t *testing.T) {
 
 	got := foldingRangesFor("test.zen", []byte(src))
 
-	// Only the entity body (line 0) is brace-delimited; enum(...)'s
-	// multi-line paren pair (lines 1-4) must never appear.
-	if len(got) != 1 {
-		t.Fatalf("len(got) = %d, want 1 (parens must never fold): %+v", len(got), got)
+	// The entity body (line 0) is brace-delimited and enum(...)'s
+	// multi-line paren pair (lines 1-4) folds alongside it: parens pair
+	// exactly like braces now.
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2 (entity body + multi-line parens): %+v", len(got), got)
 	}
 
 	if _, ok := findRange(got, 0); !ok {
 		t.Errorf("expected entity body fold range at line 0, got %+v", got)
 	}
 
-	if _, ok := findRange(got, 1); ok {
-		t.Errorf("enum(...) paren pair must not produce a fold range, got %+v", got)
+	parenRange, ok := findRange(got, 1)
+	if !ok {
+		t.Fatalf("expected enum(...) paren fold range starting at line 1, got %+v", got)
+	}
+
+	if parenRange.EndLine != 4 {
+		t.Errorf("paren EndLine = %d, want 4", parenRange.EndLine)
 	}
 }
 
@@ -196,5 +202,122 @@ entity Task {
 
 	if want.EndLine != 3 {
 		t.Errorf("EndLine = %d, want 3", want.EndLine)
+	}
+}
+
+func TestFoldingRangesForMultiLineValidateParensFold(t *testing.T) {
+	// The motivating paren case: a multi-line @validate(...) argument list
+	// folds, so long constraint lists collapse like any other block.
+	src := `entity User {
+	name: string @validate(
+		min_len: 1,
+		max_len: 64,
+	)
+}
+`
+
+	got := foldingRangesFor("test.zen", []byte(src))
+
+	validateRange, ok := findRange(got, 1)
+	if !ok {
+		t.Fatalf("expected @validate(...) paren fold range starting at line 1, got %+v", got)
+	}
+
+	if validateRange.EndLine != 4 {
+		t.Errorf("validate paren EndLine = %d, want 4", validateRange.EndLine)
+	}
+
+	if _, ok := findRange(got, 0); !ok {
+		t.Errorf("expected entity body fold range at line 0, got %+v", got)
+	}
+}
+
+func TestFoldingRangesForSingleLineParenNotFoldable(t *testing.T) {
+	src := `entity Task {
+	id: uuid @primary
+	index(id)
+}
+`
+
+	got := foldingRangesFor("test.zen", []byte(src))
+
+	if _, ok := findRange(got, 2); ok {
+		t.Errorf("single-line paren pair must not produce a fold range, got %+v", got)
+	}
+
+	if len(got) != 1 {
+		t.Errorf("len(got) = %d, want 1 (entity body only): %+v", len(got), got)
+	}
+}
+
+func TestFoldingRangesForUnclosedParenDoesNotPanic(t *testing.T) {
+	src := `entity User {
+	name: string @validate(
+`
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("foldingRangesFor panicked on unclosed paren: %v", r)
+		}
+	}()
+
+	got := foldingRangesFor("test.zen", []byte(src))
+
+	for _, r := range got {
+		if r.StartLine == 1 {
+			t.Errorf("unclosed paren must not produce a fold range, got %+v", got)
+		}
+	}
+}
+
+func TestFoldingRangesForStrayClosingParenDoesNotPanic(t *testing.T) {
+	src := `entity Task {
+	id: uuid @primary
+)
+	index(id, title)
+}
+`
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("foldingRangesFor panicked on stray closing paren: %v", r)
+		}
+	}()
+
+	got := foldingRangesFor("test.zen", []byte(src))
+
+	want, ok := findRange(got, 0)
+	if !ok {
+		t.Fatalf("expected the well-matched entity body pair to still fold, got %+v", got)
+	}
+
+	if want.EndLine != 4 {
+		t.Errorf("EndLine = %d, want 4", want.EndLine)
+	}
+}
+
+func TestFoldingRangesForMismatchedDelimitersDoNotPair(t *testing.T) {
+	// A ")" must not pop the brace stack and a "}" must not pop the paren
+	// stack: the two stacks are independent, so each closer only pairs with
+	// its own kind. Here the stray ")" is skipped and the "}" still pairs
+	// with the "{" for exactly one brace range.
+	src := `entity Task {
+	)
+}
+`
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("foldingRangesFor panicked on mismatched delimiters: %v", r)
+		}
+	}()
+
+	got := foldingRangesFor("test.zen", []byte(src))
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want 1 (brace pair only): %+v", len(got), got)
+	}
+
+	if got[0].StartLine != 0 || got[0].EndLine != 2 {
+		t.Errorf("brace range = %+v, want 0-2", got[0])
 	}
 }

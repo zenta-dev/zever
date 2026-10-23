@@ -102,7 +102,14 @@ function startClient(): void {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'zen' }],
+    // `untitled` covers unsaved `zen` editors: the client forwards their
+    // requests, but the server keys everything by filesystem path and
+    // answers unknown documents with empty results (no errors), so an
+    // untitled tab gets grammar highlighting only until it is saved.
+    documentSelector: [
+      { scheme: 'file', language: 'zen' },
+      { scheme: 'untitled', language: 'zen' },
+    ],
   };
 
   client = new LanguageClient(
@@ -122,6 +129,21 @@ function startClient(): void {
         'git clone https://github.com/zenta-dev/zever.git && ' +
         'go install ./tools/zever-lsp (run inside the clone).'
     );
+  });
+}
+
+// executeCommandForActiveEditor sends a workspace/executeCommand request for
+// the active zen document's URI. It no-ops when no zen editor is active or
+// the client is not running, so palette invocations from other languages
+// never surface an error.
+async function executeCommandForActiveEditor(command: string): Promise<void> {
+  const doc = vscode.window.activeTextEditor?.document;
+  if (doc === undefined || doc.languageId !== 'zen' || client === undefined) {
+    return;
+  }
+  await client.sendRequest('workspace/executeCommand', {
+    command,
+    arguments: [doc.uri.toString()],
   });
 }
 
@@ -146,6 +168,14 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  const validateDisposable = vscode.commands.registerCommand('zever.validate', () =>
+    executeCommandForActiveEditor('zever.validate')
+  );
+
+  const fixAllDisposable = vscode.commands.registerCommand('zever.fixAll', () =>
+    executeCommandForActiveEditor('zever.fixAll')
+  );
+
   context.subscriptions.push(
     status,
     vscode.workspace.onDidChangeTextDocument((e) => {
@@ -166,6 +196,8 @@ export function activate(context: vscode.ExtensionContext): void {
     dispose: () => {
       client?.stop();
       restartDisposable.dispose();
+      validateDisposable.dispose();
+      fixAllDisposable.dispose();
     },
   });
 }

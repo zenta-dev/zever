@@ -292,6 +292,50 @@ func paramTypeAtCursor(params []*ast.ParamDecl, cursor protocol.Position) *ast.P
 	return nil
 }
 
+// paramNameAt returns the rpc/job parameter whose declared name is under
+// the cursor, along with its owner: kind is "rpc" or "job", and ref is
+// `Service.Method` for an rpc parameter or `Name` for a job parameter.
+// Only the name matches: a parameter's type name is a separate reference
+// slot (see paramTypeAt), resolved by definition rather than hovered as a
+// parameter.
+func paramNameAt(file *ast.File, cursor protocol.Position) (*ast.ParamDecl, string, string) {
+	for _, decl := range flattenDecls(file) {
+		switch d := decl.(type) {
+		case *ast.ServiceDecl:
+			for _, rpc := range d.RPCs {
+				if rpc == nil {
+					continue
+				}
+
+				if param := paramNameAtCursor(rpc.Params, cursor); param != nil {
+					return param, "rpc", d.Name + "." + rpc.Name
+				}
+			}
+		case *ast.JobDecl:
+			if param := paramNameAtCursor(d.Params, cursor); param != nil {
+				return param, "job", d.Name
+			}
+		}
+	}
+
+	return nil, "", ""
+}
+
+// paramNameAtCursor returns the first param whose declared name covers the cursor.
+func paramNameAtCursor(params []*ast.ParamDecl, cursor protocol.Position) *ast.ParamDecl {
+	for _, param := range params {
+		if param == nil {
+			continue
+		}
+
+		if coversIdent(param.NamePos, param.Name, cursor) {
+			return param
+		}
+	}
+
+	return nil
+}
+
 // entityNameAt returns the entity whose declared name is under the cursor.
 func entityNameAt(file *ast.File, cursor protocol.Position) *ast.EntityDecl {
 	for _, decl := range flattenDecls(file) {

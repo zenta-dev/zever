@@ -231,6 +231,41 @@ func skipDir(name string) bool {
 	return strings.HasPrefix(name, ".")
 }
 
+// AddDiskFile inserts one on-disk file into the snapshot without a full
+// Rescan. The content is read from disk best-effort, exactly like Rescan
+// reads each file it walks: a non-.zen path or an unreadable file is
+// ignored. Callers pass the absolute path uriToPath resolves the file URI
+// to; it is normalized the same way Rescan normalizes walked paths.
+func (w *Workspace) AddDiskFile(path string) {
+	if filepath.Ext(path) != zenExt {
+		return
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	abs, _ := filepath.Abs(path) // path is already absolute, so Abs cannot fail
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.diskCache[abs] = string(content)
+}
+
+// RemoveDiskFile drops one path from the on-disk snapshot without a full
+// Rescan. Unknown paths are a no-op; an open buffer for the same path is
+// untouched, so it keeps winning in CollectAllFiles until it is closed.
+func (w *Workspace) RemoveDiskFile(path string) {
+	abs, _ := filepath.Abs(path) // normalize like AddDiskFile so both spellings of a path meet
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	delete(w.diskCache, abs)
+}
+
 // SetDoc records the live content of an open buffer.
 func (w *Workspace) SetDoc(uri, content string) {
 	path, ok := uriToPath(uri)

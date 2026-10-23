@@ -62,6 +62,71 @@ func fieldTypeName(t ir.FieldType) string {
 	return sb.String()
 }
 
+// symbolKindParameter is the SymbolKind used for rpc/job parameter
+// children. LSP 3.18 defines no Parameter symbol kind (the closest,
+// TypeParameter, names generic type parameters rather than value bindings),
+// so parameters surface as Variable children -- the kind for a named value
+// binding -- with the parameter's type in the detail.
+const symbolKindParameter = protocol.SymbolKindVariable
+
+// paramTypeName renders one resolved rpc/job parameter's type as it appears
+// in the outline: the referenced entity/message name for a Ref param, else
+// the scalar (or inline enum) spelling, the same rendering fields use.
+func paramTypeName(param *ir.Param) string {
+	if param == nil {
+		return ""
+	}
+
+	if param.Ref != nil {
+		return param.Ref.Name()
+	}
+
+	return fieldTypeName(param.Type)
+}
+
+// paramChildren builds one parameter child per resolved rpc/job parameter.
+func paramChildren(params []*ir.Param) []protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(params))
+
+	for _, param := range params {
+		if param == nil {
+			continue
+		}
+
+		children = append(children, leafSymbol(param.Name, symbolKindParameter,
+			paramTypeName(param), identRange(param.Pos, param.Name)))
+	}
+
+	return children
+}
+
+// astParamTypeName renders one parsed parameter's declared type name, or ""
+// when the parser dropped it mid-edit.
+func astParamTypeName(param *ast.ParamDecl) string {
+	if param == nil || param.Type == nil {
+		return ""
+	}
+
+	return param.Type.Name
+}
+
+// astParamChildren builds one parameter child per parsed rpc/job parameter,
+// the AST fallback's counterpart of paramChildren.
+func astParamChildren(params []*ast.ParamDecl) []protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(params))
+
+	for _, param := range params {
+		if param == nil {
+			continue
+		}
+
+		children = append(children, leafSymbol(param.Name, symbolKindParameter,
+			astParamTypeName(param), identRange(param.NamePos, param.Name)))
+	}
+
+	return children
+}
+
 // relationKindName renders a resolved relation kind as its DSL keyword.
 func relationKindName(k ir.RelationKind) string {
 	switch k {
@@ -125,8 +190,7 @@ func symbolsFromSchema(schema *ir.Schema, path string) protocol.DocumentSymbolSl
 				continue
 			}
 
-			symbols = append(symbols, leafSymbol(job.Name, protocol.SymbolKindFunction,
-				"queue "+job.Queue, identRange(job.Pos, job.Name)))
+			symbols = append(symbols, jobSymbol(job))
 		}
 
 		for _, schedule := range module.Schedules {
@@ -194,17 +258,44 @@ func serviceSymbol(service *ir.Service) protocol.DocumentSymbol {
 	children := make([]protocol.DocumentSymbol, 0, len(service.Operations))
 
 	for _, rpc := range service.Operations {
-		detail := ""
-		if rpc.Returns != nil {
-			detail = "-> " + rpc.Returns.Name()
-		}
-
-		children = append(children, leafSymbol(rpc.Name, protocol.SymbolKindMethod,
-			detail, identRange(rpc.Pos, rpc.Name)))
+		children = append(children, rpcSymbol(rpc))
 	}
 
 	return containerSymbol(service.Name, protocol.SymbolKindInterface, "service",
 		identRange(service.Pos, service.Name), children)
+}
+
+// rpcSymbol builds the document symbol for one resolved rpc, with its
+// parameters as children. A parameterless rpc stays a leaf, the same shape
+// it had before parameters surfaced.
+func rpcSymbol(rpc *ir.Operation) protocol.DocumentSymbol {
+	detail := ""
+	if rpc.Returns != nil {
+		detail = "-> " + rpc.Returns.Name()
+	}
+
+	params := paramChildren(rpc.Params)
+	if len(params) == 0 {
+		return leafSymbol(rpc.Name, protocol.SymbolKindMethod,
+			detail, identRange(rpc.Pos, rpc.Name))
+	}
+
+	return containerSymbol(rpc.Name, protocol.SymbolKindMethod,
+		detail, identRange(rpc.Pos, rpc.Name), params)
+}
+
+// jobSymbol builds the document symbol for one resolved job, with its
+// parameters as children. A parameterless job stays a leaf, the same shape
+// it had before parameters surfaced.
+func jobSymbol(job *ir.Job) protocol.DocumentSymbol {
+	params := paramChildren(job.Params)
+	if len(params) == 0 {
+		return leafSymbol(job.Name, protocol.SymbolKindFunction,
+			"queue "+job.Queue, identRange(job.Pos, job.Name))
+	}
+
+	return containerSymbol(job.Name, protocol.SymbolKindFunction,
+		"queue "+job.Queue, identRange(job.Pos, job.Name), params)
 }
 
 // messageSymbol builds the document symbol for one resolved message, with its fields as children.
@@ -305,8 +396,7 @@ func symbolsFromAST(file *ast.File) protocol.DocumentSymbolSlice {
 		case *ast.ServiceDecl:
 			symbols = append(symbols, astServiceSymbol(d))
 		case *ast.JobDecl:
-			symbols = append(symbols, leafSymbol(d.Name, protocol.SymbolKindFunction,
-				d.Queue, identRange(d.NamePos, d.Name)))
+			symbols = append(symbols, astJobSymbol(d))
 		case *ast.ScheduleDecl:
 			symbols = append(symbols, leafSymbol(d.Name, protocol.SymbolKindEvent,
 				d.Cron, identRange(d.NamePos, d.Name)))
@@ -349,12 +439,34 @@ func astServiceSymbol(service *ast.ServiceDecl) protocol.DocumentSymbol {
 			detail = "-> " + rpc.Returns
 		}
 
-		children = append(children, leafSymbol(rpc.Name, protocol.SymbolKindMethod,
-			detail, identRange(rpc.NamePos, rpc.Name)))
+		params := astParamChildren(rpc.Params)
+		if len(params) == 0 {
+			children = append(children, leafSymbol(rpc.Name, protocol.SymbolKindMethod,
+				detail, identRange(rpc.NamePos, rpc.Name)))
+
+			continue
+		}
+
+		children = append(children, containerSymbol(rpc.Name, protocol.SymbolKindMethod,
+			detail, identRange(rpc.NamePos, rpc.Name), params))
 	}
 
 	return containerSymbol(service.Name, protocol.SymbolKindInterface, "service",
 		identRange(service.NamePos, service.Name), children)
+}
+
+// astJobSymbol builds the document symbol for one parsed job declaration,
+// with its parameters as children. A parameterless job stays a leaf, the
+// same shape it had before parameters surfaced.
+func astJobSymbol(job *ast.JobDecl) protocol.DocumentSymbol {
+	params := astParamChildren(job.Params)
+	if len(params) == 0 {
+		return leafSymbol(job.Name, protocol.SymbolKindFunction,
+			job.Queue, identRange(job.NamePos, job.Name))
+	}
+
+	return containerSymbol(job.Name, protocol.SymbolKindFunction,
+		job.Queue, identRange(job.NamePos, job.Name), params)
 }
 
 // astMessageSymbol builds the document symbol for one parsed message declaration, with its fields as children.
@@ -499,7 +611,9 @@ func workspaceSymbols(schema *ir.Schema, files map[string]string, query string) 
 }
 
 // filterSymbolsByQuery keeps only the symbols whose name contains query,
-// case-insensitively. An empty query matches everything.
+// case-insensitively. An empty query matches everything. Non-empty results
+// rank exact-prefix matches above substring matches with a stable sort, so
+// the workspace's existing declaration order decides within each tier.
 func filterSymbolsByQuery(symbols protocol.SymbolInformationSlice, query string) protocol.SymbolInformationSlice {
 	if query == "" {
 		return symbols
@@ -513,6 +627,13 @@ func filterSymbolsByQuery(symbols protocol.SymbolInformationSlice, query string)
 			out = append(out, sym)
 		}
 	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		iPrefix := strings.HasPrefix(strings.ToLower(out[i].Name), needle)
+		jPrefix := strings.HasPrefix(strings.ToLower(out[j].Name), needle)
+
+		return iPrefix && !jPrefix
+	})
 
 	return out
 }

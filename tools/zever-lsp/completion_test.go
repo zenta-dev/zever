@@ -1879,14 +1879,14 @@ func TestCompletionHonorsNegotiatedSnippetSupport(t *testing.T) {
 			t.Fatalf("Completion: %v", err)
 		}
 
-		slice, ok := res.(protocol.CompletionItemSlice)
+		slice, ok := res.(*protocol.CompletionList)
 		if !ok {
-			t.Fatalf("Completion result = %T, want CompletionItemSlice", res)
+			t.Fatalf("Completion result = %T, want *protocol.CompletionList", res)
 		}
 
-		item, ok := findCompletionItem(slice, "entity")
+		item, ok := findCompletionItem(slice.Items, "entity")
 		if !ok {
-			t.Fatalf("completion missing entity, got %v", completionLabels(slice))
+			t.Fatalf("completion missing entity, got %v", completionLabels(slice.Items))
 		}
 
 		return item
@@ -1933,4 +1933,154 @@ func TestCompletionHonorsNegotiatedSnippetSupport(t *testing.T) {
 			t.Errorf("entity InsertTextFormat = %v, want PlainText", item.InsertTextFormat)
 		}
 	})
+}
+
+// TestCompletionListDefaultsEmittedForUniformPlainText proves the
+// all-PlainText shape (a client without snippetSupport) carries its shared
+// InsertTextFormat as ItemDefaults when the client advertised
+// "insertTextFormat", while every item keeps its explicit value so the
+// render is identical with or without defaults support.
+func TestCompletionListDefaultsEmittedForUniformPlainText(t *testing.T) {
+	src := ""
+
+	file, _ := parser.New("empty.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 0, Character: 0}
+
+	items := completionAt(nil, file, src, cursor)
+	if len(items) == 0 {
+		t.Fatal("expected non-empty completion items")
+	}
+
+	caps := clientCaps{completionListDefaults: []string{"insertTextFormat"}}
+
+	list := completionListFor(items, caps)
+
+	if list.ItemDefaults == nil {
+		t.Fatal("ItemDefaults is nil, want the shared PlainText format")
+	}
+
+	if list.ItemDefaults.InsertTextFormat != protocol.InsertTextFormatPlainText {
+		t.Errorf("ItemDefaults.InsertTextFormat = %v, want PlainText", list.ItemDefaults.InsertTextFormat)
+	}
+
+	if list.ApplyKind != nil {
+		t.Errorf("ApplyKind = %+v, want nil (never set: Replace is the safe default)", list.ApplyKind)
+	}
+
+	for _, item := range list.Items {
+		if item.InsertTextFormat != protocol.InsertTextFormatPlainText {
+			t.Errorf("item %q InsertTextFormat = %v, want explicit PlainText", item.Label, item.InsertTextFormat)
+		}
+	}
+}
+
+// TestCompletionListDefaultsOnlyForAdvertisedFields proves a client that
+// never opted into item defaults gets a bare list: no ItemDefaults even
+// though every item shares PlainText.
+func TestCompletionListDefaultsOnlyForAdvertisedFields(t *testing.T) {
+	src := ""
+
+	file, _ := parser.New("empty.zen", []byte(src)).ParseFile()
+
+	items := completionAt(nil, file, src, protocol.Position{Line: 0, Character: 0})
+
+	for _, caps := range []clientCaps{{}, {completionListDefaults: []string{"editRange"}}} {
+		list := completionListFor(items, caps)
+		if list.ItemDefaults != nil {
+			t.Errorf("ItemDefaults = %+v, want nil for caps %+v", list.ItemDefaults, caps)
+		}
+	}
+}
+
+// TestCompletionListDefaultsOmittedWhenMixed proves a mixed-format response
+// (a snippet-capable client on a vocabulary with skeletons) emits no
+// default: no single value describes every item.
+func TestCompletionListDefaultsOmittedWhenMixed(t *testing.T) {
+	src := ""
+
+	file, _ := parser.New("empty.zen", []byte(src)).ParseFile()
+
+	items := completionAtWithCaps(nil, file, src, protocol.Position{Line: 0, Character: 0}, snippetCaps())
+	if len(items) == 0 {
+		t.Fatal("expected non-empty completion items")
+	}
+
+	seen := map[protocol.InsertTextFormat]bool{}
+	for _, item := range items {
+		seen[item.InsertTextFormat] = true
+	}
+
+	if len(seen) < 2 {
+		t.Fatalf("expected mixed formats in top-level keywords, got %v", seen)
+	}
+
+	list := completionListFor(items, clientCaps{snippetSupport: true, completionListDefaults: []string{"insertTextFormat"}})
+	if list.ItemDefaults != nil {
+		t.Errorf("ItemDefaults = %+v, want nil for a mixed-format response", list.ItemDefaults)
+	}
+}
+
+// TestCompletionListDefaultsEmittedForUniformSnippet proves the mirror
+// case: a vocabulary where every item carries a snippet (the lone rpc
+// member of a service body) defaults to Snippet for a snippet-capable
+// client that advertised the field.
+func TestCompletionListDefaultsEmittedForUniformSnippet(t *testing.T) {
+	src := "service S {\n\t\n}\n"
+
+	file, _ := parser.New("s.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 1, Character: 1}
+
+	items := completionAtWithCaps(nil, file, src, cursor, snippetCaps())
+	if len(items) == 0 {
+		t.Fatal("expected non-empty completion items")
+	}
+
+	list := completionListFor(items, clientCaps{snippetSupport: true, completionListDefaults: []string{"insertTextFormat"}})
+
+	if list.ItemDefaults == nil {
+		t.Fatal("ItemDefaults is nil, want the shared Snippet format")
+	}
+
+	if list.ItemDefaults.InsertTextFormat != protocol.InsertTextFormatSnippet {
+		t.Errorf("ItemDefaults.InsertTextFormat = %v, want Snippet", list.ItemDefaults.InsertTextFormat)
+	}
+}
+
+// TestAdvertisesCompletionDefault covers the advertisement lookup,
+// including the exact-match rule: "InsertTextFormat" is not
+// "insertTextFormat".
+func TestAdvertisesCompletionDefault(t *testing.T) {
+	tests := []struct {
+		name string
+		caps clientCaps
+		want bool
+	}{
+		{"advertised", clientCaps{completionListDefaults: []string{"insertTextFormat"}}, true},
+		{"advertised among others", clientCaps{completionListDefaults: []string{"editRange", "insertTextFormat"}}, true},
+		{"not advertised", clientCaps{}, false},
+		{"other field only", clientCaps{completionListDefaults: []string{"editRange"}}, false},
+		{"wrong case does not match", clientCaps{completionListDefaults: []string{"InsertTextFormat"}}, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := advertisesCompletionDefault(tc.caps, completionListItemDefaultFormat); got != tc.want {
+				t.Errorf("advertisesCompletionDefault(%+v) = %v, want %v", tc.caps, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCompletionListForEmptyItemsNeverDefaults proves an empty item slice
+// yields a default-free list rather than dereferencing items[0].
+func TestCompletionListForEmptyItemsNeverDefaults(t *testing.T) {
+	list := completionListFor(nil, clientCaps{completionListDefaults: []string{"insertTextFormat"}})
+
+	if list.ItemDefaults != nil {
+		t.Errorf("ItemDefaults = %+v, want nil for empty items", list.ItemDefaults)
+	}
+
+	if len(list.Items) != 0 {
+		t.Errorf("len(Items) = %d, want 0", len(list.Items))
+	}
 }

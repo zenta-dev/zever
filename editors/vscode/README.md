@@ -66,6 +66,8 @@ The extension contributes the following settings (under `zever.*`):
 ## Commands
 
 - `Zever: Restart Language Server` (`zever.restartServer`): stops and restarts the language server client. Available from the command palette.
+- `Zever: Validate Current File` (`zever.validate`): re-runs the server's diagnostics for the active `.zen` file via `workspace/executeCommand`. Available from the command palette while a `.zen` file is active.
+- `Zever: Fix All Issues in Current File` (`zever.fixAll`): applies every quickfix the server offers for the active `.zen` file in one edit, via `workspace/executeCommand`. Available from the command palette while a `.zen` file is active.
 
 ## Schema status item
 
@@ -96,5 +98,9 @@ Client-side TextMate snippets for the `zen` language (wired via
 
 ## Known limitations
 
+- Unsaved (`untitled:`) editors get grammar highlighting only. The client
+  forwards their requests, but `zever-lsp` keys its workspace by filesystem
+  path and answers path-less documents with empty results (no errors); save
+  the file to enable hover, completion, diagnostics, and the rest.
 - The `zever-lsp` binary is **not bundled** with this extension and is **not auto-installed**. Manual installation on `$PATH` is required, as described above. Bundling/auto-install of the server binary is planned future work.
 - End-to-end testing of the LSP-client half depends on the `zever-lsp` server existing on disk; the headless `npm test` suite covers the client lifecycle with a stubbed transport instead.

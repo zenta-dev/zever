@@ -354,6 +354,37 @@ func TestClientCapsFor(t *testing.T) {
 			withItem(itemWith(&yes, &yes, []string{"detail"})),
 			clientCaps{snippetSupport: true, insertReplaceSupport: true, resolveProps: []string{"detail"}},
 		},
+		{
+			"list defaults without an item block",
+			&protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{
+						Completion: &protocol.CompletionClientCapabilities{
+							CompletionList: &protocol.CompletionListCapabilities{
+								ItemDefaults: []string{"insertTextFormat"},
+							},
+						},
+					},
+				},
+			},
+			clientCaps{completionListDefaults: []string{"insertTextFormat"}},
+		},
+		{
+			"list defaults alongside item caps",
+			&protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{
+						Completion: &protocol.CompletionClientCapabilities{
+							CompletionItem: itemWith(&yes, nil, nil),
+							CompletionList: &protocol.CompletionListCapabilities{
+								ItemDefaults: []string{"insertTextFormat", "editRange"},
+							},
+						},
+					},
+				},
+			},
+			clientCaps{snippetSupport: true, completionListDefaults: []string{"insertTextFormat", "editRange"}},
+		},
 	}
 
 	for _, tc := range tests {
@@ -368,11 +399,12 @@ func TestClientCapsFor(t *testing.T) {
 }
 
 // equalClientCaps reports whether two capability sets agree on every field,
-// comparing resolveProps by value since clientCapsFor copies the slice.
+// comparing slice fields by value since clientCapsFor copies them.
 func equalClientCaps(got, want clientCaps) bool {
 	return got.snippetSupport == want.snippetSupport &&
 		got.insertReplaceSupport == want.insertReplaceSupport &&
-		slices.Equal(got.resolveProps, want.resolveProps)
+		slices.Equal(got.resolveProps, want.resolveProps) &&
+		slices.Equal(got.completionListDefaults, want.completionListDefaults)
 }
 
 // TestInitializeStoresCompletionCaps proves Initialize records the negotiated
@@ -584,6 +616,106 @@ func TestDidChangeWatchedFiles(t *testing.T) {
 
 	if err := s.DidChangeWatchedFiles(t.Context(), &protocol.DidChangeWatchedFilesParams{}); err != nil {
 		t.Fatalf("DidChangeWatchedFiles: %v", err)
+	}
+}
+
+// TestDidCreateDeleteFiles proves the file-operation handlers update the
+// snapshot surgically: a created file joins CollectAllFiles with its disk
+// content while a sibling written to disk but never announced stays unknown
+// (no full Rescan ran), a deleted file leaves, and non-.zen, unreadable, and
+// non-file URIs are ignored. Nil params are tolerated.
+func TestDidCreateDeleteFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	writeFile(t, dir, "seed.zen", "entity Seed {\n\tid: uuid @primary\n}\n")
+
+	s := NewServer()
+	s.ws.SetRoot(string(pathToURI(dir)))
+
+	// Siblings that land on disk after the scan: announced files must join
+	// the snapshot while these stay unknown, proving no Rescan ran.
+	stray := writeFile(t, dir, "stray.zen", "entity Stray {\n\tid: uuid @primary\n}\n")
+	strayAbs, err := filepath.Abs(stray)
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+
+	const freshContent = "entity Fresh {\n\tid: uuid @primary\n}\n"
+
+	fresh := writeFile(t, dir, "fresh.zen", freshContent)
+	freshAbs, err := filepath.Abs(fresh)
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+
+	if err := s.DidCreateFiles(t.Context(), &protocol.CreateFilesParams{
+		Files: []protocol.FileCreate{{URI: string(pathToURI(fresh))}},
+	}); err != nil {
+		t.Fatalf("DidCreateFiles: %v", err)
+	}
+
+	files := s.ws.CollectAllFiles()
+
+	if got, ok := files[freshAbs]; !ok || got != freshContent {
+		t.Errorf("created file = (%q, %v), want the disk bytes announced", got, ok)
+	}
+
+	if _, ok := files[strayAbs]; ok {
+		t.Errorf("unannounced sibling %q joined the snapshot, want no full Rescan", strayAbs)
+	}
+
+	// Non-.zen, unreadable, and non-file URIs are ignored without touching
+	// the snapshot.
+	notes := writeFile(t, dir, "notes.txt", "not a schema")
+
+	if err := s.DidCreateFiles(t.Context(), &protocol.CreateFilesParams{
+		Files: []protocol.FileCreate{
+			{URI: string(pathToURI(notes))},
+			{URI: string(pathToURI(filepath.Join(dir, "missing.zen")))},
+			{URI: "untitled:Untitled-1"},
+		},
+	}); err != nil {
+		t.Fatalf("DidCreateFiles (ignored kinds): %v", err)
+	}
+
+	if files = s.ws.CollectAllFiles(); len(files) != 2 {
+		t.Fatalf("after ignored creates got %d files, want 2 (seed + fresh): %v", len(files), keysOf(files))
+	}
+
+	// Deleting the announced file drops it while the stray stays unknown.
+	if err := s.DidDeleteFiles(t.Context(), &protocol.DeleteFilesParams{
+		Files: []protocol.FileDelete{{URI: string(pathToURI(fresh))}},
+	}); err != nil {
+		t.Fatalf("DidDeleteFiles: %v", err)
+	}
+
+	if files = s.ws.CollectAllFiles(); len(files) != 1 {
+		t.Fatalf("after delete got %d files, want 1 (seed): %v", len(files), keysOf(files))
+	}
+
+	if _, ok := files[strayAbs]; ok {
+		t.Errorf("unannounced sibling %q joined the snapshot on delete, want no full Rescan", strayAbs)
+	}
+
+	// Unknown deletes and nil params are tolerated.
+	if err := s.DidDeleteFiles(t.Context(), &protocol.DeleteFilesParams{
+		Files: []protocol.FileDelete{{URI: string(pathToURI(fresh))}},
+	}); err != nil {
+		t.Fatalf("DidDeleteFiles (unknown): %v", err)
+	}
+
+	if err := s.DidCreateFiles(t.Context(), nil); err != nil {
+		t.Fatalf("DidCreateFiles(nil): %v", err)
+	}
+
+	if err := s.DidDeleteFiles(t.Context(), nil); err != nil {
+		t.Fatalf("DidDeleteFiles(nil): %v", err)
+	}
+
+	if files = s.ws.CollectAllFiles(); len(files) != 1 {
+		t.Errorf("after tolerated calls got %d files, want 1 (seed): %v", len(files), keysOf(files))
 	}
 }
 
@@ -847,9 +979,9 @@ func TestCompletion(t *testing.T) {
 			t.Fatalf("Completion: %v", err)
 		}
 
-		items, ok := res.(protocol.CompletionItemSlice)
-		if !ok || len(items) == 0 {
-			t.Fatalf("Completion result = %#v, want non-empty CompletionItemSlice", res)
+		items, ok := res.(*protocol.CompletionList)
+		if !ok || len(items.Items) == 0 {
+			t.Fatalf("Completion result = %#v, want non-empty *protocol.CompletionList", res)
 		}
 	})
 
@@ -1149,13 +1281,17 @@ func TestPrepareRename(t *testing.T) {
 			t.Fatalf("PrepareRename: %v", err)
 		}
 
-		rng, ok := res.(*protocol.Range)
+		rng, ok := res.(*protocol.PrepareRenamePlaceholder)
 		if !ok || rng == nil {
-			t.Fatalf("PrepareRename result = %#v, want *Range", res)
+			t.Fatalf("PrepareRename result = %#v, want *PrepareRenamePlaceholder", res)
 		}
 
-		if rng.Start.Line != 0 || rng.Start.Character != 7 || rng.End.Character != 11 {
-			t.Errorf("PrepareRename range = %+v, want line 0 chars 7-11", rng)
+		if rng.Placeholder != "User" {
+			t.Errorf("PrepareRename placeholder = %q, want %q (the identifier under the cursor)", rng.Placeholder, "User")
+		}
+
+		if rng.Range.Start.Line != 0 || rng.Range.Start.Character != 7 || rng.Range.End.Character != 11 {
+			t.Errorf("PrepareRename range = %+v, want line 0 chars 7-11", rng.Range)
 		}
 	})
 
@@ -1441,6 +1577,50 @@ func TestFoldingRanges(t *testing.T) {
 			t.Errorf("FoldingRanges unknown doc = %+v, want null", ranges)
 		}
 	})
+}
+
+// TestUntitledDocumentIsNullSafe proves an unsaved (untitled:) buffer --
+// which the VS Code client now forwards via its documentSelector -- never
+// errors: DidOpen drops it (uriToPath has no filesystem path for it) and
+// every handler answers with its unknown-document result.
+func TestUntitledDocumentIsNullSafe(t *testing.T) {
+	t.Parallel()
+
+	const untitledDoc = "untitled:Untitled-1"
+
+	s := NewServer()
+
+	openDoc(t, s, untitledDoc, "entity User {\n}\n")
+
+	if _, ok := s.ws.DocContent(untitledDoc); ok {
+		t.Fatal("untitled buffer must not be stored: it has no filesystem path")
+	}
+
+	if res, err := s.Completion(t.Context(), &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(untitledDoc)},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	}); err != nil || res != nil {
+		t.Errorf("Completion(untitled) = (%v, %v), want (nil, nil)", res, err)
+	}
+
+	if ranges, err := s.FoldingRanges(t.Context(), &protocol.FoldingRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(untitledDoc)},
+	}); err != nil || ranges != nil {
+		t.Errorf("FoldingRanges(untitled) = (%v, %v), want (nil, nil)", ranges, err)
+	}
+
+	res, err := s.DocumentSymbol(t.Context(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(untitledDoc)},
+	})
+	if err != nil {
+		t.Fatalf("DocumentSymbol(untitled): %v", err)
+	}
+
+	if syms, ok := res.(protocol.DocumentSymbolSlice); !ok || len(syms) != 0 {
+		t.Errorf("DocumentSymbol(untitled) = %#v, want empty", res)
+	}
 }
 
 func TestDocumentHighlight(t *testing.T) {
