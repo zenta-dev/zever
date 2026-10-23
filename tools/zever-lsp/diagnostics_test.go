@@ -18,13 +18,19 @@ import (
 var errPublishBoom = errors.New("zever-lsp: fake publish failed")
 
 // fakeClient records publishDiagnostics calls; it embeds the default client
-// so only the one method under test needs an override.
+// so only the methods under test need an override.
 type fakeClient struct {
 	protocol.UnimplementedClient
 
 	mu    sync.Mutex
 	calls map[string][]protocol.Diagnostic
 	err   error
+
+	// codeLensRefreshes counts workspace/codeLens/refresh pushes, and
+	// inlayHintRefreshes workspace/inlayHint/refresh pushes, so tests can
+	// assert a settings change refreshed exactly the families it flipped.
+	codeLensRefreshes  int
+	inlayHintRefreshes int
 }
 
 func (c *fakeClient) PublishDiagnostics(_ context.Context, params *protocol.PublishDiagnosticsParams) error {
@@ -38,6 +44,34 @@ func (c *fakeClient) PublishDiagnostics(_ context.Context, params *protocol.Publ
 	c.calls[string(params.URI)] = params.Diagnostics
 
 	return c.err
+}
+
+// CodeLensRefresh records a code-lens refresh push.
+func (c *fakeClient) CodeLensRefresh(_ context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.codeLensRefreshes++
+
+	return nil
+}
+
+// InlayHintRefresh records an inlay-hint refresh push.
+func (c *fakeClient) InlayHintRefresh(_ context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.inlayHintRefreshes++
+
+	return nil
+}
+
+// refreshCounts returns the recorded refresh pushes.
+func (c *fakeClient) refreshCounts() (codeLens, inlayHint int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.codeLensRefreshes, c.inlayHintRefreshes
 }
 
 func (c *fakeClient) published(uri string) ([]protocol.Diagnostic, bool) {

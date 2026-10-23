@@ -4,7 +4,6 @@ import (
 	"container/heap"
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -775,7 +774,7 @@ func decodeEmbedding(b []byte) ([]float32, error) {
 	// stored as JSON numbers. Binary blobs may coincidentally start with
 	// '[' (0x5b), so only try JSON if the blob is valid JSON. This avoids
 	// mis-decoding binary as JSON.
-	if len(b) > 0 && b[0] == '[' && json.Valid(b) {
+	if len(b) > 0 && b[0] == '[' && codec.IsValid(b) {
 		if e, err := embeddingCodec.Decode(b); err == nil {
 			return e, nil
 		}

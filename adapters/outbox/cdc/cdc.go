@@ -2,7 +2,6 @@ package cdc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
@@ -353,7 +353,7 @@ func (s *store) setRelayError(ctx context.Context, err error) {
 
 // encodeMessage marshals msg to its JSON wire payload.
 func encodeMessage(msg outbox.Message) ([]byte, error) {
-	payload, err := json.Marshal(msg)
+	payload, err := codec.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("cdc: encode message: %w", err)
 	}
@@ -364,7 +364,7 @@ func encodeMessage(msg outbox.Message) ([]byte, error) {
 // decodeMessage unmarshals a JSON wire payload into msg.
 func decodeMessage(payload []byte) (outbox.Message, error) {
 	var msg outbox.Message
-	if err := json.Unmarshal(payload, &msg); err != nil {
+	if err := codec.Unmarshal(payload, &msg); err != nil {
 		return outbox.Message{}, fmt.Errorf("cdc: decode message: %w", err)
 	}
 

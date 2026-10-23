@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/orm"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
@@ -284,17 +285,17 @@ func (d *driver) RunSaga(ctx context.Context, name string, input any, workflowID
 		}
 	}
 
-	inputJSON, err := json.Marshal(input)
+	inputJSON, err := codec.Marshal(input)
 	if err != nil {
 		return "", fmt.Errorf("postgres: run saga %q: marshal input: %w", name, err)
 	}
 
 	now := time.Now().UTC()
 	statePayload := map[string]any{
-		"input":   json.RawMessage(inputJSON),
+		"input":   jsontext.Value(inputJSON),
 		"results": []any{},
 	}
-	stateJSONBytes, err := json.Marshal(statePayload)
+	stateJSONBytes, err := codec.Marshal(statePayload)
 	if err != nil {
 		return "", fmt.Errorf("postgres: run saga %q: marshal state: %w", name, err)
 	}
@@ -560,14 +561,14 @@ func (d *driver) persistSagaProgress(ctx context.Context, id workflow.RunID, ste
 		return err
 	}
 
-	resultJSON, err := json.Marshal(result)
+	resultJSON, err := codec.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("postgres: saga %q: marshal result: %w", id, err)
 	}
 
-	state.Results = append(state.Results, json.RawMessage(resultJSON))
+	state.Results = append(state.Results, jsontext.Value(resultJSON))
 
-	stateJSON, err := json.Marshal(state)
+	stateJSON, err := codec.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("postgres: saga %q: marshal state: %w", id, err)
 	}
@@ -692,7 +693,7 @@ func decodeSagaState(raw string) (*sagaState, error) {
 		return state, nil
 	}
 
-	if err := json.Unmarshal([]byte(raw), state); err != nil {
+	if err := codec.Unmarshal([]byte(raw), state); err != nil {
 		return nil, fmt.Errorf("postgres: decode saga state: %w", err)
 	}
 

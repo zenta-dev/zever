@@ -9,6 +9,7 @@ require (
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/core/queue v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/dbconn v0.8.0
 	github.com/zenta-dev/zever/shared/msgspan v0.8.0
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0
@@ -80,3 +81,5 @@ replace github.com/zenta-dev/zever/adapters/queue/db => ../db
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

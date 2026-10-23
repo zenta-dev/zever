@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/workflow v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/dbconn v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 )
@@ -56,3 +57,5 @@ replace github.com/zenta-dev/zever/adapters/workflow/memory => ../memory
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

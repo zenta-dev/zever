@@ -6,7 +6,8 @@
 // They cover: the activate error path (missing zever-lsp binary surfaces one
 // install-hint notification, leaking no paths), the happy path (no error),
 // deactivate with/without a live client, the countDecls schema-stats helper,
-// and the zen language status item.
+// the zen language status item, and the palette commands (validate/fixAll
+// forward the active editor's URI over workspace/executeCommand).
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
 import * as path from 'node:path';
@@ -32,6 +33,8 @@ interface VscodeStub {
   };
   __messages: string[];
   __statusItems: StatusItemStub[];
+  __commands: string[];
+  __commandHandlers: Record<string, () => Promise<unknown> | unknown>;
 }
 
 interface ServerOptionsStub {
@@ -39,13 +42,21 @@ interface ServerOptionsStub {
   transport: number;
 }
 
+interface SentRequest {
+  method: string;
+  params: unknown;
+}
+
 interface LanguageClientStub {
   id: string;
   name: string;
   serverOptions: ServerOptionsStub;
+  clientOptions: { documentSelector: unknown };
   stopped: boolean;
+  sentRequests: SentRequest[];
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  sendRequest: (method: string, params: unknown) => Promise<unknown>;
 }
 
 interface LanguageClientCtor {
@@ -142,6 +153,17 @@ describe('activate', () => {
     assert.equal(instance.id, 'zeverLanguageServer');
     assert.equal(instance.name, 'Zever Language Server');
     assert.equal(instance.serverOptions.command, 'zever-lsp');
+  });
+
+  it('selects both saved and untitled zen documents', () => {
+    activate(makeContext());
+
+    assert.equal(clientCtor.instances.length, 1);
+    const [instance] = clientCtor.instances;
+    assert.deepEqual(instance.clientOptions.documentSelector, [
+      { scheme: 'file', language: 'zen' },
+      { scheme: 'untitled', language: 'zen' },
+    ]);
   });
 
   it('shows one install hint and no paths when the server fails to start', async () => {
@@ -334,5 +356,90 @@ describe('status item', () => {
     activate(makeContext());
 
     assert.equal(vscodeStub.__statusItems[0].text, '$(database) Zen');
+  });
+});
+
+describe('palette commands', () => {
+  beforeEach(() => {
+    vscodeStub.__messages.length = 0;
+    vscodeStub.__commands.length = 0;
+    for (const key of Object.keys(vscodeStub.__commandHandlers)) {
+      delete vscodeStub.__commandHandlers[key];
+    }
+    clientCtor.instances.length = 0;
+    clientCtor.failWith = undefined;
+    vscodeStub.window.activeTextEditor = undefined;
+  });
+
+  function setActiveZenDocument(uri: string): void {
+    vscodeStub.window.activeTextEditor = {
+      document: {
+        languageId: 'zen',
+        getText: () => 'entity A {\n}\n',
+        uri: { toString: () => uri },
+      } as unknown as VscodeApi.TextDocument,
+    };
+  }
+
+  it('registers validate and fixAll alongside restart', () => {
+    activate(makeContext());
+
+    assert.ok(vscodeStub.__commands.includes('zever.restartServer'));
+    assert.ok(vscodeStub.__commands.includes('zever.validate'));
+    assert.ok(vscodeStub.__commands.includes('zever.fixAll'));
+  });
+
+  it('validate sends workspace/executeCommand for the active editor URI', async () => {
+    setActiveZenDocument('file:///a.zen');
+    activate(makeContext());
+
+    await vscodeStub.__commandHandlers['zever.validate']();
+
+    const [instance] = clientCtor.instances;
+    assert.equal(instance.sentRequests.length, 1);
+    assert.deepEqual(instance.sentRequests[0], {
+      method: 'workspace/executeCommand',
+      params: { command: 'zever.validate', arguments: ['file:///a.zen'] },
+    });
+  });
+
+  it('fixAll sends workspace/executeCommand for the active editor URI', async () => {
+    setActiveZenDocument('file:///b.zen');
+    activate(makeContext());
+
+    await vscodeStub.__commandHandlers['zever.fixAll']();
+
+    const [instance] = clientCtor.instances;
+    assert.equal(instance.sentRequests.length, 1);
+    assert.deepEqual(instance.sentRequests[0], {
+      method: 'workspace/executeCommand',
+      params: { command: 'zever.fixAll', arguments: ['file:///b.zen'] },
+    });
+  });
+
+  it('sends nothing with no active editor', async () => {
+    activate(makeContext());
+
+    await vscodeStub.__commandHandlers['zever.validate']();
+    await vscodeStub.__commandHandlers['zever.fixAll']();
+
+    const [instance] = clientCtor.instances;
+    assert.equal(instance.sentRequests.length, 0);
+  });
+
+  it('sends nothing for a non-zen document', async () => {
+    vscodeStub.window.activeTextEditor = {
+      document: {
+        languageId: 'typescript',
+        getText: () => 'const x = 1;',
+        uri: { toString: () => 'file:///c.ts' },
+      } as unknown as VscodeApi.TextDocument,
+    };
+    activate(makeContext());
+
+    await vscodeStub.__commandHandlers['zever.validate']();
+
+    const [instance] = clientCtor.instances;
+    assert.equal(instance.sentRequests.length, 0);
   });
 });

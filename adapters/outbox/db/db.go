@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -306,7 +306,7 @@ func (d *driver) Record(ctx context.Context, tx coredb.Tx, msg outbox.Message) e
 
 	headersJSON := "{}"
 	if len(headers) > 0 {
-		buf, err := json.Marshal(headers)
+		buf, err := codec.Marshal(headers)
 		if err != nil {
 			return fmt.Errorf("db: record %q: encode headers: %w", msg.ID, err)
 		}

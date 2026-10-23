@@ -14,6 +14,7 @@ class LanguageClient {
     this.serverOptions = serverOptions;
     this.clientOptions = clientOptions;
     this.stopped = false;
+    this.sentRequests = [];
     LanguageClient.instances.push(this);
   }
 
@@ -27,6 +28,11 @@ class LanguageClient {
   stop() {
     this.stopped = true;
     return Promise.resolve();
+  }
+
+  sendRequest(method, params) {
+    this.sentRequests.push({ method, params });
+    return Promise.resolve(null);
   }
 }
 

@@ -586,6 +586,110 @@ func keysOf(m map[string]string) []string {
 	return out
 }
 
+// TestAddDiskFileDecisions tables the surgical insert rules: a .zen file on
+// disk joins the snapshot with its disk content, while a non-.zen path, an
+// unreadable path, and a non-file URI are ignored without touching the rest
+// of the snapshot.
+func TestAddDiskFileDecisions(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	const zenContent = "entity Fresh {\n\tid: uuid @primary\n}\n"
+
+	zenPath := writeFile(t, dir, "fresh.zen", zenContent)
+	txtPath := writeFile(t, dir, "notes.txt", "not a schema")
+
+	tests := []struct {
+		name      string
+		path      string
+		wantKnown bool
+	}{
+		{"zen file from disk is added", zenPath, true},
+		{"non-zen file is ignored", txtPath, false},
+		{"unreadable path is ignored", filepath.Join(dir, "missing.zen"), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ws := NewWorkspace()
+			ws.AddDiskFile(tc.path)
+
+			abs, err := filepath.Abs(tc.path)
+			if err != nil {
+				t.Fatalf("Abs: %v", err)
+			}
+
+			files := ws.CollectAllFiles()
+
+			got, ok := files[abs]
+			if ok != tc.wantKnown {
+				t.Fatalf("CollectAllFiles knows %q = %v, want %v (all: %v)", abs, ok, tc.wantKnown, keysOf(files))
+			}
+
+			if tc.wantKnown && got != zenContent {
+				t.Errorf("added content = %q, want the disk bytes %q", got, zenContent)
+			}
+		})
+	}
+}
+
+// TestRemoveDiskFileDecisions proves a delete drops exactly its path: the
+// workspace forgets it, an unknown path is a no-op, and an open buffer for
+// the same path keeps winning in CollectAllFiles until it is closed.
+func TestRemoveDiskFileDecisions(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	seed := writeFile(t, dir, "seed.zen", "entity Seed {\n\tid: uuid @primary\n}\n")
+	gone := writeFile(t, dir, "gone.zen", "entity Gone {\n\tid: uuid @primary\n}\n")
+
+	seedAbs, err := filepath.Abs(seed)
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+
+	goneAbs, err := filepath.Abs(gone)
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+
+	ws := NewWorkspace()
+	ws.SetRoot(string(pathToURI(dir)))
+
+	if files := ws.CollectAllFiles(); len(files) != 2 {
+		t.Fatalf("seeded %d files, want 2: %v", len(files), keysOf(files))
+	}
+
+	ws.RemoveDiskFile(goneAbs)
+
+	if files := ws.CollectAllFiles(); len(files) != 1 {
+		t.Fatalf("after removing one file got %d, want 1: %v", len(files), keysOf(files))
+	} else if _, ok := files[seedAbs]; !ok {
+		t.Errorf("after removing gone.zen the survivor is %v, want seed.zen kept", keysOf(files))
+	}
+
+	// Removing again, or a path never known, changes nothing.
+	ws.RemoveDiskFile(goneAbs)
+	ws.RemoveDiskFile(filepath.Join(dir, "missing.zen"))
+
+	if files := ws.CollectAllFiles(); len(files) != 1 {
+		t.Errorf("after no-op removes got %d files, want 1: %v", len(files), keysOf(files))
+	}
+
+	// An open buffer survives the on-disk delete: the buffer still wins the
+	// layering until DidClose drops it.
+	ws.SetDoc(string(pathToURI(seed)), "entity SeedEdited {\n\tid: uuid @primary\n}\n")
+	ws.RemoveDiskFile(seedAbs)
+
+	if got, ok := ws.CollectAllFiles()[seedAbs]; !ok || !strings.Contains(got, "SeedEdited") {
+		t.Errorf("buffer after disk delete = (%q, %v), want the open buffer kept", got, ok)
+	}
+}
+
 // multiRootEntityDoc is a schema that compiles cleanly on its own; declaring
 // it in two roots at once is only an error when the roots are merged into
 // one compile.

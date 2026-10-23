@@ -3,7 +3,6 @@ package static
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -17,6 +16,7 @@ import (
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/flag"
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // DefaultLogInterval caps reload-failure log spam to one line per interval.
@@ -76,7 +76,7 @@ func New(opts flag.Options) (flag.Flag, error) {
 	}
 
 	var flags map[string]any
-	if err = json.Unmarshal(data, &flags); err != nil {
+	if err = codec.Unmarshal(data, &flags); err != nil {
 		return nil, fmt.Errorf("static: load %q: %w", path, err)
 	}
 	if flags == nil {
@@ -181,7 +181,7 @@ func (d *driver) reloadIfChanged() {
 	}
 
 	var flags map[string]any
-	if err := json.Unmarshal(data, &flags); err != nil {
+	if err := codec.Unmarshal(data, &flags); err != nil {
 		d.rateLimitedLog("static: reload of %s failed: %v; keeping last-good flags", path, err)
 		return
 	}
@@ -331,11 +331,11 @@ func (d *driver) JSON(ctx context.Context, key string, out any, fallback any) er
 		if fallback == nil {
 			return nil
 		}
-		b, err := json.Marshal(fallback)
+		b, err := codec.Marshal(fallback)
 		if err != nil {
 			return fmt.Errorf("static: key %q: %w", key, err)
 		}
-		if err := json.Unmarshal(b, out); err != nil {
+		if err := codec.Unmarshal(b, out); err != nil {
 			return fmt.Errorf("static: key %q: %w", key, err)
 		}
 		return nil
@@ -346,12 +346,12 @@ func (d *driver) JSON(ctx context.Context, key string, out any, fallback any) er
 		b = []byte(s)
 	} else {
 		var err error
-		b, err = json.Marshal(v)
+		b, err = codec.Marshal(v)
 		if err != nil {
 			return fmt.Errorf("static: key %q: %w", key, err)
 		}
 	}
-	if err := json.Unmarshal(b, out); err != nil {
+	if err := codec.Unmarshal(b, out); err != nil {
 		return fmt.Errorf("static: key %q: %w", key, err)
 	}
 	return nil

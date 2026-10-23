@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
@@ -424,7 +424,7 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 		return "", workflow.UnknownStepError{Step: name}
 	}
 
-	inputJSON, err := json.Marshal(input)
+	inputJSON, err := codec.Marshal(input)
 	if err != nil {
 		return "", fmt.Errorf("postgres: start %q: marshal input: %w", name, err)
 	}
@@ -482,7 +482,7 @@ func (d *driver) Start(ctx context.Context, name string, input any, workflowID s
 		return "", fmt.Errorf("workflow: step %q failed: %w", name, err)
 	}
 
-	resultJSON, err := json.Marshal(result)
+	resultJSON, err := codec.Marshal(result)
 	if err != nil {
 		_, _ = orm.DeleteFrom(d.tbl).Where(d.cID.Eq(string(id))).Exec(ctx, d.conn)
 
@@ -523,7 +523,7 @@ func (d *driver) Signal(ctx context.Context, runID workflow.RunID, _ string, val
 		return workflow.RunCompletedError{RunID: runID}
 	}
 
-	valueJSON, err := json.Marshal(value)
+	valueJSON, err := codec.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("postgres: signal %q: marshal value: %w", runID, err)
 	}
@@ -569,7 +569,7 @@ func (d *driver) Query(ctx context.Context, runID workflow.RunID, name string, o
 		return workflow.UnknownQueryError{Query: name}
 	}
 
-	if err := json.Unmarshal(row.Payload, out); err != nil {
+	if err := codec.Unmarshal(row.Payload, out); err != nil {
 		return fmt.Errorf("postgres: query %q: type mismatch: %w", name, err)
 	}
 
@@ -673,7 +673,7 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 
 	var input any
 	if len(row.Payload) > 0 {
-		if uerr := json.Unmarshal(row.Payload, &input); uerr != nil {
+		if uerr := codec.Unmarshal(row.Payload, &input); uerr != nil {
 			return fmt.Errorf("postgres: reclaim %q: decode input: %w", runID, uerr)
 		}
 	}
@@ -683,7 +683,7 @@ func (d *driver) Reclaim(ctx context.Context, runID workflow.RunID, owner string
 		return fmt.Errorf("workflow: step %q failed: %w", row.Step, err)
 	}
 
-	resultJSON, err := json.Marshal(result)
+	resultJSON, err := codec.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("postgres: reclaim %q: marshal result: %w", runID, err)
 	}

@@ -3,11 +3,12 @@ package log_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 
 	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
 	"github.com/zenta-dev/zever/core/mailer"
@@ -147,7 +148,7 @@ func TestSend_emitsJSONRedacted(t *testing.T) {
 			ContentID string `json:"content_id"`
 		} `json:"attachments"`
 	}
-	if err := json.Unmarshal([]byte(line), &decoded); err != nil {
+	if err := codec.Unmarshal([]byte(line), &decoded); err != nil {
 		t.Fatalf("output not valid JSON: %v\n%s", err, line)
 	}
 	if decoded.Subject != "subj" || decoded.Body != "body" || decoded.HTML != "<p>body</p>" {
@@ -169,7 +170,7 @@ func TestSend_emitsJSONRedacted(t *testing.T) {
 		t.Errorf("JSON contains raw attachment bytes (secret leaked)")
 	}
 	var raw map[string]any
-	if err := json.Unmarshal([]byte(line), &raw); err != nil {
+	if err := codec.Unmarshal([]byte(line), &raw); err != nil {
 		t.Fatalf("re-decode err = %v", err)
 	}
 	atts, ok := raw["attachments"].([]any)
@@ -241,7 +242,7 @@ func TestConcurrentSends(t *testing.T) {
 	}
 	for i, line := range lines {
 		var v map[string]any
-		if err := json.Unmarshal([]byte(line), &v); err != nil {
+		if err := codec.Unmarshal([]byte(line), &v); err != nil {
 			t.Fatalf("line %d not valid JSON: %v", i, err)
 		}
 	}

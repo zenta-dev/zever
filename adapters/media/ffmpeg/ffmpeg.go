@@ -3,7 +3,7 @@ package ffmpeg
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"io"
@@ -324,15 +324,15 @@ type ProbeResult struct {
 func (r *ProbeResult) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Format *struct {
-			FormatName string          `json:"format_name"`
-			Duration   json.RawMessage `json:"duration"`
+			FormatName string         `json:"format_name"`
+			Duration   jsontext.Value `json:"duration"`
 		} `json:"format"`
-		FormatName string          `json:"format_name"`
-		Duration   json.RawMessage `json:"duration"`
-		Streams    []ProbeStream   `json:"streams"`
+		FormatName string         `json:"format_name"`
+		Duration   jsontext.Value `json:"duration"`
+		Streams    []ProbeStream  `json:"streams"`
 	}
 
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := codec.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
@@ -361,12 +361,12 @@ func (r *ProbeResult) UnmarshalJSON(data []byte) error {
 
 func parseDuration(data []byte) (float64, error) {
 	var f float64
-	if err := json.Unmarshal(data, &f); err == nil {
+	if err := codec.Unmarshal(data, &f); err == nil {
 		return f, nil
 	}
 
 	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := codec.Unmarshal(data, &s); err != nil {
 		return 0, err
 	}
 

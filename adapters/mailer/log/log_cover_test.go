@@ -1,13 +1,14 @@
 package log
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 
 	"github.com/zenta-dev/zever/core/mailer"
 )
@@ -63,7 +64,7 @@ func TestCoverNewWithWriterNilWriterUsesStdout(t *testing.T) {
 		t.Fatalf("reader close err = %v", closeRErr)
 	}
 	var decoded map[string]any
-	if jsonErr := json.Unmarshal(out, &decoded); jsonErr != nil {
+	if jsonErr := codec.Unmarshal(out, &decoded); jsonErr != nil {
 		t.Fatalf("stdout output not JSON: %v\n%s", jsonErr, out)
 	}
 	if decoded["subject"] != "cover" {

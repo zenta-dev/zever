@@ -2,7 +2,6 @@ package firebase
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -13,6 +12,7 @@ import (
 	"firebase.google.com/go/v4/remoteconfig"
 
 	"github.com/zenta-dev/zever/core/flag"
+	"github.com/zenta-dev/zever/shared/codec"
 	sharedfirebase "github.com/zenta-dev/zever/shared/firebase"
 )
 
@@ -184,16 +184,16 @@ func (c *client) JSON(ctx context.Context, key string, out any, fallback any) er
 		if fallback == nil {
 			return nil
 		}
-		raw, err := json.Marshal(fallback)
+		raw, err := codec.Marshal(fallback)
 		if err != nil {
 			return fmt.Errorf("firebase: key %q fallback marshal: %w", key, err)
 		}
-		if err := json.Unmarshal(raw, out); err != nil {
+		if err := codec.Unmarshal(raw, out); err != nil {
 			return fmt.Errorf("firebase: key %q fallback unmarshal: %w", key, err)
 		}
 		return nil
 	}
-	if err := json.Unmarshal([]byte(cfg.GetString(key)), out); err != nil {
+	if err := codec.Unmarshal([]byte(cfg.GetString(key)), out); err != nil {
 		return fmt.Errorf("firebase: key %q is not valid JSON: %w", key, err)
 	}
 	return nil

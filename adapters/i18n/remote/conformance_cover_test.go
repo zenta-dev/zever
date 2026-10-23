@@ -1,13 +1,13 @@
 package remote
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/i18n"
 	"github.com/zenta-dev/zever/core/i18n/i18ntest"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestRemoteConformance proves the remote adapter honors the i18n.I18n
@@ -29,7 +29,7 @@ func TestRemoteConformance(t *testing.T) {
 				Args   map[string]string `json:"args"`
 			}
 
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			if err := codec.UnmarshalRead(r.Body, &req); err != nil {
 				http.Error(w, "bad request", http.StatusBadRequest)
 
 				return
@@ -46,11 +46,11 @@ func TestRemoteConformance(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"translations": out})
+			_ = codec.MarshalLine(w, map[string]any{"translations": out})
 		})
 		mux.HandleFunc("/locales", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"locales": []string{"en"}})
+			_ = codec.MarshalLine(w, map[string]any{"locales": []string{"en"}})
 		})
 
 		srv := httptest.NewServer(mux)

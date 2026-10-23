@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -392,7 +391,7 @@ func (d *driver) adoptRow(ctx context.Context, row *slotRow, now time.Time) erro
 
 	var args any
 	if len(row.Args) > 0 {
-		if err := json.Unmarshal(row.Args, &args); err != nil {
+		if err := codec.Unmarshal(row.Args, &args); err != nil {
 			return fmt.Errorf("postgres: adopt %q: decode args: %w", row.Slot, err)
 		}
 	}
@@ -518,7 +517,7 @@ func (d *driver) fire(ctx context.Context, slot string) {
 
 	if args == nil && len(row.Args) > 0 {
 		var decoded any
-		if err := json.Unmarshal(row.Args, &decoded); err != nil {
+		if err := codec.Unmarshal(row.Args, &decoded); err != nil {
 			d.logger.Warn().Str("slot", slot).Err(err).Msg("postgres: decode args")
 
 			return
