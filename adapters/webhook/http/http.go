@@ -56,6 +56,8 @@ type adapter struct {
 	allowPrivate bool
 }
 
+var _ webhook.Webhook = (*adapter)(nil)
+
 func (a *adapter) Register(_ context.Context, event string, target string, secret string) error {
 	if event == "" {
 		return ErrMissingEvent

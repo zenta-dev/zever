@@ -18,6 +18,8 @@ import (
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
+var _ outbox.Store = (*store)(nil)
+
 // emitSQL publishes one outbox message as a transactional logical-replication
 // message. transactional=true means the message is only replicated when the
 // surrounding transaction commits, so a rollback drops the event.

@@ -12,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/shared/codec"
 )
 
+var _ geo.Geo = (*staticGeo)(nil)
+
 type city struct {
 	Name string  `json:"name"`
 	Lat  float64 `json:"lat"`

@@ -8,6 +8,8 @@ import (
 	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
+var _ storage.Storage = (*s3Adapter)(nil)
+
 type s3Adapter struct {
 	*s3opts.Core
 	policySync string

@@ -10,6 +10,8 @@ import (
 	"github.com/zenta-dev/zever/core/analytics"
 )
 
+var _ analytics.Analytics = (*adapter)(nil)
+
 // adapter renders analytics events as JSON log lines.
 type adapter struct {
 	// logger receives rendered events.

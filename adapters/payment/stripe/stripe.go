@@ -16,6 +16,8 @@ import (
 	"github.com/zenta-dev/zever/shared/providersclient"
 )
 
+var _ payment.Payment = (*driver)(nil)
+
 // driver is the Stripe payment backend.
 type driver struct {
 	// client talks to the Stripe API.

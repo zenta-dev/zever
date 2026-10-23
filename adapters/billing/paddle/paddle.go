@@ -12,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/shared/providersopt"
 )
 
+var _ billing.Billing = (*driver)(nil)
+
 // newSDK creates the underlying Paddle SDK client. It is a seam for tests.
 var newSDK = paddle.New
 

@@ -13,6 +13,8 @@ import (
 	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
+var _ geo.Geo = (*adapter)(nil)
+
 type adapter struct {
 	client *gmaps.Client
 }

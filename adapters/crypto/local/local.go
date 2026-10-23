@@ -25,6 +25,8 @@ type localCrypto struct {
 	closed   atomic.Bool
 }
 
+var _ crypto.Crypto = (*localCrypto)(nil)
+
 // randRead is a seam for testing nonce generation failure.
 var randRead = rand.Read
 
@@ -145,7 +147,7 @@ func (l *localCrypto) Verify(_ context.Context, message, signature []byte) (bool
 	if l.signPriv == nil {
 		return false, crypto.ErrKeyNotFound
 	}
-	pub := l.signPriv.Public().(ed25519.PublicKey) //nolint:forcetypeassert // ed25519 PrivateKey always returns ed25519.PublicKey
+	pub := l.signPriv.Public().(ed25519.PublicKey) //nolint:forcetypeassert // stdlib guarantee: ed25519.PrivateKey.Public() always returns ed25519.PublicKey
 	return ed25519.Verify(pub, message, signature), nil
 }
 

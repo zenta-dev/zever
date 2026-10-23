@@ -10,6 +10,8 @@ import (
 	"github.com/zenta-dev/zever/core/log"
 )
 
+var _ log.Logger = (*slogLogger)(nil)
+
 type slogLogger struct {
 	logger *stdslog.Logger
 }

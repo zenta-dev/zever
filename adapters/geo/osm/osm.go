@@ -20,6 +20,8 @@ import (
 	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
+var _ geo.Geo = (*osmGeo)(nil)
+
 const defaultEndpoint = "https://nominatim.openstreetmap.org"
 const defaultMaxBody = 1 << 20
 const defaultTimeout = 10 * time.Second

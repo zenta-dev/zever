@@ -17,6 +17,8 @@ import (
 	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
+var _ document.Document = (*driver)(nil)
+
 type driver struct {
 	endpoint  string
 	apiKey    string

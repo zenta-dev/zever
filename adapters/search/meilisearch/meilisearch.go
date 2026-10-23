@@ -42,6 +42,8 @@ type meilisearchClient struct {
 	idIndexes *lrucache.Cache[string, []string]
 }
 
+var _ search.Search = (*meilisearchClient)(nil)
+
 // New creates a Meilisearch-backed search.Search from options.
 func New(o search.Options) (search.Search, error) {
 	if err := o.Validate(); err != nil {

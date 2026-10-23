@@ -6,6 +6,8 @@ import (
 	"github.com/zenta-dev/zever/core/log"
 )
 
+var _ log.Logger = (*noopLogger)(nil)
+
 type noopLogger struct{}
 
 // New returns a Logger that discards all events.

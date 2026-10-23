@@ -184,6 +184,19 @@ test-lsp: ## Run zever-lsp module tests
 bench: ## Run benchmarks in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -run='^$$' -bench=. -benchmem ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 
+.PHONY: bench-baseline
+bench-baseline: ## Run baseline benchmarks (count=10) into .bench/baseline.txt
+	@mkdir -p .bench
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -run='^$$' -bench=. -benchmem -count=10 ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done 2>&1 | tee .bench/baseline.txt; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+
+.PHONY: bench-ab
+bench-ab: ## Compare benchmarks against baseline (requires BASELINE=.bench/baseline.txt, runs count=10)
+	@test -n "$(BASELINE)" || { echo "usage: make bench-ab BASELINE=.bench/baseline.txt" >&2; exit 1; }
+	@command -v benchstat >/dev/null 2>&1 || { $(GO) install golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e; }
+	@mkdir -p .bench
+	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -run='^$$' -bench=. -benchmem -count=10 ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done 2>&1 | tee .bench/head.txt; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
+	benchstat $(BASELINE) .bench/head.txt
+
 .PHONY: cover
 cover: ## Run tests with coverage and print the total
 	$(GO) test -covermode=atomic -coverprofile=$(COVERAGE) ./...

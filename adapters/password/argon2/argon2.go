@@ -14,6 +14,8 @@ import (
 	"github.com/zenta-dev/zever/core/password"
 )
 
+var _ password.Hasher = (*hasher)(nil)
+
 // maxPasswordLength guards derivation cost against oversized inputs.
 const maxPasswordLength = 1024
 

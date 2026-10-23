@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -150,7 +151,10 @@ func splitWhere(where Node, budget int) ([]Node, error) {
 		return nil, fmt.Errorf("orm: planInChunks: %w", ErrInListTooLarge)
 	}
 
-	vals := target.Value.([]any) //nolint:forcetypeassert // largestChunkableIn only returns value-list INs
+	vals, ok := target.Value.([]any)
+	if !ok {
+		return nil, errors.New("orm: planInChunks: internal error: target.Value not []any")
+	}
 
 	others := countNodeArgs(where) - len(vals)
 	chunkSize := budget - others
@@ -189,8 +193,16 @@ func largestChunkableIn(n *Node, chunkable bool) *Node {
 	walk = func(n *Node, chunkable bool) {
 		if n.Kind == NIn && n.Op == In && chunkable {
 			if vs, ok := n.Value.([]any); ok {
-				if best == nil || len(vs) > len(best.Value.([]any)) { //nolint:forcetypeassert // best only ever holds value-list INs
+				if best == nil {
 					best = n
+				} else {
+					bestVals, ok := best.Value.([]any)
+					if !ok {
+						// best was set from a value-list IN, so this should never happen
+						best = n
+					} else if len(vs) > len(bestVals) {
+						best = n
+					}
 				}
 			}
 		}

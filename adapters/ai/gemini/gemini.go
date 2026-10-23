@@ -235,7 +235,7 @@ func (a *adapter) Embed(ctx context.Context, model string, inputs []string, opts
 
 	cfg := &genai.EmbedContentConfig{}
 	if opts.Dimensions > 0 {
-		v := int32(opts.Dimensions) //nolint:gosec
+		v := int32(opts.Dimensions) //nolint:gosec // Dimensions is bounded by embedding model limits (typically <= 8192)
 		cfg.OutputDimensionality = &v
 	}
 
@@ -280,7 +280,7 @@ func buildGenerateConfig(opts ai.GenerateOptions, system *genai.Content) *genai.
 	}
 
 	if opts.MaxTokens > 0 {
-		cfg.MaxOutputTokens = int32(opts.MaxTokens) //nolint:gosec
+		cfg.MaxOutputTokens = int32(opts.MaxTokens) //nolint:gosec // MaxTokens is bounded by model context limits (typically <= 2M)
 	}
 
 	if opts.TopP != nil {

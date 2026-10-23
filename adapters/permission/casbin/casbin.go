@@ -12,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 )
 
+var _ permission.Checker = (*checker)(nil)
+
 // defaultModelText is the embedded deny-override RBAC model. Role rules
 // seeded from Options use obj "*" (RBAC rules ignore the resource), so the
 // matcher accepts a wildcard policy object alongside exact matches.

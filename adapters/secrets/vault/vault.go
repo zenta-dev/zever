@@ -17,6 +17,8 @@ import (
 	"github.com/zenta-dev/zever/core/secrets"
 )
 
+var _ secrets.Secrets = (*driver)(nil)
+
 // DefaultHTTPTimeout bounds Vault HTTP round-trips.
 const DefaultHTTPTimeout = 5 * time.Second
 

@@ -85,7 +85,8 @@ func (c *Cache[K, V]) Get(k K) (V, bool) {
 	}
 
 	c.ll.MoveToFront(el)
-	return el.Value.(*entry[K, V]).val, true //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+	e := el.Value.(*entry[K, V]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
+	return e.val, true
 }
 
 // Put inserts or updates the value for k and marks it most-recently-used.
@@ -101,7 +102,7 @@ func (c *Cache[K, V]) Put(k K, v V) {
 
 	c.mu.Lock()
 	if el, ok := c.items[k]; ok {
-		el.Value.(*entry[K, V]).val = v //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+		el.Value.(*entry[K, V]).val = v //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
 		c.ll.MoveToFront(el)
 	} else {
 		el := c.ll.PushFront(&entry[K, V]{key: k, val: v})
@@ -110,7 +111,7 @@ func (c *Cache[K, V]) Put(k K, v V) {
 		if c.ll.Len() > c.capacity {
 			back := c.ll.Back()
 			if back != nil {
-				be := back.Value.(*entry[K, V]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+				be := back.Value.(*entry[K, V]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
 				c.ll.Remove(back)
 				delete(c.items, be.key)
 				evictKey, evictVal, evicted = be.key, be.val, true
@@ -143,7 +144,7 @@ func (c *Cache[K, V]) Delete(k K) (V, bool) {
 		return zero, false
 	}
 
-	e := el.Value.(*entry[K, V]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+	e := el.Value.(*entry[K, V]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
 	c.ll.Remove(el)
 	delete(c.items, k)
 	return e.val, true
@@ -179,7 +180,7 @@ func (c *Cache[K, V]) GetOrCompute(k K, compute func() V) (V, bool) {
 
 	if el, ok := c.items[k]; ok {
 		c.ll.MoveToFront(el)
-		v := el.Value.(*entry[K, V]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+		v := el.Value.(*entry[K, V]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
 		c.mu.Unlock()
 		return v, true
 	}
@@ -198,7 +199,7 @@ func (c *Cache[K, V]) GetOrCompute(k K, compute func() V) (V, bool) {
 	if c.ll.Len() > c.capacity {
 		back := c.ll.Back()
 		if back != nil {
-			be := back.Value.(*entry[K, V]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+			be := back.Value.(*entry[K, V]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
 			c.ll.Remove(back)
 			delete(c.items, be.key)
 			evictKey, evictVal, evicted = be.key, be.val, true
@@ -240,7 +241,7 @@ func (c *Cache[K, V]) Clear(fn func(K, V)) {
 
 	removed := make([]entry[K, V], 0, len(c.items))
 	for _, el := range c.items {
-		removed = append(removed, *el.Value.(*entry[K, V])) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, V]
+		removed = append(removed, *el.Value.(*entry[K, V])) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
 	}
 	c.ll = list.New()
 	c.items = make(map[K]*list.Element, c.capacity)

@@ -12,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
+var _ lock.Locker = (*adapter)(nil)
+
 // defaultMaxEntries bounds the lease table before LRU eviction, matching the
 // cache/memory adapter default. It applies when lock.Options.MaxEntries is
 // non-positive.

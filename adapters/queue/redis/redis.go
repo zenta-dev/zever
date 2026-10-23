@@ -100,6 +100,8 @@ type redisAdapter struct {
 	closed            atomic.Bool
 }
 
+var _ queue.Queue = (*redisAdapter)(nil)
+
 // connOptions maps queue options onto the shared client options. A set URL
 // takes precedence over Addr; both spellings connect.
 func connOptions(opts queue.Options) redisopt.Options {

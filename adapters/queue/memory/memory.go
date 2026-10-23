@@ -12,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
+var _ queue.Queue = (*memoryAdapter)(nil)
+
 type inflight struct {
 	msg      queue.Message
 	deadline time.Time

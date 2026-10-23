@@ -15,6 +15,8 @@ import (
 	"github.com/zenta-dev/zever/core/observability"
 )
 
+var _ log.Logger = (*logger)(nil)
+
 const (
 	colorReset  = "\033[0m"
 	colorGray   = "\033[90m"

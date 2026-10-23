@@ -17,6 +17,8 @@ import (
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
+var _ outbox.Store = (*driver)(nil)
+
 // tsLayout is the fixed-width UTC timestamp layout used for sqlite cells so
 // lexicographic ordering matches chronological ordering.
 const tsLayout = "2006-01-02T15:04:05.000000000Z07:00"

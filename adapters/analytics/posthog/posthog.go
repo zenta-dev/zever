@@ -11,6 +11,8 @@ import (
 	"github.com/zenta-dev/zever/core/analytics"
 )
 
+var _ analytics.Analytics = (*adapter)(nil)
+
 // client is the minimal seam the adapter needs from the PostHog SDK.
 // The real SDK client satisfies it and fakes implement it trivially.
 type client interface {
