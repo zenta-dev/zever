@@ -320,7 +320,7 @@ vulncheck-all: ## Scan every module; reachable vulns fail unless allowlisted wit
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { printf '%s\n' "govulncheck not found: run 'make setup'"; exit 1; }
 	$(GO) run ./tools/vulngate --govulncheck "$(GOVULNCHECK)" $(if $(MODULES),$(MODULES),$(SHARD_MODULES))
 
-.PHONY: docs-dev docs-build docs-preview docs-audit docs-lint docs-links docs-gates
+.PHONY: docs-dev docs-build docs-preview docs-audit docs-lint docs-links docs-repo-facts docs-docgo-facts docs-gates
 docs-dev: ## Run docs dev server
 	cd docs && npm run dev
 docs-build: ## Build docs site
@@ -362,16 +362,36 @@ docs-legacy-config: ## Check the repo never configures Zever through a legacy co
 docs-legacy-config-self-test: ## Prove the legacy config file check rejects the mistakes it guards against
 	cd docs && node scripts/no-legacy-config.mjs --self-test
 
+.PHONY: docs-repo-facts
+docs-repo-facts: ## Fact-check the repository markdown against the Go code (env keys, accessors, commands, paths, versions)
+	cd docs && node scripts/audit-repo-facts.mjs
+
+.PHONY: docs-repo-facts-self-test
+docs-repo-facts-self-test: ## Prove the repository markdown fact check rejects the mistakes it guards against
+	cd docs && node scripts/audit-repo-facts.mjs --self-test
+
+.PHONY: docs-docgo-facts
+docs-docgo-facts: ## Fact-check the package doc.go corpus against the Go code (env keys, adapter values, file references)
+	cd docs && node scripts/audit-docgo-facts.mjs
+
+.PHONY: docs-docgo-facts-self-test
+docs-docgo-facts-self-test: ## Prove the doc.go fact check rejects the mistakes it guards against
+	cd docs && node scripts/audit-docgo-facts.mjs --self-test
+
 # Every offline docs gate in one target, the same set the CI docs job runs.
 # The external link check is not here: it needs the network and stays a
 # report (the lychee job in .github/workflows/docs.yml).
 .PHONY: docs-gates
-docs-gates: ## Run every offline docs gate (audit, style lint, internal links)
+docs-gates: ## Run every offline docs gate (fact audits, style lint, legacy config, links)
 	$(MAKE) docs-audit
 	$(MAKE) docs-audit-self-test
 	$(MAKE) docs-lint
 	$(MAKE) docs-lint-self-test
 	$(MAKE) docs-legacy-config
 	$(MAKE) docs-legacy-config-self-test
+	$(MAKE) docs-repo-facts
+	$(MAKE) docs-repo-facts-self-test
+	$(MAKE) docs-docgo-facts
+	$(MAKE) docs-docgo-facts-self-test
 	$(MAKE) docs-links
 	$(MAKE) docs-links-self-test
