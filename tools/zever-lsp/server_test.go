@@ -130,7 +130,6 @@ func TestInitialize_capabilities(t *testing.T) {
 		{"HoverProvider", caps.HoverProvider},
 		{"DocumentFormattingProvider", caps.DocumentFormattingProvider},
 		{"DocumentRangeFormattingProvider", caps.DocumentRangeFormattingProvider},
-		{"CodeActionProvider", caps.CodeActionProvider},
 		{"ReferencesProvider", caps.ReferencesProvider},
 		{"FoldingRangeProvider", caps.FoldingRangeProvider},
 		{"DocumentHighlightProvider", caps.DocumentHighlightProvider},
@@ -164,6 +163,15 @@ func TestInitialize_capabilities(t *testing.T) {
 		if caps.CompletionProvider.ResolveProvider == nil || !*caps.CompletionProvider.ResolveProvider {
 			t.Error("CompletionProvider.ResolveProvider not enabled")
 		}
+	}
+
+	codeAction, ok := caps.CodeActionProvider.(*protocol.CodeActionOptions)
+	if !ok {
+		t.Fatalf("CodeActionProvider = %T, want *CodeActionOptions", caps.CodeActionProvider)
+	}
+
+	if codeAction.ResolveProvider == nil || !*codeAction.ResolveProvider {
+		t.Error("CodeActionProvider.ResolveProvider not enabled")
 	}
 
 	if caps.SignatureHelpProvider == nil {
@@ -1082,7 +1090,12 @@ func TestCodeAction(t *testing.T) {
 		actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
 			Range:        diagRange,
-			Context:      protocol.CodeActionContext{},
+			// Scope to quickfix: the tab-indented fixture would
+			// otherwise offer the format action, and this subtest pins
+			// the no-diagnostics null for quick fixes.
+			Context: protocol.CodeActionContext{
+				Only: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+			},
 		})
 		if err != nil {
 			t.Fatalf("CodeAction: %v", err)
@@ -1105,6 +1118,10 @@ func TestCodeAction(t *testing.T) {
 					Range:   diagRange,
 					Message: protocol.String("something else entirely"),
 				}},
+				// Scope to quickfix: the tab-indented fixture would
+				// otherwise offer the format action, and this subtest
+				// pins the unrecognized-diagnostic null for quick fixes.
+				Only: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
 			},
 		})
 		if err != nil {

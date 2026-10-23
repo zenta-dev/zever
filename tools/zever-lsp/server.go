@@ -239,7 +239,12 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 				FirstTriggerCharacter: "\n",
 				MoreTriggerCharacter:  []string{"}", " "},
 			},
-			CodeActionProvider: protocol.Boolean(true),
+			// Like CompletionProvider above, this is a pointer to an options
+			// struct rather than a bare bool: ResolveProvider advertises that
+			// codeAction/resolve fills an action's edit lazily. Actions still
+			// carry their edits eagerly, so clients without resolve support
+			// keep working; resolve only fills edits that are absent.
+			CodeActionProvider: &protocol.CodeActionOptions{ResolveProvider: &enabled},
 			// PrepareProvider tells the client to ask prepareRename first,
 			// so a cursor on a non-renameable symbol is refused before the
 			// user is ever prompted for a new name.
@@ -704,21 +709,41 @@ func (s *Server) TextDocumentOnTypeFormatting(ctx context.Context, params *proto
 }
 
 // CodeAction returns quick fixes for the diagnostics the client reports as
-// present in params.Context.Diagnostics. Like Completion and Hover it
-// resolves against the latest whole-workspace schema, falling back to a
-// standalone parse of the document when resolution fails. A nil result
-// encodes LSP null: no fix applies.
+// present in params.Context.Diagnostics, plus the whole-document format
+// action when the request's Only filter admits source actions. Like
+// Completion and Hover it resolves against the latest whole-workspace
+// schema, falling back to a standalone parse of the document when
+// resolution fails. A nil result encodes LSP null: no fix applies.
 func (s *Server) CodeAction(ctx context.Context, params *protocol.CodeActionParams) ([]protocol.CommandOrCodeAction, error) {
 	s.captureClient(ctx)
 
 	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
 
-	actions := codeActionsAt(schema, file, params.TextDocument.URI, params)
+	var src []byte
+
+	if content, ok := s.ws.DocContent(string(params.TextDocument.URI)); ok {
+		src = []byte(content)
+	}
+
+	actions := codeActionsAt(schema, file, params.TextDocument.URI, src, params)
 	if len(actions) == 0 {
 		return nil, nil // LSP encodes "no code actions" as a null result
 	}
 
 	return actions, nil
+}
+
+// CodeActionResolve fills in a single code action's edit when the action
+// arrived without one. It delegates to the lowercase implementation that
+// code_action.go owns.
+func (s *Server) CodeActionResolve(ctx context.Context, params *protocol.CodeAction) (*protocol.CodeAction, error) {
+	s.captureClient(ctx)
+
+	if params == nil {
+		return nil, nil //nolint:nilnil // LSP encodes "nothing to resolve" as a null result
+	}
+
+	return s.codeActionResolve(params), nil
 }
 
 // PrepareRename answers whether the symbol under the cursor can be renamed,
