@@ -2,9 +2,10 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestExitCodeFor(t *testing.T) {
@@ -105,7 +106,7 @@ func TestEmitErrorEnvelope(t *testing.T) {
 	emitError("compile", errors.New("boom"))
 
 	var env Envelope
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
 		t.Fatalf("envelope is not JSON: %v", err)
 	}
 
@@ -123,7 +124,7 @@ func TestEmitSuccessEnvelope(t *testing.T) {
 	emitSuccess("check", map[string]any{"valid": true})
 
 	var env Envelope
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
 		t.Fatalf("envelope is not JSON: %v", err)
 	}
 
@@ -184,7 +185,7 @@ func TestPrintAgentHelp(t *testing.T) {
 		} `json:"exitCodes"`
 	}
 
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &catalog); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &catalog); err != nil {
 		t.Fatalf("catalog is not JSON: %v", err)
 	}
 

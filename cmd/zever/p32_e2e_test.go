@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +13,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // DefaultE2ETimeout bounds the scaffold boot e2e.
@@ -156,7 +157,7 @@ func TestP32ScaffoldBootsE2E(t *testing.T) {
 		} `json:"batteries"`
 	}
 
-	if err := json.Unmarshal(doctorOut, &doctorDoc); err != nil {
+	if err := codec.Unmarshal(doctorOut, &doctorDoc); err != nil {
 		t.Fatalf("decode doctor report: %v\n%s", err, doctorOut)
 	}
 

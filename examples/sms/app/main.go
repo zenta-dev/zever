@@ -4,7 +4,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"os"
@@ -24,9 +24,9 @@ const pluginName = "sms"
 
 func run(ctx context.Context) error {
 	cfg := config.Default()
-	cfg.Plugins = map[string]config.Service[json.RawMessage]{
+	cfg.Plugins = map[string]config.Service[jsontext.Value]{
 		pluginName: {
-			Options: json.RawMessage(`{"from":"+15550000"}`),
+			Options: jsontext.Value(`{"from":"+15550000"}`),
 		},
 	}
 

@@ -3,20 +3,21 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func mustBenchServer() *Server { return newServer() }
 
 func mustBenchCallParams(name string, args map[string]any) rpcRequest {
-	raw, err := json.Marshal(callParams{Name: name, Arguments: args})
+	raw, err := codec.Marshal(callParams{Name: name, Arguments: args})
 	if err != nil {
 		panic(err)
 	}
-	return rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/call", Params: raw}
+	return rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "tools/call", Params: raw}
 }
 
 func stubBenchSchema() *ir.Schema {
@@ -35,7 +36,7 @@ func stubBenchSchema() *ir.Schema {
 
 func BenchmarkHandlePing(b *testing.B) {
 	s := mustBenchServer()
-	req := rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "ping"}
+	req := rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "ping"}
 	ctx := b.Context()
 	b.ReportAllocs()
 	for b.Loop() {
@@ -45,7 +46,7 @@ func BenchmarkHandlePing(b *testing.B) {
 
 func BenchmarkHandleToolsList(b *testing.B) {
 	s := mustBenchServer()
-	req := rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/list"}
+	req := rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "tools/list"}
 	ctx := b.Context()
 	b.ReportAllocs()
 	for b.Loop() {
@@ -55,7 +56,7 @@ func BenchmarkHandleToolsList(b *testing.B) {
 
 func BenchmarkHandleInitialize(b *testing.B) {
 	s := mustBenchServer()
-	req := rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "initialize", Params: json.RawMessage(`{"protocolVersion":"2025-06-18"}`)}
+	req := rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "initialize", Params: jsontext.Value(`{"protocolVersion":"2025-06-18"}`)}
 	ctx := b.Context()
 	b.ReportAllocs()
 	for b.Loop() {
@@ -65,7 +66,7 @@ func BenchmarkHandleInitialize(b *testing.B) {
 
 func BenchmarkHandleUnknownMethod(b *testing.B) {
 	s := mustBenchServer()
-	req := rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "nope"}
+	req := rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "nope"}
 	ctx := b.Context()
 	b.ReportAllocs()
 	for b.Loop() {
@@ -111,7 +112,7 @@ func BenchmarkHandleToolsCallExplain(b *testing.B) {
 	sumResp := s.handle(ctx, mustBenchCallParams("zever_schema", map[string]any{"files": files}))
 	res, _ := sumResp.Result.(callToolResult)
 	var sum schemaSummary
-	_ = json.Unmarshal([]byte(res.Content[0].Text), &sum)
+	_ = codec.Unmarshal([]byte(res.Content[0].Text), &sum)
 	path := sum.Modules[0].Name + ".Post"
 	b.ReportAllocs()
 	for b.Loop() {
@@ -128,11 +129,11 @@ func BenchmarkToolList(b *testing.B) {
 }
 
 func BenchmarkErrorResponseEncode(b *testing.B) {
-	id := json.RawMessage("1")
+	id := jsontext.Value("1")
 	b.ReportAllocs()
 	for b.Loop() {
 		var buf bytes.Buffer
-		_ = json.NewEncoder(&buf).Encode(errorResponse(id, codeMethodNotFound, "zever-mcp: method not found: x"))
+		_ = codec.MarshalLine(&buf, errorResponse(id, codeMethodNotFound, "zever-mcp: method not found: x"))
 	}
 }
 
@@ -157,7 +158,7 @@ func BenchmarkSummarizeMarshal(b *testing.B) {
 	schema := stubBenchSchema()
 	b.ReportAllocs()
 	for b.Loop() {
-		_, _ = json.Marshal(summarize(schema))
+		_, _ = codec.Marshal(summarize(schema))
 	}
 }
 

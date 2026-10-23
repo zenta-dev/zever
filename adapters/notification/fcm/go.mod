@@ -5,23 +5,10 @@ go 1.27.3
 require (
 	firebase.google.com/go/v4 v4.22.0
 	github.com/zenta-dev/zever/core/notification v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/firebase v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 )
-
-replace github.com/zenta-dev/zever/core/notification => ../../../core/notification
-
-replace github.com/zenta-dev/zever/shared/firebase => ../../../shared/firebase
-
-replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
-
-replace github.com/zenta-dev/zever/adapters/notification/log => ../log
-
-replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
-
-replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
-
-replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 
 require (
 	cel.dev/expr v0.25.3 // indirect
@@ -80,5 +67,19 @@ require (
 	google.golang.org/grpc v1.85.0-dev.0.20260825072537-93e31b48545e // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+replace github.com/zenta-dev/zever/core/notification => ../../../core/notification
+
+replace github.com/zenta-dev/zever/shared/firebase => ../../../shared/firebase
+
+replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
+
+replace github.com/zenta-dev/zever/adapters/notification/log => ../log
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
+
+replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
+
+replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref

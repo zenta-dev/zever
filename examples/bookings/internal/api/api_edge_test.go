@@ -1,11 +1,12 @@
 package api_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // doRaw sends a raw body for malformed-payload cases.
@@ -71,7 +72,7 @@ func TestMalformedJSON(t *testing.T) {
 	var space struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &space); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &space); err != nil {
 		t.Fatalf("space id: %v", err)
 	}
 
@@ -221,7 +222,7 @@ func TestDoubleCancelIdempotent(t *testing.T) {
 	var space struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &space); err != nil || space.ID == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &space); err != nil || space.ID == "" {
 		t.Fatalf("space id: %v", err)
 	}
 	rec = do(t, h, "POST", "/api/bookings", guestToken, map[string]string{
@@ -235,7 +236,7 @@ func TestDoubleCancelIdempotent(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"booking"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &booked); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &booked); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	for i := 0; i < 2; i++ {

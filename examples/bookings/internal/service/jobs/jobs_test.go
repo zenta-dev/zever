@@ -3,7 +3,6 @@ package jobs_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,6 +23,7 @@ import (
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/bookings/internal/service/jobs"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/examples/bookings/internal/testsetup"
@@ -171,7 +171,7 @@ func TestConfirmationHandlerShape(t *testing.T) {
 	deps, _, _ := testDeps(t, database, logger)
 
 	handle := jobs.ConfirmationHandler(deps)
-	raw, _ := json.Marshal(jobs.SendConfirmationArgs{BookingID: "booking-1"})
+	raw, _ := codec.Marshal(jobs.SendConfirmationArgs{BookingID: "booking-1"})
 	_ = raw
 	if err := handle(ctx, jobs.SendConfirmationArgs{BookingID: "booking-1"}); err != nil {
 		t.Fatalf("Handler: %v", err)

@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestRedactAddr(t *testing.T) {
@@ -205,13 +205,13 @@ func TestDecodeMessage(t *testing.T) {
 		t.Errorf("bad JSON err = %v, want redis: decode wrap", err)
 	}
 
-	badID, _ := json.Marshal(wireMessage{ID: "not-a-uuid"}) // fixture marshal cannot fail.
+	badID, _ := codec.Marshal(wireMessage{ID: "not-a-uuid"}) // fixture marshal cannot fail.
 	if _, err := decodeMessage(topic, badID); !errors.Is(err, eventbus.ErrInvalidMessageID) {
 		t.Errorf("bad UUID err = %v, want ErrInvalidMessageID", err)
 	}
 
 	want := eventbus.NewMessage(topic, eventbus.NewPayload([]byte("hi")), eventbus.NewHeaders(map[string]string{"k": "v"}))
-	raw, _ := json.Marshal(wireMessage{ID: want.ID.String(), Payload: want.Payload, Headers: want.Headers}) // fixture marshal cannot fail.
+	raw, _ := codec.Marshal(wireMessage{ID: want.ID.String(), Payload: want.Payload, Headers: want.Headers}) // fixture marshal cannot fail.
 
 	msg, err := decodeMessage(topic, raw)
 	if err != nil {

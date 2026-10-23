@@ -28,6 +28,7 @@ require (
 	github.com/PaddleHQ/paddle-go-sdk/v5 v5.2.0
 	github.com/zenta-dev/zever/core/idempotency v0.8.0
 	github.com/zenta-dev/zever/core/payment v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/httpclient v0.8.0
 	github.com/zenta-dev/zever/shared/providersopt v0.8.0
 )
@@ -49,3 +50,5 @@ replace github.com/zenta-dev/zever/core/db => ../../../core/db
 replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

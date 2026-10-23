@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/dsl/parser"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // executeArgs marshals values the way a client encodes executeCommand
@@ -22,9 +22,9 @@ func executeArgs(t *testing.T, values ...any) []protocol.LSPAny {
 	out := make([]protocol.LSPAny, 0, len(values))
 
 	for _, v := range values {
-		raw, err := json.Marshal(v)
+		raw, err := codec.Marshal(v)
 		if err != nil {
-			t.Fatalf("json.Marshal(%v): %v", v, err)
+			t.Fatalf("codec.Marshal(%v): %v", v, err)
 		}
 
 		out = append(out, protocol.LSPAny(raw))
@@ -52,7 +52,7 @@ func executeFixAllEdits(t *testing.T, s *Server, docURI string) protocol.Workspa
 
 	var edit protocol.WorkspaceEdit
 
-	if err := json.Unmarshal([]byte(raw), &edit); err != nil {
+	if err := codec.Unmarshal([]byte(raw), &edit); err != nil {
 		t.Fatalf("fixAll result is not a WorkspaceEdit: %v", err)
 	}
 
@@ -307,6 +307,205 @@ func TestExecuteCommand_fixAll_unknownDoc_returnsEmptyEdit(t *testing.T) {
 
 	if len(edit.Changes) != 0 || len(edit.DocumentChanges) != 0 {
 		t.Errorf("fixAll on an unknown document = %+v, want an empty edit", edit)
+	}
+}
+
+// TestBuildFixAllEdit_annotations pins the 3.18 confirmation shape: only a
+// client that advertised workspace.workspaceEdit.changeAnnotationSupport
+// gets annotations, only for files other than the requested document, and
+// one annotation per foreign file with needsConfirmation set. Same-file
+// edits stay silent plain TextEdits, and without support (or without
+// foreign files) the edit stays the legacy plain Changes map.
+func TestBuildFixAllEdit_annotations(t *testing.T) {
+	t.Parallel()
+
+	editFor := func(line uint32, text string) protocol.TextEdit {
+		return protocol.TextEdit{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: line, Character: 0},
+				End:   protocol.Position{Line: line, Character: 5},
+			},
+			NewText: text,
+		}
+	}
+
+	const requested = "file:///w/main.zen"
+
+	foreignA := uri.URI("file:///w/other-a.zen")
+	foreignB := uri.URI("file:///w/other-b.zen")
+
+	multiFile := map[uri.URI][]protocol.TextEdit{
+		uri.URI(requested): {editFor(1, "string")},
+		foreignA:           {editFor(2, "User")},
+		foreignB:           {editFor(3, "User"), editFor(4, "uuid")},
+	}
+
+	t.Run("no-cap client gets plain edits everywhere", func(t *testing.T) {
+		t.Parallel()
+
+		got := buildFixAllEdit(requested, multiFile, false)
+
+		if len(got.Changes) != 3 {
+			t.Errorf("Changes = %v, want all 3 files as plain edits", got.Changes)
+		}
+
+		if len(got.DocumentChanges) != 0 || len(got.ChangeAnnotations) != 0 {
+			t.Errorf("annotated arms = %+v / %+v, want none without support", got.DocumentChanges, got.ChangeAnnotations)
+		}
+	})
+
+	t.Run("same-file-only carries no annotations", func(t *testing.T) {
+		t.Parallel()
+
+		sameFile := map[uri.URI][]protocol.TextEdit{
+			uri.URI(requested): {editFor(1, "string")},
+		}
+
+		got := buildFixAllEdit(requested, sameFile, true)
+
+		if len(got.Changes) != 1 {
+			t.Errorf("Changes = %v, want the plain single-file shape", got.Changes)
+		}
+
+		if len(got.DocumentChanges) != 0 || len(got.ChangeAnnotations) != 0 {
+			t.Errorf("annotated arms = %+v / %+v, want none for same-file-only", got.DocumentChanges, got.ChangeAnnotations)
+		}
+	})
+
+	t.Run("multi-file carries one confirmation per foreign file", func(t *testing.T) {
+		t.Parallel()
+
+		got := buildFixAllEdit(requested, multiFile, true)
+
+		if len(got.Changes) != 0 {
+			t.Errorf("Changes = %v, want empty (edits live in DocumentChanges)", got.Changes)
+		}
+
+		if len(got.ChangeAnnotations) != 2 {
+			t.Fatalf("ChangeAnnotations = %v, want one per foreign file", got.ChangeAnnotations)
+		}
+
+		for id, annotation := range got.ChangeAnnotations {
+			if annotation.Label == "" {
+				t.Errorf("annotation %q has no label", id)
+			}
+
+			if annotation.NeedsConfirmation == nil || !*annotation.NeedsConfirmation {
+				t.Errorf("annotation %q NeedsConfirmation = %v, want true", id, annotation.NeedsConfirmation)
+			}
+		}
+
+		if len(got.DocumentChanges) != 3 {
+			t.Fatalf("DocumentChanges holds %d files, want requested + 2 foreign", len(got.DocumentChanges))
+		}
+
+		// The requested document sorts first and stays silent: plain
+		// TextEdits with no annotation.
+		first, ok := got.DocumentChanges[0].(*protocol.TextDocumentEdit)
+		if !ok {
+			t.Fatalf("DocumentChanges[0] = %T, want *TextDocumentEdit", got.DocumentChanges[0])
+		}
+
+		if string(first.TextDocument.URI) != requested {
+			t.Errorf("DocumentChanges[0] targets %q, want the requested document first", first.TextDocument.URI)
+		}
+
+		for _, element := range first.Edits {
+			if _, ok := element.(*protocol.TextEdit); !ok {
+				t.Errorf("same-file element = %T, want plain *TextEdit", element)
+			}
+		}
+
+		seen := make(map[protocol.ChangeAnnotationIdentifier]int)
+
+		for _, change := range got.DocumentChanges[1:] {
+			fileEdit, ok := change.(*protocol.TextDocumentEdit)
+			if !ok {
+				t.Fatalf("foreign change = %T, want *TextDocumentEdit", change)
+			}
+
+			if string(fileEdit.TextDocument.URI) == requested {
+				t.Errorf("requested document appears twice in DocumentChanges")
+			}
+
+			for _, element := range fileEdit.Edits {
+				annotated, ok := element.(*protocol.AnnotatedTextEdit)
+				if !ok {
+					t.Errorf("foreign element = %T, want *AnnotatedTextEdit", element)
+
+					continue
+				}
+
+				if _, ok := got.ChangeAnnotations[annotated.AnnotationID]; !ok {
+					t.Errorf("foreign edit references unknown annotation %q", annotated.AnnotationID)
+				}
+
+				seen[annotated.AnnotationID]++
+			}
+		}
+
+		if len(seen) != 2 {
+			t.Errorf("foreign edits reference %d annotations, want 2 (one per file)", len(seen))
+		}
+	})
+}
+
+// TestExecuteCommand_fixAll_sameFileOnly_carriesNoAnnotations proves the
+// capability alone changes nothing for the common case: a fixAll whose fixes
+// all land in the requested document keeps the legacy plain Changes shape
+// even when the client supports annotations.
+func TestExecuteCommand_fixAll_sameFileOnly_carriesNoAnnotations(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+
+	if _, err := s.Initialize(t.Context(), &protocol.InitializeParams{
+		Capabilities: protocol.ClientCapabilities{
+			Workspace: &protocol.WorkspaceClientCapabilities{
+				WorkspaceEdit: &protocol.WorkspaceEditClientCapabilities{
+					ChangeAnnotationSupport: &protocol.ChangeAnnotationsSupportOptions{},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	openDoc(t, s, serverDocA, serverBrokenDoc)
+
+	edit := executeFixAllEdits(t, s, serverDocA)
+
+	if len(edit.Changes) != 1 {
+		t.Errorf("fixAll Changes = %v, want the plain single-file shape", edit.Changes)
+	}
+
+	if len(edit.DocumentChanges) != 0 || len(edit.ChangeAnnotations) != 0 {
+		t.Errorf("fixAll annotated arms = %+v / %+v, want none for same-file-only", edit.DocumentChanges, edit.ChangeAnnotations)
+	}
+}
+
+// TestExecuteCommand_fixAll_noCapClient_returnsPlainEdits proves the
+// fallback: a client that never advertised changeAnnotationSupport gets
+// plain edits everywhere, never an annotation it cannot honor.
+func TestExecuteCommand_fixAll_noCapClient_returnsPlainEdits(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+
+	if _, err := s.Initialize(t.Context(), &protocol.InitializeParams{}); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	openDoc(t, s, serverDocA, serverBrokenDoc)
+
+	edit := executeFixAllEdits(t, s, serverDocA)
+
+	if len(edit.Changes) != 1 {
+		t.Errorf("fixAll Changes = %v, want 1 plain scalar fix", edit.Changes)
+	}
+
+	if len(edit.DocumentChanges) != 0 || len(edit.ChangeAnnotations) != 0 {
+		t.Errorf("fixAll annotated arms = %+v / %+v, want none without support", edit.DocumentChanges, edit.ChangeAnnotations)
 	}
 }
 

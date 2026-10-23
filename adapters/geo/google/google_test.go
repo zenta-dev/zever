@@ -1,7 +1,6 @@
 package google
 
 import (
-	"encoding/json"
 	"errors"
 	"math"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	gmaps "googlemaps.github.io/maps"
 
 	"github.com/zenta-dev/zever/core/geo"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestNew_RequiresAPIKey(t *testing.T) {
@@ -169,7 +169,7 @@ func TestGeocode_OK(t *testing.T) {
 		},
 		"status": "OK",
 	}
-	b, _ := json.Marshal(resp)
+	b, _ := codec.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 
@@ -250,7 +250,7 @@ func TestReverseGeocode_OK(t *testing.T) {
 		},
 		"status": "OK",
 	}
-	b, _ := json.Marshal(resp)
+	b, _ := codec.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 
@@ -298,7 +298,7 @@ func TestReverseGeocode_EmptyTypes(t *testing.T) {
 		},
 		"status": "OK",
 	}
-	b, _ := json.Marshal(resp)
+	b, _ := codec.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 	addrs, err := g.ReverseGeocode(t.Context(), 0, 0)
@@ -358,7 +358,7 @@ func TestDistance_StatusNotOK(t *testing.T) {
 			}},
 		},
 	}
-	b, _ := json.Marshal(resp)
+	b, _ := codec.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 	_, err := g.Distance(t.Context(), geo.Point{Lat: 0, Lng: 0}, geo.Point{Lat: 1, Lng: 1})
@@ -382,7 +382,7 @@ func TestDistance_OK(t *testing.T) {
 			}},
 		},
 	}
-	b, _ := json.Marshal(resp)
+	b, _ := codec.Marshal(resp)
 	srv := newTestServer(t, string(b), 200)
 	g := newGeoWithServer(t, srv)
 	d, err := g.Distance(t.Context(), geo.Point{Lat: 1.315125, Lng: 103.764713}, geo.Point{Lat: 1.280776, Lng: 103.8487})

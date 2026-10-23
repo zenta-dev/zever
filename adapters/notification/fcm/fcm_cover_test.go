@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // writeServiceAccountJSON generates an RSA key in-test and writes a
@@ -38,7 +38,7 @@ func writeServiceAccountJSON(t *testing.T, projectID string) string {
 		"client_email": "test@" + projectID + ".iam.gserviceaccount.com",
 		"token_uri":    "https://oauth2.googleapis.com/token",
 	}
-	raw, err := json.Marshal(doc)
+	raw, err := codec.Marshal(doc)
 	if err != nil {
 		t.Fatalf("marshal service account = %v", err)
 	}

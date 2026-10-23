@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,6 +20,7 @@ import (
 	"github.com/zenta-dev/zever/examples/showcase/internal/api"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
 	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const testJWTSecret = "test-secret-for-showcase-32-bytes-min"
@@ -119,7 +119,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any) *htt
 
 	var buf bytes.Buffer
 	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		if err := codec.MarshalLine(&buf, body); err != nil {
 			t.Fatalf("encode: %v", err)
 		}
 	}
@@ -154,7 +154,7 @@ func login(t *testing.T, h http.Handler, email string) string {
 		t.Fatalf("login %s: status %d: %s", email, rec.Code, rec.Body.String())
 	}
 	var out map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode token: %v", err)
 	}
 	if out["token"] == "" {
@@ -197,7 +197,7 @@ func makeProduct(t *testing.T, s testSetup, admin, category, sku string) string 
 		t.Fatalf("create %s: status %d: %s", sku, rec.Code, rec.Body.String())
 	}
 	var out map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode product: %v", err)
 	}
 	return out["id"]
@@ -231,7 +231,7 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("me: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var me map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &me); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &me); err != nil {
 		t.Fatalf("decode me: %v", err)
 	}
 	if me["email"] != "ann@example.com" || me["name"] != "Ann" {
@@ -291,7 +291,7 @@ func TestProductFlow(t *testing.T) {
 		t.Fatalf("list: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var list []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
 	if len(list) != 1 {
@@ -365,7 +365,7 @@ func TestCheckoutAndReviews(t *testing.T) {
 		t.Fatalf("checkout: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var receipt map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &receipt); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &receipt); err != nil {
 		t.Fatalf("decode receipt: %v", err)
 	}
 	if receipt["total_cents"] != float64(5000) {
@@ -379,7 +379,7 @@ func TestCheckoutAndReviews(t *testing.T) {
 	// Stock decremented 10 -> 8.
 	rec = do(t, s.handler, "GET", "/api/products/"+pid, admin, nil)
 	var prod map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &prod); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &prod); err != nil {
 		t.Fatalf("decode product: %v", err)
 	}
 	if prod["stock"] != float64(8) {
@@ -426,7 +426,7 @@ func TestCheckoutAndReviews(t *testing.T) {
 		t.Fatalf("list reviews: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var reviews []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &reviews); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &reviews); err != nil {
 		t.Fatalf("decode reviews: %v", err)
 	}
 	if len(reviews) != 1 {
@@ -500,7 +500,7 @@ func TestCheckoutConcurrentOversellGuarded(t *testing.T) {
 
 	rec = do(t, s.handler, "GET", "/api/products/"+pid, admin, nil)
 	var prod map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &prod); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &prod); err != nil {
 		t.Fatalf("decode product: %v", err)
 	}
 

@@ -34,7 +34,7 @@ func TestDiagToLSPDiagnosticMapsRelated(t *testing.T) {
 			{Pos: diag.Position{File: "b.zen", Line: 1, Col: 8}, Msg: "other file"},
 			{Pos: diag.Position{File: "c.zen", Line: 1, Col: 8}, Msg: "unknown file"},
 		},
-	}, src, srcFor)
+	}, src, srcFor, false)
 
 	if len(got.RelatedInformation) != 3 {
 		t.Fatalf("RelatedInformation len = %d, want 3", len(got.RelatedInformation))
@@ -77,7 +77,7 @@ func TestDiagToLSPDiagnosticSkipsEmptyRelatedFile(t *testing.T) {
 		Pos:     diag.Position{File: "a.zen", Line: 1, Col: 1},
 		Msg:     "boom",
 		Related: []diag.RelatedInfo{{Msg: "nowhere"}},
-	}, "", nil)
+	}, "", nil, false)
 
 	if len(got.RelatedInformation) != 0 {
 		t.Fatalf("RelatedInformation = %+v, want empty", got.RelatedInformation)

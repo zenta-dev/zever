@@ -3,7 +3,6 @@ package ollama
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // fakeTransport hand-fakes the HTTP layer: no network is touched.
@@ -25,7 +25,7 @@ func (f fakeTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func jsonResp(status int, v any) *http.Response {
-	body, _ := json.Marshal(v)
+	body, _ := codec.Marshal(v)
 
 	return &http.Response{
 		StatusCode: status,
@@ -235,7 +235,7 @@ func TestGenerate_happyPath(t *testing.T) {
 			return nil, fmt.Errorf("unexpected path %s", r.URL.Path)
 		}
 
-		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+		if err := codec.UnmarshalRead(r.Body, &gotReq); err != nil {
 			return nil, err
 		}
 
@@ -270,7 +270,7 @@ func TestGenerate_explicitModelWins(t *testing.T) {
 	var gotReq chatRequest
 
 	a := openFake(t, func(r *http.Request) (*http.Response, error) {
-		_ = json.NewDecoder(r.Body).Decode(&gotReq)
+		_ = codec.UnmarshalRead(r.Body, &gotReq)
 		return jsonResp(http.StatusOK, chatOK("ok", 0, 0)), nil
 	}, "default-model")
 
@@ -325,7 +325,7 @@ func TestGenerate_normalizesRoles(t *testing.T) {
 	var gotReq chatRequest
 
 	a := openFake(t, func(r *http.Request) (*http.Response, error) {
-		_ = json.NewDecoder(r.Body).Decode(&gotReq)
+		_ = codec.UnmarshalRead(r.Body, &gotReq)
 		return jsonResp(http.StatusOK, chatOK("ok", 0, 0)), nil
 	}, "llama3")
 
@@ -439,7 +439,7 @@ func TestGenerate_optionsMapping(t *testing.T) {
 			var gotReq chatRequest
 
 			a := openFake(t, func(r *http.Request) (*http.Response, error) {
-				_ = json.NewDecoder(r.Body).Decode(&gotReq)
+				_ = codec.UnmarshalRead(r.Body, &gotReq)
 				return jsonResp(http.StatusOK, chatOK("ok", 0, 0)), nil
 			}, "llama3")
 

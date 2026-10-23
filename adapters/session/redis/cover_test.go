@@ -1,12 +1,12 @@
 package redis_test
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // plantRaw writes a raw wire record directly, bypassing the store, for
@@ -27,7 +27,7 @@ func wireJSON(t *testing.T, expiresAt time.Time) string {
 	if !expiresAt.IsZero() {
 		exp = expiresAt.UnixNano()
 	}
-	b, err := json.Marshal(map[string]any{
+	b, err := codec.Marshal(map[string]any{
 		"data":       map[string]any{"v": 1},
 		"created_at": time.Now().Add(-time.Hour).UnixNano(),
 		"updated_at": time.Now().Add(-time.Hour).UnixNano(),

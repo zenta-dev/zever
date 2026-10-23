@@ -95,6 +95,76 @@ function serverCommand(): string {
   }
 }
 
+// parseMajorMinor extracts the [major, minor] pair from a version string,
+// tolerating a leading `v` and trailing patch/prerelease segments. It
+// returns undefined when no leading numeric pair is present.
+function parseMajorMinor(version: string): [number, number] | undefined {
+  if (!version) {
+    return undefined;
+  }
+  const match = /^\s*v?(\d+)\.(\d+)/.exec(version);
+  if (match === null) {
+    return undefined;
+  }
+  return [Number(match[1]), Number(match[2])];
+}
+
+// isCompatibleVersion reports whether a language server version is
+// compatible with the extension version. Compatibility means equal major
+// and minor numbers; patch differences are fine. Missing or unparseable
+// versions never trigger a warning, so this returns true for them. Kept
+// pure for headless unit tests.
+export function isCompatibleVersion(server: string, ext: string): boolean {
+  const serverPair = parseMajorMinor(server);
+  const extPair = parseMajorMinor(ext);
+  if (serverPair === undefined || extPair === undefined) {
+    return true;
+  }
+  return serverPair[0] === extPair[0] && serverPair[1] === extPair[1];
+}
+
+// extensionVersion returns this extension's own version from its package.json
+// contribution, or undefined when unavailable (dev hosts, headless tests).
+// Never throws.
+function extensionVersion(): string | undefined {
+  try {
+    const ext = vscode.extensions.getExtension('zenta-dev.zever-dsl');
+    const version: unknown = ext?.packageJSON?.version;
+    return typeof version === 'string' && version !== '' ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// checkServerVersion warns once when the running language server's
+// major.minor version differs from the extension's own version, hinting at
+// a stale `zever-lsp` binary. Missing versions on either side stay silent.
+function checkServerVersion(running: LanguageClient): void {
+  let serverVersion: string | undefined;
+  try {
+    serverVersion = running.initializeResult?.serverInfo?.version;
+  } catch {
+    return;
+  }
+  if (typeof serverVersion !== 'string' || serverVersion === '') {
+    return;
+  }
+  const extVersion = extensionVersion();
+  if (extVersion === undefined) {
+    return;
+  }
+  if (!isCompatibleVersion(serverVersion, extVersion)) {
+    try {
+      vscode.window.showWarningMessage(
+        `Zever: language server version ${serverVersion} differs from extension version ${extVersion}; ` +
+          'update zever-lsp to match the extension (see the README install steps).'
+      );
+    } catch {
+      // Notification-only; never break activation.
+    }
+  }
+}
+
 function startClient(): void {
   const serverOptions: ServerOptions = {
     command: serverCommand(),
@@ -122,7 +192,16 @@ function startClient(): void {
   // Fire-and-forget start: a missing binary surfaces one error notification
   // with the install hint. No retry/respawn loop by design — VS Code
   // re-invokes activate on the next `zen` document, which retries naturally.
-  client.start().catch((err: unknown) => {
+  // On success the server version is compared once against the extension
+  // version (warns on major.minor mismatch, silent otherwise).
+  client
+    .start()
+    .then(() => {
+      if (client !== undefined) {
+        checkServerVersion(client);
+      }
+    })
+    .catch((err: unknown) => {
     const detail = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(
       `Failed to start zever-lsp: ${detail}. Install it with: ` +

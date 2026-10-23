@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"errors"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const testSchema = `entity Post {
@@ -26,16 +30,16 @@ func testFiles() map[string]string {
 func callToolReq(t *testing.T, s *Server, name string, args map[string]any) rpcResponse {
 	t.Helper()
 
-	raw, err := json.Marshal(callParams{Name: name, Arguments: args})
+	raw, err := codec.Marshal(callParams{Name: name, Arguments: args})
 	if err != nil {
 		t.Fatalf("marshal params: %v", err)
 	}
 
 	return s.handle(t.Context(), rpcRequest{
 		JSONRPC: "2.0",
-		ID:      json.RawMessage("1"),
+		ID:      jsontext.Value("1"),
 		Method:  "tools/call",
-		Params:  raw,
+		Params:  jsontext.Value(raw),
 	})
 }
 
@@ -63,7 +67,7 @@ func TestInitialize(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "initialize", Params: json.RawMessage(`{"protocolVersion":"2025-06-18"}`)})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "initialize", Params: jsontext.Value(`{"protocolVersion":"2025-06-18"}`)})
 
 	m, ok := resp.Result.(map[string]any)
 	if !ok {
@@ -78,7 +82,7 @@ func TestToolsList(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "tools/list"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "tools/list"})
 
 	m, ok := resp.Result.(map[string]any)
 	if !ok {
@@ -97,7 +101,7 @@ func TestUnknownMethod(t *testing.T) {
 	t.Parallel()
 
 	s := newServer()
-	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "nope"})
+	resp := s.handle(t.Context(), rpcRequest{JSONRPC: "2.0", ID: jsontext.Value("1"), Method: "nope"})
 	if resp.Error == nil || resp.Error.Code != codeMethodNotFound {
 		t.Fatalf("error = %+v, want method not found", resp.Error)
 	}
@@ -166,7 +170,7 @@ func TestSchemaTool(t *testing.T) {
 	}
 
 	var sum schemaSummary
-	if err := json.Unmarshal([]byte(resultText(t, resp)), &sum); err != nil {
+	if err := codec.Unmarshal([]byte(resultText(t, resp)), &sum); err != nil {
 		t.Fatalf("summary is not JSON: %v", err)
 	}
 	if len(sum.Modules) != 1 {
@@ -185,7 +189,7 @@ func TestExplainTool(t *testing.T) {
 	// Discover the module name from the schema summary, then explain an entity.
 	sumResp := callToolReq(t, s, "zever_schema", map[string]any{"files": testFiles()})
 	var sum schemaSummary
-	if err := json.Unmarshal([]byte(resultText(t, sumResp)), &sum); err != nil {
+	if err := codec.Unmarshal([]byte(resultText(t, sumResp)), &sum); err != nil {
 		t.Fatalf("summary is not JSON: %v", err)
 	}
 	mod := sum.Modules[0].Name
@@ -226,11 +230,14 @@ func TestRun_stdioLoop(t *testing.T) {
 		t.Fatalf("run() = %d, stderr = %s", code, errb.String())
 	}
 
-	dec := json.NewDecoder(&out)
+	dec := jsontext.NewDecoder(&out)
 	count := 0
-	for dec.More() {
+	for {
 		var resp rpcResponse
-		if err := dec.Decode(&resp); err != nil {
+		if err := codec.UnmarshalDecode(dec, &resp); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			t.Fatalf("decode response: %v", err)
 		}
 		count++

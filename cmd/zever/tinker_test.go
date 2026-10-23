@@ -214,11 +214,16 @@ func TestTinkerDevWarningIsExplicit(t *testing.T) {
 // fakeTinkerShim is a self-contained protocol peer: it answers every verb
 // with canned payloads, emits one non-protocol log line (passthrough), and
 // can be told to misbehave per test via the request contents.
+//
+// The shim is compiled standalone via `go run` with no access to
+// shared/codec, so it stays stdlib-only and decodes with encoding/json/v2
+// plus jsontext directly instead of the codec facade.
 const fakeTinkerShim = `package main
 
 import (
 	"bufio"
-	"encoding/json"
+	"encoding/json/v2"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 	"strings"
@@ -233,7 +238,7 @@ func main() {
 	for sc.Scan() {
 		var req struct {
 			Verb string          ` + "`json:\"verb\"`" + `
-			Args json.RawMessage ` + "`json:\"args,omitempty\"`" + `
+			Args jsontext.Value ` + "`json:\"args,omitempty\"`" + `
 		}
 
 		if err := json.Unmarshal([]byte(sc.Text()), &req); err != nil {
@@ -250,7 +255,7 @@ func main() {
 				SQL string ` + "`json:\"sql\"`" + `
 			}
 
-			_ = json.Unmarshal(req.Args, &a)
+			_ = json.Unmarshal([]byte(req.Args), &a)
 
 			switch {
 			case strings.Contains(a.SQL, "badframe"):

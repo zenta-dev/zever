@@ -1,11 +1,12 @@
 package analytics
 
 import (
-	"encoding/json"
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestValidatePropertiesSize_nil_returnsNil(t *testing.T) {
@@ -80,7 +81,7 @@ func TestMarshalValidated_ok_returnsBytes(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	var decoded map[string]any
-	if err := json.Unmarshal(b, &decoded); err != nil {
+	if err := codec.Unmarshal(b, &decoded); err != nil {
 		t.Fatalf("unmarshal err = %v", err)
 	}
 	if decoded["a"] != "b" {

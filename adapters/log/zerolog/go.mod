@@ -12,6 +12,7 @@ require (
 require (
 	github.com/rs/zerolog v1.35.1
 	github.com/zenta-dev/zever/core/log v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 )
 
 replace github.com/zenta-dev/zever/core/log => ../../../core/log
@@ -21,3 +22,5 @@ replace github.com/zenta-dev/zever/adapters/log/noop => ../noop
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

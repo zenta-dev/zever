@@ -129,7 +129,6 @@ func TestInitialize_capabilities(t *testing.T) {
 		{"TypeDefinitionProvider", caps.TypeDefinitionProvider},
 		{"HoverProvider", caps.HoverProvider},
 		{"DocumentFormattingProvider", caps.DocumentFormattingProvider},
-		{"DocumentRangeFormattingProvider", caps.DocumentRangeFormattingProvider},
 		{"ReferencesProvider", caps.ReferencesProvider},
 		{"FoldingRangeProvider", caps.FoldingRangeProvider},
 		{"DocumentHighlightProvider", caps.DocumentHighlightProvider},
@@ -179,6 +178,18 @@ func TestInitialize_capabilities(t *testing.T) {
 	} else if len(caps.SignatureHelpProvider.TriggerCharacters) != 2 {
 		t.Errorf("SignatureHelpProvider.TriggerCharacters = %v, want [( ,]",
 			caps.SignatureHelpProvider.TriggerCharacters)
+	}
+
+	// The range-formatting capability uses the options-struct form (not a
+	// bare bool) so the server can advertise 3.18 rangesSupport for
+	// textDocument/rangesFormatting.
+	rangeFmt, ok := caps.DocumentRangeFormattingProvider.(*protocol.DocumentRangeFormattingOptions)
+	if !ok {
+		t.Fatalf("DocumentRangeFormattingProvider = %T, want *DocumentRangeFormattingOptions", caps.DocumentRangeFormattingProvider)
+	}
+
+	if rangeFmt.RangesSupport == nil || !*rangeFmt.RangesSupport {
+		t.Error("DocumentRangeFormattingProvider.RangesSupport not enabled")
 	}
 
 	rename, ok := caps.RenameProvider.(*protocol.RenameOptions)
@@ -1184,6 +1195,197 @@ func TestRangeFormatting(t *testing.T) {
 			t.Errorf("RangeFormatting unknown doc = %+v, want null", edits)
 		}
 	})
+}
+
+func TestRangesFormatting(t *testing.T) {
+	const unformatted = "entity User {\n" + // line 0
+		"        id: uuid @primary\n" + // line 1 (bad indent)
+		"        email:string\n" + // line 2 (bad indent + spacing)
+		"        created_at: timestamp\n" + // line 3 (bad indent)
+		"}\n" // line 4
+
+	singleLine := func(line uint32) protocol.Range {
+		return protocol.Range{
+			Start: protocol.Position{Line: line, Character: 0},
+			End:   protocol.Position{Line: line, Character: 30},
+		}
+	}
+
+	t.Run("multi-range returns union of per-range edits", func(t *testing.T) {
+		s := NewServer()
+		openDoc(t, s, serverDocA, unformatted)
+
+		full, err := s.Formatting(t.Context(), &protocol.DocumentFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		})
+		if err != nil {
+			t.Fatalf("Formatting: %v", err)
+		}
+
+		if len(full) == 0 {
+			t.Fatal("fixture produced no edits to filter")
+		}
+
+		ranges := []protocol.Range{singleLine(1), singleLine(3)}
+
+		got, err := s.RangesFormatting(t.Context(), &protocol.DocumentRangesFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			Ranges:       ranges,
+		})
+		if err != nil {
+			t.Fatalf("RangesFormatting: %v", err)
+		}
+
+		var want = make([]protocol.TextEdit, 0, len(full))
+
+		for _, rng := range ranges {
+			want = append(want, filterEditsToRange(full, rng)...)
+		}
+
+		if len(got) != len(want) {
+			t.Fatalf("RangesFormatting returned %d edits, want union of %d: %+v", len(got), len(want), got)
+		}
+
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("RangesFormatting edit %d = %+v, want %+v", i, got[i], want[i])
+			}
+		}
+
+		for _, edit := range got {
+			if edit.Range.Start.Line == 2 {
+				t.Errorf("edit on unrequested line 2 leaked through: %+v", edit)
+			}
+		}
+	})
+
+	t.Run("overlapping ranges deduplicate shared edits", func(t *testing.T) {
+		s := NewServer()
+		openDoc(t, s, serverDocA, unformatted)
+
+		once, err := s.RangesFormatting(t.Context(), &protocol.DocumentRangesFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			Ranges:       []protocol.Range{singleLine(1)},
+		})
+		if err != nil {
+			t.Fatalf("RangesFormatting: %v", err)
+		}
+
+		twice, err := s.RangesFormatting(t.Context(), &protocol.DocumentRangesFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			Ranges:       []protocol.Range{singleLine(1), singleLine(1)},
+		})
+		if err != nil {
+			t.Fatalf("RangesFormatting: %v", err)
+		}
+
+		if len(once) == 0 {
+			t.Fatal("single range produced no edits to compare")
+		}
+
+		if len(twice) != len(once) {
+			t.Errorf("duplicate ranges returned %d edits, want %d (no duplicates)", len(twice), len(once))
+		}
+	})
+
+	t.Run("unknown document is null", func(t *testing.T) {
+		s := NewServer()
+
+		edits, err := s.RangesFormatting(t.Context(), &protocol.DocumentRangesFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			Ranges:       []protocol.Range{singleLine(0)},
+		})
+		if err != nil {
+			t.Fatalf("RangesFormatting: %v", err)
+		}
+
+		if edits != nil {
+			t.Errorf("RangesFormatting unknown doc = %+v, want null", edits)
+		}
+	})
+}
+
+func TestInitialize_recordsMarkupAndAnnotationCaps(t *testing.T) {
+	t.Parallel()
+
+	yes := true
+
+	tests := []struct {
+		name           string
+		params         *protocol.InitializeParams
+		wantMarkup     bool
+		wantAnnotation bool
+	}{
+		{"nil params negotiates nothing", nil, false, false},
+		{"empty params negotiates nothing", &protocol.InitializeParams{}, false, false},
+		{
+			name: "markup support recorded",
+			params: &protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{
+						Diagnostic: &protocol.DiagnosticClientCapabilities{
+							MarkupMessageSupport: &yes,
+						},
+					},
+				},
+			},
+			wantMarkup:     true,
+			wantAnnotation: false,
+		},
+		{
+			name: "annotation support recorded on presence",
+			params: &protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					Workspace: &protocol.WorkspaceClientCapabilities{
+						WorkspaceEdit: &protocol.WorkspaceEditClientCapabilities{
+							ChangeAnnotationSupport: &protocol.ChangeAnnotationsSupportOptions{},
+						},
+					},
+				},
+			},
+			wantMarkup:     false,
+			wantAnnotation: true,
+		},
+		{
+			name: "both recorded together",
+			params: &protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{
+						Diagnostic: &protocol.DiagnosticClientCapabilities{
+							MarkupMessageSupport: &yes,
+						},
+					},
+					Workspace: &protocol.WorkspaceClientCapabilities{
+						WorkspaceEdit: &protocol.WorkspaceEditClientCapabilities{
+							ChangeAnnotationSupport: &protocol.ChangeAnnotationsSupportOptions{},
+						},
+					},
+				},
+			},
+			wantMarkup:     true,
+			wantAnnotation: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := NewServer()
+
+			if _, err := s.Initialize(t.Context(), tc.params); err != nil {
+				t.Fatalf("Initialize: %v", err)
+			}
+
+			if got := s.markupMessage.Load(); got != tc.wantMarkup {
+				t.Errorf("markupMessage = %v, want %v", got, tc.wantMarkup)
+			}
+
+			if got := s.changeAnnotation.Load(); got != tc.wantAnnotation {
+				t.Errorf("changeAnnotation = %v, want %v", got, tc.wantAnnotation)
+			}
+		})
+	}
 }
 
 func TestCodeAction(t *testing.T) {

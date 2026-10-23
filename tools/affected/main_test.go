@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // These tests drive run(), which shells out to git in the process working
@@ -85,7 +86,7 @@ func runAffected(t *testing.T, args []string) (int, output) {
 	code := run(args, out, errOut)
 
 	var got output
-	if err := json.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
+	if err := codec.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
 		t.Fatalf("decode output: %v", err)
 	}
 
@@ -132,7 +133,7 @@ func TestRunFallback(t *testing.T) {
 	}
 
 	var got output
-	if err := json.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
+	if err := codec.Unmarshal([]byte(readSink(t, out)), &got); err != nil {
 		t.Fatal(err)
 	}
 	mustEqual(t, "reason", got.Reason, "fallback")

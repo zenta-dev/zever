@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/bookings/internal/api"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	"github.com/zenta-dev/zever/examples/bookings/internal/testsetup"
 )
@@ -141,7 +141,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any, head
 
 	var buf bytes.Buffer
 	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		if err := codec.MarshalLine(&buf, body); err != nil {
 			t.Fatalf("encode: %v", err)
 		}
 	}
@@ -181,7 +181,7 @@ func login(t *testing.T, h http.Handler, email, pass string) string {
 	var out struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
 		t.Fatalf("login token missing: %v body %s", err, rec.Body.String())
 	}
 	return out.Token
@@ -213,7 +213,7 @@ func TestFullFlow(t *testing.T) {
 		Phone  string `json:"phone"`
 		Tenant string `json:"tenant"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &me); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &me); err != nil {
 		t.Fatalf("me decode: %v", err)
 	}
 	if me.Phone != "+1-555-0100" {
@@ -234,7 +234,7 @@ func TestFullFlow(t *testing.T) {
 	var space struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &space); err != nil || space.ID == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &space); err != nil || space.ID == "" {
 		t.Fatalf("space id missing: %v body %s", err, rec.Body.String())
 	}
 
@@ -244,7 +244,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("list spaces: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var spaces []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &spaces); err != nil || len(spaces) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &spaces); err != nil || len(spaces) != 1 {
 		t.Fatalf("list want 1, got %s err %v", rec.Body.String(), err)
 	}
 	rec = do(t, h, "GET", "/api/nearby?q=Chicago&radius_km=50", guestToken, nil, nil)
@@ -252,7 +252,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("nearby: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var nearby []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &nearby); err != nil || len(nearby) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &nearby); err != nil || len(nearby) != 1 {
 		t.Fatalf("nearby want 1, got %s err %v", rec.Body.String(), err)
 	}
 
@@ -277,7 +277,7 @@ func TestFullFlow(t *testing.T) {
 		Tenant          string `json:"tenant"`
 		PaymentID       string `json:"payment_id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &booked); err != nil || booked.Booking.ID == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &booked); err != nil || booked.Booking.ID == "" {
 		t.Fatalf("book decode: %v body %s", err, rec.Body.String())
 	}
 	if booked.Booking.Status != "confirmed" {
@@ -310,7 +310,7 @@ func TestFullFlow(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"booking"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &replay); err != nil || replay.Booking.ID != booked.Booking.ID {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &replay); err != nil || replay.Booking.ID != booked.Booking.ID {
 		t.Fatalf("replay id mismatch: %s", rec.Body.String())
 	}
 
@@ -331,7 +331,7 @@ func TestFullFlow(t *testing.T) {
 	var cancelled struct {
 		Status string `json:"status"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &cancelled); err != nil || cancelled.Status != "cancelled" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &cancelled); err != nil || cancelled.Status != "cancelled" {
 		t.Fatalf("cancel status: %s err %v", rec.Body.String(), err)
 	}
 	if _, err := ts.queue.Pop(t.Context(), "bookings.cancel"); err != nil {
@@ -350,7 +350,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("list reviews: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var reviews []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &reviews); err != nil || len(reviews) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &reviews); err != nil || len(reviews) != 1 {
 		t.Fatalf("reviews want 1, got %s err %v", rec.Body.String(), err)
 	}
 }
@@ -375,7 +375,7 @@ func TestOwnerScoping(t *testing.T) {
 	var space struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &space); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &space); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
@@ -401,7 +401,7 @@ func TestOwnerScoping(t *testing.T) {
 			ID string `json:"id"`
 		} `json:"booking"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &booked); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &booked); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	rec = do(t, h, "DELETE", "/api/bookings/"+booked.Booking.ID, alice, nil, nil)
@@ -415,7 +415,7 @@ func TestOwnerScoping(t *testing.T) {
 		t.Fatalf("alice list: got %d", rec.Code)
 	}
 	var aliceBookings []any
-	if err := json.Unmarshal(rec.Body.Bytes(), &aliceBookings); err != nil || len(aliceBookings) != 0 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &aliceBookings); err != nil || len(aliceBookings) != 0 {
 		t.Fatalf("alice list want empty, got %s", rec.Body.String())
 	}
 	rec = do(t, h, "GET", "/api/bookings", bob, nil, nil)
@@ -423,7 +423,7 @@ func TestOwnerScoping(t *testing.T) {
 		t.Fatalf("bob list: got %d", rec.Code)
 	}
 	var bobBookings []any
-	if err := json.Unmarshal(rec.Body.Bytes(), &bobBookings); err != nil || len(bobBookings) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &bobBookings); err != nil || len(bobBookings) != 1 {
 		t.Fatalf("bob list want 1, got %s", rec.Body.String())
 	}
 }

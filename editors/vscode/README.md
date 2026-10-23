@@ -38,6 +38,10 @@ curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | s
 
 Make sure the resulting binary is on your `$PATH` (`go install` puts it in `$(go env GOPATH)/bin` by default). If `zever-lsp` cannot be found when the extension activates, you'll see an error notification with this same instruction.
 
+## Version compatibility
+
+After the server starts, the extension compares the server's reported version (`serverInfo.version` from the LSP `initialize` result) against its own version and shows a one-time warning when the `major.minor` pair differs (patch differences are ignored). If you see `Zever: language server version X differs from extension version Y`, reinstall `zever-lsp` from the same release as the extension using the installer above so the two stay in lockstep.
+
 ## Development
 
 ```bash

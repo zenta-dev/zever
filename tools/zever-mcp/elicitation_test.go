@@ -1,10 +1,12 @@
 package main
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"net"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestGenerateApplyRoundTrip drives a full confirm:true generate through
@@ -22,16 +24,16 @@ func TestGenerateApplyRoundTrip(t *testing.T) {
 		done <- run(t.Context(), server, server, tDiscard{})
 	}()
 
-	dec := json.NewDecoder(client)
+	dec := jsontext.NewDecoder(client)
 
-	call, _ := json.Marshal(map[string]any{
+	call, _ := codec.Marshal(map[string]any{
 		"subcommand": "entity",
 		"args":       []any{"shop", "Order"},
 		"confirm":    true,
 	})
-	req, _ := json.Marshal(map[string]any{
+	req, _ := codec.Marshal(map[string]any{
 		"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-		"params": map[string]any{"name": "zever_generate", "arguments": json.RawMessage(call)},
+		"params": map[string]any{"name": "zever_generate", "arguments": jsontext.Value(call)},
 	})
 
 	if _, err := client.Write(append(req, '\n')); err != nil {
@@ -43,7 +45,7 @@ func TestGenerateApplyRoundTrip(t *testing.T) {
 		ID     int64  `json:"id"`
 		Method string `json:"method"`
 	}
-	if err := dec.Decode(&elicited); err != nil {
+	if err := codec.UnmarshalDecode(dec, &elicited); err != nil {
 		t.Fatalf("read elicitation: %v", err)
 	}
 
@@ -52,7 +54,7 @@ func TestGenerateApplyRoundTrip(t *testing.T) {
 	}
 
 	// Accept it.
-	answer, _ := json.Marshal(map[string]any{
+	answer, _ := codec.Marshal(map[string]any{
 		"jsonrpc": "2.0", "id": elicited.ID,
 		"result": map[string]any{"action": "accept"},
 	})
@@ -69,7 +71,7 @@ func TestGenerateApplyRoundTrip(t *testing.T) {
 			IsError bool `json:"isError"`
 		} `json:"result"`
 	}
-	if err := dec.Decode(&result); err != nil {
+	if err := codec.UnmarshalDecode(dec, &result); err != nil {
 		t.Fatalf("read result: %v", err)
 	}
 

@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/stripe/stripe-go/v82 v82.5.1
 	github.com/zenta-dev/zever/core/billing v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/providersclient v0.8.0
 )
 
@@ -38,3 +39,5 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../../shared/traceprop
 replace github.com/zenta-dev/zever/adapters/billing/stub => ../stub
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
