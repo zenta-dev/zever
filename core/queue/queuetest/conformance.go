@@ -22,8 +22,16 @@ const (
 	// DefaultPollInterval is the tick between delayed-delivery poll attempts.
 	DefaultPollInterval = 5 * time.Millisecond
 	// DefaultDelayedDelay is the delay PushDelayed tests request before
-	// polling for the message.
-	DefaultDelayedDelay = 60 * time.Millisecond
+	// polling for the message. It must comfortably exceed the slowest
+	// adapter Pop claim path under parallel load: the "not ready yet"
+	// check right after PushDelayed races a slow Pop (stale-claim sweep
+	// plus first claim query) that can itself take longer than a short
+	// delay, observing an already-due message and flaking the
+	// want-ErrEmpty assertion. Lengthening the delay instead of the
+	// poll timeout keeps the negative check fast (Pop still returns
+	// Empty after one poll interval) while the positive wait stays
+	// bounded by DefaultDeliveryTimeout.
+	DefaultDelayedDelay = 500 * time.Millisecond
 )
 
 // Conformance verifies factory-built queues implement the queue.Queue
