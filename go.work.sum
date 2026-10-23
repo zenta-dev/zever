@@ -1053,6 +1053,7 @@ github.com/zenta-dev/zever/adapters/notification/twilio v0.7.1/go.mod h1:L/XCmoG
 github.com/zenta-dev/zever/adapters/observability/otlp v0.7.1/go.mod h1:oxijYyiysRDJhrFq/2gJFO3WqKfDn9+PbDqn7TPqT3w=
 github.com/zenta-dev/zever/adapters/outbox/cdc v0.7.1/go.mod h1:h1gm5nyZUBnmqhJZlUWbeWxpO0nuhOw62Frs+8zGdN0=
 github.com/zenta-dev/zever/adapters/outbox/db v0.7.1/go.mod h1:0MuV0Wau4m68bTwxvhHd78vwdjUgm0/LRAIrDsiYDY8=
+github.com/zenta-dev/zever/adapters/outbox/db v0.7.2/go.mod h1:F8sG6j79O1ASFz/YBRI0AyuTReGiovGvuT6n9FPj0FM=
 github.com/zenta-dev/zever/adapters/outbox/memory v0.7.1/go.mod h1:Ur4p/uxwPctOULTDpOpsBpNEeF8kFokr49O8mYVHWKA=
 github.com/zenta-dev/zever/adapters/payment/paddle v0.7.1/go.mod h1:mNFKDnlgjaMECaA7BJRvW8AHiAszDVkC2Nf5uSGOx5M=
 github.com/zenta-dev/zever/adapters/payment/stripe v0.7.1/go.mod h1:8KYS4BZTrZKN+sAAnnNljhY6Ao0miUdz0B6iGsVG270=

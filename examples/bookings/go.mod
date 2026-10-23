@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/zenta-dev/zever/adapters/ai/anthropic v0.7.2
+	github.com/zenta-dev/zever/adapters/ai/anthropic v0.8.0
 	github.com/zenta-dev/zever/adapters/analytics/log v0.8.0
 	github.com/zenta-dev/zever/adapters/auth/jwt v0.8.0
 	github.com/zenta-dev/zever/adapters/billing/stub v0.8.0
@@ -24,7 +24,7 @@ require (
 	github.com/zenta-dev/zever/adapters/media/local v0.8.0
 	github.com/zenta-dev/zever/adapters/notification/log v0.8.0
 	github.com/zenta-dev/zever/adapters/observability/stdout v0.8.0
-	github.com/zenta-dev/zever/adapters/outbox/db v0.7.2
+	github.com/zenta-dev/zever/adapters/outbox/db v0.8.0
 	github.com/zenta-dev/zever/adapters/password/argon2 v0.8.0
 	github.com/zenta-dev/zever/adapters/payment/stub v0.8.0
 	github.com/zenta-dev/zever/adapters/permission/rbac v0.8.0
@@ -140,9 +140,13 @@ replace (
 
 replace github.com/zenta-dev/zever/adapters/analytics/log => ../../adapters/analytics/log
 
+replace github.com/zenta-dev/zever/adapters/ai/anthropic => ../../adapters/ai/anthropic
+
 replace github.com/zenta-dev/zever/adapters/auth/session => ../../adapters/auth/session
 
 replace github.com/zenta-dev/zever/adapters/crypto/local => ../../adapters/crypto/local
+
+replace github.com/zenta-dev/zever/adapters/outbox/db => ../../adapters/outbox/db
 
 replace github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
 
