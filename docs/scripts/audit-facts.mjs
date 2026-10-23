@@ -1,11 +1,12 @@
 // Cross-checks docs claims against the code. Usage: node docs/scripts/audit-facts.mjs
 // Checks: env config keys vs the Go Options structs, c.<Accessor>() vs container,
-// `zever <cmd>`/flags vs cmd/zever, Go import paths, env var prefixes, GitHub blob links.
+// `zever <cmd>`/flags vs cmd/zever, Go import paths, env var prefixes, GitHub blob links,
+// and the adapters matrix vs the core registries (reference/adapters-matrix.mdx).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { goTruth } from './go-truth.mjs';
+import { adapterNamesFromRegister, goTruth } from './go-truth.mjs';
 
 // The script resolves its own paths, so it runs from the repo root
 // (node docs/scripts/audit-facts.mjs) and from docs/ alike.
@@ -90,6 +91,44 @@ export function envKeyProblems(code) {
   return [...out, ...defaultInstanceProblems(code)];
 }
 
+// matrixProblems cross-checks the adapters matrix
+// (reference/adapters-matrix.mdx) against the same extracted truth:
+// every row's module dir must exist, its Register() must be a real
+// function in that dir, its accessor must be a real Container method,
+// and the adapter must line up with the service's extracted registry
+// set in BOTH directions (a row nothing registers, and a registered
+// adapter with no row). A row that names no registry — the ffmpeg
+// binary helper, the cookie stdlib builder, the job dispatcher
+// ("none (no registry)") — selects nothing by config adapter value, so
+// it only gets the module and accessor checks.
+export function matrixProblems(truth) {
+  const accessors = new Set();
+  for (const f of fs.readdirSync(path.join(repo, 'container')).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go')))
+    for (const m of read(path.join(repo, 'container', f)).matchAll(/^func \(c \*Container\) ([A-Z]\w*)\(/gm)) accessors.add(m[1]);
+  const rows = [...read(path.join(root, 'reference', 'adapters-matrix.mdx')).matchAll(/^\| (\w[\w -]*) \| ([\w -]+) \| `([^`]+)` \| `([^`]+)` \| `(\w+)\(\)` \|$/gm)];
+  const out = [];
+  const rowAdapters = {};
+  for (const [, svc, adapter, mod, register, acc] of rows) {
+    const svcKey = svc.toLowerCase().replace(/ /g, '');
+    const where = `adapters-matrix.mdx: ${svc}/${adapter}`;
+    if (!(svcKey in truth)) { out.push(`${where}: row names no config service`); continue; }
+    const dir = mod.replace(/^github\.com\/zenta-dev\/zever\//, '');
+    if (!fs.existsSync(path.join(repo, dir))) out.push(`${where}: module dir missing: ${dir}`);
+    if (!accessors.has(acc)) out.push(`${where}: accessor c.${acc}() not in container`);
+    if (register.startsWith('none')) continue;
+    rowAdapters[svcKey] ??= new Set();
+    rowAdapters[svcKey].add(adapter);
+    const goFiles = fs.existsSync(path.join(repo, dir)) ? fs.readdirSync(path.join(repo, dir)).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go')) : [];
+    if (!goFiles.some((f) => /func Register\(/.test(read(path.join(repo, dir, f))))) out.push(`${where}: Register() not found in ${dir}`);
+    const known = [...truth[svcKey].adapters];
+    if (!truth[svcKey].adapters.has(adapter)) out.push(`${where}: adapter "${adapter}" is not registered (known: ${known.join(', ')})`);
+  }
+  for (const [svc, v] of Object.entries(truth))
+    for (const a of v.adapters)
+      if (!rowAdapters[svc]?.has(a)) out.push(`adapters-matrix.mdx: ${svc} adapter "${a}" is registered but has no matrix row`);
+  return out;
+}
+
 // tokens splits a shell-ish block into the whitespace-separated words that
 // can carry an env assignment (`DB_DSN=... zever serve` holds two).
 function tokens(code) {
@@ -99,6 +138,12 @@ function tokens(code) {
 // selfTest plants the env-key mistakes this checker exists to catch and
 // asserts it rejects them, and that the correct spellings pass. It proves
 // the guard bites instead of trusting that the regex still matches.
+// The adapter-set cases are pinned against the REAL tree: if the register.go
+// scanner ever stops recognizing a legal registration spelling (a
+// `pkg.Adapter("name")` conversion is as legal as a plain string literal),
+// the extracted set shrinks and these cases fail instead of the docs
+// audit silently drifting (a golden only answers "unchanged"; a planted
+// failure proves the checker still bites).
 function selfTest() {
   const cases = [
     {
@@ -133,12 +178,47 @@ function selfTest() {
     },
   ];
 
+  // Sources fed straight to adapterNamesFromRegister: synthetic, both
+  // legal spellings plus the forms that must NOT contribute a name.
+  const throwsFor = (src) => { try { adapterNamesFromRegister(src); return false; } catch { return true; } };
+  const checks = [
+    { name: 'the conversion-form const feeds the idempotency adapter set on the real tree', ok: truth.idempotency.adapters.has('db') },
+    { name: 'the conversion-form const feeds the session adapter set on the real tree', ok: truth.session.adapters.has('db') },
+    { name: 'IDEMPOTENCY_ADAPTER=db is clean after the fix', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=db\n').length === 0 },
+    { name: 'SESSION_ADAPTER=db is clean after the fix', ok: envKeyProblems('SESSION_ADAPTER=db\n').length === 0 },
+    { name: 'an unknown idempotency adapter value is still rejected', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=nope\n').length === 1 },
+    { name: 'an unknown session adapter value is still rejected', ok: envKeyProblems('SESSION_ADAPTER=nope\n').length === 1 },
+    {
+      name: 'adapterNamesFromRegister parses both spellings',
+      ok: adapterNamesFromRegister('package pkg\n\nconst Adapter foo.Adapter = "a"\nconst Adapter bar.Adapter = bar.Adapter("b")\n').join(',') === 'a,b',
+    },
+    {
+      name: 'adapterNamesFromRegister parses a const block and keeps mixed case verbatim',
+      ok: adapterNamesFromRegister('type Adapter string\n\nconst (\n\t// Adapter is the battery name.\n\tAdapter foo.Adapter = foo.Adapter("Postgres")\n)\n').join() === 'Postgres',
+    },
+    { name: 'the reference form ( = foo.DB, from core) contributes no name', ok: adapterNamesFromRegister('const Adapter foo.Adapter = foo.DB\n').length === 0 },
+    { name: 'an untyped const Adapter is garbage, not a name', ok: throwsFor('const Adapter = "db"\n') },
+    { name: 'an unparsable const Adapter throws instead of returning []', ok: throwsFor('const Adapter pkg.Adapter = pkg.Adapter "db"\n') },
+    { name: 'a const block line that is not a declarator is ignored', ok: adapterNamesFromRegister('const (\n\tMemory Adapter = "memory"\n)\n').length === 0 },
+    { name: 'the adapters matrix matches the extracted truth exactly', ok: matrixProblems(truth).length === 0 },
+    { name: 'matrixProblems catches a row the code does not register', ok: matrixProblems({ ...truth, storage: { ...truth.storage, adapters: new Set(['local']) } }).some((p) => p.includes('storage/s3')) },
+    { name: 'matrixProblems catches a registered adapter with no row', ok: matrixProblems({ ...truth, crypto: { ...truth.crypto, adapters: new Set([...truth.crypto.adapters, 'phantom']) } }).some((p) => p.includes('crypto adapter "phantom"')) },
+  ];
+
   let failed = 0;
   for (const c of cases) {
     const got = envKeyProblems(c.code).length;
     if (got !== c.expect) {
       failed++;
       console.error(`self-test FAIL: ${c.name}: got ${got} problems, want ${c.expect}`);
+    } else {
+      console.log(`self-test ok: ${c.name}`);
+    }
+  }
+  for (const c of checks) {
+    if (!c.ok) {
+      failed++;
+      console.error(`self-test FAIL: ${c.name}`);
     } else {
       console.log(`self-test ok: ${c.name}`);
     }
@@ -223,6 +303,11 @@ for (const file of pages) {
 }
 console.log(`${pages.length} pages, ${yamlBlocks} yaml blocks (${yamlSkipped} unparsable, skipped)`);
 console.log(`known: ${Object.keys(services).length} services, ${accessors.size} accessors, ${commands.size} commands, ${flags.size} flags`);
+// Cross-check the adapters matrix against the same extracted truth, so a
+// registered adapter without a row (or a row without a registration) cannot
+// drift through unnoticed.
+problems.push(...matrixProblems(truth));
+
 // Known false positives: prose that looks like a command/flag/env, and app-specific env names.
 const ignore = [
   /flag --old \(after "zever breaking"\)/,

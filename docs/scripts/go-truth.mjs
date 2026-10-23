@@ -31,6 +31,39 @@ function camelToSnake(s) {
   return out;
 }
 
+// Adapter const spellings in adapters/<svc>/<adapter>/register.go. All three
+// declare the same `const Adapter <pkg>.Adapter`; the first two yield a name,
+// the reference form points at a core const that the core scanner already
+// captures, so it (and a sigil-free non-declaration) yields nothing.
+const ADAPTER_CONST_FORMS = [
+  [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*[\w.]*Adapter\s*\(\s*"([^"]+)"\s*\)$/, (m) => m[1]], // (const) Adapter x.Adapter = x.Adapter("name")
+  [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*"([^"]+)"$/, (m) => m[1]], // (const) Adapter x.Adapter = "name"
+  [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*[\w.]+$/, () => null], // (const) Adapter x.Adapter = x.DB (core const reference)
+];
+
+// adapterNamesFromRegister extracts the adapter names a register.go declares:
+// a list from the string-literal and conversion forms above, possibly empty
+// (an adapter may legitimately name itself in core instead; a register.go can
+// also lack the const altogether). The const may sit on one line or in a
+// `const (...)` header block; `//` comments never count. Fail closed: a line
+// that starts a `const Adapter` declaration and matches no known form throws,
+// so an unparsable register.go can never silently widen or shrink the set.
+export function adapterNamesFromRegister(src) {
+  const names = [];
+  let inBlock = false;
+  for (const raw of src.split('\n')) {
+    const code = raw.replace(/\/\/.*$/, '').trim();
+    if (!inBlock && /^const\s*\(\s*$/.test(code)) { inBlock = true; continue; }
+    if (inBlock && /^\)\s*$/.test(code)) { inBlock = false; continue; }
+    if (!(inBlock && code.startsWith('Adapter')) && !/^const\s+Adapter\b/.test(code)) continue;
+    const form = ADAPTER_CONST_FORMS.find(([re]) => re.test(code));
+    if (!form) throw new Error(`go-truth: unparsable adapter const in register.go: ${raw.trim()}`);
+    const name = form[1](code.match(form[0]));
+    if (name !== null && name !== undefined) names.push(name);
+  }
+  return names;
+}
+
 export function goTruth() {
   const cfg = read(path.join(repo, 'config/config.go'));
   const services = {};
@@ -88,7 +121,9 @@ export function goTruth() {
   // Adapter names: the canonical consts in core/<svc>/adapter.go plus the
   // per-adapter consts in adapters/<svc>/<adapter>/register.go (an adapter
   // that ships its own name, such as the postgres scheduler, declares no
-  // const in core).
+  // const in core). register.go may spell the const as a string literal or
+  // as a conversion of the service's Adapter type; adapterNamesFromRegister
+  // parses both and throws on a shape it does not know (fail closed).
   for (const [svc, v] of Object.entries(services)) {
     const core = path.join(repo, 'core', v.pkg, 'adapter.go');
     if (fs.existsSync(core))
@@ -99,7 +134,7 @@ export function goTruth() {
       if (!e.isDirectory()) continue;
       const f = path.join(base, e.name, 'register.go');
       if (!fs.existsSync(f)) continue;
-      for (const m of read(f).matchAll(/const\s+Adapter\s+\w+\.Adapter\s*=\s*"([^"]+)"/g)) v.adapters.add(m[1]);
+      for (const n of adapterNamesFromRegister(read(f))) v.adapters.add(n);
     }
   }
   return services;
