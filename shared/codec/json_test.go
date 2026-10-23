@@ -1,7 +1,5 @@
 package codec
 
-//nolint:depguard
-
 import (
 	"errors"
 	"math"

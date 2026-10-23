@@ -1,7 +1,5 @@
 package codec
 
-//nolint:depguard
-
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
