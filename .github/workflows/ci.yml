@@ -989,6 +989,18 @@ jobs:
       - name: Prove the legacy config file check rejects the mistakes it guards against
         run: npm run check-legacy-config:self-test
         working-directory: docs
+      - name: Fact-check the repository markdown against the code
+        run: npm run audit-repo
+        working-directory: docs
+      - name: Prove the repository markdown fact check rejects the mistakes it guards against
+        run: npm run audit-repo:self-test
+        working-directory: docs
+      - name: Fact-check the package doc.go corpus against the code
+        run: npm run audit-docgo
+        working-directory: docs
+      - name: Prove the doc.go fact check rejects the mistakes it guards against
+        run: npm run audit-docgo:self-test
+        working-directory: docs
       - name: Build docs
         run: npm run build
         working-directory: docs
