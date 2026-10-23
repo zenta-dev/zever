@@ -42,19 +42,20 @@ func resolveSagaSchema(decl *ast.SagaDecl, module *ir.Module, serviceByName map[
 
 	saga := &ir.Saga{Name: decl.Name, Module: module, Pos: decl.Pos, DocComment: decl.DocComment}
 
-	seen := make(map[string]bool, len(decl.Steps))
+	seen := make(map[string]diag.Position, len(decl.Steps))
 
 	pivots := 0
 
 	for _, sd := range decl.Steps {
-		if seen[sd.Name] {
-			diags = append(diags, diag.Wrap("resolve", sd.Pos, ErrInvalidOption,
+		if prevPos, dup := seen[sd.Name]; dup {
+			diags = append(diags, diag.WrapRelated("resolve", sd.Pos, ErrInvalidOption,
+				[]diag.RelatedInfo{{Pos: prevPos, Msg: "first declared here"}},
 				"saga %s has duplicate step name %q; step names must be unique within a saga", decl.Name, sd.Name))
 
 			continue
 		}
 
-		seen[sd.Name] = true
+		seen[sd.Name] = sd.Pos
 
 		if sd.Pivot {
 			pivots++

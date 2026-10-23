@@ -64,22 +64,28 @@ func resolveEnum(decl *ast.EnumDecl, module *ir.Module) (*ir.Enum, diag.List) {
 
 	var diags diag.List
 
-	seen := make(map[string]bool, len(decl.Values))
+	seen := make(map[string]diag.Position, len(decl.Values))
 
 	for i, v := range decl.Values {
-		if seen[v] {
+		if prevPos, dup := seen[v]; dup {
 			pos := decl.Pos
 			if i < len(decl.ValuePos) {
 				pos = decl.ValuePos[i]
 			}
 
-			diags = append(diags, diag.Wrap("resolve", pos, ErrInvalidAttribute,
+			diags = append(diags, diag.WrapRelated("resolve", pos, ErrInvalidAttribute,
+				[]diag.RelatedInfo{{Pos: prevPos, Msg: "first declared here"}},
 				"duplicate value %q in enum %q", v, decl.Name))
 
 			continue
 		}
 
-		seen[v] = true
+		pos := decl.Pos
+		if i < len(decl.ValuePos) {
+			pos = decl.ValuePos[i]
+		}
+
+		seen[v] = pos
 	}
 
 	enum := &ir.Enum{

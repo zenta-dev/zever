@@ -29,6 +29,15 @@ const (
 	SeverityWarning
 )
 
+// RelatedInfo is a secondary location attached to a Diagnostic, such as
+// the first declaration a duplicate-declaration diagnostic collides with.
+// Related positions never affect Diagnostic.Error output or List.Sorted
+// ordering, which both consider only the primary Pos.
+type RelatedInfo struct {
+	Pos Position
+	Msg string
+}
+
 // Diagnostic represents a compile problem (error or warning).
 // Unwrap() returns Wrapped so errors.Is/errors.As reach through it transparently.
 //
@@ -39,6 +48,7 @@ type Diagnostic struct {
 	Phase    string // "lex" | "parse" | "resolve" | a backend's Name()
 	Msg      string
 	Wrapped  error
+	Related  []RelatedInfo
 }
 
 // Error returns the error message in the format "pos: [phase] msg".
@@ -82,6 +92,21 @@ func Wrap(phase string, pos Position, cause error, format string, args ...any) *
 		Phase:   phase,
 		Msg:     fmt.Sprintf(format, args...),
 		Wrapped: cause,
+	}
+}
+
+// WrapRelated creates a new Diagnostic with a wrapped cause error and
+// secondary related locations. Error and Sorted consider only the primary
+// Pos; Related is carried for LSP relatedInformation and similar uses.
+func WrapRelated(
+	phase string, pos Position, cause error, related []RelatedInfo, format string, args ...any,
+) *Diagnostic {
+	return &Diagnostic{
+		Pos:     pos,
+		Phase:   phase,
+		Msg:     fmt.Sprintf(format, args...),
+		Wrapped: cause,
+		Related: related,
 	}
 }
 
