@@ -29,33 +29,38 @@ var traceHeaders = []string{
 
 // extractTraceHeaders builds a lowercase header map from the request's W3C
 // propagation headers. Only headers with a non-empty value are included.
+// Returns nil if no trace headers are present to avoid allocation.
 func extractTraceHeaders(r *http.Request) map[string]string {
-	hdrs := make(map[string]string, len(traceHeaders))
+	var hdrs map[string]string
 	for _, k := range traceHeaders {
 		if v := r.Header.Get(k); v != "" {
+			if hdrs == nil {
+				hdrs = make(map[string]string, len(traceHeaders))
+			}
 			hdrs[k] = v
 		}
 	}
-
 	return hdrs
 }
 
 // extractTraceMetadata builds a lowercase header map from the incoming gRPC
 // metadata's W3C propagation headers. Only headers with a non-empty first
-// value are included.
+// value are included. Returns nil if no trace headers are present.
 func extractTraceMetadata(ctx context.Context) map[string]string {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil
 	}
 
-	hdrs := make(map[string]string, len(traceHeaders))
+	var hdrs map[string]string
 	for _, k := range traceHeaders {
 		if vals := md.Get(k); len(vals) > 0 && vals[0] != "" {
+			if hdrs == nil {
+				hdrs = make(map[string]string, len(traceHeaders))
+			}
 			hdrs[k] = vals[0]
 		}
 	}
-
 	return hdrs
 }
 
