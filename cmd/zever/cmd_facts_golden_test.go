@@ -132,10 +132,15 @@ func harvestCmdFacts(root *cobra.Command) cmdFacts {
 		if cmd != root {
 			cmd.InitDefaultHelpFlag()
 
+			aliases := append([]string(nil), cmd.Aliases...)
+			if aliases == nil {
+				aliases = []string{}
+			}
+
 			local, _ := harvestFlags(cmd)
 			facts.Commands = append(facts.Commands, cmdFactsCommand{
 				Path:       path,
-				Aliases:    append([]string(nil), cmd.Aliases...),
+				Aliases:    aliases,
 				Hidden:     cmd.Hidden,
 				Deprecated: cmd.Deprecated,
 				Flags:      local,

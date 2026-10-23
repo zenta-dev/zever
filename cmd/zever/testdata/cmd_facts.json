@@ -46,7 +46,7 @@
   "commands": [
     {
       "path": "add",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -108,7 +108,7 @@
     },
     {
       "path": "breaking",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -122,7 +122,7 @@
     },
     {
       "path": "build",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -154,7 +154,7 @@
     },
     {
       "path": "check",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -184,7 +184,7 @@
     },
     {
       "path": "compile",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -228,7 +228,7 @@
     },
     {
       "path": "completion",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -242,7 +242,7 @@
     },
     {
       "path": "completion bash",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -256,7 +256,7 @@
     },
     {
       "path": "completion fish",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -270,7 +270,7 @@
     },
     {
       "path": "completion powershell",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -284,7 +284,7 @@
     },
     {
       "path": "completion zsh",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -298,7 +298,7 @@
     },
     {
       "path": "config",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -312,7 +312,7 @@
     },
     {
       "path": "config show",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -326,7 +326,7 @@
     },
     {
       "path": "db",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -340,7 +340,7 @@
     },
     {
       "path": "db migrate",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -354,7 +354,7 @@
     },
     {
       "path": "db rollback",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -368,7 +368,7 @@
     },
     {
       "path": "db seed",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -382,7 +382,7 @@
     },
     {
       "path": "dev",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -396,7 +396,7 @@
     },
     {
       "path": "docs",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -422,7 +422,7 @@
     },
     {
       "path": "doctor",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -442,7 +442,7 @@
     },
     {
       "path": "explain",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -456,7 +456,7 @@
     },
     {
       "path": "extract",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -470,7 +470,7 @@
     },
     {
       "path": "fmt",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -496,7 +496,7 @@
     },
     {
       "path": "generate",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -510,7 +510,7 @@
     },
     {
       "path": "graph",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -524,7 +524,7 @@
     },
     {
       "path": "new",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -610,7 +610,7 @@
     },
     {
       "path": "outbox",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -624,7 +624,7 @@
     },
     {
       "path": "outbox dlq",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -638,7 +638,7 @@
     },
     {
       "path": "outbox purge",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -652,7 +652,7 @@
     },
     {
       "path": "outbox status",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -666,7 +666,7 @@
     },
     {
       "path": "queue:work",
-      "aliases": null,
+      "aliases": [],
       "hidden": true,
       "deprecated": "",
       "flags": [
@@ -680,7 +680,7 @@
     },
     {
       "path": "routes",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -694,7 +694,7 @@
     },
     {
       "path": "schedule",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -708,7 +708,7 @@
     },
     {
       "path": "schedule run",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -722,7 +722,7 @@
     },
     {
       "path": "schedule:run",
-      "aliases": null,
+      "aliases": [],
       "hidden": true,
       "deprecated": "",
       "flags": [
@@ -736,7 +736,7 @@
     },
     {
       "path": "serve",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -750,7 +750,7 @@
     },
     {
       "path": "tinker",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -764,7 +764,7 @@
     },
     {
       "path": "uninstall",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -802,7 +802,7 @@
     },
     {
       "path": "upgrade",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
@@ -852,7 +852,7 @@
     },
     {
       "path": "worker",
-      "aliases": null,
+      "aliases": [],
       "hidden": false,
       "deprecated": "",
       "flags": [
