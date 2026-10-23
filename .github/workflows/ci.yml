@@ -78,7 +78,6 @@ jobs:
       contents: read
       pull-requests: read
     strategy:
-      fail-fast: false
       matrix:
         group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
@@ -118,7 +117,6 @@ jobs:
     permissions:
       contents: read
     strategy:
-      fail-fast: false
       matrix:
         group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
@@ -282,6 +280,7 @@ jobs:
     name: conformance
     timeout-minutes: 15
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     env:
       # Same Chrome sandbox limitation as the test jobs: the document/local
       # render conformance suite needs --no-sandbox in the CI container.
@@ -429,6 +428,7 @@ jobs:
     name: out-of-tree proof module
     timeout-minutes: 10
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -458,6 +458,7 @@ jobs:
     name: fuzz smoke (security)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -523,6 +524,7 @@ jobs:
     name: scaffold builds, tests and lints
     timeout-minutes: 20
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -625,12 +627,11 @@ jobs:
     timeout-minutes: 40
     if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-24.04
-    needs: [detect]
+    needs: [detect, fast-gate]
     permissions:
       contents: read
       id-token: write
     strategy:
-      fail-fast: false
       matrix:
         group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
@@ -694,11 +695,10 @@ jobs:
     if: github.event_name != 'pull_request' && needs.detect.outputs.groups != '[]'
     continue-on-error: true
     runs-on: ubuntu-24.04
-    needs: [detect]
+    needs: [detect, fast-gate]
     permissions:
       contents: read
     strategy:
-      fail-fast: false
       matrix:
         group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
@@ -758,6 +758,7 @@ jobs:
     timeout-minutes: 10
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -788,6 +789,7 @@ jobs:
     # reason and an expiry date; expired entries fail closed. Unreachable
     # (import-only) findings are reported but never block.
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -818,6 +820,7 @@ jobs:
     name: apidiff
     timeout-minutes: 20
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -843,6 +846,7 @@ jobs:
     name: patch-break
     timeout-minutes: 10
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -863,13 +867,12 @@ jobs:
     timeout-minutes: 20
     if: needs.detect.outputs.groups != '[]'
     runs-on: ubuntu-24.04
-    needs: [detect]
+    needs: [detect, fast-gate]
     permissions:
       contents: read
       id-token: write
       attestations: write
     strategy:
-      fail-fast: false
       matrix:
         group: ${{ fromJson(needs.detect.outputs.groups) }}
     env:
@@ -922,6 +925,7 @@ jobs:
     name: doc-snippets
     timeout-minutes: 15
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -959,6 +963,7 @@ jobs:
     name: docs-audit
     timeout-minutes: 10
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -1046,6 +1051,7 @@ jobs:
     name: fuzz smoke (config)
     timeout-minutes: 15
     runs-on: ubuntu-24.04
+    needs: [fast-gate]
     permissions:
       contents: read
     steps:
@@ -1077,12 +1083,31 @@ jobs:
   #       - name: Check generated code matches the schema
   #         run: zever generate --check ./examples/...
 
+  # Fast gate: aggregates the cheap tier (fmt, lint, test, drift, tags,
+  # errors, modules, docs-toolchain-adjacent checks). Expensive jobs
+  # (race, sbom, bench, conformance, fuzz, scaffold, vuln, apidiff,
+  # docs) wait on this gate so a cheap failure cancels them early.
+  # Passes on success/skipped (docs-only skips), fails on failure/cancelled.
+  fast-gate:
+    name: fast-gate
+    timeout-minutes: 5
+    if: always()
+    runs-on: ubuntu-24.04
+    needs: [detect, fmt, lint, test, module-graph, check-tags, err-lint, drift, changelog, lsp, mcp, compilefail, installer]
+    steps:
+      - name: Aggregate fast results
+        run: |
+          case "${{ join(needs.*.result, ' ') }}" in
+            *failure*|*cancelled*) echo fast-gate failed; exit 1;;
+            *) echo "fast-gate passed";;
+          esac
+
   ci-gate:
     name: ci-gate
     timeout-minutes: 5
     if: always()
     runs-on: ubuntu-24.04
-    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, docs-audit, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, err-lint, changelog]
+    needs: [detect, fmt, lint, test, test-race, coverage-floor, sbom, lsp, mcp, vulnerability, external-sms, doc-snippets, docs-audit, module-graph, conformance, apidiff, patch-break, fuzz-smoke, env-fuzz-smoke, compilefail, scaffold, check-tags, err-lint, changelog, fast-gate]
     steps:
       - name: Aggregate results
         run: |
