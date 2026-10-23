@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/msgspan"
 	redisclient "github.com/zenta-dev/zever/shared/redisclient"
 	redisopt "github.com/zenta-dev/zever/shared/redisopt"
@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	jsonMarshal   = json.Marshal
-	jsonUnmarshal = json.Unmarshal
+	jsonMarshal   = codec.Marshal
+	jsonUnmarshal = codec.Unmarshal
 )
 
 // DefaultPingTimeout bounds the startup connectivity check.

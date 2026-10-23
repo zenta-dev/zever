@@ -7,7 +7,8 @@ import (
 	"sync"
 
 	"encoding/json/jsontext"
-	"encoding/json/v2"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Perm identifies an operation governed by a policy.
@@ -285,7 +286,7 @@ func (c *PolicyConfig) Resolve() (map[BucketName]Policy, Policy, bool, error) {
 // Unknown members are rejected (encoding/json/v2 strict mode).
 func (c *PolicyConfig) UnmarshalJSON(b []byte) error {
 	var raw map[string]jsontext.Value
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := codec.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 
@@ -298,7 +299,7 @@ func (c *PolicyConfig) UnmarshalJSON(b []byte) error {
 		}
 
 		var p Policy
-		if err := json.Unmarshal([]byte(msg), &p, json.RejectUnknownMembers(true)); err != nil {
+		if err := codec.UnmarshalStrict([]byte(msg), &p); err != nil {
 			return fmt.Errorf("storage: policy %q: %w", name, err)
 		}
 
@@ -336,7 +337,7 @@ func (c PolicyConfig) MarshalJSON() ([]byte, error) {
 		out["default"] = *c.Default
 	}
 
-	return json.Marshal(out)
+	return codec.Marshal(out)
 }
 
 // DenyReason explains why Allow refused perm for subject.
