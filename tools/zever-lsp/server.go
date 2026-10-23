@@ -220,7 +220,11 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			},
 			DocumentFormattingProvider:      protocol.Boolean(true),
 			DocumentRangeFormattingProvider: protocol.Boolean(true),
-			CodeActionProvider:              protocol.Boolean(true),
+			DocumentOnTypeFormattingProvider: protocol.DocumentOnTypeFormattingOptions{
+				FirstTriggerCharacter: "\n",
+				MoreTriggerCharacter:  []string{"}", " "},
+			},
+			CodeActionProvider: protocol.Boolean(true),
 			// PrepareProvider tells the client to ask prepareRename first,
 			// so a cursor on a non-renameable symbol is refused before the
 			// user is ever prompted for a new name.
@@ -574,6 +578,36 @@ func (s *Server) RangeFormatting(ctx context.Context, params *protocol.DocumentR
 	edits := formatDocument(path, []byte(content))
 
 	return filterEditsToRange(edits, params.Range), nil
+}
+
+// OnTypeFormatting reuses formatDocument and narrows the result to the line
+// holding the trigger position. An unknown document yields nil.
+func (s *Server) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return nil, nil
+	}
+
+	path, _ := uriToPath(uriStr)
+
+	edits := formatDocument(path, []byte(content))
+
+	rng := protocol.Range{
+		Start: protocol.Position{Line: params.Position.Line, Character: 0},
+		End:   protocol.Position{Line: params.Position.Line, Character: 0},
+	}
+
+	return filterEditsToRange(edits, rng), nil
+}
+
+// TextDocumentOnTypeFormatting is an alias kept for callers that use the
+// protocol method's full name.
+func (s *Server) TextDocumentOnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
+	return s.OnTypeFormatting(ctx, params)
 }
 
 // CodeAction returns quick fixes for the diagnostics the client reports as

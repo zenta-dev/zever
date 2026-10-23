@@ -39,7 +39,50 @@
         "scopeName": "source.zen",
         "path": "./syntaxes/zen.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Zever",
+      "properties": {
+        "zever.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace level for the zever language server communication."
+        },
+        "zever.serverPath": {
+          "type": "string",
+          "default": "zever-lsp",
+          "description": "Path to the zever-lsp executable."
+        },
+        "zever.inlayHints.implicitModule": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inlay hints for implicit module references."
+        },
+        "zever.inlayHints.errorCases": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inlay hints for error cases."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "zever.restartServer",
+        "title": "Zever: Restart Language Server"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "zever.restartServer"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

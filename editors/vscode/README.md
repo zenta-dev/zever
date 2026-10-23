@@ -52,6 +52,19 @@ Use `npm run watch` during development to recompile TypeScript on save.
 
 To package locally (no publishing): `npm run package` (requires `@vscode/vsce`), then delete the generated `.vsix` — build artifacts must not be committed.
 
+## Configuration
+
+The extension contributes the following settings (under `zever.*`):
+
+- `zever.trace.server` (string, default `"off"`): trace level for language-server communication. One of `"off"`, `"messages"`, `"verbose"`.
+- `zever.serverPath` (string, default `"zever-lsp"`): path to the `zever-lsp` executable used to start the server.
+- `zever.inlayHints.implicitModule` (boolean, default `true`): show inlay hints for implicit module references.
+- `zever.inlayHints.errorCases` (boolean, default `true`): show inlay hints for error cases.
+
+## Commands
+
+- `Zever: Restart Language Server` (`zever.restartServer`): stops and restarts the language server client. Available from the command palette.
+
 ## Known limitations
 
 - The `zever-lsp` binary is **not bundled** with this extension and is **not auto-installed**. Manual installation on `$PATH` is required, as described above. Bundling/auto-install of the server binary is planned future work.

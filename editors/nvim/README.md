@@ -154,6 +154,30 @@ Without a local clone, install the published release instead:
 curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
+## Inlay hints, signature help, and selection ranges
+
+The server provides inlay hints and signature help out of the box; Neovim
+just needs them enabled on the buffer. Add to your config (Neovim 0.10+):
+
+```lua
+vim.api.nvim_create_autocmd('LspAttach', {
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client and client.name == 'zever_lsp' then
+      vim.lsp.inlay_hint.enable(true, { bufnr = args.buf })
+    end
+  end,
+})
+```
+
+Signature help is triggered by `(` and `,` automatically once the client
+is attached; call `vim.lsp.buf.signature_help()` manually if your client
+does not auto-trigger.
+
+Selection ranges and document links also work out of the box with no extra
+configuration: use `vim.lsp.buf.selection_range()` (or your editor's
+selection-expansion keymap) and click links in `//` comments.
+
 ## Verifying it worked
 
 1. Open a `.zen` file and run `:set filetype?` — it should print

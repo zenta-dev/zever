@@ -43,7 +43,7 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Hover | `textDocument/hover` |
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
 | Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |
-| Formatting | `textDocument/formatting`, `textDocument/rangeFormatting` |
+| Formatting | `textDocument/formatting`, `textDocument/rangeFormatting`, `textDocument/onTypeFormatting` |
 | Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets) |
 | Rename | `textDocument/prepareRename`, `textDocument/rename` (entities, fields, jobs, services, RPCs) |
 | Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` |
