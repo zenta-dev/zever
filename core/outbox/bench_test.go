@@ -52,4 +52,3 @@ func BenchmarkPublisherFuncPublish(b *testing.B) {
 		_ = p.Publish(context.Background(), msg)
 	}
 }
-

@@ -87,4 +87,3 @@ func TestValidate_jitterBoundariesValid(t *testing.T) {
 		}
 	}
 }
-

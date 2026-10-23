@@ -40,4 +40,3 @@ func (s *stubBilling) GetInvoice(_ context.Context, _ string) (Invoice, error) {
 func (s *stubBilling) Close() error {
 	return nil
 }
-

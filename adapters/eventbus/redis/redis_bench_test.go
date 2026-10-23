@@ -2,22 +2,12 @@ package redis
 
 import (
 	"context"
-	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
 
 	"github.com/zenta-dev/zever/core/eventbus"
 )
-
-var benchAdapterSeq atomic.Int64
-
-// benchFreshAdapter returns an adapter name unique to this benchmark run so
-// Register never collides with a previously registered factory.
-func benchFreshAdapter() eventbus.Adapter {
-	return eventbus.Adapter(fmt.Sprintf("bench-%d", benchAdapterSeq.Add(1)))
-}
 
 // benchPusher is a no-op Pusher used to isolate registry benchmarks from a
 // live Redis broker.
@@ -71,37 +61,14 @@ func BenchmarkNew(b *testing.B) {
 	}
 }
 
-// BenchmarkRegister measures registering a factory into the eventbus registry.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		err := eventbus.Register(benchFreshAdapter(), func(eventbus.Options) (eventbus.EventBus, error) {
-			return eventbus.Wrap(benchPusher{}), nil
-		})
-		if err != nil {
-			b.Fatalf("Register() error = %v", err)
-		}
-	}
-}
-
 // BenchmarkOpen measures a registry lookup plus wrapped construction via Open.
 func BenchmarkOpen(b *testing.B) {
-	a := benchFreshAdapter()
-
-	err := eventbus.Register(a, func(eventbus.Options) (eventbus.EventBus, error) {
-		return eventbus.Wrap(benchPusher{}), nil
-	})
-	if err != nil {
-		b.Fatalf("Register() error = %v", err)
-	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		bus, openErr := eventbus.Open(a, eventbus.Options{})
+		bus, openErr := New(eventbus.Options{})
 		if openErr != nil {
 			b.Fatalf("Open() error = %v", openErr)
 		}

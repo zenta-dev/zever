@@ -103,7 +103,7 @@ func runConfigShow(args []string) error {
 
 // runConfigShowWith resolves cfg through .env/.env.local discovery plus
 // the process environment (matching how the container resolves config) and
-// prints one "<service>: adapter=<x>" header per battery, followed by its
+// prints one "<service>: driver=<x>" header per battery, followed by its
 // redacted option fields, to cfg.Out. Named instances (SERVICE__NAME__*
 // env) print as "<service>/<NAME>" sections with their own effective
 // (redacted) values.
@@ -153,7 +153,7 @@ func runConfigShowWithEnv(cfg ConfigConfig, env config.Env) error {
 
 	for _, name := range names {
 		sc := services[name]
-		_, _ = fmt.Fprintf(out, "%s  adapter=%s\n", cyan(name), sc.Adapter)
+		_, _ = fmt.Fprintf(out, "%s  driver=%s\n", cyan(name), cliDefaultDriver(name))
 
 		keys := make([]string, 0, len(sc.Options))
 		for k := range sc.Options {
@@ -168,7 +168,7 @@ func runConfigShowWithEnv(cfg ConfigConfig, env config.Env) error {
 
 		for _, iname := range sortedInstanceNames(instances, name) {
 			isc := instances[name+"/"+iname]
-			_, _ = fmt.Fprintf(out, "%s  adapter=%s\n", cyan(name+"/"+iname), isc.Adapter)
+			_, _ = fmt.Fprintf(out, "%s  driver=%s\n", cyan(name+"/"+iname), cliDefaultDriver(name))
 
 			ikeys := make([]string, 0, len(isc.Options))
 			for k := range isc.Options {
@@ -188,7 +188,8 @@ func runConfigShowWithEnv(cfg ConfigConfig, env config.Env) error {
 
 // redactedInstances resolves every named instance (SERVICE__NAME__* env) for
 // every service in services, returning "service/NAME" display rows with the
-// effective adapter and redacted options. It mirrors the container's own
+// redacted options. Drivers are code-wired (see cliDefaultDriver), so
+// instances carry no adapter of their own. It mirrors the container's own
 // overlay (see container/provide.go): DefaultOptions seeded from the service
 // default, overlaid by ApplyEnv for the named namespace. A named instance
 // whose env fails to apply is skipped: the default row already carries the
@@ -198,7 +199,7 @@ func redactedInstances(env config.Env, resolved *config.Config, services map[str
 
 	out := map[string]config.ServiceConfig{}
 
-	for svc, sc := range services {
+	for svc := range services {
 		for _, name := range config.InstanceNames(env, svc) {
 			seed := config.DefaultOptions(svc, name)
 			if seed == nil {
@@ -218,31 +219,12 @@ func redactedInstances(env config.Env, resolved *config.Config, services map[str
 			opts := optionsToMap(ptr.Elem().Interface())
 
 			out[svc+"/"+name] = config.ServiceConfig{
-				Adapter: instanceAdapter(env, svc, name, sc.Adapter),
 				Options: config.Redact(opts),
 			}
 		}
 	}
 
 	return out
-}
-
-// instanceAdapter reports the named instance's adapter: SERVICE__NAME__ADAPTER
-// from env (case-insensitive), falling back to the default instance's.
-func instanceAdapter(env config.Env, svc, name, def string) string {
-	want := strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "__ADAPTER"
-
-	for k, v := range env {
-		if strings.ToUpper(k) == want {
-			if strings.TrimSpace(v) != "" {
-				return v
-			}
-
-			break
-		}
-	}
-
-	return def
 }
 
 // sortedInstanceNames lists the instance names under svc in out's

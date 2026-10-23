@@ -20,11 +20,9 @@ import (
 func testDeps(t *testing.T) (context.Context, jobs.Deps) {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "jobs.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	ctx := t.Context()

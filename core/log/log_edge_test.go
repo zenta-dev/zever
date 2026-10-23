@@ -11,4 +11,3 @@ func TestLevelString_maxValue_unknown(t *testing.T) {
 		t.Fatalf("Level(255).String() = %q, want %q", got, "unknown")
 	}
 }
-

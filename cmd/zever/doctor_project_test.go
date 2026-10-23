@@ -10,20 +10,21 @@ import (
 	"testing"
 )
 
-// doctorTwoBatteryFixture sets two zero-infra batteries via env. Doctor
+// doctorTwoBatteryFixture steers two zero-infra batteries via env. Doctor
 // checks every known battery (service config is env-only, so no file lists
-// an enabled set); the fixture only steers values, never scope.
-const doctorTwoBatteryFixture = "LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\n"
+// an enabled set); the fixture only steers values, never scope. Adapters
+// are code-wired, so the fixture names options only.
+const doctorTwoBatteryFixture = "LOG_MIN_LEVEL=1\nDB_PATH=data/test.db\n"
 
-// doctorFailingBatteryFixture selects a battery that cannot resolve without
-// a configured secret (jwt requires a 32+ byte secret, adapter-validated at
-// Open, never at Validate, so resolution succeeds and the row FAILs).
-const doctorFailingBatteryFixture = "AUTH_ADAPTER=jwt\n"
+// doctorFailingBatteryFixture leaves auth without its secret: jwt requires
+// a 32+ byte secret, validated at Open, so resolution succeeds and the
+// auth row FAILs with the AUTH_JWT_SECRET fix hint.
+const doctorFailingBatteryFixture = "DB_PATH=data/test.db\n"
 
-// doctorTypoBatteryFixture selects a battery with a misspelled adapter:
-// ParseAdapter stays permissive so config validation passes, but the
-// adapters row fails fast with a did-you-mean hint (P4-1).
-const doctorTypoBatteryFixture = "CACHE_ADAPTER=memmory\n"
+// doctorTypoBatteryFixture misspells an option key: the unknown key is close
+// to a known field, so resolution fails the config row with a did-you-mean
+// hint.
+const doctorTypoBatteryFixture = "CACHE_MAXENTRIE=100\n"
 
 // doctorEnabledRows returns the battery names in doctor's human output by
 // first-field match, so "ai" never collides with prose like "batteries".
@@ -61,7 +62,7 @@ func TestDoctorChecksAllBatteries(t *testing.T) {
 
 	names := doctorEnabledRows(t, out.String())
 
-	for _, want := range []string{"config", "adapters", "log", "router", "db", "ai", "auth"} {
+	for _, want := range []string{"config", "log", "router", "db", "ai", "auth"} {
 		found := false
 		for _, n := range names {
 			if n == want {
@@ -102,28 +103,21 @@ func TestDoctorHumanFailsOnBatteryFailure(t *testing.T) {
 	}
 }
 
-// TestDoctorAdaptersRowSuggestsOnTypo pins the P4-1 fail-fast: a misspelled
-// adapter fails the adapters row with a did-you-mean hint naming the
-// registered adapter, instead of surfacing only as a resolve error.
-func TestDoctorAdaptersRowSuggestsOnTypo(t *testing.T) {
+// TestDoctorConfigRowSuggestsOnTypo pins the fail-fast: a misspelled
+// option key fails the config row with a did-you-mean hint naming the real
+// option, instead of resolving past it.
+func TestDoctorConfigRowSuggestsOnTypo(t *testing.T) {
 	dir := t.TempDir()
 	writeInspectFixture(t, dir, ".env", doctorTypoBatteryFixture)
 	t.Chdir(dir)
 
 	var out bytes.Buffer
-	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
-		t.Fatal("runDoctorWith typo adapter: got nil error, want non-nil")
+	err := runDoctorWith(DoctorConfig{Out: &out})
+	if err == nil {
+		t.Fatal("runDoctorWith typo option: got nil error, want non-nil")
 	}
-
-	line, ok := doctorLine(out.String(), "adapters")
-	if !ok {
-		t.Fatalf("output missing adapters row:\n%s", out.String())
-	}
-	if !strings.Contains(line, "FAIL") {
-		t.Fatalf("adapters row %q does not FAIL", line)
-	}
-	if !strings.Contains(out.String(), `did you mean "memory"`) {
-		t.Fatalf("output lacks did-you-mean hint:\n%s", out.String())
+	if !strings.Contains(err.Error(), `did you mean "max_entries"`) {
+		t.Fatalf("error lacks did-you-mean hint: %v", err)
 	}
 }
 
@@ -139,7 +133,7 @@ func TestDoctorNoProjectChecksAllWithNote(t *testing.T) {
 		t.Fatal("runDoctorWith defaults: got nil error, want non-nil (auth/jwt has no secret)")
 	}
 
-	if got := out.String(); !strings.Contains(got, "CLI registry") {
+	if got := out.String(); !strings.Contains(got, "CLI wiring") {
 		t.Fatalf("output lacks the CLI-registry note:\n%s", got)
 	}
 
@@ -242,7 +236,7 @@ func TestDoctorServerFallbackWithNote(t *testing.T) {
 	var out bytes.Buffer
 	_ = runDoctorWithContext(ctx, DoctorConfig{Out: &out})
 
-	if got := out.String(); !strings.Contains(got, "CLI registry") {
+	if got := out.String(); !strings.Contains(got, "CLI wiring") {
 		t.Fatalf("output lacks the CLI-registry fallback note:\n%s", got)
 	}
 
@@ -292,60 +286,56 @@ func TestDoctorJSONProjectEnvelope(t *testing.T) {
 		name, _ := row["name"].(string)
 		seen[name] = true
 	}
-	for _, want := range []string{"config", "adapters", "log", "router", "db"} {
+	for _, want := range []string{"config", "log", "router", "db"} {
 		if !seen[want] {
 			t.Fatalf("battery row %q missing from the envelope", want)
 		}
 	}
 }
 
-// TestDoctorSurfacesPoolMismatch proves the P5-5 diagnostics path: cache
-// (db-backed, same sqlite file) resolves before db alphabetically and opens
-// the shared pool with the default cap; db's explicit max_conns then
-// mismatches, and doctor prints the pool warning with the dedicated_pool
-// hint. Unrelated batteries (ai/auth/crypto/geo/i18n need credentials the
-// fixture does not supply) still fail, so the command exits non-zero; the
-// warning assertions are what this test pins.
-func TestDoctorSurfacesPoolMismatch(t *testing.T) {
+// TestDoctorSurfacesNoPoolMismatch pins the new sharing model: batteries
+// open their own pools (or share explicitly via NewFromDB in app code), so
+// implicit config-driven pool sharing is gone and doctor prints no pool
+// warnings for two batteries pointed at the same sqlite file. Unrelated
+// batteries (ai/auth need credentials the fixture does not supply) still
+// fail, so the command exits non-zero.
+func TestDoctorSurfacesNoPoolMismatch(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "shared.db")
-	fixture := "CACHE_ADAPTER=db\nCACHE_DSN=" + file + "\nDB_ADAPTER=sqlite\nDB_PATH=" + file + "\nDB_MAXCONNS=5\n"
+	fixture := "CACHE_DSN=" + file + "\nDB_PATH=" + file + "\nDB_MAX_CONNS=5\n"
 	writeInspectFixture(t, dir, ".env", fixture)
 	t.Chdir(dir)
 
 	var out bytes.Buffer
 	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
-		t.Fatal("runDoctorWith shared-pool fixture: got nil error, want non-nil (unconfigured batteries fail)")
+		t.Fatal("runDoctorWith shared-file fixture: got nil error, want non-nil (unconfigured batteries fail)")
 	}
 
 	got := out.String()
-	if !strings.Contains(got, "pool: db wants max_conns=5") {
-		t.Fatalf("output lacks the pool mismatch warning:\n%s", got)
-	}
-
-	if !strings.Contains(got, "dedicated_pool") {
-		t.Fatalf("pool warning lacks the fix hint:\n%s", got)
+	if strings.Contains(got, "pool: ") {
+		t.Fatalf("output carries a pool mismatch warning, want none:\n%s", got)
 	}
 
 	if strings.Contains(got, "shared.db") {
-		t.Fatalf("pool warning leaks the path:\n%s", got)
+		t.Fatalf("output leaks the path:\n%s", got)
 	}
 }
 
-// TestDoctorJSONCarriesPoolWarnings proves the same mismatch reaches the
-// JSON envelope as data.pool_warnings.
-func TestDoctorJSONCarriesPoolWarnings(t *testing.T) {
+// TestDoctorJSONOmitsPoolWarnings pins the envelope contract: with no
+// implicit sharing there are no warnings, so data carries no pool_warnings
+// key at all.
+func TestDoctorJSONOmitsPoolWarnings(t *testing.T) {
 	jbuf := mustJSONMode(t)
 
 	dir := t.TempDir()
 	file := filepath.Join(dir, "shared.db")
-	fixture := "CACHE_ADAPTER=db\nCACHE_DSN=" + file + "\nDB_ADAPTER=sqlite\nDB_PATH=" + file + "\nDB_MAXCONNS=5\n"
+	fixture := "CACHE_DSN=" + file + "\nDB_PATH=" + file + "\nDB_MAX_CONNS=5\n"
 	writeInspectFixture(t, dir, ".env", fixture)
 	t.Chdir(dir)
 
 	var human bytes.Buffer
 	if err := runDoctorWith(DoctorConfig{Out: &human, JSON: true}); err == nil {
-		t.Fatal("runDoctorWith JSON shared-pool fixture: got nil error, want non-nil (unconfigured batteries fail)")
+		t.Fatal("runDoctorWith JSON shared-file fixture: got nil error, want non-nil (unconfigured batteries fail)")
 	}
 
 	env := mustDecodeEnvelope(t, jbuf)
@@ -354,14 +344,8 @@ func TestDoctorJSONCarriesPoolWarnings(t *testing.T) {
 	}
 
 	data := envelopeData(t, env)
-	warns, ok := data["pool_warnings"].([]any)
-	if !ok || len(warns) != 1 {
-		t.Fatalf("data.pool_warnings = %v, want 1 warning", data["pool_warnings"])
-	}
-
-	line, _ := warns[0].(string)
-	if !strings.Contains(line, "dedicated_pool") {
-		t.Fatalf("pool warning = %q, want the fix hint", line)
+	if warns, ok := data["pool_warnings"]; ok {
+		t.Fatalf("data.pool_warnings = %v, want absent", warns)
 	}
 }
 

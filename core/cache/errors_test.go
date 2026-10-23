@@ -87,7 +87,6 @@ func TestMemoryInvalidInteger(t *testing.T) {
 	}
 }
 
-
 func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Parallel()
 

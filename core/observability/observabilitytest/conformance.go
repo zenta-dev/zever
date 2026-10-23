@@ -30,7 +30,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) observability.Provider
 	t.Run("Shutdown", func(t *testing.T) { conformanceShutdown(t, factory) })
 }
 
-
 func conformanceTracing(t *testing.T, factory func(t *testing.T) observability.Provider) {
 	t.Helper()
 

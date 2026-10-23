@@ -31,9 +31,8 @@ func TestEdgeSet_emptyKeyAndValue(t *testing.T) {
 // TestRegisterOpensViaCoreOptions proves Register wires the adapter factory
 // into the cache battery registry so cache.Open resolves it.
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-	Register()
 
-	c, err := cache.Open(cache.Memory, cache.Options{})
+	c, err := New(cache.Options{})
 	if err != nil {
 		t.Fatalf("Open = %v", err)
 	}

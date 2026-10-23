@@ -68,10 +68,10 @@ func TestDoctorFixHintNamesMissingEnvKey(t *testing.T) {
 			want:    "fix the service env the error names, then re-run 'zever doctor'",
 		},
 		{
-			name:    "adapters row names the adapter selector",
+			name:    "unknown battery falls back to config show",
 			battery: "adapters",
 			errText: "config: unknown adapter \"memmory\" for service \"cache\"",
-			want:    "set <SERVICE>_ADAPTER to a registered adapter ('zever explain' lists every driver)",
+			want:    "run 'zever config show' to see the resolved adapters values",
 		},
 	}
 

@@ -144,9 +144,12 @@ type poolRegistry struct {
 	// diagnostics (doctor) can surface them after the fact. It carries no
 	// DSN content (see PoolMismatch).
 	mismatchLog []PoolMismatch
-	// open builds a fresh pool. Production resolves via the db registry so
-	// the container wires no adapters itself; tests inject a fake.
-	open func(adapter db.Adapter, opts db.Options) (db.DB, error)
+	// open builds a fresh pool for backend ("postgres", "sqlite", ...).
+	// Sharing is explicit in user code now (db-backed adapters expose
+	// NewFromDB wired through container.Provide), so the production
+	// default fails: tests inject a fake, and Close only snapshots pools
+	// tests borrowed.
+	open func(backend string, opts db.Options) (db.DB, error)
 	// warn reports pool lifecycle notes (shared opens, cap mismatches,
 	// dedicated opens). Default writes one line to stderr without DSN
 	// content; tests inject a recorder.
@@ -158,9 +161,16 @@ type poolRegistry struct {
 // Container that never resolves a shareable DSN allocates nothing for it.
 func newPoolRegistry() *poolRegistry {
 	return &poolRegistry{
-		open: db.Open,
+		open: unsupportedPoolOpen,
 		warn: defaultPoolWarn,
 	}
+}
+
+// unsupportedPoolOpen is the production pool opener. Implicit shared pools
+// no longer exist: wire sharing explicitly with NewFromDB through
+// container.Provide. It fails if a borrow ever reaches it outside tests.
+func unsupportedPoolOpen(backend string, _ db.Options) (db.DB, error) {
+	return nil, fmt.Errorf("container: shared %s pool: implicit opens removed, wire NewFromDB via container.Provide", backend)
 }
 
 // poolInfoPrefix marks the purely informational "pool shared ..." lines
@@ -183,7 +193,7 @@ func defaultPoolWarn(msg string) {
 // first opener's knobs. Later borrowers reuse the pool: their pool knobs
 // are ignored, and a nonzero MaxConns differing from the pool's warns
 // without DSN content. Every successful borrow records the service.
-func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Options, key, backend string) (db.DB, error) {
+func (r *poolRegistry) borrow(service string, opts db.Options, key, backend string) (db.DB, error) {
 	for {
 		r.mu.Lock()
 		if r.pools == nil {
@@ -196,7 +206,7 @@ func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Option
 			r.pools[key] = e
 			r.mu.Unlock()
 
-			conn, err := r.open(adapter, opts)
+			conn, err := r.open(backend, opts)
 			r.mu.Lock()
 			if err != nil {
 				delete(r.pools, key)

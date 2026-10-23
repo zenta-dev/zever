@@ -10,6 +10,7 @@ import (
 	"time"
 
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
 )
@@ -39,7 +40,7 @@ func newOutboxCLIFixture(t *testing.T, name string) *outboxCLIFixture {
 
 	dsn := "file:outboxtest_" + name + "?mode=memory&cache=shared"
 
-	store, err := outbox.Open(outbox.DB, outbox.Options{DSN: dsn, Table: "outbox"})
+	store, err := outboxdb.New(outboxdb.Options{Options: coredb.Options{Path: dsn}, Table: "outbox"})
 	if err != nil {
 		t.Fatalf("open outbox store: %v", err)
 	}

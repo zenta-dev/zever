@@ -12,18 +12,14 @@ import (
 )
 
 // ExampleOpen opens the session backend, issues a token and verifies it.
-func ExampleOpen() {
-	const exampleAdapter auth.Adapter = "example-test"
-
+func Example() {
 	store, err := sessionmemory.New(coresession.Options{})
 	if err != nil {
 		fmt.Println("store error")
 		return
 	}
 
-	_ = auth.Register(exampleAdapter, authsession.New)
-
-	backend, err := auth.Open(exampleAdapter, auth.Options{Session: auth.SessionOptions{Store: store}})
+	backend, err := authsession.New(auth.Options{Session: auth.SessionOptions{Store: store}})
 	if err != nil {
 		fmt.Println("open error")
 		return

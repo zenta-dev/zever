@@ -6,8 +6,8 @@
 // per declared schedule). The scheduler dispatches onto the queue and the
 // worker consumes from it, so both must share one queue: with the in-process
 // memory adapter that means one process. Swapping the queue adapter for
-// redis/nats via QUEUE_* env is what makes this distributable, with no code
-// change here.
+// redis/nats is a wiring change (workerProviders below, then rebuild);
+// that is what makes this distributable.
 //
 // The container is wired here directly (config.Resolve + explicit adapter
 // registration) so this track stays disjoint from the sibling server track
@@ -23,44 +23,31 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/core/job"
-	"github.com/zenta-dev/zever/examples/bookings/internal/service/jobs"
-
-	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
-	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
-	cryptolocal "github.com/zenta-dev/zever/adapters/crypto/local"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
 	eventbusmemory "github.com/zenta-dev/zever/adapters/eventbus/memory"
-	flagstatic "github.com/zenta-dev/zever/adapters/flag/static"
-	geostatic "github.com/zenta-dev/zever/adapters/geo/static"
-	i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
-	idempotencymemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
-	lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
 	logslog "github.com/zenta-dev/zever/adapters/log/slog"
 	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
-	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
-	observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
-	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	paymentstub "github.com/zenta-dev/zever/adapters/payment/stub"
-	permissionrbac "github.com/zenta-dev/zever/adapters/permission/rbac"
+	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
 	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
-	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	searchdb "github.com/zenta-dev/zever/adapters/search/db"
 	secretsenv "github.com/zenta-dev/zever/adapters/secrets/env"
-	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
-	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
-	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
-	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
 	webhookqueue "github.com/zenta-dev/zever/adapters/webhook/queue"
-	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
+	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/db"
+	eventbus "github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/job"
+	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/notification"
+	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/core/scheduler"
+	"github.com/zenta-dev/zever/core/secrets"
+	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/examples/bookings/internal/service/jobs"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 const (
@@ -75,6 +62,44 @@ func main() {
 	}
 }
 
+// workerProviders wires the batteries the worker resolves. Adapters are
+// compiled-in constructors, never env selections: changing one means
+// editing this list and rebuilding.
+func workerProviders() []container.Provider {
+	return []container.Provider{
+		container.Provide(log.DefaultRef(), func(o log.Options) (log.Logger, error) {
+			return logslog.New(o), nil
+		}),
+		container.Provide(db.DefaultRef(), dbsqlite.New),
+		container.Provide(mailer.DefaultRef(), mailerlog.New),
+		container.Provide(notification.DefaultRef(), notificationlog.New),
+		container.Provide(webhook.DefaultRef(), webhookqueue.New),
+		container.Provide(secrets.DefaultRef(), func(o secrets.Options) (secrets.Secrets, error) {
+			return secretsenv.New(secretsenv.Options{Prefix: o.Prefix})
+		}),
+		container.Provide(queue.DefaultRef(), queuememory.New),
+		container.Provide(scheduler.DefaultRef(), schedulerembedded.New),
+		container.Provide(eventbus.DefaultRef(), eventbusmemory.New),
+		container.Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+			poolOpts := dbconn.SplitDSN(o.DSN)
+			poolOpts.DedicatedPool = o.DedicatedPool
+			return outboxdb.New(outboxdb.Options{
+				Options:      poolOpts,
+				Table:        o.Table,
+				InboxTable:   o.InboxTable,
+				Transport:    o.Publisher,
+				PollInterval: o.PollInterval,
+				BatchSize:    o.BatchSize,
+				MaxAttempts:  o.MaxAttempts,
+				Retry:        o.Retry,
+				Retention:    o.Retention,
+				LockSeconds:  o.LockSeconds,
+				Provider:     o.Provider,
+			})
+		}),
+	}
+}
+
 func run() error {
 	env, err := config.FromEnv()
 	if err != nil {
@@ -85,41 +110,7 @@ func run() error {
 		return fmt.Errorf("worker: load config: %w", err)
 	}
 
-	analyticslog.Register()
-	authjwt.Register()
-	billingstub.Register()
-	cachememory.Register()
-	cryptolocal.Register()
-	dbsqlite.Register()
-	documentlocal.Register()
-	eventbusmemory.Register()
-	flagstatic.Register()
-	geostatic.Register()
-	i18nembed.Register()
-	idempotencymemory.Register()
-	lockmemory.Register()
-	logslog.Register()
-	mailerlog.Register()
-	medialocal.Register()
-	notificationlog.Register()
-	observabilitystdout.Register()
-	passwordargon2.Register()
-	paymentstub.Register()
-	permissionrbac.Register()
-	queuememory.Register()
-	ratelimitmemory.Register()
-	routerstdhttp.Register()
-	schedulerembedded.Register()
-	searchdb.Register()
-	secretsenv.Register()
-	sessionmemory.Register()
-	storagelocal.Register()
-	tenantsingle.Register()
-	vectorstoredb.Register()
-	webhookqueue.Register()
-	workflowmemory.Register()
-
-	c := container.New(cfg)
+	c := container.New(cfg, workerProviders()...)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

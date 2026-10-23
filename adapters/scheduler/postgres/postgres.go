@@ -700,7 +700,7 @@ func (d *driver) Close() error {
 }
 
 // Name returns the adapter name for the scheduler.
-func (d *driver) Name() string { return string(Adapter) }
+func (d *driver) Name() string { return "postgres" }
 
 // isDuplicateErr reports PRIMARY KEY / UNIQUE violations across dialects.
 func isDuplicateErr(err error) bool {

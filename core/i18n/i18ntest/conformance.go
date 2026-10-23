@@ -30,7 +30,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) i18n.I18n) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-
 func conformanceTranslate(t *testing.T, factory func(t *testing.T) i18n.I18n) {
 	t.Helper()
 

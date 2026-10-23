@@ -52,4 +52,3 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 		t.Fatal("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
 }
-

@@ -15,9 +15,7 @@ import (
 func TestRegister_opensViaCoreOptions(t *testing.T) {
 	s := miniredis.RunT(t)
 
-	Register()
-
-	q, err := queue.Open(queue.Redis, queue.Options{Addr: s.Addr(), PollTimeout: time.Second})
+	q, err := New(queue.Options{Addr: s.Addr(), PollTimeout: time.Second})
 	if err != nil {
 		t.Fatalf("queue.Open(redis) = %v", err)
 	}

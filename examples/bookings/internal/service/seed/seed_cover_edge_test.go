@@ -13,7 +13,7 @@ import (
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/examples/bookings/internal/service/seed"
 
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/examples/bookings/internal/testsetup"
 )
 
 // errSeedCover is the generic database failure the seed cover DB reports.
@@ -45,10 +45,9 @@ func (c seedCoverDB) Exec(ctx context.Context, query string, args ...any) (int64
 func newSeedCoverDB(t *testing.T) db.DB {
 	t.Helper()
 
-	dbsqlite.Register()
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "cover.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	database, err := c.DB()
 	if err != nil {

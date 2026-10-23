@@ -40,4 +40,3 @@ func (s *stubMedia) Transform(_ context.Context, _ string, _ TransformOps) (stri
 func (s *stubMedia) Close() error {
 	return nil
 }
-

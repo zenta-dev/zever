@@ -30,4 +30,3 @@ func (s *stubPayment) WebhookEvent(_ context.Context, _ []byte, _ string) (Event
 func (s *stubPayment) Close() error {
 	return nil
 }
-

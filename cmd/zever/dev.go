@@ -379,10 +379,11 @@ func devAutoMigrate(project ProjectConfig, out io.Writer) {
 }
 
 // devResolveDB returns the effective database target the same way
-// `zever db migrate` does: the env-derived adapter plus that adapter's DSN
-// (postgres) or file path (sqlite and friends), defaulting a sqlite path to
-// the scaffold's data/app.db. Best-effort: an unresolvable environment
-// yields empty strings, and auto-migrate stays silent rather than guessing.
+// `zever db migrate` does: the env-derived DSN (postgres) or file path
+// (sqlite and friends), defaulting a sqlite path to the scaffold's
+// data/app.db. The adapter is derived from which value is set: adapters are
+// never read from env. Best-effort: an unresolvable environment yields
+// empty strings, and auto-migrate stays silent rather than guessing.
 func devResolveDB() (adapter, dsn string) {
 	env, err := config.FromEnv()
 	if err != nil {
@@ -394,12 +395,12 @@ func devResolveDB() (adapter, dsn string) {
 		return "", ""
 	}
 
-	adapter = strings.TrimSpace(resolved.DB.Adapter)
-
-	switch adapter {
-	case "postgres":
-		dsn = strings.TrimSpace(resolved.DB.Options.DSN)
-	default:
+	// A postgres DSN selects postgres; anything else (or nothing) is
+	// sqlite, the zero-infrastructure default.
+	if dsn = strings.TrimSpace(resolved.DB.Options.DSN); dsn != "" {
+		adapter = "postgres"
+	} else {
+		adapter = "sqlite"
 		dsn = strings.TrimSpace(resolved.DB.Options.Path)
 	}
 

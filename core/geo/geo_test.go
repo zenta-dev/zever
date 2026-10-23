@@ -27,4 +27,3 @@ func (s *stubGeo) Close() error {
 // NOTE: no t.Parallel anywhere in this file: registry is a global map.
 
 var geoAdapterSeq atomic.Int64
-

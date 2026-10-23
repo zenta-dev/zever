@@ -28,12 +28,11 @@ the interface/factory/options boilerplate, spelled correctly, so you can
 delete the TODOs one at a time instead of copying another adapter and hoping
 you caught every signature.
 
-WIRING (by hand, after filling in the TODOs): zever registers adapters
-explicitly, not via init(). Add a Name constant to the battery's Adapter
-enum plus its ParseAdapter case in core/<battery>/adapter.go, point the
-scaffolded register.go at it (replacing the ParseAdapter placeholder), and
-select the adapter with the <BATTERY>_ADAPTER env key (e.g.
-CACHE_ADAPTER=redis) in .env at the project root.
+WIRING (by hand, after filling in the TODOs): zever wires adapters
+explicitly, not via init(). Import the new package in your app's wiring
+(internal/app/wiring.go) and add a container.Provide entry, for example:
+container.Provide(cache.DefaultRef(), cachemymemcached.New). Then rebuild:
+changing the import changes the binary. There is no adapter env key.
 
 This is a contributor command: it writes into this repository's own
 adapters/<battery>/<name>/ module directory, and the generated files are
@@ -1308,16 +1307,18 @@ type GenerateAdapterConfig struct {
 	DryRun bool
 }
 
-// GenerateAdapterResult names everything GenerateAdapter wrote.
+// GenerateAdapterResult names everything GenerateAdapter wrote: the
+// adapter stub and its options file. Wiring is the app's own
+// container.Provide entry (see the stub's WIRING comment), so no
+// registration file is scaffolded.
 type GenerateAdapterResult struct {
-	Dir          string
-	AdapterPath  string
-	OptionsPath  string
-	RegisterPath string
+	Dir         string
+	AdapterPath string
+	OptionsPath string
 }
 
-// GenerateAdapter renders the adapter stub, options and register files
-// from resolved inputs and writes them to disk. All three files render
+// GenerateAdapter renders the adapter stub and options files from resolved
+// inputs and writes them to disk. Both files render
 // before any is written, so a collision on one cannot leave a
 // half-scaffolded package behind. It performs no flag parsing and no
 // prompting.
@@ -1364,25 +1365,17 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 		return res, err
 	}
 
-	registerSrc, err := renderAdapterRegisterFile(tag, spec, cfg.Name)
-	if err != nil {
-		return res, err
-	}
-
 	adapterPath := filepath.Join(dir, cfg.Name+".go")
 	optionsPath := filepath.Join(dir, "options.go")
-	registerPath := filepath.Join(dir, "register.go")
 
 	res.Dir = dir
 	res.AdapterPath = adapterPath
 	res.OptionsPath = optionsPath
-	res.RegisterPath = registerPath
 
 	if cfg.DryRun {
 		if stdout := cfg.Stdout; stdout != nil {
 			printGenerateDryRun(stdout, adapterPath)
 			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(optionsPath))
-			_, _ = fmt.Fprintln(stdout, dim("would write ")+cyan(registerPath))
 		}
 
 		return res, nil
@@ -1391,7 +1384,7 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 	// Every file is checked before any is written, so a collision on one
 	// cannot leave a half-scaffolded package on disk.
 	if !cfg.Force {
-		for _, path := range []string{adapterPath, optionsPath, registerPath} {
+		for _, path := range []string{adapterPath, optionsPath} {
 			if _, statErr := os.Stat(path); statErr == nil {
 				return res, fmt.Errorf("%s: %q already exists (pass --force to overwrite)", tag, path)
 			}
@@ -1403,10 +1396,6 @@ func GenerateAdapter(cfg GenerateAdapterConfig) (GenerateAdapterResult, error) {
 	}
 
 	if err := writeScaffold(tag, optionsPath, optionsSrc, cfg.Force); err != nil {
-		return res, err
-	}
-
-	if err := writeScaffold(tag, registerPath, registerSrc, cfg.Force); err != nil {
 		return res, err
 	}
 
@@ -1590,15 +1579,6 @@ type adapterFileData struct {
 	Battery   string
 	Name      string
 	Interface string
-	// AdapterConst is the suggested Adapter enum constant for the wiring
-	// comment (e.g. "Memcached"). It names nothing in code: adding the real
-	// constant to the battery package is a manual wiring step.
-	AdapterConst string
-	// EnvPrefix is the battery's uppercase service name, the prefix of the
-	// env key that selects the adapter (CACHE_ADAPTER for the cache
-	// battery). It is the only knob v0.8.0 reads: service config is
-	// env-only.
-	EnvPrefix string
 	// StdImports and LocalImports are kept apart so the template can emit
 	// them as the two groups goimports (local prefix
 	// github.com/zenta-dev/zever) would produce.
@@ -1618,12 +1598,11 @@ const adapterFileTemplate = `// Package {{.Name}} provides a {{.Name}} adapter f
 // TODOs until you do. Delete this paragraph when the adapter is real.
 //
 // WIRING: zever registers adapters explicitly, never via init(). After
-// filling in the TODOs, add a {{.AdapterConst}} constant to the {{.Battery}} Adapter enum
-// in core/{{.Battery}}/adapter.go (plus its ParseAdapter case), point the
-// scaffolded register.go at it (replacing the ParseAdapter placeholder),
-// and select it with the {{.EnvPrefix}}_ADAPTER env key (e.g.
-// CACHE_ADAPTER=redis) in .env at the project root. Until then this package
-// builds but is reachable only through its placeholder registration.
+// filling in the TODOs, then wire it by hand: import this package in your
+// app's wiring (internal/app/wiring.go) and add a container.Provide entry
+// naming this package's New (for example,
+// container.Provide(cache.DefaultRef(), cachememcached.New)). Rebuild after
+// wiring: the import is what links the adapter into the binary.
 package {{.Name}}
 
 import (
@@ -1645,8 +1624,8 @@ func (a *adapter) {{.Signature}} {
 //
 // TODO: implement. Map {{.Battery}}.Options onto the connection or client
 // the adapter needs, and fail here rather than at first use if it cannot be
-// established. Register the result by hand (see the package comment): there
-// is no init() here on purpose.
+// established. Wire the result by hand (see the package comment): there is
+// no init() and no registry here on purpose.
 func New(_ {{.Battery}}.Options) ({{.Battery}}.{{.Interface}}, error) {
 	return &adapter{}, nil
 }
@@ -1657,8 +1636,6 @@ func renderAdapterFile(tag string, spec batterySpec, name string) ([]byte, error
 		Battery:      spec.Package,
 		Name:         name,
 		Interface:    spec.Interface,
-		AdapterConst: goIdent(name),
-		EnvPrefix:    strings.ToUpper(spec.Package),
 		LocalImports: []string{"github.com/zenta-dev/zever/core/" + spec.Package},
 	}
 
@@ -1855,47 +1832,6 @@ func renderAdapterOptionsFile(tag, battery, name string, fields optionSpecs) ([]
 	data.StdImports = sortedKeys(extra)
 
 	return renderGoFile(tag, "adapter options", adapterOptionsTemplate, data)
-}
-
-// adapterRegisterData is renderAdapterRegisterFile's render input.
-type adapterRegisterData struct {
-	Battery string
-	Name    string
-	// AdapterConst is the suggested Adapter enum constant for the wiring
-	// comment (e.g. "Memcached"). It names nothing in code yet: adding the
-	// real constant to the battery package is a manual wiring step, so the
-	// Register body resolves the adapter through ParseAdapter until then.
-	AdapterConst string
-}
-
-// adapterRegisterTemplate renders the adapter module's register.go: the
-// Register() wiring its battery registry, the same shape every hand-written
-// adapter module carries. The body resolves through ParseAdapter (which
-// accepts any non-empty name) because the dedicated Adapter enum constant
-// does not exist until the manual wiring step adds it.
-const adapterRegisterTemplate = `package {{.Name}}
-
-import (
-	"github.com/zenta-dev/zever/core/{{.Battery}}"
-)
-
-// Register wires this adapter into its battery registry. Call from your app's main or generated app.go; no init magic.
-//
-// SCAFFOLD: {{.AdapterConst}} does not exist yet -- add it to the {{.Battery}} Adapter
-// enum (plus its ParseAdapter case) as part of the manual wiring, then
-// replace the ParseAdapter call below with the constant.
-func Register() {
-	adapter, _ := {{.Battery}}.ParseAdapter("{{.Name}}")
-	_ = {{.Battery}}.Register(adapter, New)
-}
-`
-
-func renderAdapterRegisterFile(tag string, spec batterySpec, name string) ([]byte, error) {
-	return renderGoFile(tag, "adapter register", adapterRegisterTemplate, adapterRegisterData{
-		Battery:      spec.Package,
-		Name:         name,
-		AdapterConst: goIdent(name),
-	})
 }
 
 // goInitialisms are the words Go style spells in all caps, so that

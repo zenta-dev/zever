@@ -32,4 +32,3 @@ func TestLimitDecode_emptyData_returnsDecodeErrorNotSizeError(t *testing.T) {
 		t.Fatalf("LimitDecode(nil) err = %v, want decode error not ErrWebhookTooLarge", err)
 	}
 }
-

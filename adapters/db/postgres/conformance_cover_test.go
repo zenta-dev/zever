@@ -20,9 +20,7 @@ func TestConformance(t *testing.T) {
 	dbtest.Conformance(t, func(t *testing.T) db.DB {
 		t.Helper()
 
-		Register()
-
-		d, err := db.Open(db.Postgres, db.Options{DSN: dsn})
+		d, err := New(db.Options{DSN: dsn})
 		if err != nil {
 			t.Fatalf("Open() error = %v", err)
 		}

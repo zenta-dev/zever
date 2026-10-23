@@ -26,4 +26,3 @@ func TestCoverInvalidMessageIDUnwrapBothArms(t *testing.T) {
 		t.Errorf("Unwrap without cause = %v want no cause", withoutCause)
 	}
 }
-

@@ -463,21 +463,16 @@ func TestDecrypt_WrongKey_Fails(t *testing.T) {
 	}
 }
 
-// Registry integration - not parallel due to global map.
-func TestRegistry_Integration(t *testing.T) {
-	// No t.Parallel() - registry is global
-	// Use a fresh adapter to avoid collision with existing registrations
-	adapter := crypto.Adapter("test-9999")
-	// Ensure not already registered - try register, ignore duplicate from prior run
-	_ = crypto.Register(adapter, New)
-	// Open via crypto.Open should succeed with valid opts
+// TestNew_ValidKey proves New opens a usable backend directly: there is
+// no registry between the constructor and the caller.
+func TestNew_ValidKey(t *testing.T) {
 	validKey := genAESKey(t)
-	c, err := crypto.Open(adapter, crypto.Options{Key: validKey})
+	c, err := New(crypto.Options{Key: validKey})
 	if err != nil {
-		t.Fatalf("Open via registry err = %v", err)
+		t.Fatalf("New err = %v", err)
 	}
 	if c == nil {
-		t.Fatal("expected non-nil crypto from registry")
+		t.Fatal("expected non-nil crypto from New")
 	}
 	ctx := t.Context()
 	enc, err := c.Encrypt(ctx, []byte("registry"))

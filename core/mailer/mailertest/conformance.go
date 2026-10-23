@@ -30,7 +30,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) mailer.Mailer) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-
 // kitMail returns a minimal valid message for delivery probes.
 func kitMail() *mailer.Mail {
 	return &mailer.Mail{

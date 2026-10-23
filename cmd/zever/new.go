@@ -1050,21 +1050,13 @@ var allServiceAdapters = map[string]string{
 	"workflow":      "memory",
 }
 
-// defaultServiceAdapter returns config.Default()'s adapter pick for the
-// named service, or "" when the name is not a known service.
+// defaultServiceAdapter returns the scaffold default adapter for the named
+// service, or "" when the name is not a known service. The map above is the
+// source of truth: adapters are compile-time imports, so there is no config
+// to consult. A service missing here scaffolds no adapter rather than a
+// wrong one.
 func defaultServiceAdapter(name string) string {
-	if a, ok := allServiceAdapters[name]; ok {
-		return a
-	}
-
-	// Belt and braces: the map above is the source of truth, but a service
-	// added to config.Default without updating it must not silently scaffold
-	// an empty adapter. Fall back to the live default.
-	if sc, ok := config.Default().RedactedServices()[name]; ok {
-		return sc.Adapter
-	}
-
-	return ""
+	return allServiceAdapters[name]
 }
 
 // minimalScaffoldBatteries is the fixed, always-scaffolded battery set: the
@@ -1773,8 +1765,9 @@ purpose.
 }
 
 // readmeBatteryList renders the README's battery list: one line per wired
-// battery, naming the env key that selects its backend and the value the
-// scaffold wrote for it.
+// battery, naming the adapter wired in code plus the scaffold's env values.
+// Adapter selection is code (internal/app/wiring.go), never env, so no
+// *_ADAPTER key is named here.
 func readmeBatteryList(selections []batterySelection) string {
 	sorted := append([]batterySelection(nil), selections...)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -1784,7 +1777,7 @@ func readmeBatteryList(selections []batterySelection) string {
 	var b strings.Builder
 
 	for _, s := range sorted {
-		fmt.Fprintf(&b, "- %s_ADAPTER=%s", strings.ToUpper(s.Battery), s.Adapter)
+		fmt.Fprintf(&b, "- %s (adapter %s)", s.Battery, s.Adapter)
 
 		if defaults := scaffoldEnvDefaults(s.Battery, ""); len(defaults) > 0 {
 			for _, key := range sortedEnvDefaultKeys(defaults) {
@@ -2358,11 +2351,11 @@ func jsonHidden(sf reflect.StructField) bool {
 	return name == "-"
 }
 
-// isAdapterField reports whether sf selects the backend adapter. The
-// <SERVICE>_ADAPTER key is reserved for that selection (the resolver
-// applies it to the service envelope and never to the Options struct), so
-// the generator emits it once: a second, empty ADAPTER key would override
-// the selected adapter and the config would fail to resolve.
+// isAdapterField reports whether sf looks like an adapter selector. There
+// is no such field on Options structs anymore (selection is code), but the
+// guard stays: an option literally named "adapter" has no env string form
+// worth emitting, and emitting it would collide with the rejected
+// <SERVICE>_ADAPTER namespace.
 func isAdapterField(sf reflect.StructField) bool {
 	name := sf.Name
 
@@ -2452,9 +2445,8 @@ func scaffoldEnvDefaults(battery, instance string) map[string]string {
 // defaults overrides the value written for a key (see scaffoldEnvDefaults);
 // a key it does not name keeps the option's own default.
 //
-// The Options-level adapter field is skipped: the adapter is selected by
-// the <SERVICE>_ADAPTER key the caller writes, and a second ADAPTER key
-// would override it with the field's empty default.
+// An Options-level adapter-shaped field is skipped: backends are wired in
+// code, and <SERVICE>_ADAPTER keys are rejected by the resolver.
 func appendEnvKeys(out *strings.Builder, prefix, sep string, opts any, defaults map[string]string) {
 	appendEnvFields(out, prefix, sep, opts, true, defaults)
 }
@@ -2484,7 +2476,7 @@ func sortedEnvDefaultKeys(env map[string]string) []string {
 
 // appendEnvFields is appendEnvKeys' worker. topLevel marks the walk over
 // the Options struct itself (embedded structs are promoted into it), where
-// the adapter field is the service's selector and not an option.
+// an adapter-shaped field is skipped (see isAdapterField).
 func appendEnvFields(out *strings.Builder, prefix, sep string, opts any, topLevel bool, defaults map[string]string) {
 	v := addressableCopy(opts)
 	if !v.IsValid() {
@@ -2558,10 +2550,11 @@ const envExampleHeader = `# Managed by ` + "`zever new`" + ` and ` + "`zever add
 `
 
 // renderEnvExample generates .env.example from the Options structs of the
-// wired batteries: every key and default, straight from
+// wired batteries: every option key and default, straight from
 // config.DefaultOptions, so the file cannot drift from what ApplyEnv
 // resolves. Every key is the option's serialized name, so the file
-// resolves as it stands; the adapter selector is written once, here.
+// resolves as it stands. Adapter selection is code, never env: no
+// *_ADAPTER key is emitted (the resolver rejects them).
 // The scaffold's own values (see scaffoldEnvDefaults) replace the bare
 // option defaults where the project needs one (the sqlite path).
 func renderEnvExample(selections []batterySelection) []byte {
@@ -2579,8 +2572,7 @@ func renderEnvExample(selections []batterySelection) []byte {
 	})
 
 	for _, s := range sorted {
-		fmt.Fprintf(&b, "\n# --- %s (adapter %s) ---\n", s.Battery, s.Adapter)
-		fmt.Fprintf(&b, "%s_ADAPTER=%s\n", strings.ToUpper(s.Battery), s.Adapter)
+		fmt.Fprintf(&b, "\n# --- %s (adapter %s, wired in internal/app/wiring.go) ---\n", s.Battery, s.Adapter)
 
 		if opts := config.DefaultOptions(s.Battery, ""); opts != nil {
 			appendEnvKeys(&b, strings.ToUpper(s.Battery), "_", opts, scaffoldEnvDefaults(s.Battery, ""))

@@ -150,9 +150,7 @@ func TestEdge_AcquireFreeKeyWithCancelledContext(t *testing.T) {
 func TestEdge_RegisterOpensViaCore(t *testing.T) {
 	s := miniredis.RunT(t)
 
-	Register()
-
-	l, err := lock.Open(lock.Redis, lock.Options{Addr: s.Addr()})
+	l, err := New(lock.Options{Addr: s.Addr()})
 	if err != nil {
 		t.Fatalf("Open = %v", err)
 	}

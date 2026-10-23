@@ -385,11 +385,10 @@ func TestEdgeMacVerifyMac_WithoutKey_Fails(t *testing.T) {
 }
 
 func TestEdgeRegister_WiresFactoryFailClosed(t *testing.T) {
-	Register()
 
 	// The registry factory uses New without DevStub, so Open must fail
 	// closed rather than silently use the deterministic stub client.
-	_, err := crypto.Open(crypto.AdapterKMS, crypto.Options{KeyID: "reg-key"})
+	_, err := New(Options{KeyID: "reg-key"})
 	if !errors.Is(err, crypto.ErrInvalidKey) {
 		t.Fatalf("Open(kms) err = %v, want ErrInvalidKey", err)
 	}

@@ -43,4 +43,3 @@ func TestDecision_zero(t *testing.T) {
 		t.Fatalf("zero Decision = %+v, want zero", d)
 	}
 }
-

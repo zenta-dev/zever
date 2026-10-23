@@ -255,7 +255,7 @@ func TestRunAddEditsWiringFiles(t *testing.T) {
 
 	example := readFile(t, filepath.Join(dir, ".env.example"))
 
-	for _, fragment := range []string{"# --- cache (adapter redis) ---", "CACHE_ADAPTER=redis", "# --- db (adapter sqlite) ---"} {
+	for _, fragment := range []string{"# --- cache (adapter redis", "# --- db (adapter sqlite"} {
 		if !strings.Contains(example, fragment) {
 			t.Fatalf(".env.example lacks %q:\n%s", fragment, example)
 		}
@@ -300,8 +300,11 @@ func TestRunAddResolvesDefaultAdapter(t *testing.T) {
 	}
 
 	example := readFile(t, filepath.Join(dir, ".env.example"))
-	if !strings.Contains(example, "CACHE_ADAPTER=memory") {
+	if !strings.Contains(example, "# --- cache (adapter memory") {
 		t.Fatalf(".env.example lacks the default memory section:\n%s", example)
+	}
+	if strings.Contains(example, "_ADAPTER=") {
+		t.Fatalf(".env.example must not emit an adapter env key:\n%s", example)
 	}
 }
 
@@ -429,7 +432,6 @@ func TestRunAddNamedInstance(t *testing.T) {
 
 	for _, fragment := range []string{
 		"# --- db (adapter sqlite, instance analytics) ---",
-		"DB__ANALYTICS__ADAPTER=sqlite",
 		"DB__ANALYTICS__PATH=",
 	} {
 		if !strings.Contains(example, fragment) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/search"
 	"github.com/zenta-dev/zever/core/search/searchtest"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // TestConformance runs the shared search kit against the migrated adapter.
@@ -17,9 +18,7 @@ func TestConformance(t *testing.T) {
 		searchtest.Conformance(t, func(t *testing.T) search.Search {
 			t.Helper()
 
-			Register()
-
-			s, err := search.Open(search.DB, search.Options{})
+			s, err := New(Options{})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}
@@ -43,9 +42,8 @@ func TestConformance(t *testing.T) {
 		searchtest.Conformance(t, func(t *testing.T) search.Search {
 			t.Helper()
 
-			Register()
-
-			s, err := search.Open(search.DB, search.Options{DSN: dsn})
+			poolOpts := dbconn.SplitDSN(dsn)
+			s, err := New(Options{Options: poolOpts})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}

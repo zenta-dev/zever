@@ -1,7 +1,5 @@
 package idempotency
 
-import (
-)
+import ()
 
 var freshAdapterCounter int64
-

@@ -82,4 +82,3 @@ func TestValidMethod_unicode(t *testing.T) {
 		t.Fatal("ValidMethod(GÉT) = true, want false")
 	}
 }
-

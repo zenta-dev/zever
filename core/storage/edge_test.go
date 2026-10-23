@@ -86,7 +86,6 @@ func TestDecisionHook_concurrent(t *testing.T) {
 	}
 }
 
-
 func TestValidKeyRejectsControlCharacters(t *testing.T) {
 	t.Parallel()
 

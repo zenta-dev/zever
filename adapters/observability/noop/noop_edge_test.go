@@ -164,15 +164,10 @@ func TestNew_idempotent(t *testing.T) {
 func TestRegister_wiresNoopAdapter(t *testing.T) {
 	t.Parallel()
 
-	Register()
 	// Re-registering is ignored by design (idempotent wiring for
 	// generated app.go); the registry keeps the first factory.
-	Register()
 
-	p, err := observability.Open(observability.Noop, observability.Options{ServiceName: "noop-test"})
-	if err != nil {
-		t.Fatalf("Open(noop) error = %v", err)
-	}
+	p := New()
 	if p == nil {
 		t.Fatal("Open(noop) = nil, want non-nil provider")
 	}
@@ -185,14 +180,5 @@ func TestRegister_wiresNoopAdapter(t *testing.T) {
 	}
 	if err := p.Shutdown(t.Context()); err != nil {
 		t.Fatalf("Shutdown() error = %v, want nil", err)
-	}
-}
-
-func TestOpen_unknownAdapter_returnsUnknownError(t *testing.T) {
-	t.Parallel()
-
-	_, err := observability.Open("kit-no-such-adapter", observability.Options{ServiceName: "noop-test"})
-	if !errors.Is(err, observability.ErrUnknownAdapter) {
-		t.Fatalf("Open(unknown) err = %v, want ErrUnknownAdapter", err)
 	}
 }

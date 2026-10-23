@@ -574,14 +574,13 @@ func TestCoverSearchCount(t *testing.T) {
 
 // TestCoverRegisterShared covers the shared-factory registration.
 func TestCoverRegisterShared(t *testing.T) {
-	Register()
 	conn, err := dbsqlite.New(coredb.Options{Path: ":memory:"})
 	if err != nil {
 		t.Fatalf("dbsqlite.New() err = %v", err)
 	}
 	t.Cleanup(func() { _ = conn.Close(t.Context()) })
-	for _, a := range []search.Adapter{search.DB} {
-		s, err := search.OpenShared(a, conn, search.Options{})
+	for _, a := range []string{"db"} {
+		s, err := NewFromDB(conn, Options{})
 		if err != nil {
 			t.Fatalf("OpenShared(%s) err = %v", a, err)
 		}

@@ -55,7 +55,7 @@ var staticResources = []resourceDef{
 			"\n" +
 			"Each FAIL row names a battery that failed to resolve. Fix it " +
 			"via the matching `<SERVICE>_*` environment variable " +
-			"(for example DB_ADAPTER, AUTH_JWT_SECRET). A battery needing a secret " +
+			"(for example DB_MAX_CONNS, AUTH_JWT_SECRET). A battery needing a secret " +
 			"(for example auth/jwt with no configured secret) fails " +
 			"expectedly: supply the secret, never invent one.\n" +
 			"Pass `--strict` to gate CI on zero FAIL rows.\n",

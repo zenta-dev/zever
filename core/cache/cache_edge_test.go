@@ -189,4 +189,3 @@ func TestCacheEdge_OptionsValidateAlwaysNil(t *testing.T) {
 		t.Fatalf("Validate() = %v, want nil", err)
 	}
 }
-

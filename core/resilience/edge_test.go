@@ -13,4 +13,3 @@ func TestState_constants(t *testing.T) {
 		t.Fatalf("state constants = %q, %q, %q", resilience.StateClosed, resilience.StateOpen, resilience.StateHalfOpen)
 	}
 }
-

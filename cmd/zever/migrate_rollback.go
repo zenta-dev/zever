@@ -156,28 +156,15 @@ func runDBRollback(args []string) error {
 	return nil
 }
 
-// openRollbackDB opens the named adapter for rollback. It shares
-// openZeverDB's registration but reports errors under the rollback command
-// name.
+// openRollbackDB opens the named adapter for rollback via direct dispatch
+// (see openDirectDB), reporting errors under the rollback command name.
 func openRollbackDB(adapterName, dsn string) (db.DB, error) {
-	ensureZeverDBAdapters()
-
-	adapter, err := db.ParseAdapter(adapterName)
-	if err != nil {
-		return nil, fmt.Errorf("zever db rollback: unsupported --adapter %q (want sqlite, postgres, or mysql): %w", adapterName, err)
-	}
-
 	opts, err := rollbackOptions(adapterName, dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := db.Open(adapter, opts)
-	if err != nil {
-		return nil, fmt.Errorf("zever db rollback: open %s: %w", adapterName, err)
-	}
-
-	return conn, nil
+	return openDirectDB("zever db rollback", adapterName, opts)
 }
 
 // rollbackDialect maps a db adapter name to the SQL dialect whose inverse

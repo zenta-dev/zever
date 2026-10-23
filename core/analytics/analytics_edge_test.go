@@ -125,4 +125,3 @@ func TestEdgeSizeLimitError_message(t *testing.T) {
 		t.Fatalf("Error() = %q, want size/limit detail", err.Error())
 	}
 }
-

@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-
 	"github.com/zenta-dev/zever/core/lock"
 )
 
@@ -31,4 +30,3 @@ func (stubLocker) Close(context.Context) error { return nil }
 
 var _ lock.Locker = stubLocker{}
 var _ lock.Lock = stubLock{}
-

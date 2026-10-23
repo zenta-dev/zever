@@ -1,6 +1,3 @@
 package password_test
 
-import (
-
-)
-
+import ()

@@ -11,8 +11,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 // errOutboxUnknownSubcommand is returned when `zever outbox` is given no
@@ -147,10 +149,11 @@ func resolveOutboxTarget(dsn, table string) (outboxTarget, error) {
 	return outboxTarget{DSN: opts.DSN, Table: opts.Table}, nil
 }
 
-// openOutboxStore opens a store at target; adapters.go registers the db
-// factory at startup.
+// openOutboxStore opens a db-backed store at target via direct dispatch:
+// CLI adapter selection is compiled in, never from env.
 func openOutboxStore(target outboxTarget) (outbox.Store, error) {
-	store, err := outbox.Open(outbox.DB, outbox.Options{DSN: target.DSN, Table: target.Table})
+	poolOpts := dbconn.SplitDSN(target.DSN)
+	store, err := outboxdb.New(outboxdb.Options{Options: poolOpts, Table: target.Table})
 	if err != nil {
 		return nil, fmt.Errorf("zever outbox: open db: %w", err)
 	}

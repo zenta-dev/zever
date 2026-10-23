@@ -46,4 +46,3 @@ func TestErrors_typed_unwrap(t *testing.T) {
 		t.Error("InvalidKeyError does not unwrap to ErrInvalidKey")
 	}
 }
-

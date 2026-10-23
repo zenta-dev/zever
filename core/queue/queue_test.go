@@ -31,4 +31,3 @@ func (stubQueue) IsEmpty(_ context.Context, _ string) (bool, error) { return tru
 func (stubQueue) Close() error { return nil }
 
 func (stubQueue) Name() string { return "" }
-

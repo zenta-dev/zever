@@ -38,4 +38,3 @@ func TestNotificationClone_emptyNonNilData_staysNonNil(t *testing.T) {
 		t.Fatalf("Clone() Data len = %d, want 0", len(clone.Data))
 	}
 }
-

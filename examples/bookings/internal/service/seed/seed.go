@@ -35,8 +35,6 @@ const (
 // Seeding is idempotent: existing rows are left untouched, so re-running
 // this command is safe.
 func Run(ctx context.Context, database db.DB) error {
-	passwordargon2.Register()
-
 	hostID, err := ensureUser(ctx, database, HostID, HostEmail)
 	if err != nil {
 		return err
@@ -73,7 +71,18 @@ func ensureUser(ctx context.Context, database db.DB, id, email string) (string, 
 		return existing.ID, nil
 	}
 
-	hash, err := password.Hash(ctx, uuid.NewString()[:DemoPassLen])
+	hasher, err := passwordargon2.New(password.Options{
+		Time:    password.DefaultTime,
+		Memory:  password.DefaultMemory,
+		Threads: password.DefaultThreads,
+		SaltLen: password.DefaultSaltLen,
+		KeyLen:  password.DefaultKeyLen,
+	})
+	if err != nil {
+		return "", fmt.Errorf("seed: hasher: %w", err)
+	}
+
+	hash, err := hasher.Hash(ctx, uuid.NewString()[:DemoPassLen])
 	if err != nil {
 		return "", fmt.Errorf("seed: hash password: %w", err)
 	}

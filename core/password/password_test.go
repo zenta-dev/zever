@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-
 	"github.com/zenta-dev/zever/core/password"
 )
 

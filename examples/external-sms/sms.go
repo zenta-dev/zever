@@ -9,6 +9,7 @@ package sms
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"sync"
@@ -233,11 +234,9 @@ func RegisterStub() error {
 
 // validatePluginOptions implements config.RegisterPluginValidator: it decodes
 // the plugin's raw options and runs Options.Validate. Unknown fields pass
-// through encoding/json untouched until here.
-func validatePluginOptions(adapter string, opts json.RawMessage) error {
-	if _, err := ParseAdapter(adapter); err != nil {
-		return err
-	}
+// through encoding/json untouched until here. Adapter selection is code
+// (RegisterStub wires the stub backend), never config.
+func validatePluginOptions(opts jsontext.Value) error {
 	var o Options
 	if len(opts) > 0 {
 		if err := json.Unmarshal(opts, &o); err != nil {
@@ -247,8 +246,9 @@ func validatePluginOptions(adapter string, opts json.RawMessage) error {
 	return o.Validate()
 }
 
-// BuildFromConfig decodes cfg.Plugins["sms"] and opens the selected adapter.
-// It is the container.Plugin build func registered by RegisterPlugin.
+// BuildFromConfig decodes cfg.Plugins["sms"] and opens the code-wired stub
+// backend. It is the container.Plugin build func registered by
+// RegisterPlugin.
 func BuildFromConfig(cfg *config.Config) (SMS, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("sms: %w: nil config", ErrInvalidOptions)
@@ -263,11 +263,7 @@ func BuildFromConfig(cfg *config.Config) (SMS, error) {
 			return nil, fmt.Errorf("sms: decode options: %w", err)
 		}
 	}
-	adapter, err := ParseAdapter(entry.Adapter)
-	if err != nil {
-		return nil, err
-	}
-	return Open(adapter, opts)
+	return Open(Stub, opts)
 }
 
 // RegisterPlugin wires the full path in one call for copy-paste hosts:

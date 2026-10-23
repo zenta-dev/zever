@@ -60,4 +60,3 @@ func TestEventbusEdge_DefaultChanBuffer(t *testing.T) {
 		t.Fatalf("DefaultChanBuffer = %d, want 256", DefaultChanBuffer)
 	}
 }
-

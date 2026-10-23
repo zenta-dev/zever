@@ -5,11 +5,9 @@ import (
 	"github.com/zenta-dev/zever/core/password"
 )
 
-// ExampleOpen opens the argon2id hasher with default options.
-func ExampleOpen() {
-	_ = password.Register(password.AdapterArgon2ID, argon2.New)
-
-	hasher, err := password.Open(password.AdapterArgon2ID, password.Options{})
+// Example opens the argon2id hasher with default options.
+func Example() {
+	hasher, err := argon2.New(password.Options{})
 	if err != nil {
 		return
 	}

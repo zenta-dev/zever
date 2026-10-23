@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/outbox"
 )
@@ -267,8 +268,8 @@ func TestRelayPublishSpanMessagingSystemFallsBackToAdapter(t *testing.T) {
 	d.pollOnce(t.Context())
 
 	attrs := p.tracer.spanAttrs(outbox.SpanPublish)
-	if got := attrStringValue(attrs, observability.MessagingSystem); got != string(outbox.DB) {
-		t.Errorf("messaging.system = %q, want %q", got, outbox.DB)
+	if got := attrStringValue(attrs, observability.MessagingSystem); got != "db" {
+		t.Errorf("messaging.system = %q, want %q", got, "db")
 	}
 }
 
@@ -409,10 +410,9 @@ func TestRelayMetricsNilProviderNoOp(t *testing.T) {
 func TestRegisterWiresProvider(t *testing.T) {
 	t.Parallel()
 
-	Register()
 	p := newFakeProvider()
 
-	s, err := outbox.Open(outbox.DB, outbox.Options{DSN: filepath.Join(t.TempDir(), "reg.db"), Provider: p})
+	s, err := New(Options{Options: coredb.Options{Path: filepath.Join(t.TempDir(), "reg.db")}, Provider: p})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}

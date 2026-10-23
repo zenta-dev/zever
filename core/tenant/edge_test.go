@@ -34,5 +34,3 @@ func TestContext_nilParentValue(t *testing.T) {
 		t.Fatal("ContextWithTenant returned nil")
 	}
 }
-
-

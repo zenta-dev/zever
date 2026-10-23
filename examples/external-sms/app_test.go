@@ -19,7 +19,6 @@ func TestEndToEnd(t *testing.T) {
 	cfg := config.Default()
 	cfg.Plugins = map[string]config.Service[json.RawMessage]{
 		"sms": {
-			Adapter: "stub",
 			Options: json.RawMessage(`{"from":"+15550000"}`),
 		},
 	}

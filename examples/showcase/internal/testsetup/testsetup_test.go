@@ -7,15 +7,13 @@ import (
 	"github.com/zenta-dev/zever/container"
 )
 
-// TestRegisterDefaultsResolvesBatteries proves the registration helper makes
-// config.Default() resolvable: after RegisterDefaults, a fresh container
-// opens a default battery (cache) without any per-test wiring, and the
-// helper is idempotent.
-func TestRegisterDefaultsResolvesBatteries(t *testing.T) {
-	RegisterDefaults()
-	RegisterDefaults()
+// TestProvidersResolveBatteries proves the test helper wires every default
+// battery: a fresh container resolves a default battery with no per-test
+// wiring, and calling Providers twice yields independent instances.
+func TestProvidersResolveBatteries(t *testing.T) {
+	cfg := config.Default()
 
-	c := container.New(config.Default())
+	c := container.New(cfg, Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	if _, err := c.Cache(); err != nil {

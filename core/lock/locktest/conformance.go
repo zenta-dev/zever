@@ -47,7 +47,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) lock.Locker) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-
 func conformanceExclusive(t *testing.T, factory func(t *testing.T) lock.Locker) {
 	t.Helper()
 

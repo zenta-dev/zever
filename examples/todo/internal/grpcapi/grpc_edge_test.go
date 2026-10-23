@@ -33,10 +33,9 @@ type edgeFixture struct {
 func newEdgeFixture(t *testing.T) *edgeFixture {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
 	cfg := config.Default()
 	cfg.Auth.Options.JWT.Secret = "test-secret-for-todo-edge-32-bytes-min!"
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	authInst, err := c.Auth()
 	if err != nil {

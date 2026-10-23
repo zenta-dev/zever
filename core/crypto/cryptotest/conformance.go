@@ -34,7 +34,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) crypto.Crypto) {
 	t.Run("Mac", func(t *testing.T) { conformanceMac(t, factory) })
 }
 
-
 func conformanceEncryptDecrypt(t *testing.T, factory func(t *testing.T) crypto.Crypto) {
 	t.Helper()
 

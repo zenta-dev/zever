@@ -332,9 +332,7 @@ config	Config	VectorStore	vectorstore	v0.7.2
 config	Config	Webhook	webhook	v0.7.2
 config	Config	Workflow	workflow	v0.7.2
 config	Config	Plugins	plugins	v0.7.2
-config	Service	Adapter	adapter	v0.7.2
 config	Service	Options	options	v0.7.2
-config	ServiceConfig	Adapter	adapter	v0.7.2
 config	ServiceConfig	Options	options	v0.7.2
 core/ai	Options	APIKey	api_key	v0.7.2
 core/ai	Options	Model	model	v0.7.2

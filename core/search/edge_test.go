@@ -45,4 +45,3 @@ func TestQueryOptions_defaults_not_mutated(t *testing.T) {
 		t.Fatalf("QueryOptions zero-value handling changed: %+v", opts)
 	}
 }
-

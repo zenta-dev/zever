@@ -39,9 +39,6 @@ func (stubStorage) Name() string {
 	return "stub"
 }
 
-
-
-
 func TestOptionsValidate(t *testing.T) {
 	t.Parallel()
 

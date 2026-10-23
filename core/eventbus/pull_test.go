@@ -102,4 +102,3 @@ func TestNewMessage_stampsReceivedAt(t *testing.T) {
 		t.Fatalf("ReceivedAt = %v, want within [%v, %v]", m.ReceivedAt, before, after)
 	}
 }
-

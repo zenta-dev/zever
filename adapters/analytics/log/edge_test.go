@@ -55,10 +55,8 @@ func TestEdgeTrack_emptyEvent(t *testing.T) {
 // resolution.
 func TestEdgeRegister_resolvesAdapter(t *testing.T) {
 	// Serial: Register mutates the process-global battery registry.
-	Register()
-	Register()
 
-	a, err := analytics.Open(analytics.Log, analytics.Options{})
+	a, err := New(analytics.Options{})
 	if err != nil {
 		t.Fatalf("analytics.Open() after Register = %v, want nil", err)
 	}

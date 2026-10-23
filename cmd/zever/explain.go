@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
 )
@@ -375,8 +374,8 @@ func buildWiringRows(env config.Env, services map[string]config.ServiceConfig, i
 	for _, svc := range names {
 		rows = append(rows, wiringRow{
 			Ref:     svc,
-			Driver:  services[svc].Adapter,
-			Drivers: container.RegisteredAdapters(svc),
+			Driver:  cliDefaultDriver(svc),
+			Drivers: cliDriverNames(svc),
 			Depends: wiringDependsOn(svc),
 			Env:     wiringEnvKeys(env, svc, ""),
 		})
@@ -384,8 +383,8 @@ func buildWiringRows(env config.Env, services map[string]config.ServiceConfig, i
 		for _, iname := range sortedInstanceNames(instances, svc) {
 			rows = append(rows, wiringRow{
 				Ref:     svc + "/" + iname,
-				Driver:  instances[svc+"/"+iname].Adapter,
-				Drivers: container.RegisteredAdapters(svc),
+				Driver:  cliDefaultDriver(svc),
+				Drivers: cliDriverNames(svc),
 				Depends: wiringDependsOn(svc),
 				Env:     wiringEnvKeys(env, svc, iname),
 			})
@@ -395,25 +394,25 @@ func buildWiringRows(env config.Env, services map[string]config.ServiceConfig, i
 	return rows
 }
 
-// wiringEnvKeys lists the env keys wiring one ref in sorted order: the
-// ADAPTER selector when set, plus every set key under the ref's namespace
-// (SERVICE_ for the default instance, SERVICE__NAME__ for a named one).
+// wiringEnvKeys lists the env keys wiring one ref in sorted order: every
+// set key under the ref's namespace (SERVICE_ for the default instance,
+// SERVICE__NAME__ for a named one). Adapter selectors no longer exist:
+// backends are wired in code (see cliDefaultDriver), and config.Resolve
+// rejects any *_ADAPTER key before rows are built.
 func wiringEnvKeys(env config.Env, svc, name string) []string {
-	var prefix, adapterKey string
+	var prefix string
 
 	if name == "" {
 		prefix = strings.ToUpper(svc) + "_"
-		adapterKey = strings.ToUpper(svc) + "_ADAPTER"
 	} else {
 		prefix = strings.ToUpper(svc) + "__" + strings.ToUpper(name) + "__"
-		adapterKey = prefix + "ADAPTER"
 	}
 
 	var out []string
 
 	for k := range env {
 		upper := strings.ToUpper(k)
-		if upper == adapterKey || (strings.HasPrefix(upper, prefix) && upper != strings.ToUpper(svc)) {
+		if strings.HasPrefix(upper, prefix) && upper != strings.ToUpper(svc) {
 			out = append(out, k)
 		}
 	}

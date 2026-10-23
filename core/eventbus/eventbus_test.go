@@ -26,4 +26,3 @@ func (stubBus) SubscribeChan(_ context.Context, _ string, _ int) (<-chan Message
 }
 
 func (stubBus) Unsubscribe(_ string, _ <-chan Message) error { return ErrNotSubscribed }
-

@@ -569,13 +569,7 @@ func TestClose(t *testing.T) {
 
 func TestRegisterAndOpen(t *testing.T) {
 	t.Parallel()
-	// ensure New can be used via geo.Register/Open
-	// use unique adapter name to avoid duplicate
-	// but Static already may be registered elsewhere? Test via direct New.
-	// Instead verify factory works via geo.Open after registering if not yet registered.
-	// Try register static if not already.
-	_ = geo.Register(geo.Static, New) // ignore duplicate error
-	g, err := geo.Open(geo.Static, geo.Options{Path: fixturePath(t)})
+	g, err := New(geo.Options{Path: fixturePath(t)})
 	if err != nil {
 		t.Fatalf("Open static: %v", err)
 	}

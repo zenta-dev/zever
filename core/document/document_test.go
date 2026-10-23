@@ -18,4 +18,3 @@ func (s *stubDocument) Render(_ context.Context, _ []byte, _ OutputFormat) ([]by
 func (s *stubDocument) Close() error {
 	return nil
 }
-

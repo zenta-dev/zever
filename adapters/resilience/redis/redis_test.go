@@ -260,15 +260,13 @@ func TestRegister_thenOpen(t *testing.T) {
 
 	s := testServer(t)
 
-	redis.Register()
-
-	m, err := resilience.Open(resilience.Redis, resilience.Options{
+	m, err := redis.New(redis.Options{Options: resilience.Options{
 		Redis: resilience.RedisOptions{
 			Options: redisopt.Options{
 				ConnectOptions: redisopt.ConnectOptions{Addr: s.Addr()},
 			},
 		},
-	})
+	}})
 	if err != nil {
 		t.Fatalf("Open(Redis) error = %v", err)
 	}

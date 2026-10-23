@@ -50,4 +50,3 @@ func TestErrors_typed_unwrap(t *testing.T) {
 		t.Error("KeyNotFoundError does not unwrap to ErrKeyNotFound")
 	}
 }
-

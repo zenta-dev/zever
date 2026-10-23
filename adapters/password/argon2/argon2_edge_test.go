@@ -93,10 +93,8 @@ func TestHash_concurrentSafe(t *testing.T) {
 // (reduced) cost parameters, and a repeated Register is tolerated.
 func TestEdgeRegister_resolvesAdapter(t *testing.T) {
 	// Serial: Register mutates the process-global battery registry.
-	Register()
-	Register()
 
-	h, err := password.Open(password.AdapterArgon2ID, password.Options{
+	h, err := New(password.Options{
 		Time:    1,
 		Memory:  8 * 1024,
 		Threads: 1,

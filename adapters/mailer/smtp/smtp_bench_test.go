@@ -44,14 +44,6 @@ func BenchmarkNew(b *testing.B) {
 	}
 }
 
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		Register()
-	}
-}
-
 func BenchmarkBuildMIME(b *testing.B) {
 	msg := benchMail()
 	b.ReportAllocs()

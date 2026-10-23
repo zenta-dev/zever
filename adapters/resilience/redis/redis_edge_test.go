@@ -318,21 +318,14 @@ func TestRedisEdge_concurrentGuard(t *testing.T) {
 	}
 }
 
-// TestRedisEdge_doubleRegister proves Register is safe to call twice and the
-// adapter still opens under the redis name.
-func TestRedisEdge_doubleRegister(t *testing.T) {
+// TestRedisEdge_opensDirectly proves the adapter opens via its own New:
+// there is no registry to register twice anymore.
+func TestRedisEdge_opensDirectly(t *testing.T) {
 	t.Parallel()
 
 	s := testServer(t)
 
-	redis.Register()
-	redis.Register()
-
-	m, err := resilience.Open(resilience.Redis, resilience.Options{
-		Redis: resilience.RedisOptions{
-			Options: optionsFor(s).Redis.Options,
-		},
-	})
+	m, err := redis.New(optionsFor(s))
 	if err != nil {
 		t.Fatalf("Open(Redis) error = %v", err)
 	}

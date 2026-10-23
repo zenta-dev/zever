@@ -220,10 +220,9 @@ func TestEdgeNew_negativeTTL(t *testing.T) {
 	}
 }
 
-// TestEdgeRegisterSharedOpensViaCore proves Register wires the shared factory
-// so cache.OpenShared resolves the adapter over a borrowed pool.
-func TestEdgeRegisterSharedOpensViaCore(t *testing.T) {
-	Register()
+// TestEdgeNewFromDB_borrowsPool proves NewFromDB opens over a borrowed pool:
+// closing the cache leaves the caller's conn usable.
+func TestEdgeNewFromDB_borrowsPool(t *testing.T) {
 
 	conn, err := dbsqlite.New(coredb.Options{Path: filepath.Join(t.TempDir(), "cache.db")})
 	if err != nil {
@@ -233,9 +232,9 @@ func TestEdgeRegisterSharedOpensViaCore(t *testing.T) {
 	ctx := t.Context()
 	t.Cleanup(func() { _ = conn.Close(ctx) })
 
-	c, err := cache.OpenShared(Adapter, conn, cache.Options{})
+	c, err := NewFromDB(conn, Options{})
 	if err != nil {
-		t.Fatalf("OpenShared = %v", err)
+		t.Fatalf("NewFromDB = %v", err)
 	}
 
 	if setErr := c.Set(ctx, "k", []byte("v"), time.Minute); setErr != nil {

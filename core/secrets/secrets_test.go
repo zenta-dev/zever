@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-
 	"github.com/zenta-dev/zever/adapters/secrets/env"
 	"github.com/zenta-dev/zever/core/secrets"
 )

@@ -78,10 +78,8 @@ func TestEdgeGenerate_emptyMessages(t *testing.T) {
 // resolution.
 func TestEdgeRegister_resolvesAdapter(t *testing.T) {
 	// Serial: Register mutates the process-global battery registry.
-	Register()
-	Register()
 
-	a, err := ai.Open(ai.Anthropic, ai.Options{APIKey: "test-key"})
+	a, err := New(ai.Options{APIKey: "test-key"})
 	if err != nil {
 		t.Fatalf("ai.Open() after Register = %v, want nil", err)
 	}

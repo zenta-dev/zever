@@ -41,7 +41,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) eventbus.EventBus) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-
 func conformancePushDelivery(t *testing.T, factory func(t *testing.T) eventbus.EventBus) {
 	t.Helper()
 

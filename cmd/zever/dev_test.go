@@ -1285,7 +1285,6 @@ func TestDevAutoMigrateGate(t *testing.T) {
 
 	t.Run("postgres skipped outside dev env", func(t *testing.T) {
 		t.Setenv("ZEVER_ENV", "production")
-		t.Setenv("DB_ADAPTER", "postgres")
 		t.Setenv("DB_DSN", "postgres://user:pass@localhost:5432/test?sslmode=disable")
 
 		out := &syncBuffer{}
@@ -1298,7 +1297,6 @@ func TestDevAutoMigrateGate(t *testing.T) {
 
 	t.Run("postgres attempted in dev env", func(t *testing.T) {
 		t.Setenv("ZEVER_ENV", "dev")
-		t.Setenv("DB_ADAPTER", "postgres")
 		t.Setenv("DB_DSN", "postgres://user:pass@localhost:5432/test?sslmode=disable")
 
 		out := &syncBuffer{}

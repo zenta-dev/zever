@@ -173,19 +173,15 @@ func batteryImportPath(b batterySelection) string {
 	return "github.com/zenta-dev/zever/adapters/" + adapterDirName(b)
 }
 
-// coreBatterySelections resolves coreBatteries against config.Default()'s
-// adapter picks -- the minimum app.go needs so every generated entrypoint's
-// c.<Battery>() call resolves, used whenever nothing more specific (a
-// `zever new` battery selection) is available.
-//
-// Adaptation note: zever's config is typed (Service[T] fields), so the picks
-// come from named fields rather than zen-go's cfg.Get(name).Adapter map.
+// coreBatterySelections hardcodes the floor adapter picks -- the minimum
+// app.go needs so every generated entrypoint's providers resolve, used
+// whenever nothing more specific (a `zever new` battery selection) is
+// available. Adapters are compile-time imports, so there is no config to
+// read: changing the floor means editing this list and rebuilding.
 func coreBatterySelections() []batterySelection {
-	cfg := config.Default()
-
 	byName := map[string]string{
-		"log":    cfg.Log.Adapter,
-		"router": cfg.Router.Adapter,
+		"log":    "slog",
+		"router": "stdhttp",
 	}
 
 	sel := make([]batterySelection, 0, len(coreBatteries))

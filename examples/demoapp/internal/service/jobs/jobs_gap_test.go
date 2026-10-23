@@ -29,10 +29,8 @@ import (
 func newDeps(t *testing.T) (context.Context, jobs.Deps, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 
-	dbsqlite.Register()
-
 	ctx := t.Context()
-	conn, err := db.Open(db.SQLite, db.Options{Path: filepath.Join(t.TempDir(), "jobs.db")})
+	conn, err := dbsqlite.New(db.Options{Path: filepath.Join(t.TempDir(), "jobs.db")})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -199,10 +197,9 @@ func TestScheduledJobHandlers(t *testing.T) {
 
 // BenchmarkRunProcessOrder measures the single-row status update.
 func BenchmarkRunProcessOrder(b *testing.B) {
-	dbsqlite.Register()
 
 	ctx := b.Context()
-	conn, err := db.Open(db.SQLite, db.Options{Path: filepath.Join(b.TempDir(), "bench.db")})
+	conn, err := dbsqlite.New(db.Options{Path: filepath.Join(b.TempDir(), "bench.db")})
 	if err != nil {
 		b.Fatalf("open: %v", err)
 	}

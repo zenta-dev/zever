@@ -79,9 +79,7 @@ func TestEdgeClose_nilRelease(t *testing.T) {
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
 	s := miniredis.RunT(t)
 
-	Register()
-
-	c, err := cache.Open(cache.Redis, cache.Options{Addr: s.Addr()})
+	c, err := New(cache.Options{Addr: s.Addr()})
 	if err != nil {
 		t.Fatalf("Open = %v", err)
 	}

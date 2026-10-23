@@ -8,7 +8,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
@@ -130,19 +129,36 @@ Driving the real Atlas engine for full diff-based migrations is deferred.`
 
 var migrateAdapters = []string{"sqlite", "postgres", "mysql"}
 
-// dbAdaptersOnce registers the database adapters the CLI can open. The
-// container package owns the full registration as the composition root; the
-// CLI registers just the two adapters its commands can address so `zever db`
-// works without booting a container. Duplicate errors are ignored, matching
-// the container's convention.
-var dbAdaptersOnce sync.Once
+// openDirectDB opens sqlite or postgres by --adapter name without a
+// registry: CLI adapter selection is the flag (dispatched here in code),
+// never env. MySQL parses as a dialect but has no zever adapter yet, so it
+// fails with a gap error. what names the calling command for error text.
+// opts carries the already-built db.Options for the adapter.
+func openDirectDB(what, adapterName string, opts db.Options) (db.DB, error) {
+	switch strings.ToLower(strings.TrimSpace(adapterName)) {
+	case "sqlite":
+		conn, err := dbsqlite.New(opts)
+		if err != nil {
+			return nil, fmt.Errorf("%s: open sqlite: %w", what, err)
+		}
 
-// ensureZeverDBAdapters registers the sqlite and postgres factories.
-func ensureZeverDBAdapters() {
-	dbAdaptersOnce.Do(func() {
-		_ = db.Register(db.SQLite, dbsqlite.New)
-		_ = db.Register(db.Postgres, dbpostgres.New)
-	})
+		return conn, nil
+	case "postgres":
+		conn, err := dbpostgres.New(opts)
+		if err != nil {
+			return nil, fmt.Errorf("%s: open postgres: %w", what, err)
+		}
+
+		return conn, nil
+	case "mysql":
+		return nil, errors.New(what + ": --adapter mysql has no zever db adapter yet (sqlite and postgres only)")
+	default:
+		if s := closest(adapterName, migrateAdapters); s != "" {
+			return nil, fmt.Errorf("%s: unsupported --adapter %q (did you mean %q? want sqlite, postgres, or mysql)", what, adapterName, s)
+		}
+
+		return nil, fmt.Errorf("%s: unsupported --adapter %q (want sqlite, postgres, or mysql)", what, adapterName)
+	}
 }
 
 // MigrateConfig is the resolved configuration for one `zever db migrate` run.
@@ -334,8 +350,8 @@ func runDBMigrate(args []string) error {
 	}
 
 	// Env-first connection: flags win, unset flags fall back to the
-	// effective env-derived DB config (DB_ADAPTER plus the adapter's DSN or
-	// Path), best-effort. Values are never echoed: failures name the field,
+	// effective env-derived DB options (DSN or Path for the flag-selected
+	// adapter), best-effort. Values are never echoed: failures name the field,
 	// never the DSN.
 	adapterVal, dsnVal := migrateConnFromEnv(*adapter, *dsn, flagWasSet(fs, "adapter"))
 
@@ -409,10 +425,10 @@ func runDBMigrate(args []string) error {
 }
 
 // migrateConnFromEnv applies the env-first connection rule for db migrate:
-// an explicitly-set --adapter/--dsn always wins; otherwise the effective
-// env-derived DB config supplies the adapter (DB_ADAPTER) and the DSN or
-// file path for that adapter. Resolution is best-effort: an unresolvable
-// environment keeps the flag values.
+// an explicitly-set --dsn always wins; otherwise the effective env-derived
+// DB options supply the DSN or file path for the flag-selected adapter.
+// Adapters are never read from env (see openDirectDB). Resolution is
+// best-effort: an unresolvable environment keeps the flag values.
 func migrateConnFromEnv(adapter, dsn string, adapterSet bool) (string, string) {
 	if adapterSet && strings.TrimSpace(dsn) != "" {
 		return adapter, dsn
@@ -426,10 +442,6 @@ func migrateConnFromEnv(adapter, dsn string, adapterSet bool) (string, string) {
 	resolved, err := config.Resolve(env)
 	if err != nil || resolved == nil {
 		return adapter, dsn
-	}
-
-	if !adapterSet && strings.TrimSpace(resolved.DB.Adapter) != "" {
-		adapter = resolved.DB.Adapter
 	}
 
 	if strings.TrimSpace(dsn) == "" {
@@ -610,39 +622,15 @@ func applyDiff(adapter, dsn string, schema *ir.Schema, planOpts migrate.PlanOpti
 	return nil
 }
 
-// openZeverDB parses the adapter name, builds its options from the single
-// --dsn flag, and opens the database. MySQL parses as a dialect but has no
-// registered zever adapter yet, so it fails here with a gap error rather
-// than deeper in the engine.
+// openZeverDB builds the adapter options from the single --dsn flag and
+// opens the database via direct dispatch (see openDirectDB).
 func openZeverDB(adapterName, dsn string) (db.DB, error) {
-	ensureZeverDBAdapters()
-
-	// MySQL parses as a dialect but has no registered zever adapter yet:
-	// fail here with a gap error instead of an adapter-registry error.
-	if adapterName == "mysql" {
-		return nil, errors.New("zever db migrate: --adapter mysql has no registered zever db adapter yet (sqlite and postgres only)")
-	}
-
-	adapter, err := db.ParseAdapter(adapterName)
-	if err != nil {
-		if s := closest(adapterName, migrateAdapters); s != "" {
-			return nil, fmt.Errorf("zever db migrate: unsupported --adapter %q (did you mean %q? want sqlite, postgres, or mysql): %w", adapterName, s, err)
-		}
-
-		return nil, fmt.Errorf("zever db migrate: unsupported --adapter %q (want sqlite, postgres, or mysql): %w", adapterName, err)
-	}
-
 	opts, err := migrateOptions(adapterName, dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := db.Open(adapter, opts)
-	if err != nil {
-		return nil, fmt.Errorf("zever db migrate: open %s: %w", adapterName, err)
-	}
-
-	return conn, nil
+	return openDirectDB("zever db migrate", adapterName, opts)
 }
 
 // migrateDSNHint returns the next step for a failed open with no DSN: the

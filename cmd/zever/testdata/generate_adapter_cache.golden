@@ -8,12 +8,11 @@
 // TODOs until you do. Delete this paragraph when the adapter is real.
 //
 // WIRING: zever registers adapters explicitly, never via init(). After
-// filling in the TODOs, add a Memcached constant to the cache Adapter enum
-// in core/cache/adapter.go (plus its ParseAdapter case), point the
-// scaffolded register.go at it (replacing the ParseAdapter placeholder),
-// and select it with the CACHE_ADAPTER env key (e.g.
-// CACHE_ADAPTER=redis) in .env at the project root. Until then this package
-// builds but is reachable only through its placeholder registration.
+// filling in the TODOs, then wire it by hand: import this package in your
+// app's wiring (internal/app/wiring.go) and add a container.Provide entry
+// naming this package's New (for example,
+// container.Provide(cache.DefaultRef(), cachememcached.New)). Rebuild after
+// wiring: the import is what links the adapter into the binary.
 package memcached
 
 import (
@@ -80,8 +79,8 @@ func (a *adapter) Close(ctx context.Context) error {
 //
 // TODO: implement. Map cache.Options onto the connection or client
 // the adapter needs, and fail here rather than at first use if it cannot be
-// established. Register the result by hand (see the package comment): there
-// is no init() here on purpose.
+// established. Wire the result by hand (see the package comment): there is
+// no init() and no registry here on purpose.
 func New(_ cache.Options) (cache.Cache, error) {
 	return &adapter{}, nil
 }

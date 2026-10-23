@@ -56,4 +56,3 @@ var (
 	_ Event   = stubEvent{}
 	_ Context = stubContext{}
 )
-

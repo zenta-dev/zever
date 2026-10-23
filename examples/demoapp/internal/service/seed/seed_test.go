@@ -13,7 +13,7 @@ import (
 	"github.com/zenta-dev/zever/examples/demoapp/internal/service/seed"
 	"github.com/zenta-dev/zever/orm"
 
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/examples/demoapp/internal/testsetup"
 )
 
 // migrate creates every table from the committed DDL fixture.
@@ -42,11 +42,10 @@ func migrate(t *testing.T, database interface {
 // TestRunSeedsAndIsIdempotent seeds twice and asserts the fixed demo rows
 // exist exactly once.
 func TestRunSeedsAndIsIdempotent(t *testing.T) {
-	dbsqlite.Register()
 
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "seed.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	ctx := t.Context()

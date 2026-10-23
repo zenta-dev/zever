@@ -25,7 +25,6 @@ func run(ctx context.Context) error {
 	cfg := config.Default()
 	cfg.Plugins = map[string]config.Service[json.RawMessage]{
 		pluginName: {
-			Adapter: "stub",
 			Options: json.RawMessage(`{"from":"+15550000"}`),
 		},
 	}
@@ -48,12 +47,9 @@ func run(ctx context.Context) error {
 			}
 		}
 
-		adapter, err := sms.ParseAdapter(entry.Adapter)
-		if err != nil {
-			return nil, err
-		}
-
-		return sms.Open(adapter, opts)
+		// The adapter is selected in code: this app wires the stub
+		// backend directly, then rebuilds to change it.
+		return sms.Open(sms.Stub, opts)
 	}); err != nil {
 		return fmt.Errorf("sms: register plugin: %w", err)
 	}

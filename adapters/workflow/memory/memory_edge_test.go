@@ -49,9 +49,8 @@ func mustRunningRun(t *testing.T, a *Adapter, step, id string) func() {
 // TestRegister_opensViaCoreOptions proves Register wires the memory engine
 // into the core registry so workflow.Open resolves it.
 func TestRegister_opensViaCoreOptions(t *testing.T) {
-	Register()
 
-	w, err := workflow.Open(workflow.Memory, workflow.Options{})
+	w, err := New(workflow.Options{})
 	if err != nil {
 		t.Fatalf("workflow.Open(memory) = %v", err)
 	}

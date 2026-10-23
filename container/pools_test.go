@@ -62,15 +62,15 @@ func (w *warnSink) all() []string {
 
 // stubRegistry builds a registry whose opens run open and whose warns land
 // in sink. It returns the registry and a counter of open calls.
-func stubRegistry(open func(adapter db.Adapter, opts db.Options) (db.DB, error), sink *warnSink) (*poolRegistry, *atomic.Int32) {
+func stubRegistry(open func(backend string, opts db.Options) (db.DB, error), sink *warnSink) (*poolRegistry, *atomic.Int32) {
 	var calls atomic.Int32
 	r := newPoolRegistry()
 	r.warn = sink.warn
 	prev := open
-	r.open = func(adapter db.Adapter, opts db.Options) (db.DB, error) {
+	r.open = func(backend string, opts db.Options) (db.DB, error) {
 		calls.Add(1)
 
-		return prev(adapter, opts)
+		return prev(backend, opts)
 	}
 
 	return r, &calls
@@ -79,7 +79,7 @@ func stubRegistry(open func(adapter db.Adapter, opts db.Options) (db.DB, error),
 func mustBorrow(t *testing.T, r *poolRegistry, service string, opts db.Options, key, backend string) db.DB {
 	t.Helper()
 
-	conn, err := r.borrow(service, db.SQLite, opts, key, backend)
+	conn, err := r.borrow(service, opts, key, backend)
 	if err != nil {
 		t.Fatalf("borrow %s: %v", service, err)
 	}
@@ -146,7 +146,7 @@ func TestPostgresPreviewHidesSecrets(t *testing.T) {
 
 func TestPoolRegistry_BorrowSharesOnePool(t *testing.T) {
 	sink := &warnSink{}
-	r, calls := stubRegistry(func(_ db.Adapter, _ db.Options) (db.DB, error) {
+	r, calls := stubRegistry(func(_ string, _ db.Options) (db.DB, error) {
 		return &stubPool{}, nil
 	}, sink)
 
@@ -179,7 +179,7 @@ func TestPoolRegistry_CapMismatchWarnsWithoutDSN(t *testing.T) {
 	//nolint:gosec // fixture DSN with a fake password, never dialed
 	const dsn = "postgres://app:s3cret@db:5432/app"
 	sink := &warnSink{}
-	r, _ := stubRegistry(func(_ db.Adapter, _ db.Options) (db.DB, error) {
+	r, _ := stubRegistry(func(_ string, _ db.Options) (db.DB, error) {
 		return &stubPool{}, nil
 	}, sink)
 
@@ -214,7 +214,7 @@ func TestPoolRegistry_BuildFailureEvictsAndRetries(t *testing.T) {
 	var calls atomic.Int32
 	r := newPoolRegistry()
 	r.warn = sink.warn
-	r.open = func(_ db.Adapter, _ db.Options) (db.DB, error) {
+	r.open = func(_ string, _ db.Options) (db.DB, error) {
 		if calls.Add(1) == 1 {
 			return nil, errors.New("boom")
 		}
@@ -222,7 +222,7 @@ func TestPoolRegistry_BuildFailureEvictsAndRetries(t *testing.T) {
 		return &stubPool{}, nil
 	}
 
-	_, err := r.borrow("queue", db.SQLite, db.Options{Path: "f.db"}, "sqlite:f.db", poolSQLite)
+	_, err := r.borrow("queue", db.Options{Path: "f.db"}, "sqlite:f.db", poolSQLite)
 	if err == nil || !strings.Contains(err.Error(), "(shared pool)") || !strings.Contains(err.Error(), "queue") {
 		t.Fatalf("borrow error = %v, want shared-pool marker naming queue", err)
 	}
@@ -231,7 +231,7 @@ func TestPoolRegistry_BuildFailureEvictsAndRetries(t *testing.T) {
 		t.Fatalf("snapshot after failure = %d, want 0 (key evicted)", got)
 	}
 
-	if _, err := r.borrow("queue", db.SQLite, db.Options{Path: "f.db"}, "sqlite:f.db", poolSQLite); err != nil {
+	if _, err := r.borrow("queue", db.Options{Path: "f.db"}, "sqlite:f.db", poolSQLite); err != nil {
 		t.Fatalf("retry borrow: %v", err)
 	}
 
@@ -300,9 +300,9 @@ func TestPoolRegistry_CloseOrdering(t *testing.T) {
 	c.cache.ready.Store(true)
 
 	pool := &recordingPool{order: &order, mu: &mu}
-	c.pools.open = func(_ db.Adapter, _ db.Options) (db.DB, error) { return pool, nil }
+	c.pools.open = func(_ string, _ db.Options) (db.DB, error) { return pool, nil }
 
-	conn, err := c.pools.borrow("db", db.SQLite, db.Options{Path: "f.db"}, "sqlite:f.db", poolSQLite)
+	conn, err := c.pools.borrow("db", db.Options{Path: "f.db"}, "sqlite:f.db", poolSQLite)
 	if err != nil {
 		t.Fatalf("borrow: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestPoolRegistry_MismatchesRecorded(t *testing.T) {
 	//nolint:gosec // fixture DSN with a fake password, never dialed
 	const dsn = "postgres://app:s3cret@db:5432/app"
 	sink := &warnSink{}
-	r, _ := stubRegistry(func(_ db.Adapter, _ db.Options) (db.DB, error) {
+	r, _ := stubRegistry(func(_ string, _ db.Options) (db.DB, error) {
 		return &stubPool{}, nil
 	}, sink)
 
@@ -387,7 +387,7 @@ func TestContainer_PoolStatusAndMismatches(t *testing.T) {
 	c := New(nil)
 	var warns warnSink
 	c.pools.warn = warns.warn
-	c.pools.open = func(_ db.Adapter, opts db.Options) (db.DB, error) {
+	c.pools.open = func(_ string, opts db.Options) (db.DB, error) {
 		return &stubPool{}, nil
 	}
 	t.Cleanup(func() {
@@ -398,11 +398,11 @@ func TestContainer_PoolStatusAndMismatches(t *testing.T) {
 
 	file := filepath.Join(t.TempDir(), "status.db")
 	key := "sqlite:" + file
-	if _, err := c.pools.borrow("db", db.SQLite, db.Options{Path: file, MaxConns: 5}, key, poolSQLite); err != nil {
+	if _, err := c.pools.borrow("db", db.Options{Path: file, MaxConns: 5}, key, poolSQLite); err != nil {
 		t.Fatalf("borrow db: %v", err)
 	}
 
-	if _, err := c.pools.borrow("queue", db.SQLite, db.Options{Path: file}, key, poolSQLite); err != nil {
+	if _, err := c.pools.borrow("queue", db.Options{Path: file}, key, poolSQLite); err != nil {
 		t.Fatalf("borrow queue: %v", err)
 	}
 

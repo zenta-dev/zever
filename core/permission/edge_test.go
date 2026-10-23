@@ -56,4 +56,3 @@ func TestSubject_roundtrip_zero(t *testing.T) {
 		t.Fatalf("zero subject roundtrip = %+v, want zero", got)
 	}
 }
-

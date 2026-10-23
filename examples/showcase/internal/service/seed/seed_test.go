@@ -11,9 +11,8 @@ import (
 	"github.com/zenta-dev/zever/container"
 	gen "github.com/zenta-dev/zever/examples/showcase/generated/zenorm/orm/gen/shop"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
+	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
 	"github.com/zenta-dev/zever/orm"
-
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 )
 
 // migrate creates every table from the committed DDL fixture.
@@ -39,11 +38,9 @@ func migrate(t *testing.T, database interface {
 }
 
 func TestRunSeedsAllEntities(t *testing.T) {
-	dbsqlite.Register()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "seed.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	ctx := t.Context()

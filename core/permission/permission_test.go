@@ -12,4 +12,3 @@ type stubChecker struct{}
 func (stubChecker) Can(_ context.Context, _ Subject, _ string, _ Resource) (Decision, error) {
 	return Decision{Allowed: true, Reason: "allow"}, nil
 }
-

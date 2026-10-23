@@ -182,12 +182,7 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-	Register()
-
-	c, err := cache.Open(Adapter, cache.Options{})
-	if err != nil {
-		t.Fatalf("Open = %v", err)
-	}
+	c := mustNew(t)
 
 	if err := c.Close(t.Context()); err != nil {
 		t.Fatalf("Close = %v", err)

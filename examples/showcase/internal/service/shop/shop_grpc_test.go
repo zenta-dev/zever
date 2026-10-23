@@ -51,13 +51,11 @@ type grpcParityFixture struct {
 func newGRPCFixture(t *testing.T) *grpcParityFixture {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	cfg.Auth.Options.JWT.Secret = grpcParityJWTSecret
 
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 
 	ctx := context.Background()
 	database, err := c.DB()

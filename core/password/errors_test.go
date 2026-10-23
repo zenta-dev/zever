@@ -41,4 +41,3 @@ func TestTypedErrorStrings(t *testing.T) {
 		})
 	}
 }
-

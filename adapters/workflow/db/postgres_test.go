@@ -292,11 +292,10 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-	Register()
 
 	// The canonical "db" name must resolve.
-	for _, adapter := range []workflow.Adapter{workflow.DB} {
-		wf, err := workflow.Open(adapter, workflow.Options{})
+	for _, adapter := range []string{"db"} {
+		wf, err := New(Options{})
 		if err != nil {
 			t.Fatalf("Open(%s) = %v", adapter, err)
 		}
@@ -319,9 +318,9 @@ func TestRegisterOpensViaCoreOptions(t *testing.T) {
 
 	t.Cleanup(func() { _ = conn.Close(t.Context()) })
 
-	shared, err := workflow.OpenShared(workflow.DB, conn, workflow.Options{})
+	shared, err := NewFromDB(conn, Options{})
 	if err != nil {
-		t.Fatalf("OpenShared(%s) = %v", workflow.DB, err)
+		t.Fatalf("OpenShared(%s) = %v", "db", err)
 	}
 
 	closer, ok := shared.(interface{ Close() error })

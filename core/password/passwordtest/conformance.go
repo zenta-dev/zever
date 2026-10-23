@@ -31,7 +31,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Run("InvalidHash", func(t *testing.T) { conformanceInvalidHash(t, factory) })
 }
 
-
 func conformanceHashVerify(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Helper()
 

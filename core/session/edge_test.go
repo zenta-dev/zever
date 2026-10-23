@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-
-
-
-
-
 func TestValidateID_length_boundary(t *testing.T) {
 	t.Parallel()
 
@@ -78,4 +73,3 @@ func TestStore_concurrent_create_get(t *testing.T) {
 
 	wg.Wait()
 }
-

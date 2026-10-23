@@ -8,13 +8,11 @@ import (
 	"github.com/zenta-dev/zever/core/db"
 )
 
-// ExampleDB_openExecQuery mirrors the sqlite doc sample: register the
-// driver, open an in-memory database, create a table, insert a row, and
-// read it back.
-func Example_dbOpenExecQuery() {
-	_ = db.Register(db.SQLite, sqlite.New)
-
-	conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
+// Example_sqliteOpenExecQuery mirrors the sqlite doc sample: open an
+// in-memory database directly, create a table, insert a row, and read it
+// back. There is no registry: the constructor is imported and called.
+func Example_sqliteOpenExecQuery() {
+	conn, err := sqlite.New(db.Options{Path: ":memory:"})
 	if err != nil {
 		fmt.Println("open error")
 		return

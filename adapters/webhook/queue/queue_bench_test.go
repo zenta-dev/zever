@@ -23,19 +23,6 @@ func newBenchAdapter(b *testing.B) *adapter {
 
 // BenchmarkRegister measures target syntax validation plus the registration
 // map write under the adapter mutex.
-func BenchmarkRegister(b *testing.B) {
-	a := newTestAdapter(newStubQueue())
-	b.Cleanup(func() { _ = a.Close() })
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if err := a.Register(b.Context(), "evt", "http://127.0.0.1:1/hook", "bench-secret"); err != nil {
-			b.Fatalf("Register(): %v", err)
-		}
-	}
-}
 
 // BenchmarkDeliver measures enqueuing one delivery: signature build, header
 // map construction, and a queue push per registered target.

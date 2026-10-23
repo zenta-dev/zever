@@ -38,13 +38,11 @@ type testSetup struct {
 func newTestSetup(t *testing.T) testSetup {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	cfg.Auth.Options.JWT.Secret = "test-secret-for-showcase-32-bytes-min"
 
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 
 	ctx := t.Context()
 	database, err := c.DB()

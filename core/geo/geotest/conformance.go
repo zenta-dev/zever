@@ -32,7 +32,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) geo.Geo) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-
 func conformanceEmptyQuery(t *testing.T, factory func(t *testing.T) geo.Geo) {
 	t.Helper()
 

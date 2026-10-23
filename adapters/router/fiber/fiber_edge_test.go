@@ -44,10 +44,8 @@ func TestServeHTTP_concurrentSafe(t *testing.T) {
 // resolution.
 func TestEdgeRegister_resolvesAdapter(t *testing.T) {
 	// Serial: Register mutates the process-global battery registry.
-	Register()
-	Register()
 
-	r, err := router.Open(router.AdapterFiber, router.Options{})
+	r, err := New(router.Options{})
 	if err != nil {
 		t.Fatalf("router.Open() after Register = %v, want nil", err)
 	}

@@ -50,10 +50,8 @@ func TestEdgeCheckEndpoint_table(t *testing.T) {
 // resolution.
 func TestEdgeRegister_resolvesAdapter(t *testing.T) {
 	// Serial: Register mutates the process-global battery registry.
-	Register()
-	Register()
 
-	a, err := analytics.Open(analytics.PostHog, analytics.Options{
+	a, err := New(analytics.Options{
 		APIKey:   "test-key",
 		Endpoint: "http://localhost:9",
 	})

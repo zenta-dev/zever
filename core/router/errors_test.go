@@ -73,4 +73,3 @@ func TestErrors_duplicate_aliases_compat(t *testing.T) {
 		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
 	}
 }
-

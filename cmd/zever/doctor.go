@@ -40,7 +40,7 @@ func printDoctorUsage(fs *flag.FlagSet) {
 		usage,
 		"",
 		"Every wired battery is checked, resolved from service",
-		"env (<SERVICE>_<FIELD>, e.g. DB_ADAPTER, AUTH_JWT_SECRET).",
+		"env (<SERVICE>_<FIELD>, e.g. DB_DSN, AUTH_JWT_SECRET).",
 		"In a project with a server entrypoint the",
 		"checks run inside the built server ("+cmd("go run <entry> --doctor")+")",
 		"against its real container and registrations; without one every",
@@ -123,7 +123,6 @@ func runDoctor(args []string) error {
 var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[string]func() error {
 	return map[string]func() error{
 		"config":        resolved.Validate,
-		"adapters":      c.ValidateAdapters,
 		"ai":            func() error { _, err := c.AI(); return err },
 		"analytics":     func() error { _, err := c.Analytics(); return err },
 		"auth":          func() error { _, err := c.Auth(); return err },
@@ -158,27 +157,6 @@ var doctorChecksFor = func(c *container.Container, resolved *config.Config) map[
 		"webhook":       func() error { _, err := c.Webhook(); return err },
 		"workflow":      func() error { _, err := c.Workflow(); return err },
 	}
-}
-
-// scopedValidateAdapters validates the resolved config against the
-// process's registrations, skipping batteries the project does not enable:
-// a slim `zever build --adapters=...` binary registers only its subset, so
-// validating excluded batteries would fail a binary that is correct for its
-// project. A nil enabled set (nothing narrowed the scope) keeps the strict
-// all-battery check. Enabled-but-unregistered batteries still fail closed.
-func scopedValidateAdapters(resolved *config.Config, enabled map[string]bool, registered func(service string) []string) error {
-	if enabled == nil {
-		return resolved.ValidateAdapters(registered)
-	}
-
-	keys := make([]string, 0, len(enabled))
-	for k := range enabled {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-
-	return resolved.ValidateEnabledAdapters(keys, registered)
 }
 
 // doctorRow is one battery's check result, human and JSON alike.
@@ -219,29 +197,22 @@ func resolveDoctorScope() doctorScope {
 	if fi, err := os.Stat(entry); err == nil && fi.IsDir() {
 		scope.serverEntry = entry
 	} else {
-		scope.note = fmt.Sprintf("no built server entrypoint %q — checked via CLI registry", entry)
+		scope.note = fmt.Sprintf("no built server entrypoint %q — checked via CLI wiring", entry)
 	}
 
 	return scope
 }
 
 // localDoctorRows resolves the scope's enabled batteries against the CLI
-// process's own container and registrations (a slim `zever build` binary
-// registers only its adapter subset; the adapters meta-check is scoped to
-// the enabled set so it stays green there). In deterministic name order.
-// The "config" row always runs.
+// process's own container, wired with cliProviders (every battery's
+// default). In deterministic name order. The "config" row always runs.
 //
 // When the container carries explicit providers (see container.Provide),
 // only their Wired refs are checked: unwired services are the project's
-// choice, not failures. The CLI builds its container from env alone with no
-// providers, so Wired is empty there and every known battery is checked.
+// choice, not failures. The CLI wires every battery, so every known battery
+// is checked.
 func localDoctorRows(c *container.Container, resolved *config.Config, enabled map[string]bool) []doctorRow {
 	checks := doctorChecksFor(c, resolved)
-	if _, ok := checks["adapters"]; ok {
-		checks["adapters"] = func() error {
-			return scopedValidateAdapters(resolved, enabled, container.RegisteredAdapters)
-		}
-	}
 
 	names := make([]string, 0, len(checks))
 
@@ -259,7 +230,7 @@ func localDoctorRows(c *container.Container, resolved *config.Config, enabled ma
 	}
 
 	for name := range checks {
-		if name == "config" || name == "adapters" {
+		if name == "config" {
 			names = append(names, name)
 
 			continue
@@ -313,7 +284,8 @@ func serverDoctorRows(resolved *config.Config, rep serverDoctorReport, enabled m
 
 		// The config row comes from the CLI's own validation of the
 		// resolved env (above); the server's own config row would print
-		// the same check twice.
+		// the same check twice. A legacy "adapters" row from an older
+		// server still surfaces: it names a real failure.
 		if b.Name == "config" {
 			continue
 		}
@@ -374,7 +346,7 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 		return fmt.Errorf("zever doctor: resolve config from env: %w", err)
 	}
 
-	c := container.New(resolved)
+	c := container.New(resolved, cliProviders()...)
 	defer func() {
 		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
@@ -389,11 +361,11 @@ func runDoctorWithContext(ctx context.Context, cfg DoctorConfig) error {
 		if rep, rerr := runServerDoctor(ctx, scope.serverEntry); rerr == nil {
 			rows = serverDoctorRows(resolved, rep, scope.enabled)
 			scope.source = "server:" + scope.serverEntry
-			scope.note = fmt.Sprintf("checked via built server entrypoint %s --doctor (real container + registrations)", scope.serverEntry)
+			scope.note = fmt.Sprintf("checked via built server entrypoint %s --doctor (real container + providers)", scope.serverEntry)
 		} else {
 			rows = localDoctorRows(c, resolved, scope.enabled)
 			local = true
-			scope.note = fmt.Sprintf("built server unavailable (%s) — checked via CLI registry", shortDoctorErr(rerr))
+			scope.note = fmt.Sprintf("built server unavailable (%s) — checked via CLI wiring", shortDoctorErr(rerr))
 		}
 	} else {
 		rows = localDoctorRows(c, resolved, scope.enabled)

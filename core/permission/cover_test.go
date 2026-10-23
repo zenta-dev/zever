@@ -75,4 +75,3 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 // errCoverOpenFactory is process-shared so repeat runs (-count=2)
 // rewire the same sentinel instance; Register tolerates the duplicate.
 var errCoverOpenFactory = errors.New("cover boom 9202")
-

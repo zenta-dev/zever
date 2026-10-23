@@ -274,9 +274,8 @@ func TestOpenFromDBNilConn(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-	Register()
 
-	s, err := outbox.Open(outbox.DB, outbox.Options{DSN: filepath.Join(t.TempDir(), "reg.db")})
+	s, err := New(Options{Options: coredb.Options{Path: filepath.Join(t.TempDir(), "reg.db")}})
 	if err != nil {
 		t.Fatalf("Open(db) error = %v", err)
 	}

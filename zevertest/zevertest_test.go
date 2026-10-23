@@ -6,7 +6,10 @@ import (
 	"testing"
 	"time"
 
+	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/zevertest"
 )
 
@@ -66,15 +69,19 @@ func TestNewTestContainerIsolatesDB(t *testing.T) {
 	}
 }
 
-func TestWithRegisterRunsBeforeBuild(t *testing.T) {
+func TestWithProvidersAppends(t *testing.T) {
 	t.Parallel()
 
-	ran := false
+	c := zevertest.NewTestContainer(t, zevertest.WithProviders(
+		container.Provide(cache.Ref("extra"), cachememory.New),
+	))
 
-	zevertest.NewTestContainer(t, zevertest.WithRegister(func() { ran = true }))
+	if _, err := container.Get(c, cache.Ref("extra")); err != nil {
+		t.Fatalf("extra cache: %v", err)
+	}
 
-	if !ran {
-		t.Fatal("WithRegister func did not run")
+	if _, err := c.Cache(); err != nil {
+		t.Fatalf("Cache: %v", err)
 	}
 }
 

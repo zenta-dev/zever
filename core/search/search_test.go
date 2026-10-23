@@ -28,4 +28,3 @@ func (s *stubSearch) Search(_ context.Context, _ string, _ QueryOptions) (Result
 func (s *stubSearch) Close() error {
 	return nil
 }
-

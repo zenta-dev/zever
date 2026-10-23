@@ -53,4 +53,3 @@ func TestValidMethod(t *testing.T) {
 		})
 	}
 }
-

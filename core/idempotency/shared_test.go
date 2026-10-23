@@ -31,4 +31,3 @@ func TestValidateKey_invalidUTF8_accepted(t *testing.T) {
 		t.Fatalf("ValidateKey(invalid utf8) err = %v, want nil (RuneError skipped)", err)
 	}
 }
-

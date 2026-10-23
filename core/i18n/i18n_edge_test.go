@@ -33,4 +33,3 @@ func TestLocaleChain_whitespaceOnlyInputs_empty(t *testing.T) {
 		t.Fatalf("LocaleChain(whitespace) = %q, want empty", got)
 	}
 }
-

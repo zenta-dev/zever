@@ -302,8 +302,8 @@ func TestConsumeSpanMessagingSystemFallsBackToAdapter(t *testing.T) {
 	}
 
 	attrs := p.tracer.spanAttrs(outbox.SpanConsume)
-	if got := attrStringValue(attrs, observability.MessagingSystem); got != string(outbox.CDC) {
-		t.Errorf("messaging.system = %q, want %q", got, outbox.CDC)
+	if got := attrStringValue(attrs, observability.MessagingSystem); got != "cdc" {
+		t.Errorf("messaging.system = %q, want %q", got, "cdc")
 	}
 }
 

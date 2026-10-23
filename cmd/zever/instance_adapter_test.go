@@ -1,77 +1,51 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/config"
 )
 
-// TestInstanceAdapterKey pins the env key the named instance's adapter is
-// read from: SERVICE__NAME__ADAPTER (two underscores around the instance
-// name, like every other named-instance key). The default instance's
-// adapter is SERVICE_ADAPTER.
-func TestInstanceAdapterKey(t *testing.T) {
+// TestNamedInstanceAdapterKeysRejected pins the removal for the instance
+// namespace: SERVICE__NAME__ADAPTER (and the default SERVICE_ADAPTER) fail
+// resolution instead of selecting anything. Named instances inherit the
+// code-wired driver; only option keys apply per instance.
+func TestNamedInstanceAdapterKeysRejected(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-		env  config.Env
-		svc  string
-		inst string
-		def  string
-		want string
-	}{
-		{
-			name: "named instance adapter",
-			env:  config.Env{"DB__REPORTING__ADAPTER": "postgres"},
-			svc:  "db", inst: "reporting", def: "sqlite",
-			want: "postgres",
-		},
-		{
-			name: "named instance adapter is case insensitive",
-			env:  config.Env{"db__reporting__adapter": "postgres"},
-			svc:  "db", inst: "reporting", def: "sqlite",
-			want: "postgres",
-		},
-		{
-			name: "default instance keeps the resolved default",
-			env:  config.Env{"DB_ADAPTER": "postgres"},
-			svc:  "db", inst: "", def: "sqlite",
-			want: "sqlite",
-		},
-		{
-			name: "named instance falls back to the default adapter",
-			env:  config.Env{"DB_ADAPTER": "postgres"},
-			svc:  "db", inst: "reporting", def: "postgres",
-			want: "postgres",
-		},
-		{
-			name: "an empty named adapter falls back to the default",
-			env:  config.Env{"DB__REPORTING__ADAPTER": "  "},
-			svc:  "db", inst: "reporting", def: "sqlite",
-			want: "sqlite",
-		},
-		{
-			name: "no adapter anywhere keeps the default",
-			env:  config.Env{},
-			svc:  "db", inst: "reporting", def: "sqlite",
-			want: "sqlite",
-		},
-		{
-			name: "the single-underscore spelling is not an instance key",
-			env:  config.Env{"DB_REPORTING_ADAPTER": "postgres"},
-			svc:  "db", inst: "reporting", def: "sqlite",
-			want: "sqlite",
-		},
+	for _, key := range []string{"DB__REPORTING__ADAPTER", "DB_ADAPTER", "db__reporting__adapter"} {
+		if _, err := config.Resolve(config.Env{key: "postgres"}); err == nil {
+			t.Errorf("Resolve(%s) = nil error, want removal failure", key)
+		} else if !strings.Contains(err.Error(), "adapter selection removed") {
+			t.Errorf("Resolve(%s) error = %q, want removal message", key, err)
+		}
+	}
+}
+
+// TestNamedInstancesShareCodeWiredDriver pins that named instances carry
+// no adapter of their own: redactedInstances rows hold options only, while
+// the driver comes from cliDefaultDriver (the compiled-in wiring).
+func TestNamedInstancesShareCodeWiredDriver(t *testing.T) {
+	t.Parallel()
+
+	env := config.Env{"DB__REPORTING__PATH": "data/reporting.db"}
+	services := map[string]config.ServiceConfig{
+		"db": {Options: map[string]any{}},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	got := redactedInstances(env, nil, services)
 
-			if got := instanceAdapter(tc.env, tc.svc, tc.inst, tc.def); got != tc.want {
-				t.Errorf("instanceAdapter = %q, want %q", got, tc.want)
-			}
-		})
+	row, ok := got["db/REPORTING"]
+	if !ok {
+		t.Fatal("redactedInstances missing db/reporting")
+	}
+
+	if row.Options == nil {
+		t.Error("db/reporting options = nil, want redacted options map")
+	}
+
+	if def := cliDefaultDriver("db"); def == "" {
+		t.Error("cliDefaultDriver(db) empty, want wired default")
 	}
 }

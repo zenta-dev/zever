@@ -95,4 +95,3 @@ func TestEdgeNotFoundError_message(t *testing.T) {
 		t.Fatalf("Error() = %q, want resource and id", err.Error())
 	}
 }
-

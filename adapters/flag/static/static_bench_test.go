@@ -2,20 +2,10 @@ package static
 
 import (
 	"context"
-	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/flag"
 )
-
-var benchAdapterSeq atomic.Int64
-
-// benchFreshAdapter returns an adapter name unique to this benchmark run so
-// Register never collides with a previously registered factory.
-func benchFreshAdapter() flag.Adapter {
-	return flag.Adapter(fmt.Sprintf("bench-%d", benchAdapterSeq.Add(1)))
-}
 
 // stubFlag is a no-op flag.Flag used to isolate registry benchmarks.
 type stubFlag struct{}
@@ -141,35 +131,14 @@ func BenchmarkFloatToInt(b *testing.B) {
 	}
 }
 
-// BenchmarkRegister measures registering a factory into the flag registry.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		err := flag.Register(benchFreshAdapter(), func(flag.Options) (flag.Flag, error) {
-			return stubFlag{}, nil
-		})
-		if err != nil {
-			b.Fatalf("Register() error = %v", err)
-		}
-	}
-}
-
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-	a := benchFreshAdapter()
-
-	err := flag.Register(a, func(flag.Options) (flag.Flag, error) { return stubFlag{}, nil })
-	if err != nil {
-		b.Fatalf("Register() error = %v", err)
-	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		f, openErr := flag.Open(a, flag.Options{})
+		f, openErr := New(flag.Options{})
 		if openErr != nil {
 			b.Fatalf("Open() error = %v", openErr)
 		}

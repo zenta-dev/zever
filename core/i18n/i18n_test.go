@@ -16,4 +16,3 @@ func (s *stubI18n) Translate(_ context.Context, _, _ string, _ map[string]string
 func (s *stubI18n) Locales(_ context.Context) ([]string, error) { return nil, nil }
 
 func (s *stubI18n) Close() error { return nil }
-

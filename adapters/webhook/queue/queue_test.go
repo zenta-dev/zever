@@ -25,12 +25,16 @@ import (
 var errTestTransport = errors.New("test transport boom")
 
 func TestMain(m *testing.M) {
-	_ = corequeue.Register(corequeue.Memory, func(_ corequeue.Options) (corequeue.Queue, error) {
-		return newStubQueue(), nil
-	})
-	_ = corequeue.Register(corequeue.Redis, func(_ corequeue.Options) (corequeue.Queue, error) {
-		return nil, errTestTransport
-	})
+	openQueue = func(adapter string, _ corequeue.Options) (corequeue.Queue, error) {
+		switch strings.ToLower(strings.TrimSpace(adapter)) {
+		case "memory":
+			return newStubQueue(), nil
+		case "redis":
+			return nil, errTestTransport
+		default:
+			return nil, corequeue.ErrUnknownAdapter
+		}
+	}
 	os.Exit(m.Run())
 }
 

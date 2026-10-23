@@ -2,29 +2,21 @@ package local_test
 
 import (
 	"context"
-	"errors"
 	"os"
 
 	medialocal "github.com/zenta-dev/zever/adapters/media/local"
 	"github.com/zenta-dev/zever/core/media"
 )
 
-// ExampleOpen uploads and stats one asset through the local adapter.
-func ExampleOpen() {
-	if err := media.Register(media.Local, medialocal.New); err != nil {
-		var dup media.DuplicateAdapterError
-		if !errors.As(err, &dup) {
-			return
-		}
-	}
-
+// Example uploads and stats one asset through the local adapter.
+func Example() {
 	root, err := os.MkdirTemp("", "media-example-")
 	if err != nil {
 		return
 	}
 	defer func() { _ = os.RemoveAll(root) }()
 
-	m, err := media.Open(media.Local, media.Options{Root: root, BaseURL: "/media"})
+	m, err := medialocal.New(media.Options{Root: root, BaseURL: "/media"})
 	if err != nil {
 		return
 	}

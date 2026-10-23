@@ -30,4 +30,3 @@ func TestErrors_typed_unwrap(t *testing.T) {
 		t.Error("InvalidOptionsError does not unwrap to ErrInvalidOptions")
 	}
 }
-

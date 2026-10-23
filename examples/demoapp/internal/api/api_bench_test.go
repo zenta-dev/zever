@@ -15,41 +15,7 @@ import (
 	"github.com/zenta-dev/zever/examples/demoapp/internal/api"
 	"github.com/zenta-dev/zever/examples/demoapp/locales"
 
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	searchdb "github.com/zenta-dev/zever/adapters/search/db"
-	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
-
-	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
-	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
-	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
-	cryptolocal "github.com/zenta-dev/zever/adapters/crypto/local"
-	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
-	eventbusmemory "github.com/zenta-dev/zever/adapters/eventbus/memory"
-	flagstatic "github.com/zenta-dev/zever/adapters/flag/static"
-	geostatic "github.com/zenta-dev/zever/adapters/geo/static"
-	i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
-	idempotencymemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
-	lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
-	logslog "github.com/zenta-dev/zever/adapters/log/slog"
-	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
-	medialocal "github.com/zenta-dev/zever/adapters/media/local"
-	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
-	observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
-	paymentstub "github.com/zenta-dev/zever/adapters/payment/stub"
-	permissionrbac "github.com/zenta-dev/zever/adapters/permission/rbac"
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
-	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
-	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	secretsenv "github.com/zenta-dev/zever/adapters/secrets/env"
-	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
-	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
-	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
-	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
-	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
+	"github.com/zenta-dev/zever/examples/demoapp/internal/testsetup"
 )
 
 // benchSetup builds a fresh handler for benchmarks with per-bench temp dirs.
@@ -62,7 +28,6 @@ func benchSetup(b *testing.B) http.Handler {
 	cfg.DB.Options.Path = filepath.Join(tmp, "bench.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 	cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: locales.FS, Dir: ".", Fallback: "en"}
-	cfg.Permission.Adapter = "rbac"
 	cfg.Permission.Options.Rules = []permission.Rule{
 		{Role: "admin", Action: "*"},
 		{Role: "member", Action: "product.read"},
@@ -86,42 +51,7 @@ func benchSetup(b *testing.B) http.Handler {
 	cfg.Storage.Options.Root = filepath.Join(tmp, "storage")
 	cfg.Media.Options.Root = filepath.Join(tmp, "media")
 
-	documentlocal.Register()
-	medialocal.Register()
-	authjwt.Register()
-	billingstub.Register()
-	dbsqlite.Register()
-	aianthropic.Register()
-	analyticslog.Register()
-	cachememory.Register()
-	cryptolocal.Register()
-	eventbusmemory.Register()
-	flagstatic.Register()
-	geostatic.Register()
-	i18nembed.Register()
-	idempotencymemory.Register()
-	lockmemory.Register()
-	logslog.Register()
-	mailerlog.Register()
-	notificationlog.Register()
-	observabilitystdout.Register()
-	paymentstub.Register()
-	permissionrbac.Register()
-	queuememory.Register()
-	ratelimitmemory.Register()
-	routerstdhttp.Register()
-	schedulerembedded.Register()
-	secretsenv.Register()
-	sessionmemory.Register()
-	storagelocal.Register()
-	tenantsingle.Register()
-	webhookhttp.Register()
-	workflowmemory.Register()
-	passwordargon2.Register()
-	searchdb.Register()
-	vectorstoredb.Register()
-
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	ctx := b.Context()
 	database, err := c.DB()
 	if err != nil {

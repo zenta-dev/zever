@@ -31,7 +31,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) log.Logger) {
 	t.Run("Sync", func(t *testing.T) { conformanceSync(t, factory) })
 }
 
-
 func conformanceEmitLevels(t *testing.T, factory func(t *testing.T) log.Logger) {
 	t.Helper()
 

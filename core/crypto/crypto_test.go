@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"testing"
 
-
 	"github.com/zenta-dev/zever/core/crypto"
 )
 

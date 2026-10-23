@@ -83,4 +83,3 @@ func TestEdgeInvalidOptionsError_emptyReason(t *testing.T) {
 		t.Fatalf("Error() = %q, want trailing sentinel with empty reason", err.Error())
 	}
 }
-

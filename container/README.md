@@ -271,25 +271,31 @@ snapshot-closed backends, so `Close` shuts them first (with `scheduler` and
 
 ## Shared pools
 
-The container resolves **one pool per DSN** and shares it across every
-db-backed battery pointing at the same DSN (`db`, `cache`, `queue`,
-`search`, `session`, `idempotency`, `workflow`, `scheduler`,
-`vectorstore`), instead of opening one pool per battery. Matching is the
-exact DSN string after trim: a postgres URL with and without a query
-string are different pools. SQLite file paths share after
+Pool sharing is explicit, not automatic. Each db-backed adapter opens its
+own pool from its own options by default; to share one pool across
+batteries pointing at the same DSN, wire it in the app with the `NewFromDB`
+constructors over a single `db.DB` (see `container.Provide2`):
+
+```go
+container.Provide(DB, dbsqlite.New),
+container.Provide1(Cache, DB, func(o cache.Options, db db.DB) (cache.Cache, error) {
+    return cachedb.NewFromDB(db, cachedb.Options{Options: coredb.Options{DSN: o.DSN}})
+}),
+```
+
+Matching is the exact DSN string after trim: a postgres URL with and without
+a query string are different pools. SQLite file paths share after
 `filepath.Clean` (relative paths resolve against the process CWD, so every
 battery must run with the same CWD); `:memory:` (including
 `file::memory:?cache=shared`) never shares.
 
 ```sh
-SEARCH_ADAPTER=db
 SEARCH_DSN="postgres://app:secret@db:5432/app?sslmode=require"
 SEARCH_DEDICATED_POOL=false   # default false shares; true restores a private pool
 ```
 
-- Share-by-default: two identical DSNs are unambiguous operator intent, so
-  existing files keep working unchanged — sharing activates only on
-  exact-DSN match (or sqlite same-file match).
+- One pool per DSN: sharing activates only on exact-DSN match (or sqlite
+  same-file match) between explicitly wired `NewFromDB` borrowers.
 - Single cap: the shared pool is built with the **first opener's** pool
   knobs; later borrowers' pool knobs are ignored (their table names,
   prefixes, TTLs still apply). A nonzero `MaxConns` differing from the

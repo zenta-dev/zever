@@ -111,4 +111,3 @@ func TestEdgeToken_zero(t *testing.T) {
 		t.Fatalf("zero Token.ExpiresAt = %v, want zero", tok.ExpiresAt)
 	}
 }
-

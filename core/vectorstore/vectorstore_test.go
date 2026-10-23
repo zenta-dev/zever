@@ -69,4 +69,3 @@ func (s *stubStore) Query(_ context.Context, embedding []float32, topK int) ([]S
 func (s *stubStore) Close() error {
 	return nil
 }
-

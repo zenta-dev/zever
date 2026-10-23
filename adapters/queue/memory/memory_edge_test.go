@@ -49,9 +49,8 @@ func TestMemory_Push_nilPayload_roundTrip(t *testing.T) {
 // TestRegister_opensViaCoreOptions proves Register wires the memory adapter
 // into the core registry so queue.Open resolves it.
 func TestRegister_opensViaCoreOptions(t *testing.T) {
-	Register()
 
-	q, err := queue.Open(queue.Memory, queue.Options{})
+	q, err := New(queue.Options{})
 	if err != nil {
 		t.Fatalf("queue.Open(memory) = %v", err)
 	}

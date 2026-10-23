@@ -275,19 +275,17 @@ func TestOps_cancelledContext(t *testing.T) {
 	}
 }
 
-// TestRegister_opensViaCoreOptions proves Register wires the DB adapter into
-// both core registries: queue.Open resolves the own-pool factory and
-// queue.OpenShared resolves the borrowed-pool factory.
-func TestRegister_opensViaCoreOptions(t *testing.T) {
+// TestNew_opensOwnPool proves New opens a working queue over its own pool,
+// while NewFromDB borrows the caller's connection and leaves ownership
+// with the caller.
+func TestNew_opensOwnPool(t *testing.T) {
 	t.Parallel()
-
-	queuedb.Register()
 
 	ctx := t.Context()
 
-	q, err := queue.Open(queue.DB, queue.Options{})
+	q, err := queuedb.New(queuedb.Options{Options: coredb.Options{Path: ":memory:"}})
 	if err != nil {
-		t.Fatalf("queue.Open(db) = %v", err)
+		t.Fatalf("New() = %v", err)
 	}
 
 	t.Cleanup(func() { _ = q.Close() })
@@ -303,9 +301,9 @@ func TestRegister_opensViaCoreOptions(t *testing.T) {
 
 	t.Cleanup(func() { _ = conn.Close(ctx) })
 
-	shared, err := queue.OpenShared(queue.DB, conn, queue.Options{})
+	shared, err := queuedb.NewFromDB(conn, queuedb.Options{Options: coredb.Options{Path: ":memory:"}})
 	if err != nil {
-		t.Fatalf("queue.OpenShared(db) = %v", err)
+		t.Fatalf("NewFromDB() = %v", err)
 	}
 
 	if err := shared.Push(ctx, "t", queue.Payload("v"), nil); err != nil {

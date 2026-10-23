@@ -38,4 +38,3 @@ func BenchmarkOptions_Validate(b *testing.B) {
 		}
 	}
 }
-

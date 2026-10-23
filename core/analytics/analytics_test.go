@@ -29,4 +29,3 @@ func (s *stubAnalytics) Close() error {
 
 	return nil
 }
-

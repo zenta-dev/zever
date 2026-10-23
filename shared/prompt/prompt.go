@@ -128,7 +128,7 @@ func ToolPlan(task string, tools []string) string {
 func DoctorTriage(doctorOutput string) string {
 	return "The following `zever doctor --json` output lists batteries that " +
 		"failed to resolve. For each FAIL row, name the `.env` key or " +
-		"`<SERVICE>_*` environment variable (for example DB_ADAPTER, " +
+		"`<SERVICE>_*` environment variable (for example DB_MAX_CONNS, " +
 		"AUTH_JWT_SECRET) that fixes it, or state when the " +
 		"failure is expected (for example a battery needing a secret that " +
 		"must be supplied, never invented).\n\nDoctor output:\n" +

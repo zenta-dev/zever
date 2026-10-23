@@ -8,7 +8,6 @@ import (
 
 var freshAdapterCounter int64
 
-
 func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
 	t.Helper()
 
@@ -135,11 +134,6 @@ func TestSession_Expired_table(t *testing.T) {
 		})
 	}
 }
-
-
-
-
-
 
 func TestStore_Create_Get_roundtrip(t *testing.T) {
 	t.Parallel()

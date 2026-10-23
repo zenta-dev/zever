@@ -46,4 +46,3 @@ func (s *stubAI) Close() error {
 	s.closed = true
 	return nil
 }
-

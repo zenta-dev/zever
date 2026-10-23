@@ -41,23 +41,46 @@ require (
 	github.com/zenta-dev/zever/adapters/workflow/memory v0.8.0
 	github.com/zenta-dev/zever/config v0.8.0
 	github.com/zenta-dev/zever/container v0.8.0
+	github.com/zenta-dev/zever/core/ai v0.8.0
+	github.com/zenta-dev/zever/core/analytics v0.8.0
 	github.com/zenta-dev/zever/core/auth v0.8.0
 	github.com/zenta-dev/zever/core/authz v0.8.0
+	github.com/zenta-dev/zever/core/billing v0.8.0
 	github.com/zenta-dev/zever/core/cache v0.8.0
+	github.com/zenta-dev/zever/core/crypto v0.8.0
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/document v0.8.0
+	github.com/zenta-dev/zever/core/eventbus v0.8.0
+	github.com/zenta-dev/zever/core/flag v0.8.0
+	github.com/zenta-dev/zever/core/geo v0.8.0
+	github.com/zenta-dev/zever/core/i18n v0.8.0
+	github.com/zenta-dev/zever/core/idempotency v0.8.0
 	github.com/zenta-dev/zever/core/job v0.8.0
+	github.com/zenta-dev/zever/core/lock v0.8.0
 	github.com/zenta-dev/zever/core/log v0.8.0
+	github.com/zenta-dev/zever/core/mailer v0.8.0
+	github.com/zenta-dev/zever/core/media v0.8.0
+	github.com/zenta-dev/zever/core/notification v0.8.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/core/password v0.8.0
+	github.com/zenta-dev/zever/core/payment v0.8.0
 	github.com/zenta-dev/zever/core/permission v0.8.0
 	github.com/zenta-dev/zever/core/queue v0.8.0
 	github.com/zenta-dev/zever/core/ratelimit v0.8.0
 	github.com/zenta-dev/zever/core/router v0.8.0
 	github.com/zenta-dev/zever/core/scheduler v0.8.0
+	github.com/zenta-dev/zever/core/search v0.8.0
+	github.com/zenta-dev/zever/core/secrets v0.8.0
+	github.com/zenta-dev/zever/core/session v0.8.0
+	github.com/zenta-dev/zever/core/storage v0.8.0
+	github.com/zenta-dev/zever/core/tenant v0.8.0
+	github.com/zenta-dev/zever/core/vectorstore v0.8.0
+	github.com/zenta-dev/zever/core/webhook v0.8.0
+	github.com/zenta-dev/zever/core/workflow v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
 	github.com/zenta-dev/zever/serve v0.8.0
 	github.com/zenta-dev/zever/shared/apperror v0.8.0
+	github.com/zenta-dev/zever/shared/dbconn v0.8.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
@@ -281,35 +304,12 @@ require (
 	github.com/zenta-dev/zever/adapters/db/postgres v0.8.0 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/agent v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/ai v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/analytics v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/billing v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/cdn v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/crypto v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/eventbus v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/flag v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/geo v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/i18n v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/idempotency v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/lock v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/mailer v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/media v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/middleware v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/notification v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/outbox v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/payment v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/search v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/secrets v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/session v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/storage v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/tenant v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/vectorstore v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/webhook v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/workflow v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/dbconn v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/grpcclient v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.8.0 // indirect

@@ -115,8 +115,11 @@ func TestConfigShowJSONEmitsEnvelope(t *testing.T) {
 	}
 
 	db, ok := services["db"].(map[string]any)
-	if !ok || db["adapter"] == nil {
-		t.Fatalf("data.services.db = %v, want adapter entry", services["db"])
+	if !ok || db["options"] == nil {
+		t.Fatalf("data.services.db = %v, want options entry", services["db"])
+	}
+	if _, bad := db["adapter"]; bad {
+		t.Fatalf("data.services.db = %v, want no adapter entry (drivers are code-wired)", services["db"])
 	}
 }
 

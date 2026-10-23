@@ -35,7 +35,6 @@ func Conformance(t *testing.T, open OpenFunc) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, open) })
 }
 
-
 func conformanceClosedAllows(t *testing.T, open OpenFunc) {
 	t.Helper()
 

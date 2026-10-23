@@ -1010,13 +1010,10 @@ func TestConcurrentMixedOps(t *testing.T) {
 	wg.Wait()
 }
 
-// TestRegistryIntegration is serial: it mutates the global adapter registry.
-func TestRegistryIntegration(t *testing.T) {
-	if err := workflow.Register(workflow.Memory, New); err != nil && !errors.Is(err, workflow.ErrDuplicate) {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	w, err := workflow.Open(workflow.Memory, workflow.Options{})
+// TestDirectConstruction is serial: it exercises the full open/close
+// lifecycle through the constructor, no registry involved.
+func TestDirectConstruction(t *testing.T) {
+	w, err := New(workflow.Options{})
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -1027,10 +1024,6 @@ func TestRegistryIntegration(t *testing.T) {
 
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close failed: %v", err)
-	}
-
-	if err := workflow.Register(workflow.Memory, New); !errors.Is(err, workflow.ErrDuplicate) {
-		t.Fatalf("second Register = %v, want ErrDuplicate", err)
 	}
 }
 
@@ -1044,15 +1037,6 @@ func TestOpenInvalidOptions(t *testing.T) {
 
 	if _, err := New(bad); err == nil {
 		t.Fatal("expected New with invalid Options to fail")
-	}
-
-	// Ensure the adapter is registered, then verify Open propagates the error.
-	if err := workflow.Register(workflow.Memory, New); err != nil && !errors.Is(err, workflow.ErrDuplicate) {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	if _, err := workflow.Open(workflow.Memory, bad); err == nil {
-		t.Fatal("expected Open with invalid Options to fail")
 	}
 }
 

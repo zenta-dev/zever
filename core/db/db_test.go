@@ -32,4 +32,3 @@ func (s *stubDB) Ping(_ context.Context) error { return nil }
 func (s *stubDB) Close(_ context.Context) error { return nil }
 
 func (s *stubDB) Dialect() string { return s.dialect }
-

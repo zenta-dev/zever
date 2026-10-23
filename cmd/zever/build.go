@@ -131,9 +131,38 @@ func adapterNameForDir(battery, dir string) string {
 // slimAdaptersSource filters an adapters.go source to the selected battery
 // set, returning gofmt-clean source. A nil selection keeps every adapter
 // (the full CLI). Adapter imports whose module directory is unselected are
-// dropped along with the init() statements referencing them; core/* and
-// other non-adapter imports are always kept. Selection entries may be
+// dropped along with the cliProviders() entries referencing them; core/*
+// and other non-adapter imports are always kept. Selection entries may be
 // canonical names or legacy aliases (adapterDirName decides the directory).
+// eltRefsDropped reports whether elt references any dropped adapter alias:
+// a SelectorExpr X that names a dropped import alias (for example
+// cachememory in cachememory.New) pins the element to that adapter.
+func eltRefsDropped(elt ast.Expr, dropped map[string]bool) bool {
+	refs := false
+
+	ast.Inspect(elt, func(n ast.Node) bool {
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		id, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+
+		if dropped[id.Name] {
+			refs = true
+
+			return false
+		}
+
+		return true
+	})
+
+	return refs
+}
+
 func slimAdaptersSource(src string, sel []batterySelection) (string, error) {
 	const tag = "zever build"
 
@@ -269,48 +298,45 @@ func slimAdaptersSource(src string, sel []batterySelection) (string, error) {
 
 	f.Decls = kept
 
-	// Drop init() statements referencing dropped adapter aliases.
+	// Drop cliProviders() entries referencing dropped adapter aliases. The
+	// providers live as elements of the returned slice literal, so filter
+	// elements rather than statements: an element survives only when none
+	// of its adapter aliases was dropped.
 	for _, decl := range f.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name == nil || fn.Name.Name != "init" || fn.Body == nil {
+		if !ok || fn.Name == nil || fn.Name.Name != "cliProviders" || fn.Body == nil {
 			continue
 		}
 
-		stmts := fn.Body.List[:0]
-
 		for _, stmt := range fn.Body.List {
-			refsDropped := false
+			ret, ok := stmt.(*ast.ReturnStmt)
+			if !ok {
+				continue
+			}
 
-			ast.Inspect(stmt, func(n ast.Node) bool {
-				sel, ok := n.(*ast.SelectorExpr)
+			for _, res := range ret.Results {
+				lit, ok := res.(*ast.CompositeLit)
 				if !ok {
-					return true
+					continue
 				}
 
-				id, ok := sel.X.(*ast.Ident)
-				if !ok {
-					return true
+				elts := lit.Elts[:0]
+
+				for _, elt := range lit.Elts {
+					if eltRefsDropped(elt, dropped) {
+						continue
+					}
+
+					elts = append(elts, elt)
 				}
 
-				if dropped[id.Name] {
-					refsDropped = true
-
-					return false
-				}
-
-				return true
-			})
-
-			if !refsDropped {
-				stmts = append(stmts, stmt)
+				lit.Elts = elts
 			}
 		}
-
-		fn.Body.List = stmts
 	}
 
 	// Drop imports no kept code references anymore (unselected adapters and
-	// the core packages whose Register calls left with them).
+	// the core packages whose Provide entries left with them).
 	refs := map[string]bool{}
 
 	for _, decl := range f.Decls {

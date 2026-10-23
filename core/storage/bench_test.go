@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 func BenchmarkPolicyAllow(b *testing.B) {
 	pol := Policy{
 		Read: Rule{Allow: []Subject{"alice", "bob"}, Deny: []Subject{"mallory"}},

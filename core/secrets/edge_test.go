@@ -70,4 +70,3 @@ func TestOptionsValidate_alwaysNil(t *testing.T) {
 		}
 	}
 }
-

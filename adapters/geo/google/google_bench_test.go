@@ -2,24 +2,14 @@ package google
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/geo"
 )
-
-var benchAdapterSeq atomic.Int64
-
-// benchFreshAdapter returns an adapter name unique to this benchmark run so
-// Register never collides with a previously registered factory.
-func benchFreshAdapter() geo.Adapter {
-	return geo.Adapter(fmt.Sprintf("bench-%d", benchAdapterSeq.Add(1)))
-}
 
 // stubGeo is a no-op geo.Geo used to isolate registry benchmarks.
 type stubGeo struct{}
@@ -142,35 +132,14 @@ func BenchmarkDistance(b *testing.B) {
 	}
 }
 
-// BenchmarkRegister measures registering a factory into the geo registry.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		err := geo.Register(benchFreshAdapter(), func(geo.Options) (geo.Geo, error) {
-			return stubGeo{}, nil
-		})
-		if err != nil {
-			b.Fatalf("Register() error = %v", err)
-		}
-	}
-}
-
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-	a := benchFreshAdapter()
-
-	err := geo.Register(a, func(geo.Options) (geo.Geo, error) { return stubGeo{}, nil })
-	if err != nil {
-		b.Fatalf("Register() error = %v", err)
-	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		g, openErr := geo.Open(a, geo.Options{})
+		g, openErr := New(geo.Options{})
 		if openErr != nil {
 			b.Fatalf("Open() error = %v", openErr)
 		}

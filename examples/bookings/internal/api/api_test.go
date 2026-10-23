@@ -17,22 +17,7 @@ import (
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/examples/bookings/internal/api"
 
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
-	cryptolocal "github.com/zenta-dev/zever/adapters/crypto/local"
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	flagstatic "github.com/zenta-dev/zever/adapters/flag/static"
-	geostatic "github.com/zenta-dev/zever/adapters/geo/static"
-	i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
-	idempotencymemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
-	lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
-	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	paymentstub "github.com/zenta-dev/zever/adapters/payment/stub"
-	permissionrbac "github.com/zenta-dev/zever/adapters/permission/rbac"
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
-	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
-	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
+	"github.com/zenta-dev/zever/examples/bookings/internal/testsetup"
 )
 
 const testJWTSecret = "test-secret-for-bookings-32-bytes-min!"
@@ -47,35 +32,17 @@ type testSetup struct {
 func newTestSetup(t *testing.T) testSetup {
 	t.Helper()
 
-	authjwt.Register()
-	billingstub.Register()
-	cryptolocal.Register()
-	dbsqlite.Register()
-	flagstatic.Register()
-	geostatic.Register()
-	i18nembed.Register()
-	idempotencymemory.Register()
-	lockmemory.Register()
-	passwordargon2.Register()
-	paymentstub.Register()
-	permissionrbac.Register()
-	queuememory.Register()
-	ratelimitmemory.Register()
-	routerstdhttp.Register()
-	tenantsingle.Register()
-
 	cfg := config.Default()
 	cfg.Crypto.Options.AllowDevKey = true
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 	cfg.Geo.Options.Path = filepath.Join("testdata", "cities.json")
 	cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}
-	cfg.Permission.Adapter = "rbac"
 	cfg.Permission.Options.Rules = []permission.Rule{
 		{Role: "user", Action: "booking.cancel", OwnedOnly: true, OwnedAttr: "owner"},
 	}
 
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 
 	ctx := t.Context()
 	database, err := c.DB()

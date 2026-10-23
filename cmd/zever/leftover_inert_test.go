@@ -48,13 +48,13 @@ func legacyConfigFileName(ext string) string {
 // No t.Parallel: captureStderr redirects os.Stderr process-wide.
 func TestConfigShowIgnoresLeftoverFileWithConflictingValue(t *testing.T) {
 	const (
-		envValue     = "sqlite"
+		envValue     = "data/app.db"
 		leftoverMark = "from-legacy-inert-canary"
 	)
 
 	dir := t.TempDir()
 	dotenvPath := filepath.Join(dir, ".env")
-	if err := os.WriteFile(dotenvPath, []byte("DB_ADAPTER="+envValue+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(dotenvPath, []byte("DB_PATH="+envValue+"\n"), 0o600); err != nil {
 		t.Fatalf("write .env: %v", err)
 	}
 
@@ -83,8 +83,11 @@ func TestConfigShowIgnoresLeftoverFileWithConflictingValue(t *testing.T) {
 	stdout := out.String()
 
 	// (a) The reported value is the .env value, not the leftover's.
-	if !strings.Contains(stdout, "db  adapter="+envValue) {
-		t.Fatalf("output = %q, want the .env value %q", stdout, "db  adapter="+envValue)
+	if !strings.Contains(stdout, "db  driver=sqlite") {
+		t.Fatalf("output = %q, want the code-wired db driver", stdout)
+	}
+	if !strings.Contains(stdout, envValue) {
+		t.Fatalf("output = %q, want the .env value %q", stdout, envValue)
 	}
 
 	// (b) The leftover value reaches neither stdout nor stderr (nor the

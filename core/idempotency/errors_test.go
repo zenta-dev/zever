@@ -57,4 +57,3 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 		t.Fatal("InvalidKeyError does not unwrap to ErrInvalidKey")
 	}
 }
-

@@ -9,27 +9,31 @@ import (
 	"testing"
 )
 
-// stubAdaptersSource is a miniature adapters.go exercising both
-// registration shapes: explicit core.Register and no-arg Register().
+// stubAdaptersSource is a miniature adapters.go exercising the provider
+// shape: one container.Provide entry per battery plus the adapter and core
+// imports those entries reference.
 const stubAdaptersSource = `package main
 
 import (
 	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
+	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/core/queue"
 	queredis "github.com/zenta-dev/zever/adapters/queue/redis"
 )
 
-func init() {
-	_ = cache.Register(cache.Memory, cachememory.New)
-	_ = queue.Register(queue.Memory, queuememory.New)
-	queredis.Register()
+func cliProviders() []container.Provider {
+	return []container.Provider{
+		container.Provide(cache.DefaultRef(), cachememory.New),
+		container.Provide(queue.DefaultRef(), queuememory.New),
+		container.Provide(queue.Ref("alt"), queredis.New),
+	}
 }
 `
 
 // TestSlimAdaptersSourceKeepsSelected pins that filtering keeps the selected
-// battery's imports and Register calls and drops the rest, while core
+// battery's imports and Provide entries and drops the rest, while core
 // imports stay.
 func TestSlimAdaptersSourceKeepsSelected(t *testing.T) {
 	t.Parallel()
@@ -58,7 +62,7 @@ func TestSlimAdaptersSourceKeepsSelected(t *testing.T) {
 	}
 
 	if strings.Contains(out, "queuememory") || strings.Contains(out, "queredis") {
-		t.Errorf("slim source keeps dropped Register calls:\n%s", out)
+		t.Errorf("slim source keeps dropped Provide entries:\n%s", out)
 	}
 
 	if _, err := parser.ParseFile(token.NewFileSet(), "adapters.go", out, 0); err != nil {

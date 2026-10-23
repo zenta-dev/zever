@@ -30,7 +30,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) analytics.Analytics) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-
 func conformanceHappyPath(t *testing.T, factory func(t *testing.T) analytics.Analytics) {
 	t.Helper()
 

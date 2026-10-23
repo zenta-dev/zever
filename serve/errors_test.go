@@ -9,7 +9,6 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/authz"
 	"github.com/zenta-dev/zever/core/db"
 )
@@ -188,7 +187,7 @@ func TestSetupGRPCUnwiredAuthNamesAddHint(t *testing.T) {
 		t.Fatalf("setupGRPC err = %q, want auth: none hint", msg)
 	}
 
-	if !errors.Is(err, auth.ErrUnknownAdapter) {
-		t.Fatalf("setupGRPC err = %v, want errors.Is auth.ErrUnknownAdapter", err)
+	if !errors.Is(err, container.ErrNotWired) {
+		t.Fatalf("setupGRPC err = %v, want errors.Is container.ErrNotWired", err)
 	}
 }

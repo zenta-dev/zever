@@ -101,4 +101,3 @@ func TestIsPrivateIP_publicLiteral(t *testing.T) {
 		t.Error("IsPrivateIP(2001:db8::1) = true, want false")
 	}
 }
-
