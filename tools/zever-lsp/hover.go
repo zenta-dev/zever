@@ -85,6 +85,16 @@ func fieldHoverMarkdown(entity *ast.EntityDecl, field *ast.FieldDecl) string {
 		fmt.Fprintf(&sb, "\n\nField of entity `%s`.", entity.Name)
 	}
 
+	if field != nil {
+		hint := fieldTypeHint(field)
+		if hint == "" && field.Type != nil {
+			hint = renderTypeExpr(field.Type)
+		}
+		if hint != "" {
+			fmt.Fprintf(&sb, "\n\nType: %s", hint)
+		}
+	}
+
 	sb.WriteString(docCommentParagraph(field.DocComment))
 
 	if lines := renderAttributes(field.Attributes); len(lines) > 0 {
@@ -92,7 +102,56 @@ func fieldHoverMarkdown(entity *ast.EntityDecl, field *ast.FieldDecl) string {
 		sb.WriteString(strings.Join(lines, "\n"))
 	}
 
+	if hasDefaultOrValidate(field) {
+		fmt.Fprintf(&sb, "\n\nType hint: %s", fieldTypeHint(field))
+		if vh := validateHint(field); vh != "" {
+			fmt.Fprintf(&sb, " (validate: %s)", vh)
+		}
+	}
+
 	return sb.String()
+}
+
+// hasDefaultOrValidate reports whether field declares a @default or @validate
+// attribute -- the only cases where a Type hint line adds information beyond
+// the attribute bullets already rendered above.
+func hasDefaultOrValidate(field *ast.FieldDecl) bool {
+	if field == nil {
+		return false
+	}
+
+	for _, attr := range field.Attributes {
+		if attr == nil {
+			continue
+		}
+
+		if attr.Name == "default" || attr.Name == "validate" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validateHint renders the arguments of a field's @validate attribute, if any,
+// so the Type hint line can surface the constraint alongside the type.
+func validateHint(field *ast.FieldDecl) string {
+	if field == nil {
+		return ""
+	}
+
+	for _, attr := range field.Attributes {
+		if attr == nil || attr.Name != "validate" {
+			continue
+		}
+
+		args := renderArgs(attr.Args)
+		args = strings.TrimPrefix(args, "(")
+		args = strings.TrimSuffix(args, ")")
+		return strings.TrimSpace(args)
+	}
+
+	return ""
 }
 
 // entityDeclHoverMarkdown summarises an entity declaration under the cursor.

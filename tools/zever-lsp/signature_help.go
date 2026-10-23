@@ -133,8 +133,14 @@ func signatureHelpAt(src string, cursor protocol.Position) *protocol.SignatureHe
 	// so index < 0 is impossible and the old clamp was dead.
 	active := protocol.NewNullable(uint32(index)) //nolint:gosec // proven non-negative above
 
+	sig := signatureInformation(nameTok.Lit, spec)
+	sig.ActiveParameter = active
+
+	activeSig := uint32(0)
+
 	return &protocol.SignatureHelp{
-		Signatures:      []protocol.SignatureInformation{signatureInformation(nameTok.Lit, spec)},
+		Signatures:      []protocol.SignatureInformation{sig},
+		ActiveSignature: &activeSig,
 		ActiveParameter: active,
 	}
 }
