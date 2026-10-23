@@ -30,6 +30,7 @@ require (
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/core/queue v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/msgspan v0.8.0
 	github.com/zenta-dev/zever/shared/redisclient v0.8.0
 	github.com/zenta-dev/zever/shared/redisopt v0.8.0
@@ -55,3 +56,5 @@ replace github.com/zenta-dev/zever/core/observability => ../../../core/observabi
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observability/noop
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

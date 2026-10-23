@@ -63,6 +63,19 @@ var (
 
 	// indentOpts for MarshalIndent (2-space indent, multiline, deterministic).
 	indentOpts = json.JoinOptions(json.Deterministic(true), jsontext.Multiline(true), jsontext.WithIndent("  "))
+
+	// indentCompatOpts renders pretty JSON byte-identical to the previous
+	// encoding/json MarshalIndent (sorted keys, two-space indent, HTML/JS
+	// escaping). codec.MarshalIndent leaves HTML escaping off, which would
+	// rewrite cache-stable outputs (e.g. zever generate stamps) on every
+	// run. New code prefers MarshalIndent; this is only for outputs whose
+	// bytes must not change.
+	indentCompatOpts = json.JoinOptions(json.Deterministic(true), jsontext.Multiline(true), jsontext.WithIndent("  "), jsontext.EscapeForHTML(true), jsontext.EscapeForJS(true))
+
+	// strictUnmarshalOpts applies the default duration round-trip plus
+	// rejection of unknown object members (v1 had no strict mode; v2
+	// ignores unknown fields unless asked).
+	strictUnmarshalOpts = json.JoinOptions(json.WithUnmarshalers(durationUnmarshalers), json.RejectUnknownMembers(true))
 )
 
 // JSONCodec is a Codec[V] implementation that uses JSON encoding.
@@ -129,6 +142,15 @@ func MarshalIndent(v any, indent string) ([]byte, error) {
 	return json.Marshal(v, indentOpts)
 }
 
+// MarshalIndentCompat serializes v to pretty-printed JSON with 2-space indent
+// and HTML/JS escaping, byte-identical to the previous encoding/json
+// MarshalIndent output. Use only for outputs whose bytes must stay stable
+// across the migration (e.g. zever generate stamps); new code prefers
+// MarshalIndent.
+func MarshalIndentCompat(v any) ([]byte, error) {
+	return json.Marshal(v, indentCompatOpts)
+}
+
 // MarshalLine serializes v to w followed by a newline.
 // Equivalent to v1 json.NewEncoder(w).Encode(v).
 func MarshalLine(w io.Writer, v any) error {
@@ -155,6 +177,14 @@ func UnmarshalRead(r io.Reader, v any) error {
 // For NDJSON / multi-value streams.
 func UnmarshalDecode(dec *jsontext.Decoder, v any) error {
 	return json.UnmarshalDecode(dec, v, defaultUnmarshalOpts)
+}
+
+// UnmarshalStrict deserializes data into v with repo-default options plus
+// rejection of unknown object members. encoding/json v2 ignores unknown
+// fields unless asked; use this for fail-closed wire formats (e.g. storage
+// policies) where a typo'd key must error instead of silently dropping.
+func UnmarshalStrict(data []byte, v any) error {
+	return json.Unmarshal(data, v, strictUnmarshalOpts)
 }
 
 // IsValid reports whether data is syntactically valid JSON.

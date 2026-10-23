@@ -3,7 +3,6 @@ package s3
 import (
 	"context"
 	"encoding/json/jsontext"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const (
@@ -52,7 +52,7 @@ type rawPolicyDocument struct {
 }
 
 // bucketPolicyDoc renders the managed-policy document for p. It cannot fail:
-// the document is a struct of strings, so json.Marshal always succeeds.
+// the document is a struct of strings, so codec.MarshalIndent always succeeds.
 func bucketPolicyDoc(p storage.Policy, bucket string) string {
 	type permerAction struct {
 		perm   storage.Perm
@@ -83,7 +83,7 @@ func bucketPolicyDoc(p storage.Policy, bucket string) string {
 		doc.Statement = append(doc.Statement, st)
 	}
 
-	b, _ := json.Marshal(doc, jsontext.WithIndent("  "))
+	b, _ := codec.MarshalIndent(doc, "  ")
 
 	return string(b)
 }
@@ -115,7 +115,7 @@ func (a *s3Adapter) SyncPolicy(ctx context.Context, bucket string) error {
 	}
 
 	// mergePolicy already parsed current into the same document shape, and
-	// merged is json.Marshal output, so neither canonicalization can fail.
+	// merged is codec.MarshalIndent output, so neither canonicalization can fail.
 	canonCurrent, _ := canonicalPolicy(current)
 	canonMerged, _ := canonicalPolicy(merged)
 
@@ -146,13 +146,13 @@ func (a *s3Adapter) policySyncError(ctx context.Context, bucket string, err erro
 func (a *s3Adapter) mergePolicy(bucket, current string) (string, bool, error) {
 	genDoc := bucketPolicyDoc(a.PolicyFor(bucket), bucket)
 
-	// genDoc is json.Marshal output, so it always parses.
+	// genDoc is codec.MarshalIndent output, so it always parses.
 	var gen rawPolicyDocument
-	_ = json.Unmarshal([]byte(genDoc), &gen)
+	_ = codec.Unmarshal([]byte(genDoc), &gen)
 
 	existing := rawPolicyDocument{Version: policyVersion, Statement: []jsontext.Value{}}
 	if strings.TrimSpace(current) != "" {
-		if err := json.Unmarshal([]byte(current), &existing); err != nil {
+		if err := codec.Unmarshal([]byte(current), &existing); err != nil {
 			return "", false, fmt.Errorf("s3: parse existing bucket policy: %w", err)
 		}
 
@@ -171,7 +171,7 @@ func (a *s3Adapter) mergePolicy(bucket, current string) (string, bool, error) {
 		var sidHolder struct {
 			Sid string `json:"Sid"`
 		}
-		if err := json.Unmarshal(st, &sidHolder); err != nil {
+		if err := codec.Unmarshal(st, &sidHolder); err != nil {
 			kept = append(kept, st)
 			continue
 		}
@@ -191,7 +191,7 @@ func (a *s3Adapter) mergePolicy(bucket, current string) (string, bool, error) {
 
 	// Every statement above survived a strict unmarshal (gen is Marshal
 	// output), so this re-marshal cannot fail.
-	b, _ := json.Marshal(merged, jsontext.WithIndent("  "))
+	b, _ := codec.MarshalIndent(merged, "  ")
 
 	return string(b), drift, nil
 }
@@ -203,7 +203,7 @@ func canonicalPolicy(s string) (string, error) {
 		return marshalRawPolicy(doc)
 	}
 
-	if err := json.Unmarshal([]byte(s), &doc); err != nil {
+	if err := codec.Unmarshal([]byte(s), &doc); err != nil {
 		return "", fmt.Errorf("s3: parse bucket policy: %w", err)
 	}
 
@@ -219,7 +219,7 @@ func canonicalPolicy(s string) (string, error) {
 }
 
 func marshalRawPolicy(doc rawPolicyDocument) (string, error) {
-	b, err := json.Marshal(doc, jsontext.WithIndent("  "))
+	b, err := codec.MarshalIndent(doc, "  ")
 	if err != nil {
 		return "", fmt.Errorf("s3: marshal bucket policy: %w", err)
 	}
@@ -235,9 +235,9 @@ func canonicalStatements(stmts []jsontext.Value) string {
 
 	for _, st := range stmts {
 		var m map[string]jsontext.Value
-		_ = json.Unmarshal(st, &m)
+		_ = codec.Unmarshal(st, &m)
 
-		b, _ := json.Marshal(m, json.Deterministic(true))
+		b, _ := codec.Marshal(m)
 
 		parts = append(parts, string(b))
 	}

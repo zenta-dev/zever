@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"context"
-	"encoding/json/v2"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -141,12 +141,11 @@ func (c *checker) Send(ctx context.Context, msg *mailer.Mail) error {
 	}
 	m.TraceID = traceprop.TraceID(ctx)
 	c.buf.Reset()
-	// MarshalWrite emits no trailing newline; add the line terminator before
-	// the single write so the wire format matches json.Marshal plus newline.
-	if err := json.MarshalWrite(&c.buf, m, json.Deterministic(true)); err != nil {
+	// MarshalLine emits the deterministic JSON encoding plus the line
+	// terminator before the single write, matching json.Marshal plus newline.
+	if err := codec.MarshalLine(&c.buf, m); err != nil {
 		return err
 	}
-	c.buf.WriteByte('\n')
 	_, err := c.w.Write(c.buf.Bytes())
 	return err
 }

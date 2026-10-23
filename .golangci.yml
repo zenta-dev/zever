@@ -115,9 +115,11 @@ linters:
             - pkg: "github.com/magiconair/properties"
               desc: "The framework is env-only: no non-test file may parse Java-style properties"
         # shared/codec is the ONLY package allowed to import encoding/json/v2
-        # and encoding/json/jsontext directly. All other packages must use
-        # the shared/codec facade. This rule will be tightened in the final
-        # workstream (W9) to deny encoding/json everywhere.
+        # and encoding/json/jsontext directly in NON-TEST code. All other
+        # packages must use the shared/codec facade. Tests may still import
+        # v2, but only to pin exact engine bytes or options (with a comment
+        # saying so); the jsonv2-facade rule below enforces the non-test
+        # side. (This is the W9 tightening this comment anticipated.)
         codec-facade:
           files:
             - "shared/codec/**/*.go"
@@ -131,6 +133,27 @@ linters:
               desc: "Deprecated since Go 1.16: use io or os instead"
             - pkg: "encoding/json"
               desc: "Use shared/codec facade instead of encoding/json directly."
+        # All JSON goes through shared/codec (built on encoding/json/v2):
+        # non-test code outside shared/codec must not import
+        # encoding/json/v2 directly. encoding/json/jsontext stays allowed
+        # repo-wide: it is a data type (jsontext.Value fields/params in
+        # ~46 files), not an engine entry point. Verified empirically with
+        # golangci-lint v2.14.0: `files` positives and negations combine
+        # as (no positives OR matches a positive) AND matches no
+        # negation, and analyzed filenames are absolute, so the
+        # shared/codec exclusion needs a leading `**` (a bare
+        # `shared/codec/**` never matches and shared/codec itself
+        # would fire). ["!$test", "!**/shared/codec/**"] therefore
+        # scopes this rule to non-test files outside shared/codec
+        # (shared/codec itself still passes, and a v2 import planted
+        # in another module's non-test file fires).
+        jsonv2-facade:
+          files:
+            - "!$test"
+            - "!**/shared/codec/**"
+          deny:
+            - pkg: "encoding/json/v2"
+              desc: "Use the shared/codec facade instead of encoding/json/v2 directly (allowed only in shared/codec; tests pinning exact engine bytes/options must say so in a comment)."
     errorlint:
       errorf: true
     exhaustive:

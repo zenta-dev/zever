@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/adapters/queue/memory"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // eventually polls cond until true or timeout, failing the test on expiry.
@@ -683,7 +683,7 @@ func TestWorkerProcessKnownSuccess(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Register known-success: %v", err)
 	}
-	payload, err := json.Marshal("hello")
+	payload, err := codec.Marshal("hello")
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -737,7 +737,7 @@ func TestWorkerProcessMiddlewareOrder(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Register mw-job: %v", err)
 	}
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	msg := queue.Message{
 		Payload: queue.Payload(payload),
 		Headers: queue.Headers{headerJobName: "mw-job"},
@@ -762,7 +762,7 @@ func TestWorkerProcessNilHeaders(t *testing.T) {
 	if err := Register("nilhdr-job", func(context.Context, string) error { return nil }); err != nil {
 		t.Fatalf("Register nilhdr-job: %v", err)
 	}
-	payload, _ := json.Marshal("hi")
+	payload, _ := codec.Marshal("hi")
 	msg := queue.Message{
 		Payload: queue.Payload(payload),
 		Headers: nil,
@@ -781,7 +781,7 @@ func TestWorkerProcessPanicHandler(t *testing.T) {
 	if err := Register("panic-job", func(context.Context, string) error { panic("boom-panic") }); err != nil {
 		t.Fatalf("Register panic-job: %v", err)
 	}
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	msg := queue.Message{
 		Payload: queue.Payload(payload),
 		Headers: queue.Headers{headerJobName: "panic-job"},
@@ -1094,7 +1094,7 @@ func TestWorkerRunLoopBranches(t *testing.T) {
 		if err := Register("runloop-success", func(context.Context, string) error { return nil }); err != nil {
 			t.Fatalf("Register runloop-success: %v", err)
 		}
-		payload, _ := json.Marshal("hello")
+		payload, _ := codec.Marshal("hello")
 		msg := queue.Message{
 			Payload: queue.Payload(payload),
 			Headers: queue.Headers{headerJobName: "runloop-success"},
@@ -1161,7 +1161,7 @@ func TestWorkerLaunchHandlerDrain(t *testing.T) {
 	if err := Register("launch-job", func(context.Context, string) error { return nil }); err != nil {
 		t.Fatalf("Register launch-job: %v", err)
 	}
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	msg := queue.Message{
 		Payload: queue.Payload(payload),
 		Headers: queue.Headers{headerJobName: "launch-job"},
@@ -1212,7 +1212,7 @@ func TestWorkerRunWithMemoryQueue(t *testing.T) {
 		t.Fatalf("memory.New: %v", err)
 	}
 	defer q.Close()
-	payload, _ := json.Marshal("hello")
+	payload, _ := codec.Marshal("hello")
 	headers := queue.Headers{headerJobName: "worker-run-mem"}
 	if err := q.Push(t.Context(), "low", queue.Payload(payload), headers); err != nil {
 		t.Fatalf("Push: %v", err)
@@ -1293,7 +1293,7 @@ func TestWorkerRunPanicHandler(t *testing.T) {
 	if err := Register("worker-panic", func(context.Context, string) error { panic("panic in run") }); err != nil {
 		t.Fatalf("Register worker-panic: %v", err)
 	}
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	headers := queue.Headers{headerJobName: "worker-panic"}
 	// stub that returns message once then empty
 	var popped atomic.Bool

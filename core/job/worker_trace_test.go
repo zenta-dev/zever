@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-	"encoding/json/v2"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/observability"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/msgspan"
 )
 
@@ -189,7 +189,7 @@ func TestWorkerLaunchHandler_ExtractsTrace(t *testing.T) {
 		t.Fatalf("Register trace-job: %v", err)
 	}
 
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	msg := queue.Message{
 		ID:      mustMessageID(t, "0198f0a0-0000-7000-8000-000000000001"),
 		Payload: queue.Payload(payload),
@@ -251,7 +251,7 @@ func TestWorkerLaunchHandler_SpanRecordsHandlerError(t *testing.T) {
 		t.Fatalf("Register failing-job: %v", err)
 	}
 
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	msg := queue.Message{
 		ID:      mustMessageID(t, "0198f0a0-0000-7000-8000-000000000002"),
 		Topic:   "low",
@@ -294,7 +294,7 @@ func TestWorkerLaunchHandler_NoProvider(t *testing.T) {
 		t.Fatalf("Register untraced-provider-job: %v", err)
 	}
 
-	payload, _ := json.Marshal("x")
+	payload, _ := codec.Marshal("x")
 	msg := queue.Message{
 		ID:      mustMessageID(t, "0198f0a0-0000-7000-8000-000000000003"),
 		Payload: queue.Payload(payload),

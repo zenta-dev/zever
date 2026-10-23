@@ -29,6 +29,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
 	github.com/zenta-dev/zever/core/storage v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/s3opts v0.8.0
 )
 
@@ -43,3 +44,5 @@ replace github.com/zenta-dev/zever/core/log => ../../../core/log
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec
