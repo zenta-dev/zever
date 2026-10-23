@@ -40,6 +40,7 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/zenta-dev/zever/core/log v0.8.0 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -81,3 +82,5 @@ replace github.com/zenta-dev/zever/core/log => ../../../core/log
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

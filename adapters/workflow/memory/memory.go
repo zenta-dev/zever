@@ -2,11 +2,12 @@ package memory
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/zenta-dev/zever/core/workflow"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var _ workflow.Workflow = (*Adapter)(nil)
@@ -170,12 +171,12 @@ func (a *Adapter) Query(_ context.Context, runID workflow.RunID, name string, ou
 
 	a.mu.RUnlock()
 
-	b, err := json.Marshal(state)
+	b, err := codec.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("workflow: query %q: marshal state: %w", name, err)
 	}
 
-	if err := json.Unmarshal(b, out); err != nil {
+	if err := codec.Unmarshal(b, out); err != nil {
 		return fmt.Errorf("workflow: query %q: type mismatch: %w", name, err)
 	}
 

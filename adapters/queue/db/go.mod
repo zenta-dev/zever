@@ -27,6 +27,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
@@ -81,3 +82,5 @@ replace github.com/zenta-dev/zever/adapters/queue/db => ../db
 replace github.com/zenta-dev/zever/dsl => ../../../dsl
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

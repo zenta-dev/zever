@@ -18,6 +18,7 @@ require (
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
@@ -44,3 +45,5 @@ replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../observability/noop
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

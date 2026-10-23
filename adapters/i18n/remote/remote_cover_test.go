@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
@@ -97,7 +97,7 @@ func TestCacheKey(t *testing.T) {
 }
 
 func jstr(s string) string {
-	b, _ := json.Marshal(s)
+	b, _ := codec.Marshal(s)
 	return string(b)
 }
 

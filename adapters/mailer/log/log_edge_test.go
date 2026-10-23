@@ -2,10 +2,11 @@ package log_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 
 	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
 	"github.com/zenta-dev/zever/core/mailer"
@@ -23,7 +24,7 @@ func sendAndDecode(t *testing.T, msg *mailer.Mail) map[string]any {
 		t.Fatalf("Send err = %v", err)
 	}
 	var decoded map[string]any
-	if err := json.Unmarshal([]byte(strings.TrimSpace(buf.String())), &decoded); err != nil {
+	if err := codec.Unmarshal([]byte(strings.TrimSpace(buf.String())), &decoded); err != nil {
 		t.Fatalf("output not valid JSON: %v", err)
 	}
 	return decoded

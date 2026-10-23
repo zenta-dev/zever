@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/secrets"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var _ secrets.Secrets = (*driver)(nil)
@@ -75,7 +75,7 @@ func (d *driver) request(ctx context.Context, method, path string, body any) (*h
 	if body == nil {
 		buf = bytes.NewBuffer(nil)
 	} else {
-		raw, err := json.Marshal(body)
+		raw, err := codec.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("vault: encode request: %w", err)
 		}
@@ -141,7 +141,7 @@ func (d *driver) Get(ctx context.Context, name string) ([]byte, error) {
 			Data map[string]string `json:"data"`
 		} `json:"data"`
 	}
-	if decErr := json.NewDecoder(resp.Body).Decode(&out); decErr != nil {
+	if decErr := codec.UnmarshalRead(resp.Body, &out); decErr != nil {
 		return nil, fmt.Errorf("vault: get %s: decode: %w", name, decErr)
 	}
 	raw, ok := out.Data.Data["value"]
@@ -226,7 +226,7 @@ func (d *driver) List(ctx context.Context) ([]string, error) {
 			Keys []string `json:"keys"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := codec.UnmarshalRead(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("vault: list: decode: %w", err)
 	}
 	return out.Data.Keys, nil

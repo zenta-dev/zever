@@ -12,6 +12,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect

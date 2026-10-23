@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // mustTokenFile writes a token file with 0600 then chmods it to perm,
@@ -202,7 +203,7 @@ func TestMount_EscapedOnWire(t *testing.T) {
 			for k := range store {
 				keys = append(keys, k)
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"keys": keys}})
+			_ = codec.MarshalLine(w, map[string]any{"data": map[string]any{"keys": keys}})
 		case strings.Contains(r.URL.EscapedPath(), "/data/"):
 			name := r.URL.EscapedPath()[len(escaped+"data/"):]
 			switch r.Method {
@@ -210,7 +211,7 @@ func TestMount_EscapedOnWire(t *testing.T) {
 				var body struct {
 					Data map[string]string `json:"data"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				if err := codec.UnmarshalRead(r.Body, &body); err != nil {
 					http.Error(w, "bad request", http.StatusBadRequest)
 					return
 				}
@@ -222,7 +223,7 @@ func TestMount_EscapedOnWire(t *testing.T) {
 					http.Error(w, "not found", http.StatusNotFound)
 					return
 				}
-				_ = json.NewEncoder(w).Encode(map[string]any{
+				_ = codec.MarshalLine(w, map[string]any{
 					"data": map[string]any{"data": map[string]string{"value": val}},
 				})
 			default:

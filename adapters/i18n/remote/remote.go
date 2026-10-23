@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"container/list"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -133,10 +132,10 @@ func cacheKey(locale, key string, args map[string]string) string {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		kb, _ := json.Marshal(k) // string keys always marshal (infallible)
+		kb, _ := codec.Marshal(k) // string keys always marshal (infallible)
 		b.Write(kb)
 		b.WriteByte(':')
-		vb, _ := json.Marshal(args[k]) // string values always marshal (infallible)
+		vb, _ := codec.Marshal(args[k]) // string values always marshal (infallible)
 		b.Write(vb)
 	}
 	b.WriteByte('}')
