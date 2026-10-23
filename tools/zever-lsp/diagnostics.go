@@ -4,16 +4,97 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 
 	"github.com/zenta-dev/zever/dsl/diag"
 )
 
 // debounceDelay is how long an edit burst must settle before recompiling.
+// It is also the default of the settings-driven delay (Settings.DebounceDelay).
 const debounceDelay = 250 * time.Millisecond
+
+// Diagnostic codes. Each code names one class of compiler diagnostic,
+// classified deterministically from the message text (see diagnosticClasses).
+// The codes are a stability contract: once a class ships with a code, that
+// code never moves to another class, so editor filters and CodeDescription
+// links stay meaningful across releases.
+const (
+	// diagCodeUnknownFieldType is the resolver's "unknown field type" class:
+	// a field's type names no scalar, enum, entity, or message.
+	diagCodeUnknownFieldType = "zen-001"
+	// diagCodeUnknownRelationTarget is the resolver's "relation ... references
+	// unknown entity" class: a relation points at an entity that does not
+	// exist (the class code_action.go's fixUnresolvedRelationTarget serves).
+	diagCodeUnknownRelationTarget = "zen-002"
+	// diagCodeDuplicateDeclaration is the duplicate-declaration class:
+	// duplicated entities, enum values, error codes, saga steps, and
+	// many_to_many join tables.
+	diagCodeDuplicateDeclaration = "zen-003"
+	// diagCodeCrossModuleReference is the module-boundary class: a relation,
+	// rpc param/return, or permission crosses module boundaries.
+	diagCodeCrossModuleReference = "zen-004"
+	// diagCodeUnknownAttribute is the unknown-attribute class: an @attribute
+	// the resolver does not know on fields, entities, relations, indexes,
+	// messages, params, and so on.
+	diagCodeUnknownAttribute = "zen-005"
+	// diagCodeUnknownName is the generic unknown-identifier class: a name
+	// outside its expected vocabulary (calls, argument keys, default
+	// functions, enum values, error codes, validate kinds, formats, and the
+	// like). It deliberately omits the classes above, which match first.
+	diagCodeUnknownName = "zen-006"
+	// diagCodeSyntaxError is the parser's syntax-error class: messages of
+	// the "expected X, got Y" shape.
+	diagCodeSyntaxError = "zen-007"
+	// diagCodeInvalidValue is the invalid-literal/invalid-value class:
+	// malformed numbers, durations, cron expressions, and path placeholders.
+	diagCodeInvalidValue = "zen-008"
+)
+
+// diagDocURL anchors the in-two-clicks explanation of these codes in this
+// package's README, which documents the full code table alongside the
+// settings this server reads.
+const diagDocURL = "https://github.com/zenta-dev/zever/blob/main/tools/zever-lsp/README.md#diagnostic-codes"
+
+// diagnosticClasses classifies diagnostic messages into codes: the first
+// pattern (plain substring containment, the same matcher code_action.go
+// uses) that the message contains wins. Ordered most-specific first, so
+// narrower patterns ("attribute @", which the resolver renders inside
+// "unknown ... attribute @x" messages) must precede the broad "unknown ".
+// A message matching nothing carries no code at all -- a speculative code
+// is accidental API.
+var diagnosticClasses = []struct {
+	pattern string
+	code    string
+}{
+	{"unknown field type", diagCodeUnknownFieldType},
+	{"references unknown entity", diagCodeUnknownRelationTarget},
+	{"duplicate ", diagCodeDuplicateDeclaration},
+	{"different module", diagCodeCrossModuleReference},
+	{"crosses module boundary", diagCodeCrossModuleReference},
+	{"attribute @", diagCodeUnknownAttribute},
+	{"unknown ", diagCodeUnknownName},
+	{"expected ", diagCodeSyntaxError},
+	{"invalid ", diagCodeInvalidValue},
+	{"out of range", diagCodeInvalidValue},
+	{"nesting depth exceeded", diagCodeInvalidValue},
+}
+
+// diagnosticCode returns the stable code of the diagnostic class msg
+// belongs to, or "" when no class matches.
+func diagnosticCode(msg string) string {
+	for _, class := range diagnosticClasses {
+		if strings.Contains(msg, class.pattern) {
+			return class.code
+		}
+	}
+
+	return ""
+}
 
 // stopper is the cancel half of a scheduled debounce callback. *time.Timer
 // satisfies it, and tests substitute a fake driven by hand.
@@ -32,12 +113,22 @@ func diagToLSPDiagnostic(d *diag.Diagnostic, src string) protocol.Diagnostic {
 		severity = protocol.DiagnosticSeverityWarning
 	}
 
-	return protocol.Diagnostic{
+	out := protocol.Diagnostic{
 		Range:    diagnosticRange(d.Pos, src),
 		Severity: severity,
 		Source:   protocol.NewOptional("zen"),
 		Message:  protocol.String(d.Msg),
 	}
+
+	// Only a message matching a known class carries a code (plus its
+	// CodeDescription, which the spec requires to be paired with one);
+	// everything else stays code-less rather than inventing a class.
+	if code := diagnosticCode(d.Msg); code != "" {
+		out.Code = protocol.String(code)
+		out.CodeDescription = protocol.CodeDescription{Href: uri.URI(diagDocURL)}
+	}
+
+	return out
 }
 
 // diagnosticPublisher groups diagnostics per file and publishes them,
@@ -51,6 +142,12 @@ type diagnosticPublisher struct {
 	// the enclosing identifier. Nil (the zero value) falls back to point
 	// ranges, which is what tests that do not exercise spans rely on.
 	srcFor func(path string) (string, bool)
+	// delayHook supplies the debounce delay for each schedule call, so the
+	// server can honor Settings.DebounceDelay. Nil falls back to debounceDelay.
+	// It runs while the schedule lock is held, so an implementation must not
+	// re-enter the publisher; the server wires it to an atomic settings load,
+	// which takes no other lock.
+	delayHook func() time.Duration
 }
 
 // newDiagnosticPublisher returns a publisher with empty state and a time.AfterFunc-driven debounce clock.
@@ -174,7 +271,12 @@ func (p *diagnosticPublisher) schedule(key string, fn func()) {
 		timer.Stop()
 	}
 
-	p.timers[key] = p.afterFunc(debounceDelay, fn)
+	delay := debounceDelay
+	if p.delayHook != nil {
+		delay = p.delayHook()
+	}
+
+	p.timers[key] = p.afterFunc(delay, fn)
 }
 
 // cancel stops any pending debounce for a document.

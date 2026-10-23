@@ -214,6 +214,59 @@ func TestInitialize_capabilities(t *testing.T) {
 	}
 }
 
+// TestInitialize_positionEncoding pins the negotiation: the server picks
+// UTF-8 exactly when the client offers it (its offsets are byte-based) and
+// omits the capability otherwise, leaving the protocol's implicit UTF-16
+// default in place.
+func TestInitialize_positionEncoding(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		encodings  []protocol.PositionEncodingKind
+		wantCaps   protocol.PositionEncodingKind
+		wantStored protocol.PositionEncodingKind
+	}{
+		{"client offers utf-8 among others", []protocol.PositionEncodingKind{
+			protocol.PositionEncodingKindUTF16,
+			protocol.PositionEncodingKindUTF8,
+		}, protocol.PositionEncodingKindUTF8, protocol.PositionEncodingKindUTF8},
+		{"client offers only utf-16", []protocol.PositionEncodingKind{protocol.PositionEncodingKindUTF16}, "", ""},
+		{"client offers nothing", nil, "", ""},
+		{"no general capabilities block", nil, "", ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := NewServer()
+
+			params := &protocol.InitializeParams{}
+			if tc.encodings != nil {
+				params.Capabilities.General = &protocol.GeneralClientCapabilities{PositionEncodings: tc.encodings}
+			}
+
+			res, err := s.Initialize(t.Context(), params)
+			if err != nil {
+				t.Fatalf("Initialize: %v", err)
+			}
+
+			if got := res.Capabilities.PositionEncoding; got != tc.wantCaps {
+				t.Errorf("Capabilities.PositionEncoding = %q, want %q", got, tc.wantCaps)
+			}
+
+			s.mu.Lock()
+			stored := s.encoding
+			s.mu.Unlock()
+
+			if stored != tc.wantStored {
+				t.Errorf("stored encoding = %q, want %q", stored, tc.wantStored)
+			}
+		})
+	}
+}
+
 func TestInitialize_rootPrecedence(t *testing.T) {
 	foldersURI := uri.File("/ws/folders")
 	rootURI := uri.File("/ws/uri")

@@ -5,6 +5,8 @@ import (
 	"log"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"go.lsp.dev/protocol"
 
@@ -53,9 +55,23 @@ type Server struct {
 	// the client's textDocument/didOpen documentLink.tooltipSupport, so
 	// documentLink/resolve knows whether to fill Tooltip. Guarded by mu.
 	docLinkTooltip bool
+
+	// settings is the current editing configuration, swapped whole by
+	// workspace/didChangeConfiguration and read by every handler. Atomic
+	// (rather than mu-guarded) so the diagnostics publisher's delay hook can
+	// read it while holding the publisher's own lock.
+	settings atomic.Pointer[Settings]
+
+	// encoding is the position encoding negotiated at initialize. It is ""
+	// when UTF-16, the protocol's implicit default, was left in place.
+	// Stored information only today: every hand-computed offset in this
+	// server is byte-based (which is why utf-8 is negotiated when offered),
+	// and semantic tokens are UTF-16-exact regardless. Guarded by mu.
+	encoding protocol.PositionEncodingKind
 }
 
-// NewServer returns a server with an empty workspace and no client yet.
+// NewServer returns a server with an empty workspace and no client yet. The
+// settings snapshot starts at the defaults.
 func NewServer() *Server {
 	ws := NewWorkspace()
 	publisher := newDiagnosticPublisher()
@@ -63,12 +79,19 @@ func NewServer() *Server {
 	// identifier using each file's live source.
 	publisher.srcFor = ws.ContentForPath
 
-	return &Server{
+	s := &Server{
 		ws:          ws,
 		publisher:   publisher,
 		trace:       protocol.TraceValueOff,
 		semTokCache: make(map[string]semTokCacheEntry),
 	}
+
+	// The publisher consults the settings atomically on each schedule, so a
+	// didChangeConfiguration between edit bursts is honored by the next one
+	// without any cross-lock dance.
+	publisher.delayHook = func() time.Duration { return s.currentSettings().DebounceDelay }
+
+	return s
 }
 
 // setClient installs the peer client, typically once at startup.
@@ -133,11 +156,24 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.mu.Unlock()
 	}
 
+	// Position encoding negotiation: this server computes all LSP character
+	// offsets as byte offsets (semantics tokens aside, which the token
+	// encoder builds UTF-16-exact itself), so UTF-8 is picked exactly when
+	// the client offers it; otherwise the protocol's implicit UTF-16 default
+	// applies by omitting the capability entirely.
+	encoding := negotiatePositionEncoding(params)
+	if encoding != "" {
+		s.mu.Lock()
+		s.encoding = encoding
+		s.mu.Unlock()
+	}
+
 	syncKind := protocol.TextDocumentSyncKindFull
 	enabled := true
 
 	return &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
+			PositionEncoding: encoding,
 			// A bare sync-kind value (rather than this options struct)
 			// declares open/close/change support only -- no "save" key at
 			// all -- yet clients may send textDocument/didSave
@@ -207,6 +243,25 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 	}, nil
 }
 
+// negotiatePositionEncoding picks the position encoding to answer an
+// initialize request with, from the client's general.positionEncodings
+// announcement. It returns the UTF-8 kind when the client offers it and ""
+// otherwise, which is mapped to the protocol's implicit UTF-16 default by
+// omitting the positionEncoding capability (the spec's mandatory fallback).
+func negotiatePositionEncoding(params *protocol.InitializeParams) protocol.PositionEncodingKind {
+	if params == nil || params.Capabilities.General == nil {
+		return ""
+	}
+
+	for _, kind := range params.Capabilities.General.PositionEncodings {
+		if kind == protocol.PositionEncodingKindUTF8 {
+			return protocol.PositionEncodingKindUTF8
+		}
+	}
+
+	return ""
+}
+
 // Initialized handles the initialized notification by publishing the first
 // round of diagnostics.
 func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams) error {
@@ -214,6 +269,35 @@ func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams)
 	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil
+}
+
+// DidChangeConfiguration stores the settings the client pushes over
+// workspace/didChangeConfiguration, under the sole `zever` section (see
+// settings.go for the shape). An empty or non-object payload leaves the
+// current settings untouched; everything else is a whole replacement.
+func (s *Server) DidChangeConfiguration(ctx context.Context, params *protocol.DidChangeConfigurationParams) error {
+	s.captureClient(ctx)
+
+	if params == nil {
+		return nil
+	}
+
+	if parsed, ok := parseSettings(params.Settings); ok {
+		s.settings.Store(&parsed)
+	}
+
+	return nil
+}
+
+// currentSettings returns the settings snapshot in effect. NewServer always
+// installs one; the defaults are the answer for a zero-value Server, of the
+// kind direct struct literals in tests can produce.
+func (s *Server) currentSettings() Settings {
+	if st := s.settings.Load(); st != nil {
+		return *st
+	}
+
+	return defaultSettings()
 }
 
 // Shutdown is a no-op: there is no background state to tear down.
@@ -725,13 +809,14 @@ func (s *Server) SemanticTokensFullDelta(ctx context.Context, params *protocol.S
 }
 
 // InlayHint returns every inlay hint for one document, computed natively via
-// inlayHintsAt. A nil slice encodes LSP null for unknown documents.
+// inlayHintsFor under the server's current settings. A nil slice encodes LSP
+// null for unknown documents.
 func (s *Server) InlayHint(ctx context.Context, params *protocol.InlayHintParams) ([]protocol.InlayHint, error) {
 	s.captureClient(ctx)
 
 	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
 
-	return inlayHintsAt(schema, file), nil
+	return inlayHintsFor(schema, file, s.currentSettings()), nil
 }
 
 // InlayHintResolve is best-effort by design: hints already carry their full
