@@ -1,4 +1,3 @@
-//nolint:depguard
 package codec
 
 import (
