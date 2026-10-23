@@ -611,7 +611,9 @@ func workspaceSymbols(schema *ir.Schema, files map[string]string, query string) 
 }
 
 // filterSymbolsByQuery keeps only the symbols whose name contains query,
-// case-insensitively. An empty query matches everything.
+// case-insensitively. An empty query matches everything. Non-empty results
+// rank exact-prefix matches above substring matches with a stable sort, so
+// the workspace's existing declaration order decides within each tier.
 func filterSymbolsByQuery(symbols protocol.SymbolInformationSlice, query string) protocol.SymbolInformationSlice {
 	if query == "" {
 		return symbols
@@ -625,6 +627,13 @@ func filterSymbolsByQuery(symbols protocol.SymbolInformationSlice, query string)
 			out = append(out, sym)
 		}
 	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		iPrefix := strings.HasPrefix(strings.ToLower(out[i].Name), needle)
+		jPrefix := strings.HasPrefix(strings.ToLower(out[j].Name), needle)
+
+		return iPrefix && !jPrefix
+	})
 
 	return out
 }

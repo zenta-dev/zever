@@ -51,6 +51,7 @@ interface LanguageClientStub {
   id: string;
   name: string;
   serverOptions: ServerOptionsStub;
+  clientOptions: { documentSelector: unknown };
   stopped: boolean;
   sentRequests: SentRequest[];
   start: () => Promise<void>;
@@ -152,6 +153,17 @@ describe('activate', () => {
     assert.equal(instance.id, 'zeverLanguageServer');
     assert.equal(instance.name, 'Zever Language Server');
     assert.equal(instance.serverOptions.command, 'zever-lsp');
+  });
+
+  it('selects both saved and untitled zen documents', () => {
+    activate(makeContext());
+
+    assert.equal(clientCtor.instances.length, 1);
+    const [instance] = clientCtor.instances;
+    assert.deepEqual(instance.clientOptions.documentSelector, [
+      { scheme: 'file', language: 'zen' },
+      { scheme: 'untitled', language: 'zen' },
+    ]);
   });
 
   it('shows one install hint and no paths when the server fails to start', async () => {

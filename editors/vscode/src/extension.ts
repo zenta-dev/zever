@@ -102,7 +102,14 @@ function startClient(): void {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'zen' }],
+    // `untitled` covers unsaved `zen` editors: the client forwards their
+    // requests, but the server keys everything by filesystem path and
+    // answers unknown documents with empty results (no errors), so an
+    // untitled tab gets grammar highlighting only until it is saved.
+    documentSelector: [
+      { scheme: 'file', language: 'zen' },
+      { scheme: 'untitled', language: 'zen' },
+    ],
   };
 
   client = new LanguageClient(

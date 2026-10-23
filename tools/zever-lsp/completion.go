@@ -418,9 +418,9 @@ func enumValueCandidatesFor(schema *ir.Schema, file *ast.File, src string, curso
 // its label as plain text; completionAtWithCaps is the capability-aware
 // entry point.
 //
-// The textDocument/completion handler wraps a non-empty result in
-// protocol.CompletionItemSlice (the CompletionResult union arm) and returns
-// a literal nil when there is nothing to offer.
+// The textDocument/completion handler wraps a non-empty result in a
+// CompletionList via completionListFor and returns a literal nil when there
+// is nothing to offer.
 func completionAt(
 	schema *ir.Schema,
 	file *ast.File,
@@ -658,6 +658,65 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string, c
 	}
 
 	return out
+}
+
+// completionListItemDefaultFormat is the CompletionList.itemDefaults
+// property name (LSP 3.18 `completionList.itemDefaults: string[]`) for the
+// insert-text format default this server can emit.
+const completionListItemDefaultFormat = "insertTextFormat"
+
+// completionListFor wraps items in a CompletionList, attaching ItemDefaults
+// for the fields every item repeats verbatim -- but only for fields the
+// client advertised in `completionList.itemDefaults`.
+//
+// Of everything items() sets uniformly, only InsertTextFormat is even
+// eligible for defaults: SortText embeds a per-item group prefix plus the
+// label, FilterText is the label itself, and InsertText carries either the
+// label or a per-candidate snippet. Kind is constant per response but has
+// no defaults-counterpart in CompletionItemDefaults, so it stays item-only.
+// InsertTextFormat is constant across a response exactly when no item
+// carries a snippet -- the snippetSupport-off shape, where every item is
+// PlainText -- or when every item happens to be a snippet; a mixed response
+// (snippet-capable client on a vocabulary with skeletons) emits no default.
+//
+// Item values stay explicit even when a default is emitted, and applyKind is
+// never set: without applyKind the spec's default Replace combination means
+// an explicit item value always wins over the default, so the defaults are a
+// pure bandwidth hint and the rendered behavior is byte-for-byte identical
+// to the bare-slice shape. The bandwidth win is partial (one shared enum
+// instead of N repeated ones) in exchange for zero behavioral risk.
+func completionListFor(items []protocol.CompletionItem, caps clientCaps) *protocol.CompletionList {
+	list := &protocol.CompletionList{Items: items}
+
+	if len(items) == 0 || !advertisesCompletionDefault(caps, completionListItemDefaultFormat) {
+		return list
+	}
+
+	format := items[0].InsertTextFormat
+
+	for _, item := range items[1:] {
+		if item.InsertTextFormat != format {
+			return list
+		}
+	}
+
+	list.ItemDefaults = &protocol.CompletionItemDefaults{InsertTextFormat: format}
+
+	return list
+}
+
+// advertisesCompletionDefault reports whether the client opted into the
+// named CompletionList.itemDefaults property at Initialize (LSP 3.18
+// `completionList.itemDefaults: string[]`). Matching is exact: the spec's
+// property names are camelCase JSON keys like "insertTextFormat".
+func advertisesCompletionDefault(caps clientCaps, field string) bool {
+	for _, advertised := range caps.completionListDefaults {
+		if advertised == field {
+			return true
+		}
+	}
+
+	return false
 }
 
 // prefixRange returns the single-line range covering the already-typed

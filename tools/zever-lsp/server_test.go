@@ -354,6 +354,37 @@ func TestClientCapsFor(t *testing.T) {
 			withItem(itemWith(&yes, &yes, []string{"detail"})),
 			clientCaps{snippetSupport: true, insertReplaceSupport: true, resolveProps: []string{"detail"}},
 		},
+		{
+			"list defaults without an item block",
+			&protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{
+						Completion: &protocol.CompletionClientCapabilities{
+							CompletionList: &protocol.CompletionListCapabilities{
+								ItemDefaults: []string{"insertTextFormat"},
+							},
+						},
+					},
+				},
+			},
+			clientCaps{completionListDefaults: []string{"insertTextFormat"}},
+		},
+		{
+			"list defaults alongside item caps",
+			&protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{
+						Completion: &protocol.CompletionClientCapabilities{
+							CompletionItem: itemWith(&yes, nil, nil),
+							CompletionList: &protocol.CompletionListCapabilities{
+								ItemDefaults: []string{"insertTextFormat", "editRange"},
+							},
+						},
+					},
+				},
+			},
+			clientCaps{snippetSupport: true, completionListDefaults: []string{"insertTextFormat", "editRange"}},
+		},
 	}
 
 	for _, tc := range tests {
@@ -368,11 +399,12 @@ func TestClientCapsFor(t *testing.T) {
 }
 
 // equalClientCaps reports whether two capability sets agree on every field,
-// comparing resolveProps by value since clientCapsFor copies the slice.
+// comparing slice fields by value since clientCapsFor copies them.
 func equalClientCaps(got, want clientCaps) bool {
 	return got.snippetSupport == want.snippetSupport &&
 		got.insertReplaceSupport == want.insertReplaceSupport &&
-		slices.Equal(got.resolveProps, want.resolveProps)
+		slices.Equal(got.resolveProps, want.resolveProps) &&
+		slices.Equal(got.completionListDefaults, want.completionListDefaults)
 }
 
 // TestInitializeStoresCompletionCaps proves Initialize records the negotiated
@@ -947,9 +979,9 @@ func TestCompletion(t *testing.T) {
 			t.Fatalf("Completion: %v", err)
 		}
 
-		items, ok := res.(protocol.CompletionItemSlice)
-		if !ok || len(items) == 0 {
-			t.Fatalf("Completion result = %#v, want non-empty CompletionItemSlice", res)
+		items, ok := res.(*protocol.CompletionList)
+		if !ok || len(items.Items) == 0 {
+			t.Fatalf("Completion result = %#v, want non-empty *protocol.CompletionList", res)
 		}
 	})
 
@@ -1545,6 +1577,50 @@ func TestFoldingRanges(t *testing.T) {
 			t.Errorf("FoldingRanges unknown doc = %+v, want null", ranges)
 		}
 	})
+}
+
+// TestUntitledDocumentIsNullSafe proves an unsaved (untitled:) buffer --
+// which the VS Code client now forwards via its documentSelector -- never
+// errors: DidOpen drops it (uriToPath has no filesystem path for it) and
+// every handler answers with its unknown-document result.
+func TestUntitledDocumentIsNullSafe(t *testing.T) {
+	t.Parallel()
+
+	const untitledDoc = "untitled:Untitled-1"
+
+	s := NewServer()
+
+	openDoc(t, s, untitledDoc, "entity User {\n}\n")
+
+	if _, ok := s.ws.DocContent(untitledDoc); ok {
+		t.Fatal("untitled buffer must not be stored: it has no filesystem path")
+	}
+
+	if res, err := s.Completion(t.Context(), &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(untitledDoc)},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	}); err != nil || res != nil {
+		t.Errorf("Completion(untitled) = (%v, %v), want (nil, nil)", res, err)
+	}
+
+	if ranges, err := s.FoldingRanges(t.Context(), &protocol.FoldingRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(untitledDoc)},
+	}); err != nil || ranges != nil {
+		t.Errorf("FoldingRanges(untitled) = (%v, %v), want (nil, nil)", ranges, err)
+	}
+
+	res, err := s.DocumentSymbol(t.Context(), &protocol.DocumentSymbolParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(untitledDoc)},
+	})
+	if err != nil {
+		t.Fatalf("DocumentSymbol(untitled): %v", err)
+	}
+
+	if syms, ok := res.(protocol.DocumentSymbolSlice); !ok || len(syms) != 0 {
+		t.Errorf("DocumentSymbol(untitled) = %#v, want empty", res)
+	}
 }
 
 func TestDocumentHighlight(t *testing.T) {

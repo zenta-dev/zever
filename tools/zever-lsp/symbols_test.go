@@ -1090,3 +1090,65 @@ func TestAstParamTypeName(t *testing.T) {
 		})
 	}
 }
+
+// TestFilterSymbolsByQueryRanksPrefixAboveSubstring proves a non-empty
+// query ranks exact-prefix matches above mere substring matches, keeping
+// the input order within each tier: "GetUser" precedes "User" in the input
+// but only "User" and "UserService" start with "user".
+func TestFilterSymbolsByQueryRanksPrefixAboveSubstring(t *testing.T) {
+	mkSym := func(name string) protocol.SymbolInformation {
+		return protocol.SymbolInformation{
+			BaseSymbolInformation: protocol.BaseSymbolInformation{Name: name, Kind: protocol.SymbolKindClass},
+		}
+	}
+
+	in := protocol.SymbolInformationSlice{
+		mkSym("GetUser"),
+		mkSym("User"),
+		mkSym("UserService"),
+		mkSym("Unrelated"),
+	}
+
+	got := filterSymbolsByQuery(in, "user")
+
+	want := []string{"User", "UserService", "GetUser"}
+
+	if len(got) != len(want) {
+		t.Fatalf("filterSymbolsByQuery() = %v, want %v", workspaceSymbolNames(got), want)
+	}
+
+	for i, name := range want {
+		if got[i].Name != name {
+			t.Errorf("rank %d = %q, want %q (full order: %v)", i, got[i].Name, name, workspaceSymbolNames(got))
+		}
+	}
+}
+
+// TestWorkspaceSymbolsPrefixRanksAboveSubstring proves the ranking end to
+// end: "MyTask" is declared before "Task" but only "Task" starts with
+// "task", so the prefix match leads despite the declaration order.
+func TestWorkspaceSymbolsPrefixRanksAboveSubstring(t *testing.T) {
+	files := map[string]string{
+		"main.zen": "entity MyTask {\n\tid: uuid @primary\n}\n\nentity Task {\n\tid: uuid @primary\n}\n",
+	}
+
+	result, diags := compile.Compile(files)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	symbols := workspaceSymbols(result.Schema, files, "task")
+	names := workspaceSymbolNames(symbols)
+
+	want := []string{"Task", "MyTask"}
+
+	if len(names) != len(want) {
+		t.Fatalf("workspaceSymbols(task) = %v, want %v", names, want)
+	}
+
+	for i, name := range want {
+		if names[i] != name {
+			t.Errorf("rank %d = %q, want %q (full order: %v)", i, names[i], name, names)
+		}
+	}
+}

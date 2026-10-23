@@ -332,39 +332,49 @@ func negotiatePositionEncoding(params *protocol.InitializeParams) protocol.Posit
 
 // clientCaps records the completion capabilities a client advertised at
 // Initialize: whether completion items may carry snippet insert text,
-// whether the client understands insert/replace edits, and which item
-// properties it can resolve lazily. The zero value -- a client that
-// advertised nothing -- renders every item as a plain-text label.
+// whether the client understands insert/replace edits, which item
+// properties it can resolve lazily, and which CompletionList item-default
+// fields it opts into (LSP 3.18 `completionList.itemDefaults`). The zero
+// value -- a client that advertised nothing -- renders every item as a
+// plain-text label with no list defaults.
 type clientCaps struct {
-	snippetSupport       bool
-	insertReplaceSupport bool
-	resolveProps         []string
+	snippetSupport         bool
+	insertReplaceSupport   bool
+	resolveProps           []string
+	completionListDefaults []string
 }
 
 // clientCapsFor reads the completion capabilities out of an Initialize
 // request's params. Every pointer in the chain may be nil -- a client that
 // advertises no completion block negotiates nothing -- so each level is
-// guarded the same way Initialize guards the tooltip flag.
+// guarded the same way Initialize guards the tooltip flag. The item and
+// list blocks are independent: a client may opt into list item-defaults
+// without advertising any item capabilities.
 func clientCapsFor(params *protocol.InitializeParams) clientCaps {
 	if params == nil || params.Capabilities.TextDocument == nil ||
-		params.Capabilities.TextDocument.Completion == nil ||
-		params.Capabilities.TextDocument.Completion.CompletionItem == nil {
+		params.Capabilities.TextDocument.Completion == nil {
 		return clientCaps{}
 	}
 
-	item := params.Capabilities.TextDocument.Completion.CompletionItem
+	comp := params.Capabilities.TextDocument.Completion
 
 	var caps clientCaps
 
-	if item.SnippetSupport != nil {
-		caps.snippetSupport = *item.SnippetSupport
+	if item := comp.CompletionItem; item != nil {
+		if item.SnippetSupport != nil {
+			caps.snippetSupport = *item.SnippetSupport
+		}
+
+		if item.InsertReplaceSupport != nil {
+			caps.insertReplaceSupport = *item.InsertReplaceSupport
+		}
+
+		caps.resolveProps = append([]string(nil), item.ResolveSupport.Properties...)
 	}
 
-	if item.InsertReplaceSupport != nil {
-		caps.insertReplaceSupport = *item.InsertReplaceSupport
+	if list := comp.CompletionList; list != nil {
+		caps.completionListDefaults = append([]string(nil), list.ItemDefaults...)
 	}
-
-	caps.resolveProps = append([]string(nil), item.ResolveSupport.Properties...)
 
 	return caps
 }
@@ -730,7 +740,10 @@ func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
 }
 
 // Completion lists the candidates valid at the cursor. A nil result encodes
-// LSP null: nothing to offer here, or the document is unknown.
+// LSP null: nothing to offer here, or the document is unknown. The result
+// is a CompletionList (rather than a bare item slice) so uniform
+// per-response fields can ride along as itemDefaults; see completionListFor
+// for which fields qualify and why item values stay explicit.
 func (s *Server) Completion(ctx context.Context, params *protocol.CompletionParams) (protocol.CompletionResult, error) {
 	s.captureClient(ctx)
 
@@ -752,7 +765,7 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 		return nil, nil //nolint:nilnil // LSP encodes "no completions" as a null result
 	}
 
-	return protocol.CompletionItemSlice(items), nil
+	return completionListFor(items, caps), nil
 }
 
 // CompletionResolve fills in a single completion item's detail. It delegates
