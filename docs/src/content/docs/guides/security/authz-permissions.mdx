@@ -10,11 +10,9 @@ description: Guard routes and RPCs with allow or deny checks using noop, RBAC, o
 The default `noop` denies every check with `implicit_deny`: a placeholder until real policies exist, never for a protected deployment.
 
 ```sh
-PERMISSION_ADAPTER=rbac
 ```
 
 ```sh
-PERMISSION_ADAPTER=rbac
 ```
 
 ```go title="main.go"
@@ -73,7 +71,7 @@ Decisions are `allow`, `implicit_deny` (no rule matched), or `explicit_deny` (a 
 <details>
 <summary>Every request is denied</summary>
 
-The adapter is still `noop`. Set `PERMISSION_ADAPTER=rbac` (or `casbin`).
+The default backend is `noop`. Wire `rbac` (or `casbin`) with a `container.Provide` entry in `internal/app/wiring.go` and rebuild.
 </details>
 
 <details>

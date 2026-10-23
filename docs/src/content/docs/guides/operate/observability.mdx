@@ -14,14 +14,13 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 ```go title="main.go"
 import (
     "context"
-    "github.com/zenta-dev/zever/adapters/observability/stdout"
+    observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
     "github.com/zenta-dev/zever/core/observability"
 )
 
-stdout.Register() // container wires nothing
-c := container.New(config.Default())
+c := container.New(config.Default(), container.Provide(observability.DefaultRef(), observabilitystdout.New))
 p, err := c.Observability()
 if err != nil {
     panic(err)
@@ -41,14 +40,13 @@ Expected output: span lines in human-readable form.
 Use `otlp` to reach a real collector. Replicas all funnel into one collector keyed by `service_name`.
 
 ```sh
-OBSERVABILITY_ADAPTER=otlp
 OBSERVABILITY_SERVICE_NAME=bookings
 OBSERVABILITY_ENDPOINT=collector:4317
 OBSERVABILITY_SAMPLE_RATIO=0.1
 OBSERVABILITY_HEADERS_X-TENANT=acme
 ```
 
-Env names follow the usual scheme: `OBSERVABILITY_ADAPTER`, `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`.
+Env names follow the usual scheme: `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`. The backend (`stdout` default, `otlp` for a collector) is wired in code, not env.
 
 `Validate` requires `service_name` of 1 to 128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. Adapters are `noop` for tests, `stdout` (default) for local visibility, and `otlp` for production. See the [observability config reference](../../../reference/config/#observability).
 
@@ -77,7 +75,7 @@ Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValue
 ## Production checklist
 
 - Providers declare `Shutdown(ctx)`, not `Close`. `c.Close(ctx)` probes it so buffered spans flush. Always shut down with a timeout-bearing context.
-- Set `OBSERVABILITY_ADAPTER=otlp` in production; the default `stdout` keeps traces on the box.
+- Wire the `otlp` backend in production; the default `stdout` keeps traces on the box.
 - Never log raw option maps. Use `cfg.RedactedServices()`.
 
 ## Troubleshooting

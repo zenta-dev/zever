@@ -10,7 +10,6 @@ Use `workflow` for multi-step runs (onboarding, payouts, provisioning) that must
 ## Quick start
 
 ```sh
-WORKFLOW_ADAPTER=memory
 WORKFLOW_NAMESPACE=bookings
 ```
 
@@ -47,7 +46,7 @@ wf-b-1 <nil>
 <nil> map[booking_id:b-1]
 ```
 
-Register the adapter with `workflowmemory.Register()` before resolving through the container (`c.Workflow()`). The only query name is `state`; any other returns an unknown-query error. On `memory`, `Start` runs the registered step inline and finishes the run, so a later `Signal` or `Cancel` on it returns a run-completed error; those calls act on runs still in flight (`db`). Pass an empty `workflowID` to generate one (`run-N` on memory); a duplicate ID fails with a duplicate-run error. `Signal(ctx, runID, name, value)` delivers a value to a running ID. `Workflow()` resolves lazily, caches per container, and retries after errors; `Close() error` takes no context. See [the container](../../../concepts/container/).
+Wire the adapter with a `container.Provide` entry before resolving through the container (`c.Workflow()`). The only query name is `state`; any other returns an unknown-query error. On `memory`, `Start` runs the registered step inline and finishes the run, so a later `Signal` or `Cancel` on it returns a run-completed error; those calls act on runs still in flight (`db`). Pass an empty `workflowID` to generate one (`run-N` on memory); a duplicate ID fails with a duplicate-run error. `Signal(ctx, runID, name, value)` delivers a value to a running ID. `Workflow()` resolves lazily, caches per container, and retries after errors; `Close() error` takes no context. See [the container](../../../concepts/container/).
 
 ## Choose a backend
 
@@ -61,13 +60,12 @@ Register the adapter with `workflowmemory.Register()` before resolving through t
 ## Configure the workflow
 
 ```sh
-WORKFLOW_ADAPTER=memory
 WORKFLOW_NAMESPACE=bookings
 WORKFLOW_HOST_PORT=127.0.0.1:7233
 WORKFLOW_DSN=postgres://app:secret@db:5432/app
 ```
 
-`namespace` scopes runs; `host_port` names a workflow server address when the backend needs one. Durable keys are `dsn`, `table` (default `workflow_runs`), and `dedicated_pool`. All are optional for `memory`. `Validate` only rejects a malformed `host_port` (it must split as host:port when set); everything else passes to the adapter. A durable workflow shares the container pool for its DSN with every other battery on that DSN (first opener's `max_conns` wins); set `WORKFLOW_DEDICATED_POOL=true` with a separate workflow database under load. All keys: [workflow config reference](../../../reference/config/#workflow).
+`namespace` scopes runs; `host_port` names a workflow server address when the backend needs one. Durable keys are `dsn`, `table` (default `workflow_runs`), and `dedicated_pool`. All are optional for `memory`. `Validate` only rejects a malformed `host_port` (it must split as host:port when set); everything else passes to the adapter. A durable workflow can share one pool with every other battery on the same DSN by wiring `NewFromDB` over a shared `db.DB` (first opener's `max_conns` wins); set `WORKFLOW_DEDICATED_POOL=true` with a separate workflow database under load. All keys: [workflow config reference](../../../reference/config/#workflow).
 
 ## Production checklist
 

@@ -13,7 +13,7 @@
 //	environment; see LoadEnv and FromEnv.
 //
 // Backend selection is compile-time, not configuration: adapters are wired
-// in wiring.go with container.Provide plus direct imports. The environment
+// in the app's wiring module with container.Provide plus direct imports. The environment
 // only tunes options; any *_ADAPTER key fails resolution, and a Config
 // carries no adapter names. Named instances add a middle segment
 // (DB__REPORTING__DSN); see ApplyEnv and InstanceNames.

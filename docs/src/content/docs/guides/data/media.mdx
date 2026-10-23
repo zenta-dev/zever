@@ -12,7 +12,6 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 `local` (default, `adapters/media/local`) writes under `root` and suits single instances and tests. `s3` (`adapters/media/s3`) needs `bucket`, `region`, and credentials. Transforms call the configured `ffmpeg` and `ffprobe` binaries.
 
 ```sh
-MEDIA_ADAPTER=local
 MEDIA_ROOT=/var/media
 MEDIA_MAX_DOWNLOAD_BYTES=67108864
 MEDIA_MAX_PIXELS=50000000
@@ -40,9 +39,8 @@ import (
 )
 
 func main() {
-	medialocal.Register()
 	ctx := context.Background()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(media.DefaultRef(), medialocal.New))
 	defer c.Close(ctx)
 
 	m, err := c.Media()

@@ -98,9 +98,7 @@ export function envKeyProblems(code) {
         continue;
       }
       if (field.toUpperCase() === 'ADAPTER' && svc in services) {
-        const known = [...(truth[svc]?.adapters ?? [])];
-        if (known.length && !known.includes(value))
-          out.push(`env ${m[1]}_ADAPTER: "${value}" is not a ${svc} adapter (known: ${known.join(', ')})`);
+        out.push(`env ${m[1]}_ADAPTER: adapter selection is code, not config (wire ${svc} in internal/app/wiring.go with container.Provide and rebuild; *_ADAPTER keys are rejected)`);
       }
       // Canonical field spelling: the runtime matches case- and
       // underscore-insensitively, but docs should use the canonical key.
@@ -120,14 +118,13 @@ export function envKeyProblems(code) {
 
 // matrixProblems cross-checks the adapters matrix
 // (reference/adapters-matrix.mdx) against the same extracted truth:
-// every row's module dir must exist, its Register() must be a real
+// every row's module dir must exist, its New() constructor must be a real
 // function in that dir, its accessor must be a real Container method,
-// and the adapter must line up with the service's extracted registry
-// set in BOTH directions (a row nothing registers, and a registered
-// adapter with no row). A row that names no registry — the ffmpeg
-// binary helper, the cookie stdlib builder, the job dispatcher
-// ("none (no registry)") — selects nothing by config adapter value, so
-// it only gets the module and accessor checks.
+// and the adapter must line up with the service's shipped adapter set in
+// BOTH directions (a row nothing ships, and a shipped adapter with no
+// row). A row that names no backend — the ffmpeg binary helper, the
+// cookie stdlib builder, the job dispatcher ("none (no backend)") —
+// selects nothing, so it only gets the module and accessor checks.
 export function matrixProblems(truth) {
   const accessors = new Set();
   for (const f of fs.readdirSync(path.join(repo, 'container')).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go')))
@@ -142,17 +139,17 @@ export function matrixProblems(truth) {
     const dir = mod.replace(/^github\.com\/zenta-dev\/zever\//, '');
     if (!fs.existsSync(path.join(repo, dir))) out.push(`${where}: module dir missing: ${dir}`);
     if (!accessors.has(acc)) out.push(`${where}: accessor c.${acc}() not in container`);
-    if (register.startsWith('none')) continue;
     rowAdapters[svcKey] ??= new Set();
     rowAdapters[svcKey].add(adapter);
+    if (register.startsWith('none')) continue;
     const goFiles = fs.existsSync(path.join(repo, dir)) ? fs.readdirSync(path.join(repo, dir)).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go')) : [];
-    if (!goFiles.some((f) => /func Register\(/.test(read(path.join(repo, dir, f))))) out.push(`${where}: Register() not found in ${dir}`);
+    if (!goFiles.some((f) => /\bfunc New\(/.test(read(path.join(repo, dir, f))))) out.push(`${where}: New() constructor not found in ${dir}`);
     const known = [...truth[svcKey].adapters];
-    if (!truth[svcKey].adapters.has(adapter)) out.push(`${where}: adapter "${adapter}" is not registered (known: ${known.join(', ')})`);
+    if (!truth[svcKey].adapters.has(adapter)) out.push(`${where}: adapter "${adapter}" is not shipped (known: ${known.join(', ')})`);
   }
   for (const [svc, v] of Object.entries(truth))
     for (const a of v.adapters)
-      if (!rowAdapters[svc]?.has(a)) out.push(`adapters-matrix.mdx: ${svc} adapter "${a}" is registered but has no matrix row`);
+      if (!rowAdapters[svc]?.has(a)) out.push(`adapters-matrix.mdx: ${svc} adapter "${a}" is shipped but has no matrix row`);
   return out;
 }
 
@@ -165,17 +162,17 @@ function tokens(code) {
 // selfTest plants the env-key mistakes this checker exists to catch and
 // asserts it rejects them, and that the correct spellings pass. It proves
 // the guard bites instead of trusting that the regex still matches.
-// The adapter-set cases are pinned against the REAL tree: if the register.go
-// scanner ever stops recognizing a legal registration spelling (a
-// `pkg.Adapter("name")` conversion is as legal as a plain string literal),
-// the extracted set shrinks and these cases fail instead of the docs
-// audit silently drifting (a golden only answers "unchanged"; a planted
-// failure proves the checker still bites).
+// The adapter-set cases are pinned against the REAL tree: the shipped set
+// comes from adapter directories (each dir is a compiled-in backend), so if
+// the directory scan ever stops recognizing a legal layout the extracted
+// set shrinks and these cases fail instead of the docs audit silently
+// drifting (a golden only answers "unchanged"; a planted failure proves
+// the checker still bites).
 function selfTest() {
   const cases = [
     {
       name: 'the default instance spelled flat passes',
-      code: 'DB_ADAPTER=postgres\nDB_DSN=postgres://app:secret@db:5432/app\n',
+      code: 'DB_DSN=postgres://app:secret@db:5432/app\n',
       expect: 0,
     },
     {
@@ -189,9 +186,14 @@ function selfTest() {
       expect: 1,
     },
     {
-      name: 'the default instance spelled __DEFAULT__ with an adapter is rejected',
-      code: 'AUTH__DEFAULT__ADAPTER=jwt\n',
+      name: 'an adapter selector is rejected',
+      code: 'DB_ADAPTER=postgres\n',
       expect: 1,
+    },
+    {
+      name: 'a named-instance adapter selector is rejected',
+      code: 'AUTH__DEFAULT__ADAPTER=jwt\n',
+      expect: 2,
     },
     {
       name: 'an unknown adapter name is rejected',
@@ -209,12 +211,12 @@ function selfTest() {
   // legal spellings plus the forms that must NOT contribute a name.
   const throwsFor = (src) => { try { adapterNamesFromRegister(src); return false; } catch { return true; } };
   const checks = [
-    { name: 'the conversion-form const feeds the idempotency adapter set on the real tree', ok: truth.idempotency.adapters.has('db') },
-    { name: 'the conversion-form const feeds the session adapter set on the real tree', ok: truth.session.adapters.has('db') },
-    { name: 'IDEMPOTENCY_ADAPTER=db is clean after the fix', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=db\n').length === 0 },
-    { name: 'SESSION_ADAPTER=db is clean after the fix', ok: envKeyProblems('SESSION_ADAPTER=db\n').length === 0 },
-    { name: 'an unknown idempotency adapter value is still rejected', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=nope\n').length === 1 },
-    { name: 'an unknown session adapter value is still rejected', ok: envKeyProblems('SESSION_ADAPTER=nope\n').length === 1 },
+    { name: 'the directory scan feeds the idempotency adapter set on the real tree', ok: truth.idempotency.adapters.has('db') },
+    { name: 'the directory scan feeds the session adapter set on the real tree', ok: truth.session.adapters.has('db') },
+    { name: 'IDEMPOTENCY_ADAPTER=db is rejected', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=db\n').length === 1 },
+    { name: 'SESSION_ADAPTER=db is rejected', ok: envKeyProblems('SESSION_ADAPTER=db\n').length === 1 },
+    { name: 'an unknown idempotency adapter value is rejected', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=nope\n').length === 1 },
+    { name: 'an unknown session adapter value is rejected', ok: envKeyProblems('SESSION_ADAPTER=nope\n').length === 1 },
     { name: 'a non-canonical field spelling is rejected (DB_MAXCONNS)', ok: envKeyProblems('DB_MAXCONNS=20\n').length === 1 },
     { name: 'the canonical field spelling passes (DB_MAX_CONNS)', ok: envKeyProblems('DB_MAX_CONNS=20\n').length === 0 },
     {

@@ -12,7 +12,6 @@ Stay on `log` for development and CI, and move to `smtp` for production; there i
 ## Quick start
 
 ```sh
-MAILER_ADAPTER=log
 MAILER_HOST=localhost
 MAILER_PORT=25
 ```
@@ -31,8 +30,7 @@ import (
 )
 
 func main() {
-	maillog.Register()
-	m, _ := mailer.Open(mailer.Log, mailer.Options{Host: "localhost", Port: 25})
+	m, _ := maillog.New(mailer.Options{Host: "localhost", Port: 25})
 	defer m.Close()
 
 	msg := mailer.NewMail(
@@ -58,7 +56,6 @@ logged, not delivered
 <Tabs>
   <TabItem label="YAML">
 ```sh
-MAILER_ADAPTER=smtp
 MAILER_HOST=mail.example.com
 MAILER_PORT=587
 MAILER_USERNAME=bookings
@@ -70,7 +67,6 @@ MAILER_MAX_MESSAGE_SIZE=10485760
   </TabItem>
   <TabItem label="Env">
 ```sh
-MAILER_ADAPTER=smtp
 MAILER_HOST=mail.example.com
 MAILER_PORT=587
 MAILER_USERNAME=bookings

@@ -33,7 +33,7 @@ The rest of this page walks each row. Read [Check the migration](#check-the-migr
 `zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read. `config.Load` is gone. `config.FromEnv()` plus `config.Resolve(env)` replace them. The framework does not look for a legacy file at all: no probe, no discovery step, no warning.
 
 <Aside type="danger" title="A leftover file is inert">
-A v0.7.x file left in the working directory is silently ignored. Every service falls back to its built-in default adapter, so a half-translated project looks healthy while it talks to the wrong database. Nothing will tell you: translate the file by hand and delete it. The mapping is mechanical, `adapter:` becomes `<SERVICE>_ADAPTER` and every `options:` key becomes `<SERVICE>_<KEY>`.
+A v0.7.x file left in the working directory is silently ignored. Every service falls back to its compiled-in wiring, so a half-translated project looks healthy while it talks to the wrong database. Nothing will tell you: translate the file by hand and delete it. The mapping is mechanical: every `options:` key becomes `<SERVICE>_<KEY>`, and each `adapter:` becomes a `container.Provide` entry (plus import) in `internal/app/wiring.go`.
 </Aside>
 
 Translate each `adapter:` and `options:` key to an uppercase env variable. Every service uses `<SERVICE>_<FIELD>`; named instances use `<SERVICE>__<NAME>__<FIELD>`.
@@ -88,32 +88,27 @@ Example:
 -    max_conns: 20
 -log:
 -  adapter: slog
-+DB_ADAPTER=postgres
 +DB_DSN=postgres://app:secret@db:5432/app
 +DB_MAX_CONNS=20
-+LOG_ADAPTER=slog
 ```
 
 The same project as a `.env` file, with an AI key, a JWT secret, and a named second database:
 
 ```sh title=".env"
-DB_ADAPTER=postgres
 DB_DSN=postgres://app:secret@db:5432/app
 DB_MAX_CONNS=20
-AI_ADAPTER=anthropic
 AI_API_KEY=sk-...
-AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 DB__REPORTING__DSN=postgres://app:secret@db:5432/reporting
 ```
 
 A named instance reaches the container only through a matching named Ref (`db.Ref("reporting")`) wired with `container.Provide`. The default instance reads the flat `<SERVICE>_<FIELD>` namespace.
 
-Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes `<SERVICE>_<KEY>` uppercased; one nesting level flattens with a single underscore (`jwt.secret` under auth becomes `AUTH_JWT_SECRET`); durations are Go strings in env (`5s`, `1m`), not integer nanoseconds. Keys with no string form (maps, lists) cannot move to env. Full mapping and defaults: [Config reference](../../../reference/config/).
+Rules: `adapter:` becomes a `container.Provide` entry in `internal/app/wiring.go` (there is no adapter env key -- any `*_ADAPTER` key fails resolution); each `options:` key becomes `<SERVICE>_<KEY>` uppercased; one nesting level flattens with a single underscore (`jwt.secret` under auth becomes `AUTH_JWT_SECRET`); durations are Go strings in env (`5s`, `1m`), not integer nanoseconds. Keys with no string form (maps, lists) cannot move to env. Full mapping and defaults: [Config reference](../../../reference/config/).
 
 ## Adapter names
 
-Three services dropped the alias names that only existed for the old file. The DB-backed adapter has one name now, `db`, and the DSN decides the backend.
+Three services dropped the alias names that only existed for the old file. The DB-backed wiring is one constructor now (`searchdb.New` and friends), and the DSN decides the backend: a postgres URL selects postgres, anything else selects embedded sqlite.
 
 | v0.7.x alias | v0.8.0 name | Backend picked from the DSN |
 |---|---|---|
@@ -130,16 +125,14 @@ Three services dropped the alias names that only existed for the old file. The D
 -  adapter: pgvector
 -workflow:
 -  adapter: postgres
-+SEARCH_ADAPTER=db
-+VECTORSTORE_ADAPTER=db
-+WORKFLOW_ADAPTER=db
+(no env change: the same `db` constructor reads the DSN and picks the backend)
 ```
 
-`core/db` keeps its own two adapters: `DB_ADAPTER=sqlite` and `DB_ADAPTER=postgres` are two real databases, not aliases. A removed name does not fall back to a default. It fails with `unknown adapter`, so a stale `SEARCH_ADAPTER=postgres` stops the boot instead of quietly picking a backend you did not ask for.
+`core/db` keeps two real databases behind two constructors (`dbsqlite.New`, `dbpostgres.New`): switching is an import plus a `container.Provide` change, not aliases. A removed backend does not fall back to a default. A stale `*_ADAPTER` key fails resolution instead of quietly picking a backend you did not ask for.
 
 ## Wire adapters with Provide
 
-The container no longer resolves adapters through name registries. `zever new` scaffolds one `Ref` var plus one `container.Provide` entry per instance, and `zever add <battery>` inserts more. Adapters still expose a `Register()` for the core registry, but the container path is `Provide`.
+The container never resolves adapters through name registries: there is no registry. `zever new` scaffolds one `Ref` var plus one `container.Provide` entry per instance, and `zever add <battery>` inserts more. Adapters expose only a `New` constructor; the container path is `Provide`.
 
 ```diff title="internal/app/wiring.go"
 -package app
@@ -249,7 +242,7 @@ Project layout is defaults-only, overridable by six `ZEVER_*` variables (no file
 ## Check the migration
 
 <Steps>
-1. Read the resolved values back. `zever config show` prints one `<service>  adapter=<x>` header per service with its redacted options, and one `<service>/<NAME>` section per named instance. Compare it with the file you translated: every service you configured must show the adapter and the option values you moved over.
+1. Read the resolved values back. `zever config show` prints one `<service>  driver=<x>` header per service with its redacted options, and one `<service>/<NAME>` section per named instance. Compare it with the file you translated: every service you configured must show the wired driver and the option values you moved over.
 
    ```sh
    zever config show
@@ -266,21 +259,21 @@ A wrong value is loud, so those two commands are enough:
 
 | What is wrong | What you see |
 |---|---|
-| A removed adapter alias, for example `SEARCH_ADAPTER=postgres` | `search  FAIL  container: search: search: unknown adapter: postgres (forgotten import?)` |
+| A stale adapter key (for example a removed `SEARCH_ADAPTER` variable) | `config: unknown field "ADAPTER" for service "search": adapter selection removed; wire in internal/app/wiring.go with container.Provide and rebuild` |
 | A misspelled key, for example `DB_MAXCONN=20` | `config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`, then `check env key "DB_MAXCONN" (did you mean "DB_MAX_CONNS"?)` |
 | A value that does not parse, for example `DB_MAX_CONNS=abc` | `config: invalid options db: config: invalid value for field "MAX_CONNS" from env DB_MAX_CONNS: expected int` |
-| A v0.7.x file still in the working directory | nothing at all: the file is never read, so every service falls back to its built-in default adapter |
+| A v0.7.x file still in the working directory | nothing at all: the file is never read, so every service falls back to its compiled-in wiring |
 
 That last row is the only silent one. A leftover file never fails a check, so compare `zever config show` against the file you translated, then delete the file.
 
 ## Migration checklist
 
 1. Move every `zever.yaml` stanza to `.env` or the process environment using the table above.
-2. Rename the removed adapter aliases to `db` for the `search`, `vectorstore`, and `workflow` services.
+2. Point the `search`, `vectorstore`, and `workflow` services at the `db` constructors (`searchdb.New` and friends take the DSN and pick the backend).
 3. Move the `project` stanza to the `ZEVER_*` variables.
 4. Delete `zever.yaml`; nothing reads it, so a leftover file is ignored and its values are lost.
 5. Replace `config.Load(...)` with `config.FromEnv()` plus `config.Resolve(env)`.
-6. Replace adapter `Register()` wiring with `container.Provide` entries in `internal/app/wiring.go`.
+6. Replace adapter `Register()` wiring with `container.Provide` entries in `internal/app/wiring.go` (imports plus entries; nothing is registered anymore).
 7. Replace `--profile` with `--with` in scripts and CI.
 8. Regenerate the server entrypoint so it calls `serve.Main` with providers and modules.
 9. Update Kubernetes manifests to inject `env:` from a Secret (no mounted config file).

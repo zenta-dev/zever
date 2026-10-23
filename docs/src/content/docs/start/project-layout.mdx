@@ -45,7 +45,7 @@ Batteries under `core/`: agent, ai, analytics, auth, authz, billing, cache, cryp
 
 ## Resolve a service from the container
 
-`container/` is the only resolver. Application code never constructs adapters directly:
+`container/` is the only resolver. Application code names constructors in `container.Provide` calls; the container calls them lazily on first use:
 
 ```go title="main.go" check
 package main
@@ -53,19 +53,19 @@ package main
 import (
 	"fmt"
 
-	"github.com/zenta-dev/zever/adapters/db/sqlite"
+	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/db"
 )
 
 func main() {
-	sqlite.Register()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(db.DefaultRef(), dbsqlite.New))
 	db, err := c.DB()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("db:", db.Dialect())
+	fmt.Println("db resolved:", db != nil)
 }
 ```
 

@@ -10,14 +10,10 @@ Use `job.Dispatcher` for deferred or retryable work (confirmation mail, push, we
 ## Quick start
 
 ```sh
-QUEUE_ADAPTER=memory
-SCHEDULER_ADAPTER=embedded
 SCHEDULER_CLOSE_TIMEOUT=5s
 ```
 
 ```sh
-QUEUE_ADAPTER=redis
-SCHEDULER_ADAPTER=embedded
 SCHEDULER_CLOSE_TIMEOUT=5s
 ```
 
@@ -57,8 +53,7 @@ func main() {
 	defer q.Close()
 	d := &job.Dispatcher{Q: q}
 
-	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
-	s, _ := scheduler.Open(scheduler.Embedded, scheduler.Options{Dispatcher: d})
+	s, _ := schedulerembedded.New(scheduler.Options{Dispatcher: d})
 	defer s.Stop()
 
 	_ = d.Dispatch(ctx, "SendConfirmation", ConfirmArgs{BookingID: "b_123"})

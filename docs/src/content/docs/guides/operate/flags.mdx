@@ -12,7 +12,6 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 `static` (the default) loads a JSON file once and costs no network call per evaluation. Use it for tests, offline dev, and rollouts that can ship with a deploy.
 
 ```sh
-FLAG_ADAPTER=static
 FLAG_STATIC_PATH=data/flags.json
 FLAG_STATIC_RELOAD=false
 ```
@@ -20,14 +19,13 @@ FLAG_STATIC_RELOAD=false
 ```go title="main.go"
 import (
     "context"
-    "github.com/zenta-dev/zever/adapters/flag/static"
+    flagstatic "github.com/zenta-dev/zever/adapters/flag/static"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
     "github.com/zenta-dev/zever/core/flag"
 )
 
-static.Register() // container wires nothing
-c := container.New(config.Default())
+c := container.New(config.Default(), container.Provide(flag.DefaultRef(), flagstatic.New))
 f, err := c.Flag()
 if err != nil {
     panic(err)
@@ -55,14 +53,12 @@ An empty static `path` is valid and means an empty flag set. Because the fallbac
 Use `firebase` when product or growth must change a flag live. It adds a real dependency and a 30s default operation timeout (`DefaultTimeout`). Durations in files are integer nanoseconds.
 
 ```sh
-FLAG_ADAPTER=firebase
 FLAG_FIREBASE_PROJECT_ID=my-project
 FLAG_FIREBASE_SERVICE_ACCOUNT=/run/secrets/firebase.json
 FLAG_FIREBASE_TIMEOUT=30s
 ```
 
 ```sh
-FLAG_ADAPTER=firebase
 FLAG_FIREBASE_PROJECTID=my-project
 FLAG_FIREBASE_TIMEOUT=30s
 ```

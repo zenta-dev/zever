@@ -14,13 +14,11 @@ import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components
 <Tabs>
   <TabItem label="db">
 ```sh
-SEARCH_ADAPTER=db
 SEARCH_DSN=./data/search.db
 ```
   </TabItem>
   <TabItem label="meilisearch">
 ```sh
-SEARCH_ADAPTER=meilisearch
 SEARCH_HOST=http://localhost:7700
 SEARCH_API_KEY=dev-only-key
 SEARCH_ALLOW_INSECURE=true
@@ -28,7 +26,7 @@ SEARCH_ALLOW_INSECURE=true
   </TabItem>
 </Tabs>
 
-`host` is the Meilisearch URL with a scheme and host; `dsn` is a postgres URL or sqlite path. `dedicated_pool: true` opts out of pool sharing. The DB-backed adapter is named `db`: the DSN decides the backend, so a sqlite path gives embedded FTS5 and a postgres URL gives tsvector/GIN. Env keys follow `<SERVICE>_<FIELD>` (for example `SEARCH_DSN`). Secrets belong in files or env, never committed plaintext. See the [search options](../../../reference/config/#search).
+`host` is the Meilisearch URL with a scheme and host; `dsn` is a postgres URL or sqlite path. `dedicated_pool: true` opts out of pool sharing. The DB-backed wiring (`searchdb.New`) reads the DSN to pick the backend, so a sqlite path gives embedded FTS5 and a postgres URL gives tsvector/GIN. Env keys follow `<SERVICE>_<FIELD>` (for example `SEARCH_DSN`). Secrets belong in files or env, never committed plaintext. See the [search options](../../../reference/config/#search).
 
 ## Index and query documents
 
@@ -45,12 +43,15 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
 func main() {
-	searchdb.Register()
 	ctx := context.Background()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(search.DefaultRef(), func(o search.Options) (search.Search, error) {
+		poolOpts := dbconn.SplitDSN(o.DSN)
+		return searchdb.New(searchdb.Options{Options: poolOpts})
+	}))
 	defer c.Close(ctx)
 
 	s, err := c.Search()

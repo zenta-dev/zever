@@ -47,8 +47,7 @@ Resolve the byte store from the container and pass the codec to the typed layer 
 ```go
 // imports: config, container, cachememory ("github.com/zenta-dev/zever/adapters/cache/memory"),
 //   "github.com/zenta-dev/zever/core/cache", "github.com/zenta-dev/zever/shared/codec"
-cachememory.Register()
-c := container.New(config.Default())
+c := container.New(config.Default(), container.Provide(cache.DefaultRef(), cachememory.New))
 inner, _ := c.Cache()
 typed := cache.NewTyped[string, MyPayload](inner, codec.JSONCodec[MyPayload]{})
 

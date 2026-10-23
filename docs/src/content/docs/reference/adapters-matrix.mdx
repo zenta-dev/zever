@@ -3,22 +3,35 @@ title: Adapters matrix
 description: Every service, adapter, package, and container accessor in one table.
 ---
 
-Each `core/<b>` package holds one interface plus a `Register`/`Open` registry, each adapter is its own Go module at `adapters/<b>/<a>`, and the container is the sole resolver. This matrix maps service to adapter module and accessor so swaps stay config-only. Prefer a new interface over adding methods, which break implementers.
+Each `core/<b>` package holds one interface plus its `Options` and `DefaultRef`, each adapter is its own Go module at `adapters/<b>/<a>` exposing a `New` constructor, and the container resolves only what is Provided. This matrix maps service to adapter module, constructor, and accessor. Prefer a new interface over adding methods, which break implementers.
 
-## Swap an adapter by config
+## Swap an adapter in code
 
-```sh
-CACHE_ADAPTER=redis
-CACHE_ADDR=redis:6379
-QUEUE_ADAPTER=redis
-DB_ADAPTER=postgres
-DB_DSN=postgres://app:secret@db:5432/app
+Backends are compiled in: changing one means changing the import and the `container.Provide` entry in `internal/app/wiring.go`, then rebuilding. There is no adapter env key.
+
+```go
+import (
+    cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/cache"
+)
+
+var Cache = cache.DefaultRef()
+
+func Providers() []container.Provider {
+    return []container.Provider{
+        container.Provide(Cache, cacheredis.New), // was cachememory.New
+        // ... one entry per battery
+    }
+}
 ```
+
+Options still come from the environment (`CACHE_ADDR=redis:6379`, `DB_DSN=...`); only the backend choice lives in code.
 
 ## Resolve through the container
 
 ```go
-c := container.New(cfg)
+c := container.New(cfg, app.Providers()...)
 cache, err := c.Cache()
 if err != nil {
     return err
@@ -29,17 +42,13 @@ if err != nil {
 }
 ```
 
-`New(nil)` is valid; untouched services close cleanly without opening. Accessors resolve lazily and retry on the next call after an error. `Job()` builds over the resolved `Queue`; `Scheduler()` shares both, so resolving `Scheduler()` resolves `Job()` and `Queue` as a side effect.
+`New(nil)` is valid; untouched services close cleanly without opening. Accessors resolve lazily and retry on the next call after an error. `Job()` builds over the resolved `Queue`; `Scheduler()` shares both, so resolving `Scheduler()` resolves `Job()` and `Queue` as a side effect. An unwired service fails with `NotWiredError` naming the missing `container.Provide` entry.
 
-All defaults (memory/local/sqlite/log/noop) fit single-process dev. Move shared state to redis/postgres for multi-instance staging:
-
-```sh
-DB_ADAPTER=postgres CACHE_ADAPTER=redis QUEUE_ADAPTER=redis go run ./cmd/myapp
-```
+All defaults (memory/local/sqlite/log/noop) fit single-process dev. Move shared state to redis/postgres for multi-instance staging by swapping the wired constructors, then rebuilding.
 
 ## Adapter reference
 
-Each row is `| service | adapter | module | register | accessor |`. The container wires nothing: every adapter resolves only after its `Register()` runs. `none (no registry)` marks the `job` dispatcher, the `media/ffmpeg` binary helper, and the `session/cookie` stdlib builder.
+Each row is `| service | adapter | module | constructor | accessor |`. The container wires nothing itself: every adapter resolves only after its `container.Provide` entry runs, and only imported adapters link into the binary. `none (no backend)` marks the `job` dispatcher, which builds over the resolved queue instead of opening a backend.
 
 Install every adapter module you resolve (replace `vX.Y.Z` with the lockstep release version):
 
@@ -48,106 +57,106 @@ go get github.com/zenta-dev/zever/adapters/cache/redis@vX.Y.Z
 ```
 
 ```go
-import "github.com/zenta-dev/zever/adapters/cache/redis"
+import cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
 
-redis.Register()
+container.Provide(Cache, cacheredis.New)
 ```
 
-| Service | Adapter | Module | Register | Accessor |
+| Service | Adapter | Module | Constructor | Accessor |
 |---|---|---|---|---|
-| ai | anthropic | `github.com/zenta-dev/zever/adapters/ai/anthropic` | `anthropic.Register()` | `AI()` |
-| ai | openai | `github.com/zenta-dev/zever/adapters/ai/openai` | `openai.Register()` | `AI()` |
-| ai | gemini | `github.com/zenta-dev/zever/adapters/ai/gemini` | `gemini.Register()` | `AI()` |
-| ai | ollama | `github.com/zenta-dev/zever/adapters/ai/ollama` | `ollama.Register()` | `AI()` |
-| analytics | log | `github.com/zenta-dev/zever/adapters/analytics/log` | `log.Register()` | `Analytics()` |
-| analytics | posthog | `github.com/zenta-dev/zever/adapters/analytics/posthog` | `posthog.Register()` | `Analytics()` |
-| auth | jwt | `github.com/zenta-dev/zever/adapters/auth/jwt` | `jwt.Register()` | `Auth()` |
-| auth | session | `github.com/zenta-dev/zever/adapters/auth/session` | `session.Register()` | `Auth()` |
-| auth | oidc | `github.com/zenta-dev/zever/adapters/auth/oidc` | `oidc.Register()` | `Auth()` |
-| billing | stub | `github.com/zenta-dev/zever/adapters/billing/stub` | `stub.Register()` | `Billing()` |
-| billing | stripe | `github.com/zenta-dev/zever/adapters/billing/stripe` | `stripe.Register()` | `Billing()` |
-| billing | paddle | `github.com/zenta-dev/zever/adapters/billing/paddle` | `paddle.Register()` | `Billing()` |
-| cache | memory | `github.com/zenta-dev/zever/adapters/cache/memory` | `memory.Register()` | `Cache()` |
-| cache | redis | `github.com/zenta-dev/zever/adapters/cache/redis` | `redis.Register()` | `Cache()` |
-| cache | db | `github.com/zenta-dev/zever/adapters/cache/db` | `db.Register()` | `Cache()` |
-| cdn | noop | `github.com/zenta-dev/zever/adapters/cdn/noop` | `noop.Register()` | `CDN()` |
-| cdn | cloudflare | `github.com/zenta-dev/zever/adapters/cdn/cloudflare` | `cloudflare.Register()` | `CDN()` |
-| crypto | local | `github.com/zenta-dev/zever/adapters/crypto/local` | `local.Register()` | `Crypto()` |
-| crypto | kms | `github.com/zenta-dev/zever/adapters/crypto/kms` | `kms.Register()` | `Crypto()` |
-| db | sqlite | `github.com/zenta-dev/zever/adapters/db/sqlite` | `sqlite.Register()` | `DB()` |
-| db | postgres | `github.com/zenta-dev/zever/adapters/db/postgres` | `postgres.Register()` | `DB()` |
-| document | local | `github.com/zenta-dev/zever/adapters/document/local` | `local.Register()` | `Document()` |
-| document | remote | `github.com/zenta-dev/zever/adapters/document/remote` | `remote.Register()` | `Document()` |
-| document | latex | `github.com/zenta-dev/zever/adapters/document/latex` | `latex.Register()` | `Document()` |
-| eventbus | memory | `github.com/zenta-dev/zever/adapters/eventbus/memory` | `memory.Register()` | `EventBus()` |
-| eventbus | redis | `github.com/zenta-dev/zever/adapters/eventbus/redis` | `redis.Register()` | `EventBus()` |
-| flag | static | `github.com/zenta-dev/zever/adapters/flag/static` | `static.Register()` | `Flag()` |
-| flag | firebase | `github.com/zenta-dev/zever/adapters/flag/firebase` | `firebase.Register()` | `Flag()` |
-| geo | google | `github.com/zenta-dev/zever/adapters/geo/google` | `google.Register()` | `Geo()` |
-| geo | static | `github.com/zenta-dev/zever/adapters/geo/static` | `static.Register()` | `Geo()` |
-| geo | osm | `github.com/zenta-dev/zever/adapters/geo/osm` | `osm.Register()` | `Geo()` |
-| i18n | embed | `github.com/zenta-dev/zever/adapters/i18n/embed` | `embed.Register()` | `I18n()` |
-| i18n | remote | `github.com/zenta-dev/zever/adapters/i18n/remote` | `remote.Register()` | `I18n()` |
-| idempotency | memory | `github.com/zenta-dev/zever/adapters/idempotency/memory` | `memory.Register()` | `Idempotency()` |
-| idempotency | redis | `github.com/zenta-dev/zever/adapters/idempotency/redis` | `redis.Register()` | `Idempotency()` |
-| idempotency | db | `github.com/zenta-dev/zever/adapters/idempotency/db` | `db.Register()` | `Idempotency()` |
-| lock | memory | `github.com/zenta-dev/zever/adapters/lock/memory` | `memory.Register()` | `Lock()` |
-| lock | redis | `github.com/zenta-dev/zever/adapters/lock/redis` | `redis.Register()` | `Lock()` |
-| log | noop | `github.com/zenta-dev/zever/adapters/log/noop` | `noop.Register()` | `Log()` |
-| log | zerolog | `github.com/zenta-dev/zever/adapters/log/zerolog` | `zerolog.Register()` | `Log()` |
-| log | slog | `github.com/zenta-dev/zever/adapters/log/slog` | `slog.Register()` | `Log()` |
-| log | pretty | `github.com/zenta-dev/zever/adapters/log/pretty` | `pretty.Register()` | `Log()` |
-| mailer | log | `github.com/zenta-dev/zever/adapters/mailer/log` | `log.Register()` | `Mailer()` |
-| mailer | smtp | `github.com/zenta-dev/zever/adapters/mailer/smtp` | `smtp.Register()` | `Mailer()` |
-| media | local | `github.com/zenta-dev/zever/adapters/media/local` | `local.Register()` | `Media()` |
-| media | s3 | `github.com/zenta-dev/zever/adapters/media/s3` | `s3.Register()` | `Media()` |
-| media | ffmpeg | `github.com/zenta-dev/zever/adapters/media/ffmpeg` | `none (no registry)` | `Media()` |
-| notification | log | `github.com/zenta-dev/zever/adapters/notification/log` | `log.Register()` | `Notification()` |
-| notification | twilio | `github.com/zenta-dev/zever/adapters/notification/twilio` | `twilio.Register()` | `Notification()` |
-| notification | fcm | `github.com/zenta-dev/zever/adapters/notification/fcm` | `fcm.Register()` | `Notification()` |
-| observability | noop | `github.com/zenta-dev/zever/adapters/observability/noop` | `noop.Register()` | `Observability()` |
-| observability | stdout | `github.com/zenta-dev/zever/adapters/observability/stdout` | `stdout.Register()` | `Observability()` |
-| observability | otlp | `github.com/zenta-dev/zever/adapters/observability/otlp` | `otlp.Register()` | `Observability()` |
-| outbox | memory | `github.com/zenta-dev/zever/adapters/outbox/memory` | `memory.Register()` | `Outbox()` |
-| outbox | db | `github.com/zenta-dev/zever/adapters/outbox/db` | `db.Register()` | `Outbox()` |
-| outbox | cdc | `github.com/zenta-dev/zever/adapters/outbox/cdc` | `cdc.Register()` | `Outbox()` |
-| password | argon2id | `github.com/zenta-dev/zever/adapters/password/argon2` | `argon2.Register()` | `Password()` |
-| payment | stub | `github.com/zenta-dev/zever/adapters/payment/stub` | `stub.Register()` | `Payment()` |
-| payment | stripe | `github.com/zenta-dev/zever/adapters/payment/stripe` | `stripe.Register()` | `Payment()` |
-| payment | paddle | `github.com/zenta-dev/zever/adapters/payment/paddle` | `paddle.Register()` | `Payment()` |
-| permission | noop | `github.com/zenta-dev/zever/adapters/permission/noop` | `noop.Register()` | `Permission()` |
-| permission | rbac | `github.com/zenta-dev/zever/adapters/permission/rbac` | `rbac.Register()` | `Permission()` |
-| permission | casbin | `github.com/zenta-dev/zever/adapters/permission/casbin` | `casbin.Register()` | `Permission()` |
-| queue | memory | `github.com/zenta-dev/zever/adapters/queue/memory` | `memory.Register()` | `Queue()` |
-| queue | db | `github.com/zenta-dev/zever/adapters/queue/db` | `db.Register()` | `Queue()` |
-| queue | redis | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.Register()` | `Queue()` |
-| ratelimit | memory | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | `RateLimit()` |
-| ratelimit | redis | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | `RateLimit()` |
-| resilience | memory | `github.com/zenta-dev/zever/adapters/resilience/inproc` | `inproc.Register()` | `Resilience()` |
-| resilience | redis | `github.com/zenta-dev/zever/adapters/resilience/redis` | `redis.Register()` | `Resilience()` |
-| router | fiber | `github.com/zenta-dev/zever/adapters/router/fiber` | `fiber.Register()` | `Router()` |
-| router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.Register()` | `Router()` |
-| scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.Register()` | `Scheduler()` |
-| scheduler | postgres | `github.com/zenta-dev/zever/adapters/scheduler/postgres` | `postgres.Register()` | `Scheduler()` |
-| search | db | `github.com/zenta-dev/zever/adapters/search/db` | `db.Register()` | `Search()` |
-| search | meilisearch | `github.com/zenta-dev/zever/adapters/search/meilisearch` | `meilisearch.Register()` | `Search()` |
-| secrets | env | `github.com/zenta-dev/zever/adapters/secrets/env` | `env.Register()` | `Secrets()` |
-| secrets | vault | `github.com/zenta-dev/zever/adapters/secrets/vault` | `vault.Register()` | `Secrets()` |
-| session | memory | `github.com/zenta-dev/zever/adapters/session/memory` | `memory.Register()` | `Session()` |
-| session | redis | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.Register()` | `Session()` |
-| session | db | `github.com/zenta-dev/zever/adapters/session/db` | `db.Register()` | `Session()` |
-| session | cookie | `github.com/zenta-dev/zever/adapters/session/cookie` | `none (no registry)` | `Session()` |
-| storage | local | `github.com/zenta-dev/zever/adapters/storage/local` | `local.Register()` | `Storage()` |
-| storage | s3 | `github.com/zenta-dev/zever/adapters/storage/s3` | `s3.Register()` | `Storage()` |
-| storage | r2 | `github.com/zenta-dev/zever/adapters/storage/r2` | `r2.Register()` | `Storage()` |
-| tenant | single | `github.com/zenta-dev/zever/adapters/tenant/single` | `single.Register()` | `Tenant()` |
-| tenant | header | `github.com/zenta-dev/zever/adapters/tenant/header` | `header.Register()` | `Tenant()` |
-| vectorstore | db | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.Register()` | `VectorStore()` |
-| vectorstore | qdrant | `github.com/zenta-dev/zever/adapters/vectorstore/qdrant` | `qdrant.Register()` | `VectorStore()` |
-| webhook | http | `github.com/zenta-dev/zever/adapters/webhook/http` | `http.Register()` | `Webhook()` |
-| webhook | queue | `github.com/zenta-dev/zever/adapters/webhook/queue` | `queue.Register()` | `Webhook()` |
-| workflow | memory | `github.com/zenta-dev/zever/adapters/workflow/memory` | `memory.Register()` | `Workflow()` |
-| workflow | db | `github.com/zenta-dev/zever/adapters/workflow/db` | `db.Register()` | `Workflow()` |
+| ai | anthropic | `github.com/zenta-dev/zever/adapters/ai/anthropic` | `anthropic.New` | `AI()` |
+| ai | openai | `github.com/zenta-dev/zever/adapters/ai/openai` | `openai.New` | `AI()` |
+| ai | gemini | `github.com/zenta-dev/zever/adapters/ai/gemini` | `gemini.New` | `AI()` |
+| ai | ollama | `github.com/zenta-dev/zever/adapters/ai/ollama` | `ollama.New` | `AI()` |
+| analytics | log | `github.com/zenta-dev/zever/adapters/analytics/log` | `log.New` | `Analytics()` |
+| analytics | posthog | `github.com/zenta-dev/zever/adapters/analytics/posthog` | `posthog.New` | `Analytics()` |
+| auth | jwt | `github.com/zenta-dev/zever/adapters/auth/jwt` | `jwt.New` | `Auth()` |
+| auth | session | `github.com/zenta-dev/zever/adapters/auth/session` | `session.New` | `Auth()` |
+| auth | oidc | `github.com/zenta-dev/zever/adapters/auth/oidc` | `oidc.New` | `Auth()` |
+| billing | stub | `github.com/zenta-dev/zever/adapters/billing/stub` | `stub.New` | `Billing()` |
+| billing | stripe | `github.com/zenta-dev/zever/adapters/billing/stripe` | `stripe.New` | `Billing()` |
+| billing | paddle | `github.com/zenta-dev/zever/adapters/billing/paddle` | `paddle.New` | `Billing()` |
+| cache | memory | `github.com/zenta-dev/zever/adapters/cache/memory` | `memory.New` | `Cache()` |
+| cache | redis | `github.com/zenta-dev/zever/adapters/cache/redis` | `redis.New` | `Cache()` |
+| cache | db | `github.com/zenta-dev/zever/adapters/cache/db` | `db.New` | `Cache()` |
+| cdn | noop | `github.com/zenta-dev/zever/adapters/cdn/noop` | `noop.New` | `CDN()` |
+| cdn | cloudflare | `github.com/zenta-dev/zever/adapters/cdn/cloudflare` | `cloudflare.New` | `CDN()` |
+| crypto | local | `github.com/zenta-dev/zever/adapters/crypto/local` | `local.New` | `Crypto()` |
+| crypto | kms | `github.com/zenta-dev/zever/adapters/crypto/kms` | `kms.New` | `Crypto()` |
+| db | sqlite | `github.com/zenta-dev/zever/adapters/db/sqlite` | `sqlite.New` | `DB()` |
+| db | postgres | `github.com/zenta-dev/zever/adapters/db/postgres` | `postgres.New` | `DB()` |
+| document | local | `github.com/zenta-dev/zever/adapters/document/local` | `local.New` | `Document()` |
+| document | remote | `github.com/zenta-dev/zever/adapters/document/remote` | `remote.New` | `Document()` |
+| document | latex | `github.com/zenta-dev/zever/adapters/document/latex` | `latex.New` | `Document()` |
+| eventbus | memory | `github.com/zenta-dev/zever/adapters/eventbus/memory` | `memory.New` | `EventBus()` |
+| eventbus | redis | `github.com/zenta-dev/zever/adapters/eventbus/redis` | `redis.New` | `EventBus()` |
+| flag | static | `github.com/zenta-dev/zever/adapters/flag/static` | `static.New` | `Flag()` |
+| flag | firebase | `github.com/zenta-dev/zever/adapters/flag/firebase` | `firebase.New` | `Flag()` |
+| geo | google | `github.com/zenta-dev/zever/adapters/geo/google` | `google.New` | `Geo()` |
+| geo | static | `github.com/zenta-dev/zever/adapters/geo/static` | `static.New` | `Geo()` |
+| geo | osm | `github.com/zenta-dev/zever/adapters/geo/osm` | `osm.New` | `Geo()` |
+| i18n | embed | `github.com/zenta-dev/zever/adapters/i18n/embed` | `embed.New` | `I18n()` |
+| i18n | remote | `github.com/zenta-dev/zever/adapters/i18n/remote` | `remote.New` | `I18n()` |
+| idempotency | memory | `github.com/zenta-dev/zever/adapters/idempotency/memory` | `memory.New` | `Idempotency()` |
+| idempotency | redis | `github.com/zenta-dev/zever/adapters/idempotency/redis` | `redis.New` | `Idempotency()` |
+| idempotency | db | `github.com/zenta-dev/zever/adapters/idempotency/db` | `db.New` | `Idempotency()` |
+| lock | memory | `github.com/zenta-dev/zever/adapters/lock/memory` | `memory.New` | `Lock()` |
+| lock | redis | `github.com/zenta-dev/zever/adapters/lock/redis` | `redis.New` | `Lock()` |
+| log | noop | `github.com/zenta-dev/zever/adapters/log/noop` | `noop.New` | `Log()` |
+| log | zerolog | `github.com/zenta-dev/zever/adapters/log/zerolog` | `zerolog.New` | `Log()` |
+| log | slog | `github.com/zenta-dev/zever/adapters/log/slog` | `slog.New` | `Log()` |
+| log | pretty | `github.com/zenta-dev/zever/adapters/log/pretty` | `pretty.New` | `Log()` |
+| mailer | log | `github.com/zenta-dev/zever/adapters/mailer/log` | `log.New` | `Mailer()` |
+| mailer | smtp | `github.com/zenta-dev/zever/adapters/mailer/smtp` | `smtp.New` | `Mailer()` |
+| media | local | `github.com/zenta-dev/zever/adapters/media/local` | `local.New` | `Media()` |
+| media | s3 | `github.com/zenta-dev/zever/adapters/media/s3` | `s3.New` | `Media()` |
+| media | ffmpeg | `github.com/zenta-dev/zever/adapters/media/ffmpeg` | `none (no backend)` | `Media()` |
+| notification | log | `github.com/zenta-dev/zever/adapters/notification/log` | `log.New` | `Notification()` |
+| notification | twilio | `github.com/zenta-dev/zever/adapters/notification/twilio` | `twilio.New` | `Notification()` |
+| notification | fcm | `github.com/zenta-dev/zever/adapters/notification/fcm` | `fcm.New` | `Notification()` |
+| observability | noop | `github.com/zenta-dev/zever/adapters/observability/noop` | `noop.New` | `Observability()` |
+| observability | stdout | `github.com/zenta-dev/zever/adapters/observability/stdout` | `stdout.New` | `Observability()` |
+| observability | otlp | `github.com/zenta-dev/zever/adapters/observability/otlp` | `otlp.New` | `Observability()` |
+| outbox | memory | `github.com/zenta-dev/zever/adapters/outbox/memory` | `memory.New` | `Outbox()` |
+| outbox | db | `github.com/zenta-dev/zever/adapters/outbox/db` | `db.New` | `Outbox()` |
+| outbox | cdc | `github.com/zenta-dev/zever/adapters/outbox/cdc` | `cdc.New` | `Outbox()` |
+| password | argon2id | `github.com/zenta-dev/zever/adapters/password/argon2` | `argon2.New` | `Password()` |
+| payment | stub | `github.com/zenta-dev/zever/adapters/payment/stub` | `stub.New` | `Payment()` |
+| payment | stripe | `github.com/zenta-dev/zever/adapters/payment/stripe` | `stripe.New` | `Payment()` |
+| payment | paddle | `github.com/zenta-dev/zever/adapters/payment/paddle` | `paddle.New` | `Payment()` |
+| permission | noop | `github.com/zenta-dev/zever/adapters/permission/noop` | `noop.New` | `Permission()` |
+| permission | rbac | `github.com/zenta-dev/zever/adapters/permission/rbac` | `rbac.New` | `Permission()` |
+| permission | casbin | `github.com/zenta-dev/zever/adapters/permission/casbin` | `casbin.New` | `Permission()` |
+| queue | memory | `github.com/zenta-dev/zever/adapters/queue/memory` | `memory.New` | `Queue()` |
+| queue | db | `github.com/zenta-dev/zever/adapters/queue/db` | `db.New` | `Queue()` |
+| queue | redis | `github.com/zenta-dev/zever/adapters/queue/redis` | `redis.New` | `Queue()` |
+| ratelimit | memory | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.New` | `RateLimit()` |
+| ratelimit | redis | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.New` | `RateLimit()` |
+| resilience | memory | `github.com/zenta-dev/zever/adapters/resilience/inproc` | `inproc.New` | `Resilience()` |
+| resilience | redis | `github.com/zenta-dev/zever/adapters/resilience/redis` | `redis.New` | `Resilience()` |
+| router | fiber | `github.com/zenta-dev/zever/adapters/router/fiber` | `fiber.New` | `Router()` |
+| router | stdhttp | `github.com/zenta-dev/zever/adapters/router/stdhttp` | `stdhttp.New` | `Router()` |
+| scheduler | embedded | `github.com/zenta-dev/zever/adapters/scheduler/embedded` | `embedded.New` | `Scheduler()` |
+| scheduler | postgres | `github.com/zenta-dev/zever/adapters/scheduler/postgres` | `postgres.New` | `Scheduler()` |
+| search | db | `github.com/zenta-dev/zever/adapters/search/db` | `db.New` | `Search()` |
+| search | meilisearch | `github.com/zenta-dev/zever/adapters/search/meilisearch` | `meilisearch.New` | `Search()` |
+| secrets | env | `github.com/zenta-dev/zever/adapters/secrets/env` | `env.New` | `Secrets()` |
+| secrets | vault | `github.com/zenta-dev/zever/adapters/secrets/vault` | `vault.New` | `Secrets()` |
+| session | memory | `github.com/zenta-dev/zever/adapters/session/memory` | `memory.New` | `Session()` |
+| session | redis | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.New` | `Session()` |
+| session | db | `github.com/zenta-dev/zever/adapters/session/db` | `db.New` | `Session()` |
+| session | cookie | `github.com/zenta-dev/zever/adapters/session/cookie` | `none (no backend)` | `Session()` |
+| storage | local | `github.com/zenta-dev/zever/adapters/storage/local` | `local.New` | `Storage()` |
+| storage | s3 | `github.com/zenta-dev/zever/adapters/storage/s3` | `s3.New` | `Storage()` |
+| storage | r2 | `github.com/zenta-dev/zever/adapters/storage/r2` | `r2.New` | `Storage()` |
+| tenant | single | `github.com/zenta-dev/zever/adapters/tenant/single` | `single.New` | `Tenant()` |
+| tenant | header | `github.com/zenta-dev/zever/adapters/tenant/header` | `header.New` | `Tenant()` |
+| vectorstore | db | `github.com/zenta-dev/zever/adapters/vectorstore/db` | `db.New` | `VectorStore()` |
+| vectorstore | qdrant | `github.com/zenta-dev/zever/adapters/vectorstore/qdrant` | `qdrant.New` | `VectorStore()` |
+| webhook | http | `github.com/zenta-dev/zever/adapters/webhook/http` | `http.New` | `Webhook()` |
+| webhook | queue | `github.com/zenta-dev/zever/adapters/webhook/queue` | `queue.New` | `Webhook()` |
+| workflow | memory | `github.com/zenta-dev/zever/adapters/workflow/memory` | `memory.New` | `Workflow()` |
+| workflow | db | `github.com/zenta-dev/zever/adapters/workflow/db` | `db.New` | `Workflow()` |
 | job | - (dispatcher) | `github.com/zenta-dev/zever/core/job` | `none (no registry)` | `Job()` |
 
 ### Single-process vs multi-instance
@@ -176,11 +185,11 @@ redis.Register()
 - **State differs per instance**: a `memory` adapter is still in the mix (cache, queue, session, lock). Move each shared-state service to `redis`.
 - **Logins lost on restart**: `session` on `memory` does not survive restarts. Use a shared session store for anything beyond local dev.
 - **Jobs run twice or not at all**: workers each resolved an isolated `memory` queue. Point all workers at the same shared queue (`redis`, or `db` on one database).
-- **Swap did not take effect**: the `_ADAPTER` env value is misspelled, or an old binary without the adapter compiled in. Check `config show` output and rebuild.
+- **Swap did not take effect**: the wiring still binds the old adapter. Check the `container.Provide` line in `internal/app/wiring.go`, rebuild, and make sure no leftover `*_ADAPTER` key sits in `.env` (the resolver rejects it).
 
 ## Related
 
-- [Config reference](../config/) for adapter values and the env scheme.
+- [Config reference](../config/) for option keys and the env scheme.
 - [API index](../api-index/) for accessors and close order.
 - [Authentication](../../guides/security/auth/) for jwt/session/oidc choice.
 - [Authorization and permissions](../../guides/security/authz-permissions/) for noop/rbac/casbin choice.

@@ -14,14 +14,12 @@ Pick `memory` for one process (default, no infra); pick `redis` when instances o
 <Tabs>
   <TabItem label="memory">
 ```sh
-CACHE_ADAPTER=memory
 CACHE_SWEEP_INTERVAL=1m
 CACHE_MAX_ENTRIES=10000
 ```
   </TabItem>
   <TabItem label="redis">
 ```sh
-CACHE_ADAPTER=redis
 CACHE_ADDR=localhost:6379
 CACHE_POOL_SIZE=20
 CACHE_MIN_IDLE_CONNS=2
@@ -33,7 +31,7 @@ Durations take Go duration strings such as `"1m"`. Env matching ignores case and
 
 ## Cache a value with a TTL
 
-Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
+Wire the adapter with a `container.Provide` entry, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
 
 ```go title="main.go" check
 package main
@@ -46,12 +44,12 @@ import (
 	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func main() {
-	cachememory.Register()
 	ctx := context.Background()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(cache.DefaultRef(), cachememory.New))
 	defer c.Close(ctx)
 
 	ch, err := c.Cache()
@@ -119,7 +117,7 @@ Cause: stale entries hold the old struct shape. Fix: bump the key version and le
 <details>
 <summary>Instance A writes, instance B misses</summary>
 
-Cause: `memory` in a multi-instance deploy. Fix: set `CACHE_ADAPTER=redis` with a shared `CACHE_ADDR` and confirm the host with `RedactedServices`.
+Cause: `memory` in a multi-instance deploy. Fix: wire the `redis` backend with a shared `CACHE_ADDR` and confirm the host with `RedactedServices`.
 </details>
 
 <details>

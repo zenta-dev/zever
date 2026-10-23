@@ -9,9 +9,7 @@ A plugin is a standalone Go module: a new adapter for an existing battery (`zeve
 
 ## Add an adapter to an existing battery
 
-A battery owns an interface plus a `Register`/`Open` pair. The container is the only resolver; adapters never self-register (no `init`, no globals). Each adapter lives at `adapters/<battery>/<name>` and exposes a constructor plus `Register()`. See `adapters/cache/memory/register.go`.
-
-Adapters are plain strings (`type Adapter string`, such as `cache.Memory = "memory"`). `ParseAdapter` accepts any non-empty name, so a custom backend round-trips through file and env config; `String()` is the identity (`"unknown"` only for empty).
+A battery owns an interface plus typed `Options` and a `DefaultRef`. The container is the only resolver; adapters never self-register (no `init`, no globals). Each adapter lives at `adapters/<battery>/<name>` and exposes a `New` constructor taking the battery's `Options`. There is no adapter registry, no `Adapter` string type, and no `ParseAdapter`: selection is the import plus the `container.Provide` entry, never config.
 
 This `cache` adapter lives in module `zever-adapter-foo`:
 
@@ -47,23 +45,26 @@ func New(opts cache.Options) (cache.Cache, error) {
 }
 ```
 
-The host (your app, not the adapter package) registers it:
+The host (your app, not the adapter package) wires it:
 
-```go title="main.go"
-const fooAdapter = cache.Adapter("foo")
+```go title="internal/app/wiring.go"
+import foocache "example.com/zever-adapter-foo"
 
-if err := cache.Register(fooAdapter, foo.New); err != nil {
-	return err
+var Cache = cache.DefaultRef()
+
+func Providers() []container.Provider {
+	return []container.Provider{
+		container.Provide(Cache, foocache.New),
+	}
 }
-c, err := cache.Open(fooAdapter, cache.Options{})
 ```
 
-With the container, set `CACHE_ADAPTER=foo` and the first `container.Cache()` call resolves your factory like any core adapter.
+With the container, the first `container.Get(c, Cache)` call (or the `c.Cache()` accessor, once covered by a provider) resolves your factory like any core adapter. Changing it later means changing the import and rebuilding.
 
 Follow these rules:
 
 - Do not add methods to a public battery interface; propose a new capability interface instead (such as `cache.CompareAndSwapCache`).
-- Call `opts.Validate()` first in `Open`; fail closed and join all violations.
+- Call `opts.Validate()` first in `New`; fail closed and join all violations.
 - Keep errors sentinel-based, `errors.Is`-compatible, prefixed with the battery name (`cache:`); never put secrets or raw option maps in error text (use `config.RedactedServices`).
 - Take `ctx` first for I/O and never store it in a struct.
 
@@ -99,7 +100,7 @@ search secrets session storage tenant vectorstore webhook workflow
 
 ## Ship an entirely new battery
 
-Mirror the core shape: an interface, a string `Adapter`, typed `Options` with `Validate`, a `Register`/`Open` pair, and sentinel errors. Copy `examples/sms/sms.go` (the `SMS` interface, `Stub` adapter, `Options{From}`, `Register`, `Open`) and add a deterministic stub backend like `examples/sms/stub`.
+Mirror the core shape: an interface, typed `Options` with `Validate`, a `DefaultRef`, a `New` constructor, and sentinel errors. Copy `examples/sms/sms.go` (the `SMS` interface, `Stub` adapter, `Options{From}`) and add a deterministic stub backend like `examples/sms/stub`. There is no registry to join and no adapter name to claim: your package's `New` is wired straight into the host's providers.
 
 <Steps>
 
@@ -108,18 +109,19 @@ Mirror the core shape: an interface, a string `Adapter`, typed `Options` with `V
     ```go
     cfg.Plugins = map[string]config.Service[json.RawMessage]{
     	"sms": {
-    		Adapter: "stub",
     		Options: json.RawMessage(`{"from":"+15550000"}`),
     	},
     }
     ```
 
-2. Register a validator so `Config.Validate` covers the plugin. Plugins without one skip validation and their options stay opaque. `<PLUGIN>_ADAPTER` (for example `SMS_ADAPTER=stub`) overrides the adapter from the environment; options stay raw and are not env-overridable:
+    Plugins carry options only: there is no adapter key in the envelope, and no env overlay. The backend is chosen in the build func below.
+
+2. Register a validator so `Config.Validate` covers the plugin. Plugins without one skip validation and their options stay raw and are not env-overridable:
 
     ```go
-    if err := config.RegisterPluginValidator("sms", func(adapter string, opts json.RawMessage) error {
+    if err := config.RegisterPluginValidator("sms", func(opts jsontext.Value) error {
     	var o sms.Options
-    	if err := json.Unmarshal(opts, &o); err != nil {
+    	if err := codec.Unmarshal(opts, &o); err != nil {
     		return err
     	}
     	return o.Validate()
@@ -128,7 +130,7 @@ Mirror the core shape: an interface, a string `Adapter`, typed `Options` with `V
     }
     ```
 
-3. Register a versioned build func once at startup, then resolve per container. The build receives the container's `*config.Config`:
+3. Register a versioned build func once at startup, then resolve per container. The build receives the container's `*config.Config` and picks the backend in code:
 
     ```go
     if err := container.RegisterPlugin[sms.SMS]("sms", container.PluginAPIVersion, func(cfg *config.Config) (sms.SMS, error) {
@@ -149,7 +151,7 @@ Mirror the core shape: an interface, a string `Adapter`, typed `Options` with `V
 
 Successful builds cache per `Container`; failures retry on the next `Resolve`. A wrong-typed value fails `Resolve` with a type-mismatch error, and resolved plugins close with `Container.Close`. `examples/sms/app/main.go` shows the full flow.
 
-`zever add <battery>[/<adapter>]` scaffolds the `go.mod`, `internal/app/wiring.go` with typed `container.Provide` wiring. For a plugin, pass an explicit adapter and `--module <path[@version]>` (default `v0.1.0`):
+`zever add <battery>[/<adapter>]` scaffolds the `go.mod` and `internal/app/wiring.go` with typed `container.Provide` wiring. For a plugin, pass `--module <path[@version]>` (default `v0.1.0`):
 
 ```sh
 zever add sms/stub --module example.com/zever-battery-sms
@@ -157,11 +159,11 @@ zever add sms/stub --module example.com/zever-battery-sms
 
 Flags are `--adapter`, `--force`, `--module`, and `--dry-run`. Run `go mod tidy` afterwards. See the [CLI reference](../../../reference/cli/).
 
-## Register only what you choose
+## Wire only what you choose
 
-There is no manifest file: the `go.mod` requires are the component list, and the generated `app.go` imports plus `Register()` calls are the manifest, emitted for the floor (`log`, `router`) plus your picks.
+There is no manifest file: the `go.mod` requires are the component list, and the generated `wiring.go` imports plus `container.Provide` entries are the manifest, emitted for the floor (`log`, `router`) plus your picks.
 
-This mirrors the `database/sql` driver model: import alone resolves nothing, and registration without the `go.mod` require does not build. For every adapter, import its module, call `Register()` before first use, and require it in `go.mod`. An unregistered adapter fails resolution with `UnknownAdapterError`.
+This mirrors the `database/sql` driver model: import alone resolves nothing, and wiring without the `go.mod` require does not build. For every adapter, import its module, add the `container.Provide` entry before first use, and require it in `go.mod`. An unwired service fails resolution with `NotWiredError` naming the fix.
 
 ## Version and publish
 

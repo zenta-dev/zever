@@ -17,7 +17,7 @@ Zever compiles your `.zen` schema, diffs it against the live database, and appli
    zever db migrate --dry-run schema/app.zen
    ```
 
-2. Apply it. The default adapter is `sqlite`.
+2. Apply it. The default wiring uses `sqlite`.
 
    ```sh
    zever db migrate schema/app.zen --adapter=sqlite --dsn=data/app.db
@@ -42,7 +42,6 @@ With no file arguments, `migrate` discovers `.zen` files under the schema direct
 The CLI and the app share the same `db` settings.
 
 ```sh
-DB_ADAPTER=sqlite
 DB_PATH=app.db
 ```
 
@@ -131,7 +130,6 @@ zever db migrate schema/app.zen --adapter=postgres --dsn='...' --lock-timeout=10
 Unset flags fall back to the `db` service options from the environment (`DB_LOCK_TIMEOUT` / `DB_STATEMENT_TIMEOUT`):
 
 ```sh
-DB_ADAPTER=postgres
 DB_DSN=postgres://app:secret@db:5432/app
 DB_LOCK_TIMEOUT=10s
 DB_STATEMENT_TIMEOUT=30s

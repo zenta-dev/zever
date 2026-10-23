@@ -10,24 +10,24 @@ Every service logs through one interface, `log.Logger`. Swap the adapter and eve
 ## Quick start
 
 ```sh
-LOG_ADAPTER=slog
 ```
 
 ```sh
-LOG_ADAPTER=zerolog
 ```
 
 The only option is `min_level` (minimum severity). `Options.Validate()` accepts the zero value, and the adapter choice is validated at resolve time. The container wires nothing, so register the adapter first:
 
 ```go title="main.go"
 import (
-    "github.com/zenta-dev/zever/adapters/log/slog"
+    logslog "github.com/zenta-dev/zever/adapters/log/slog"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/log"
 )
 
-slog.Register()
-c := container.New(config.Default())
+c := container.New(config.Default(), container.Provide(log.DefaultRef(), func(o log.Options) (log.Logger, error) {
+    return logslog.New(o), nil
+}))
 logger, err := c.Log()
 if err != nil {
     return err

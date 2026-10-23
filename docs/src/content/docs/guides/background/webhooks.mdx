@@ -10,7 +10,6 @@ Use `webhook` for signed outbound event delivery. The interface covers `Register
 ## Quick start
 
 ```sh
-WEBHOOK_ADAPTER=queue
 WEBHOOK_TIMEOUT=10s
 WEBHOOK_MAX_RETRIES=3
 WEBHOOK_QUEUE_ADAPTER=memory
@@ -19,7 +18,6 @@ WEBHOOK_REPLAY_TOLERANCE=5m
 ```
 
 ```sh
-WEBHOOK_ADAPTER=queue
 WEBHOOK_MAX_RETRIES=3
 WEBHOOK_REPLAY_TOLERANCE=5m
 BOOKINGS_WEBHOOK_CREATED_TARGET=https://partner.example.com/hooks
@@ -40,11 +38,12 @@ import (
 	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/webhook"
 )
 
 func main() {
-	webhookhttp.Register()
-	wh, _ := container.New(config.Default()).Webhook()
+	c := container.New(config.Default(), container.Provide(webhook.DefaultRef(), webhookhttp.New))
+	wh, _ := c.Webhook()
 	defer wh.Close()
 
 	target := "" // empty means skip, like RegisterDemoTargets
@@ -62,7 +61,7 @@ delivery skipped: no target configured
 
 With a target set and the `http` adapter, `Deliver` POSTs the signed payload to every subscriber of the event, with the signature in the `X-Hub-Signature-256` header (the `queue` adapter uses `X-Webhook-Signature` and verifies it before delivery). `Webhook()` resolves lazily, caches per container, and retries after errors; `Close() error` takes no context. See [the container](../../../concepts/container/).
 
-The bookings example sets `WEBHOOK_ADAPTER=queue`. Demo targets come from the environment only (`BOOKINGS_WEBHOOK_CREATED_TARGET` and `_SECRET`, plus the `CANCELLED` pair). `RegisterDemoTargets` skips pairs with an empty target, so delivery is quietly skipped when unconfigured and the worker runs without them.
+The bookings example wires the `queue` webhook backend in code. Demo targets come from the environment only (`BOOKINGS_WEBHOOK_CREATED_TARGET` and `_SECRET`, plus the `CANCELLED` pair). `RegisterDemoTargets` skips pairs with an empty target, so delivery is quietly skipped when unconfigured and the worker runs without them.
 
 ## Choose an adapter
 

@@ -17,12 +17,9 @@ Layers (later wins): `defaults < .env < .env.local < process environment`.
 - **process environment**: highest priority, no file I/O
 
 ```sh
-DB_ADAPTER=postgres
 DB_DSN=postgres://app:secret@db:5432/app
 DB_MAX_CONNS=20
-CACHE_ADAPTER=redis
 CACHE_ADDR=redis:6379
-AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 ```
 
@@ -43,7 +40,7 @@ the same way.
 
 Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased.
 
-- Default instance: `SERVICE_FIELD` (e.g., `DB_ADAPTER=postgres`)
+- Default instance: `SERVICE_FIELD` (e.g., `DB_DSN=...` or `DB_MAX_CONNS=20`)
 - Named instance: `SERVICE__NAME__FIELD` (e.g., `DB__ANALYTICS__DSN=...`)
 
 A named instance only reaches the container through a matching named Ref
@@ -58,32 +55,38 @@ own works too (`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`).
 
 Durations accept `"5s"` strings in env; there is no integer form.
 
-## Default adapters (zero-infra)
+## Wired defaults (zero-infra)
 
-| Service | Default Adapter |
+| Service | Wired default |
 |---------|-----------------|
 | db | sqlite |
 | cache | memory |
 | queue | memory |
 | log | slog |
 | router | stdhttp |
-| ... | (see `config.Default()`) |
+| ... | (see the `container.Provide` entries in `internal/app/wiring.go`) |
+
+Backends are compiled in: changing a default means changing the wired import plus its `Provide` entry and rebuilding. There is no adapter key in `.env` -- any `*_ADAPTER` key fails resolution.
 
 ## Migration from v0.7
 
 The map below is the upgrade path, not a runtime fallback: v0.8 reads `.env`,
 `.env.local`, and the process environment, and nothing else.
 
+> Adapter selection moved out of config after v0.8: any `*_ADAPTER` key now
+> fails resolution. Wire the backend in `internal/app/wiring.go` with an
+> import plus a `container.Provide` entry and rebuild.
+
 | v0.7 | v0.8 |
 |------|------|
 | `zever.yaml` | `.env` + `wiring.go` |
 | `config.Load("")` | `config.FromEnv()` + `config.Resolve(env)` |
-| `ServiceConfig.Adapter` | `<SERVICE>_ADAPTER` |
+| `ServiceConfig.Adapter` | `<SERVICE>_ADAPTER` (v0.8 only; removed afterwards -- see below) |
 | `DB_MAXCONNS` | `DB_MAXCONNS` (same) |
 | `DB__ANALYTICS__DSN` | `DB__ANALYTICS__DSN` (same format) |
 | `zever doctor --config` | `zever doctor` (no flag) |
 
-`<SERVICE>_ADAPTER` is a sibling of the options, never a field inside them: it selects the adapter and lands on the service envelope, next to the option map. The container binds the adapter implementation per instance in `wiring.go` with `container.Provide`; see the [Container concept page](../../../concepts/container/).
+Backends have no env form at all: any `*_ADAPTER` key (including the old `<SERVICE>_ADAPTER` shape) fails `config.Resolve`. The container binds the adapter implementation per instance in `wiring.go` with `container.Provide`; see the [Container concept page](../../../concepts/container/).
 
 ## Legacy config files
 

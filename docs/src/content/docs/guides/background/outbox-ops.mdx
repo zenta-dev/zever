@@ -19,7 +19,7 @@ The relay emits through the `observability.Provider` on
 `outbox.Options.Provider`. Telemetry is best-effort: a nil provider
 makes every metric a no-op, and metric or span errors are discarded
 (`_ =`) so a metrics backend outage can never fail a publish. Production
-therefore needs `OBSERVABILITY_ADAPTER=otlp` with `OBSERVABILITY_SERVICE_NAME` and an
+therefore needs the `otlp` backend wired in `internal/app/wiring.go`, with `OBSERVABILITY_SERVICE_NAME` and an
 `OBSERVABILITY_ENDPOINT` (with `stdout` the values print locally, with `noop` they go
 nowhere). Scope is `outbox`.
 
@@ -238,7 +238,6 @@ replica out of the load balancer instead of serving traffic it cannot
 fulfil state for:
 
 ```sh
-OUTBOX_ADAPTER=db
 OUTBOX_DSN=postgres://app:secret@db:5432/app
 OUTBOX_STALL_READINESS=true
 ```
@@ -294,7 +293,7 @@ func relayHealthy() error {
 ## Troubleshooting
 
 1. No `outbox.*` metrics at all: the provider is nil or the adapter is
-   `noop`. Set `OBSERVABILITY_ADAPTER=otlp` (plus `OBSERVABILITY_SERVICE_NAME` and
+   `noop`. Wire the `otlp` backend (plus `OBSERVABILITY_SERVICE_NAME` and
    `OBSERVABILITY_ENDPOINT`) and confirm the store was opened with a provider.
 2. `zever outbox status` connects but reports empty counters: the
    `--table` or `OUTBOX_TABLE` env does not match the table the

@@ -98,7 +98,7 @@ Dialect comes from the connection (`sqlite`/`postgres`); unsupported features fa
 
 ## Use `core/*` standalone
 
-Every battery is one small interface plus a `Register`/`Open` pair. The container is only the default resolver. Open an adapter directly when you embed a battery in a non-Zever program:
+Every battery is one small interface plus a `New` constructor. The container is only the default resolver. Construct an adapter directly when you embed a battery in a non-Zever program:
 
 ```go
 import (
@@ -106,9 +106,7 @@ import (
 	memory "github.com/zenta-dev/zever/adapters/cache/memory"
 )
 
-memory.Register() // wires "memory" into the cache registry, once
-
-c, err := cache.Open("memory", cache.Options{})
+c, err := memory.New(cache.Options{})
 if err != nil {
 	// ...
 }

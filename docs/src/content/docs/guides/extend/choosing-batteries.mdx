@@ -5,7 +5,7 @@ description: A decision guide for picking the adapter behind each battery, from 
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every battery is one small interface with several adapters, and switching adapters is a config change, not a code change. So the question is never "which library do I commit to" but "which adapter fits this stage". Start on the zero-infrastructure defaults, then change one `<SERVICE>_ADAPTER` value when the deployment shape demands it.
+Every battery is one small interface with several adapters, and switching adapters is a code change, not a config change: the question is never "which library do I commit to" but "which adapter fits this stage". Start on the zero-infrastructure defaults, then change the wired import plus its `container.Provide` entry in `internal/app/wiring.go` when the deployment shape demands it, and rebuild.
 
 The default for every battery in `config.Default()` runs with no external service (`memory`, `local`, `sqlite`, `log`, `noop`, ...), which is why tests and `zever serve` work on a fresh checkout. The full table is in the [adapters matrix](../../../reference/adapters-matrix/); this page covers the choices that matter.
 
@@ -44,18 +44,18 @@ Pick by where state lives and who must see it:
 1. **Do I run more than one process of this service?** If no, stay on `memory`/`sqlite`. If yes, move the shared batteries (`session`, `ratelimit`, `lock`, `idempotency`, `cache`, `queue`) to `redis` or `db`.
 2. **Do I already run Redis?** If yes, use it for the shared batteries. If no, the `db` adapters avoid adding a service at the cost of polling and database load.
 3. **Does it carry money, auth, or compliance?** Do not use `stub`, `noop`, or `memory` adapters for it. The `stub` payment and billing adapters verify nothing and hold no funds.
-4. **Do I need to read the choice back later?** Run `zever doctor` after changing config: it resolves every enabled battery and reports `OK` or `FAIL` per battery.
+4. **Do I need to read the choice back later?** Run `zever doctor` after rewiring: it resolves every wired battery and reports `OK` or `FAIL` per battery.
 
 ## Wiring a choice
 
-Set it via env var (e.g., `CACHE_ADAPTER=redis`), and make sure the adapter is registered. `zever add cache/redis` adds the `go.mod` require, the `Register()` call, the wiring.go entry, and the `.env.example` stanza in one step:
+Wire it in `internal/app/wiring.go` with an import plus a `container.Provide` entry, then rebuild. `zever add cache/redis` adds the `go.mod` require, the wiring.go entry, and the `.env.example` stanza in one step:
 
 ```sh
 zever add cache/redis
 zever doctor
 ```
 
-An enabled battery whose adapter was never registered fails at startup with a did-you-mean hint instead of at first use. To trim a binary to only the adapters you ship, see `zever build --adapters` in the [CLI reference](../../../reference/cli/).
+A battery with no `container.Provide` entry fails at startup with a `NotWiredError` naming the fix, instead of failing at first use. To trim a binary to only the adapters you ship, see `zever build --adapters` in the [CLI reference](../../../reference/cli/).
 
 <CardGrid>
   <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Every battery and adapter." />

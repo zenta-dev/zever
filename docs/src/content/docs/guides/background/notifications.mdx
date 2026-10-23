@@ -12,7 +12,6 @@ Stay on `log` until a real channel is wired: it writes instead of sending. Pick 
 ## Quick start
 
 ```sh
-NOTIFICATION_ADAPTER=log
 NOTIFICATION_TIMEOUT=30s
 ```
 
@@ -28,8 +27,7 @@ import (
 )
 
 func main() {
-	notificationlog.Register()
-	n, _ := notification.Open(notification.Log, notification.Options{})
+	n, _ := notificationlog.New(notification.Options{})
 	defer n.Close()
 
 	push := notification.NewNotification("device-token-abc", notification.ChannelPush, "Reminder: check-in at 3pm")
@@ -45,7 +43,7 @@ func main() {
 }
 ```
 
-Output: two JSON log lines on stdout, then `notified push and sms via log adapter`; no network is used. `notificationlog.Register()` wires the default log adapter, which writes single JSON lines to `os.Stdout`. In tests, use `NewWithWriter(opts, w)` with an `io.Writer` such as `io.Discard`.
+Output: two JSON log lines on stdout, then `notified push and sms via log adapter`; no network is used. The `notificationlog.New` constructor wires the default log backend, which writes single JSON lines to `os.Stdout`. In tests, use `NewWithWriter(opts, w)` with an `io.Writer` such as `io.Discard`.
 
 ## Choose a channel and validate the target
 
@@ -66,7 +64,6 @@ The `twilio` and `fcm` blocks are nested maps under `options`, beside the top-le
 <Tabs>
   <TabItem label="Twilio (SMS)">
 ```sh
-NOTIFICATION_ADAPTER=twilio
 NOTIFICATION_TIMEOUT=30s
 NOTIFICATION_TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxx
 NOTIFICATION_TWILIO_AUTH_TOKEN=prod-secret-here
@@ -75,7 +72,6 @@ NOTIFICATION_TWILIO_FROM_NUMBER=+15551234567
   </TabItem>
   <TabItem label="FCM (push)">
 ```sh
-NOTIFICATION_ADAPTER=fcm
 NOTIFICATION_TIMEOUT=30s
 NOTIFICATION_FCM_PROJECT_ID=bookings-prod
 NOTIFICATION_FCM_SERVICE_ACCOUNT=/run/secrets/fcm.json
@@ -84,7 +80,6 @@ NOTIFICATION_FCM_SERVICE_ACCOUNT=/run/secrets/fcm.json
 </Tabs>
 
 ```sh
-NOTIFICATION_ADAPTER=fcm
 NOTIFICATION_TIMEOUT=30s
 ```
 

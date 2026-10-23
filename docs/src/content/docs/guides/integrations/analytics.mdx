@@ -10,7 +10,6 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 ## Quick start
 
 ```sh
-ANALYTICS_ADAPTER=log
 ANALYTICS_ANONYMOUS_ID=anonymous
 ANALYTICS_GROUP_TYPE=organization
 ANALYTICS_MAX_PROPERTIES_BYTES=65536
@@ -29,11 +28,11 @@ import (
 	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/analytics"
 )
 
 func main() {
-	analyticslog.Register() // container wires nothing
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(analytics.DefaultRef(), analyticslog.New))
 	defer c.Close(context.Background())
 
 	an, err := c.Analytics()

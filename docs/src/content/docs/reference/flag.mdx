@@ -7,28 +7,26 @@ Typed feature flags with per-request targeting context. `flag` resolves `Bool`, 
 
 ## Adapters
 
-| Adapter | Module | Register | Default |
+| Adapter | Module | Constructor | Wired default |
 |---|---|---|---|
-| `static` | `github.com/zenta-dev/zever/adapters/flag/static` | `static.Register()` | Yes |
-| `firebase` | `github.com/zenta-dev/zever/adapters/flag/firebase` | `firebase.Register()` | No |
+| `static` | `github.com/zenta-dev/zever/adapters/flag/static` | `static.New` | Yes |
+| `firebase` | `github.com/zenta-dev/zever/adapters/flag/firebase` | `firebase.New` | No |
 
-Resolve through the container with `c.Flag()`. Swapping backends is a config change: set `flag.adapter`, no code change.
+Resolve through the container with `c.Flag()`. Swapping backends is a wiring change: swap the `container.Provide` entry and rebuild.
 
 ## Configuration
 
 Service key: `flag`. File example:
 
 ```sh
-FLAG_ADAPTER=static
 FLAG_STATIC_PATH=flags.json
 FLAG_STATIC_RELOAD=true
 ```
 
 ```sh
-FLAG_ADAPTER=static
 ```
 
-Env rule: `FLAG_<FIELD>=value`, uppercase, no prefix (for example `FLAG_ADAPTER`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
+Env rule: `FLAG_<FIELD>=value`, uppercase, no prefix (for example `FLAG_STATIC_PATH`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
 
 ## Options
 
@@ -51,11 +49,11 @@ Every sentinel below is a package-level `ErrXxx` in `core/flag` (see `errors.go`
 | Sentinel | Cause | Fix |
 |---|---|---|
 | `ErrClosed` | Client used after `Close` | Open a new client; do not reuse the closed one |
-| `ErrNilFactory` | `Register` called with a nil factory | Pass a non-nil constructor |
-| `ErrDuplicateAdapter` | Same adapter registered twice | Register each adapter once; check for a duplicate `Register` call |
+| `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
+| `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `static.Register()`) before `Open` |
-| `ErrInvalidAdapter` | Empty adapter name to `ParseAdapter` | Pass a non-empty adapter name |
+| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `static.New`) before `Open` |
+| `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
 | `ErrInvalidOptions` | `Options.Validate` failed (for example negative `firebase.timeout`) | Keep `firebase.timeout >= 0`; adapters validate their own required fields |
 | `ErrInvalidKey` | Flag key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the key length only, never the key itself |
 

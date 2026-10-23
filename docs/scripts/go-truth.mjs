@@ -31,10 +31,18 @@ function camelToSnake(s) {
   return out;
 }
 
-// Adapter const spellings in adapters/<svc>/<adapter>/register.go. All three
-// declare the same `const Adapter <pkg>.Adapter`; the first two yield a name,
-// the reference form points at a core const that the core scanner already
-// captures, so it (and a sigil-free non-declaration) yields nothing.
+// Adapter dir spellings whose wired name differs from the directory name
+// (mirroring cmd/zever's adapterDirName): password/argon2 wires as the
+// PHC-canonical "argon2id", resilience/inproc wires as "memory".
+const ADAPTER_DIR_NAMES = {
+  'password/argon2': 'argon2id',
+  'resilience/inproc': 'memory',
+};
+
+// Adapter const spellings in adapters/<svc>/<adapter>/register.go. Retained
+// for the self-test below; the tree no longer ships register.go files, so
+// goTruth derives the shipped set from adapter directories instead (see
+// ADAPTER_DIR_NAMES).
 const ADAPTER_CONST_FORMS = [
   [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*[\w.]*Adapter\s*\(\s*"([^"]+)"\s*\)$/, (m) => m[1]], // (const) Adapter x.Adapter = x.Adapter("name")
   [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*"([^"]+)"$/, (m) => m[1]], // (const) Adapter x.Adapter = "name"
@@ -118,23 +126,21 @@ export function goTruth() {
     };
     scan(base);
   }
-  // Adapter names: the canonical consts in core/<svc>/adapter.go plus the
-  // per-adapter consts in adapters/<svc>/<adapter>/register.go (an adapter
-  // that ships its own name, such as the postgres scheduler, declares no
-  // const in core). register.go may spell the const as a string literal or
-  // as a conversion of the service's Adapter type; adapterNamesFromRegister
-  // parses both and throws on a shape it does not know (fail closed).
+  // Adapter names: the shipped set is the adapter module directories under
+  // adapters/<svc>/ (each dir is a compiled-in backend exposing a New
+  // constructor; selection is an import plus a container.Provide entry,
+  // never config). Two dirs wire under a different name than their path:
+  // password/argon2 wires as "argon2id" and resilience/inproc wires as
+  // "memory" (mirroring cmd/zever's adapterDirName).
   for (const [svc, v] of Object.entries(services)) {
-    const core = path.join(repo, 'core', v.pkg, 'adapter.go');
-    if (fs.existsSync(core))
-      for (const m of read(core).matchAll(/^\s*\w+\s+Adapter\s*=\s*"([^"]+)"/gm)) v.adapters.add(m[1]);
     const base = path.join(repo, 'adapters', v.pkg);
     if (!fs.existsSync(base)) continue;
     for (const e of fs.readdirSync(base, { withFileTypes: true })) {
-      if (!e.isDirectory()) continue;
-      const f = path.join(base, e.name, 'register.go');
-      if (!fs.existsSync(f)) continue;
-      for (const n of adapterNamesFromRegister(read(f))) v.adapters.add(n);
+      if (!e.isDirectory() || e.name === 'internal' || e.name === 'testdata') continue;
+      const dir = path.join(base, e.name);
+      const goFiles = fs.readdirSync(dir).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go'));
+      if (!goFiles.some((f) => /\bfunc New\(/.test(read(path.join(dir, f))))) continue;
+      v.adapters.add(ADAPTER_DIR_NAMES[`${v.pkg}/${e.name}`] ?? e.name);
     }
   }
   return services;

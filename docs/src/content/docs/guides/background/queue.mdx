@@ -10,7 +10,6 @@ import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components
 ## Quick start
 
 ```sh
-QUEUE_ADAPTER=memory
 QUEUE_VISIBILITY_TIMEOUT=30s
 QUEUE_POLL_TIMEOUT=1s
 QUEUE_BUFFER=100
@@ -61,7 +60,6 @@ Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `
 <Tabs>
   <TabItem label="Redis">
 ```sh
-QUEUE_ADAPTER=redis
 QUEUE_ADDR=localhost:6379
 QUEUE_DB=0
 QUEUE_PREFIX=bookings
@@ -69,18 +67,19 @@ QUEUE_PREFIX=bookings
   </TabItem>
   <TabItem label="Database">
 ```sh
-QUEUE_ADAPTER=db
 QUEUE_DSN=postgres://app:secret@db:5432/app
 QUEUE_TABLE=queue_messages
 ```
   </TabItem>
 </Tabs>
 
+Wire the redis backend in `internal/app/wiring.go` (`container.Provide(Queue, queueredis.New)`), then point it at Redis:
+
 ```sh
-QUEUE_ADAPTER=redis QUEUE_ADDR=localhost:6379 QUEUE_VISIBILITY_TIMEOUT=30s
+QUEUE_ADDR=localhost:6379 QUEUE_VISIBILITY_TIMEOUT=30s
 ```
 
-Env keys are strict snake_case and durations take Go strings (`"30s"`). An empty `dsn` selects a private in-memory-style database. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. The container shares one pool per exact DSN across db-backed batteries (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
+Env keys are strict snake_case and durations take Go strings (`"30s"`). An empty `dsn` selects a private in-memory-style database. The backend itself is compiled in, never selected by env. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. db-backed batteries share one pool per exact DSN only when wired to share via `NewFromDB` (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
 
 ## Resolve the queue from the container
 
