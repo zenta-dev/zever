@@ -356,9 +356,23 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) [
 			continue
 		}
 
-		item := protocol.CompletionItem{Label: cand.label, Kind: kind}
+		group := completionGroup(kind, cand)
+		sortPrefix := fmt.Sprintf("%d_", group)
+
+		item := protocol.CompletionItem{
+			Label:            cand.label,
+			Kind:             kind,
+			SortText:         protocol.NewOptional(sortPrefix + cand.label),
+			FilterText:       protocol.NewOptional(cand.label),
+			InsertText:       protocol.NewOptional(cand.label),
+			InsertTextFormat: protocol.InsertTextFormatPlainText,
+		}
 
 		if cand.detail != "" {
+			item.Detail.Set(cand.detail)
+			detail := cand.detail
+			item.LabelDetails = &protocol.CompletionItemLabelDetails{Detail: &detail}
+
 			if raw, err := json.Marshal(completionResolveData{Detail: cand.detail}); err == nil {
 				item.Data = protocol.LSPAny(raw)
 			}
@@ -368,6 +382,24 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) [
 	}
 
 	return out
+}
+
+// completionGroup assigns a context-priority bucket used to build SortText:
+// keywords first (0), then scalars (1), then entities (2). Everything else
+// defaults to the scalar bucket so it lands between keywords and entities.
+func completionGroup(kind protocol.CompletionItemKind, cand candidate) int {
+	switch kind { //nolint:exhaustive // only keyword/class buckets matter; everything else defaults
+	case protocol.CompletionItemKindKeyword:
+		return 0
+	case protocol.CompletionItemKindClass:
+		if strings.HasPrefix(cand.detail, "entity") {
+			return 2
+		}
+
+		return 1
+	default:
+		return 1
+	}
 }
 
 // completionResolveDataKey is the map key completionResolveData round-trips

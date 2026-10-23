@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync"
 
 	"go.lsp.dev/protocol"
@@ -41,6 +42,12 @@ type Server struct {
 	// trace is the per-server trace setting from textDocument/setTrace.
 	// No global trace sink exists, so this is stored, not forwarded.
 	trace protocol.TraceValue
+
+	// semTokCache caches the last full semantic-token result per document
+	// URI so textDocument/semanticTokens/full/delta can answer with edits
+	// instead of recomputing from scratch. Guarded by mu.
+	semTokCache   map[string]semTokCacheEntry
+	semTokCounter uint64
 }
 
 // NewServer returns a server with an empty workspace and no client yet.
@@ -52,9 +59,10 @@ func NewServer() *Server {
 	publisher.srcFor = ws.ContentForPath
 
 	return &Server{
-		ws:        ws,
-		publisher: publisher,
-		trace:     protocol.TraceValueOff,
+		ws:          ws,
+		publisher:   publisher,
+		trace:       protocol.TraceValueOff,
+		semTokCache: make(map[string]semTokCacheEntry),
 	}
 }
 
@@ -162,7 +170,8 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			// unresolvable to the client.
 			SemanticTokensProvider: &protocol.SemanticTokensOptions{
 				Legend: semanticTokenLegend,
-				Full:   protocol.Boolean(true),
+				Range:  protocol.Boolean(true),
+				Full:   &protocol.SemanticTokensFullDelta{Delta: boolPtr(true)},
 			},
 			InlayHintProvider: protocol.Boolean(true),
 		},
@@ -540,8 +549,76 @@ func (s *Server) SemanticTokensFull(ctx context.Context, params *protocol.Semant
 
 	file := s.parseDoc(uriStr)
 
+	data := encodeSemanticTokens(classifyFile(file, content))
+	resultID := s.storeSemTokResult(uriStr, data)
+
 	return &protocol.SemanticTokens{
-		Data: encodeSemanticTokens(classifyFile(file, content)),
+		ResultID: &resultID,
+		Data:     data,
+	}, nil
+}
+
+// SemanticTokensRange classifies the spans overlapping params.Range.
+func (s *Server) SemanticTokensRange(ctx context.Context, params *protocol.SemanticTokensRangeParams) (*protocol.SemanticTokens, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return nil, nil //nolint:nilnil // LSP encodes "no tokens for this document" as a null result
+	}
+
+	file := s.parseDoc(uriStr)
+
+	spans := filterTokenSpansToRange(classifyFile(file, content), params.Range)
+
+	return &protocol.SemanticTokens{
+		Data: encodeSemanticTokens(spans),
+	}, nil
+}
+
+// SemanticTokensFullDelta answers a full/delta request. When there is no
+// cached previous result or the supplied previousResultId does not match,
+// it returns a full result; otherwise it returns delta edits transforming
+// the cached result into the freshly computed one.
+func (s *Server) SemanticTokensFullDelta(ctx context.Context, params *protocol.SemanticTokensDeltaParams) (protocol.SemanticTokensDeltaResult, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return nil, nil //nolint:nilnil // LSP encodes "no tokens for this document" as a null result
+	}
+
+	file := s.parseDoc(uriStr)
+
+	data := encodeSemanticTokens(classifyFile(file, content))
+
+	s.mu.Lock()
+	if s.semTokCache == nil {
+		s.semTokCache = make(map[string]semTokCacheEntry)
+	}
+	prev, hasPrev := s.semTokCache[uriStr]
+	mismatch := params.PreviousResultID == "" || !hasPrev || prev.resultID != params.PreviousResultID
+	s.mu.Unlock()
+
+	if mismatch {
+		resultID := s.storeSemTokResult(uriStr, data)
+
+		return &protocol.SemanticTokens{
+			ResultID: &resultID,
+			Data:     data,
+		}, nil
+	}
+
+	resultID := s.storeSemTokResult(uriStr, data)
+	edits := computeSemTokDelta(prev.data, data)
+
+	return &protocol.SemanticTokensDelta{
+		ResultID: &resultID,
+		Edits:    edits,
 	}, nil
 }
 
@@ -561,6 +638,23 @@ func (s *Server) InlayHintResolve(ctx context.Context, params *protocol.InlayHin
 	s.captureClient(ctx)
 
 	return params, nil
+}
+
+// storeSemTokResult records a full result under a fresh result id and
+// returns that id.
+func (s *Server) storeSemTokResult(uriStr string, data []uint32) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.semTokCache == nil {
+		s.semTokCache = make(map[string]semTokCacheEntry)
+	}
+
+	s.semTokCounter++
+	id := strconv.FormatUint(s.semTokCounter, 10)
+	s.semTokCache[uriStr] = semTokCacheEntry{resultID: id, data: data}
+
+	return id
 }
 
 // schemaAndFile returns the latest resolved schema (possibly nil) together
