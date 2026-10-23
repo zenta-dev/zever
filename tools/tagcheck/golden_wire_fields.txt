@@ -901,8 +901,8 @@ shared/mcpclient	request	Method	method	v0.7.2
 shared/mcpclient	request	Params	params	v0.7.2
 shared/mcpclient	rpcErrorWire	Code	code	v0.7.2
 shared/mcpclient	rpcErrorWire	Message	message	v0.7.2
-shared/mcpclient	TextContent	Type	type	ff0e561c1563
-shared/mcpclient	TextContent	Text	text	ff0e561c1563
+shared/mcpclient	TextContent	Type	type	501d62f711be
+shared/mcpclient	TextContent	Text	text	501d62f711be
 shared/providersopt	Common	SecretKey	secret_key	v0.7.2
 shared/providersopt	Common	APIKey	api_key	v0.7.2
 shared/providersopt	Common	Endpoint	endpoint	v0.7.2
@@ -942,8 +942,8 @@ tools/modgraph	modEditJSON	Module	Module	v0.7.2
 tools/vulngate	allowFile	Allowlist	allowlist	v0.7.2
 tools/vulngate	findingMsg	Finding	finding	v0.7.2
 tools/vulngate	frame	Function	function	v0.7.2
-tools/zever-lsp	callHierarchyData	Service	service	57a2a86580e4
-tools/zever-lsp	callHierarchyData	RPC	rpc	57a2a86580e4
+tools/zever-lsp	callHierarchyData	Service	service	e3b5d9f813a2
+tools/zever-lsp	callHierarchyData	RPC	rpc	e3b5d9f813a2
 tools/zever-lsp	completionResolveData	Detail	detail	v0.7.2
 tools/zever-mcp	callParams	Name	name	v0.7.2
 tools/zever-mcp	callParams	Arguments	arguments	v0.7.2
