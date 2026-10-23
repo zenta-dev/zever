@@ -7,11 +7,9 @@ import (
 	"github.com/zenta-dev/zever/core/queue"
 )
 
-// ExampleOpen opens the in-memory queue and pushes a message.
-func ExampleOpen() {
-	_ = queue.Register(queue.Memory, memory.New)
-
-	q, err := queue.Open(queue.Memory, queue.Options{})
+// Example opens the in-memory queue and pushes a message.
+func Example() {
+	q, err := memory.New(queue.Options{})
 	if err != nil {
 		return
 	}

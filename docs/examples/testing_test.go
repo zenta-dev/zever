@@ -12,6 +12,7 @@ import (
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/cache"
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/db/dbtest"
 	"github.com/zenta-dev/zever/core/outbox"
@@ -19,13 +20,13 @@ import (
 )
 
 // TestContainer_defaultCache mirrors the testing guide's container setup:
-// register the in-memory adapter, resolve from config.Default(), and close
-// in Cleanup. It opens via the constructor-free registry path the guide
-// documents, so it doubles as the compile check for that snippet.
+// wire the in-memory adapter via container.Provide, resolve from the
+// container, and close in Cleanup. It doubles as the compile check for
+// the guide's provider snippet.
 func TestContainer_defaultCache(t *testing.T) {
-	cachememory.Register()
+	cfg := config.Default()
 
-	c := container.New(config.Default())
+	c := container.New(cfg, container.Provide(cache.DefaultRef(), cachememory.New))
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	ch, err := c.Cache()

@@ -69,4 +69,4 @@ func (d *driver) Status() outbox.Status { return outbox.Status{} }
 func (d *driver) Close() error { return nil }
 
 // Name returns the adapter name.
-func (d *driver) Name() string { return string(outbox.Memory) }
+func (d *driver) Name() string { return "memory" }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"strings"
-	"sync"
 	"testing"
 )
 
@@ -101,29 +100,4 @@ func TestIsPrivateIP_publicLiteral(t *testing.T) {
 	if IsPrivateIP(net.ParseIP("2001:db8::1")) {
 		t.Error("IsPrivateIP(2001:db8::1) = true, want false")
 	}
-}
-
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshAdapter()
-			if err := Register(a, func(Options) (Webhook, error) { return &stubWebhook{}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
 }

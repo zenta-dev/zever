@@ -2,82 +2,59 @@ package config
 
 import (
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 )
 
-// TestREADMEAdapterTableMatchesConfig pins the config/README.md service table
-// to the Config struct: every known service has a row, no row names an
-// unknown service, and the Default() adapter for each service appears in its
-// row's adapter list. Edit the table and the struct together.
-func TestREADMEAdapterTableMatchesConfig(t *testing.T) {
+// TestREADMEServiceTableMatchesConfig pins the config/README.md service table
+// to the Config struct: every known service has a row, and no row names an
+// unknown service. The table lists services only: backend selection is
+// compile-time, so the README carries no adapter matrix. Edit the table and
+// the struct together.
+func TestREADMEServiceTableMatchesConfig(t *testing.T) {
 	t.Parallel()
 
 	raw, err := os.ReadFile("README.md")
 	if err != nil {
 		t.Fatalf("read README.md: %v", err)
 	}
-	rows := parseREADMEAdapterTable(t, string(raw))
+	rows := parseREADMEServiceTable(t, string(raw))
 
 	if len(rows) != len(knownServiceNames()) {
 		t.Errorf("README table has %d service rows, knownServiceNames has %d", len(rows), len(knownServiceNames()))
 	}
 	for _, name := range knownServiceNames() {
-		adapters, ok := rows[name]
-		if !ok {
-			t.Errorf("service %q missing from README adapter table", name)
-			continue
+		found := false
+		for _, row := range rows {
+			if row == name {
+				found = true
+				break
+			}
 		}
-		if len(adapters) == 0 {
-			t.Errorf("service %q has empty adapter list in README", name)
+		if !found {
+			t.Errorf("service %q missing from README service table", name)
 		}
 	}
-	for name := range rows {
+	for _, row := range rows {
 		known := false
 		for _, want := range knownServiceNames() {
-			if name == want {
+			if row == want {
 				known = true
 				break
 			}
 		}
 		if !known {
-			t.Errorf("README adapter table names unknown service %q", name)
-		}
-	}
-
-	cfg := Default()
-	v := reflect.ValueOf(cfg).Elem()
-	typ := v.Type()
-	for i := range typ.NumField() {
-		name, ok := typ.Field(i).Tag.Lookup("json")
-		if !ok || name == "plugins" {
-			continue
-		}
-		adapters, ok := rows[name]
-		if !ok {
-			continue
-		}
-		def := v.Field(i).FieldByName("Adapter").String()
-		listed := false
-		for _, a := range adapters {
-			if a == def {
-				listed = true
-				break
-			}
-		}
-		if !listed {
-			t.Errorf("service %q default adapter %q not listed in README row (%s)", name, def, strings.Join(adapters, ", "))
+			t.Errorf("README service table names unknown service %q", row)
 		}
 	}
 }
 
-// parseREADMEAdapterTable reads the "| Service | Adapters |" markdown table
-// under "## Service table" into service -> adapters.
-func parseREADMEAdapterTable(t *testing.T, raw string) map[string][]string {
+// parseREADMEServiceTable reads the single-column "| Service |" markdown
+// table under "## Service table" into the listed service names.
+func parseREADMEServiceTable(t *testing.T, raw string) []string {
 	t.Helper()
 
-	rows := map[string][]string{}
+	var rows []string
 	lines := strings.Split(raw, "\n")
 	inTable := false
 	for _, line := range lines {
@@ -105,16 +82,12 @@ func parseREADMEAdapterTable(t *testing.T, raw string) map[string][]string {
 		if service == "Service" {
 			continue
 		}
-		var adapters []string
-		for _, a := range strings.Split(cells[2], ",") {
-			if a = strings.TrimSpace(a); a != "" {
-				adapters = append(adapters, a)
-			}
+		if service != "" {
+			rows = append(rows, service)
 		}
-		rows[service] = adapters
 	}
 	if len(rows) == 0 {
-		t.Fatalf("no service rows parsed from README adapter table")
+		t.Fatalf("no service rows parsed from README service table")
 	}
 	return rows
 }

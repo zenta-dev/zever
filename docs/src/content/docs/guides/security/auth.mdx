@@ -14,13 +14,11 @@ Set a 32+ byte JWT secret, then resolve the service; `Open` refuses shorter secr
 <Tabs>
   <TabItem label="YAML">
 ```sh
-AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=change-me-to-at-least-32-bytes
 ```
   </TabItem>
   <TabItem label="env">
 ```sh
-AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 ```
   </TabItem>
@@ -41,7 +39,6 @@ if err != nil {
 List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported. Use a custom auth adapter if you need them. `alg: none` tokens are rejected.
 
 ```sh
-AUTH_ADAPTER=jwt
 AUTH_JWT_SECRET=previous-secret-at-least-32-bytes-long
 AUTH_JWT_LEEWAY=30s
 ```

@@ -7,7 +7,6 @@ require (
 	github.com/casbin/govaluate v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 )
 
 require (

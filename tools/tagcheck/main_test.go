@@ -92,6 +92,15 @@ func scanFixtureWith(t *testing.T, files map[string]string, golden, fields, exce
 func scanFixtureWithParser(t *testing.T, files map[string]string, golden, fields, except, allowlist, noConfigAllowlist, parserAllowlist string) []violation {
 	t.Helper()
 
+	return scanFixtureWithRemoved(t, files, golden, fields, except, allowlist, noConfigAllowlist, parserAllowlist, "")
+}
+
+// scanFixtureWithRemoved is scanFixtureWithParser with the removed-key
+// allowlist: one entry per line, tab-separated package dir, struct name,
+// Go field name, and justification.
+func scanFixtureWithRemoved(t *testing.T, files map[string]string, golden, fields, except, allowlist, noConfigAllowlist, parserAllowlist, removed string) []violation {
+	t.Helper()
+
 	root := t.TempDir()
 
 	for rel, fixture := range files {
@@ -116,6 +125,7 @@ func scanFixtureWithParser(t *testing.T, files map[string]string, golden, fields
 	writeFile(t, filepath.Join(toolDir, "tag_allowlist.txt"), allowlist)
 	writeFile(t, filepath.Join(toolDir, "no_config_file_allowlist.txt"), noConfigAllowlist)
 	writeFile(t, filepath.Join(toolDir, "no_config_parser_allowlist.txt"), parserAllowlist)
+	writeFile(t, filepath.Join(toolDir, "golden_wire_removed.txt"), removed)
 
 	g, err := loadGolden(toolDir)
 	if err != nil {
@@ -147,7 +157,12 @@ func scanFixtureWithParser(t *testing.T, files map[string]string, golden, fields
 		t.Fatal(err)
 	}
 
-	vs, err := scan(root, rules{structs: g, fields: f, except: e, allowed: a, noConfigAllowed: n, parserAllowed: p})
+	rem, err := loadRemoved(toolDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vs, err := scan(root, rules{structs: g, fields: f, except: e, removed: rem, allowed: a, noConfigAllowed: n, parserAllowed: p})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,6 +339,61 @@ func TestScanGoldenKeyMissing(t *testing.T) {
 
 	if !strings.Contains(vs[0].msg, "error") {
 		t.Errorf("message %q does not name the lost wire key", vs[0].msg)
+	}
+}
+
+func TestScanRemovedKeySuppressesGoldenMissing(t *testing.T) {
+	t.Parallel()
+
+	vs := scanFixtureWithRemoved(t, map[string]string{
+		"pkg/wire.go": "golden_field_removed.txt",
+	}, goldenStruct, "pkg\twireStruct\tName\tname\npkg\twireStruct\tError\terror\n", "", "", "", "", "pkg\twireStruct\tError\tbreaking change: field removed\n")
+
+	if len(vs) != 0 {
+		t.Fatalf("blessed key removal produced violations: %v", vs)
+	}
+}
+
+func TestScanRemovedKeyForExistingField(t *testing.T) {
+	t.Parallel()
+
+	vs := scanFixtureWithRemoved(t, map[string]string{
+		"pkg/wire.go": "golden_present.txt",
+	}, goldenStruct, "pkg\twireStruct\tName\tname\npkg\twireStruct\tSecret\tsecret\n", "", "", "", "", "pkg\twireStruct\tSecret\tbreaking change: field removed\n")
+
+	if len(vs) != 1 || vs[0].rule != "golden-removed" {
+		t.Fatalf("got %v, want exactly one golden-removed violation", vs)
+	}
+
+	if !strings.Contains(vs[0].msg, "Secret") {
+		t.Errorf("message %q does not name the field that still exists", vs[0].msg)
+	}
+}
+
+func TestScanRemovedKeyForUnregisteredStruct(t *testing.T) {
+	t.Parallel()
+
+	vs := scanFixtureWithRemoved(t, map[string]string{
+		"pkg/wire.go": "golden_present.txt",
+	}, goldenStruct, goldenStructFields, "", "", "", "", "pkg\tgoneStruct\tGone\tbreaking change: field removed\n")
+
+	if len(vs) != 1 || vs[0].rule != "golden-removed" {
+		t.Fatalf("got %v, want exactly one golden-removed violation", vs)
+	}
+
+	if !strings.Contains(vs[0].msg, "golden_wire_structs.txt") {
+		t.Errorf("message %q does not name the registry", vs[0].msg)
+	}
+}
+
+func TestLoadRemovedMalformedLine(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "golden_wire_removed.txt"), "# header\npkg\twireStruct\tName\n")
+
+	if _, err := loadRemoved(root); err == nil {
+		t.Fatal("malformed removed-key line accepted")
 	}
 }
 

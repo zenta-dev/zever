@@ -4,10 +4,7 @@ go 1.27.3
 
 require github.com/zenta-dev/zever/core/crypto v0.8.0
 
-require (
-	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
-)
+require github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 
 replace github.com/zenta-dev/zever/core/crypto => ../../../core/crypto
 

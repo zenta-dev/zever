@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/google/uuid v1.6.0
+	github.com/zenta-dev/zever/adapters/ai/anthropic v0.8.0
 	github.com/zenta-dev/zever/adapters/analytics/log v0.8.0
 	github.com/zenta-dev/zever/adapters/auth/jwt v0.8.0
 	github.com/zenta-dev/zever/adapters/billing/stub v0.8.0
@@ -23,6 +24,7 @@ require (
 	github.com/zenta-dev/zever/adapters/media/local v0.8.0
 	github.com/zenta-dev/zever/adapters/notification/log v0.8.0
 	github.com/zenta-dev/zever/adapters/observability/stdout v0.8.0
+	github.com/zenta-dev/zever/adapters/outbox/db v0.8.0
 	github.com/zenta-dev/zever/adapters/password/argon2 v0.8.0
 	github.com/zenta-dev/zever/adapters/payment/stub v0.8.0
 	github.com/zenta-dev/zever/adapters/permission/rbac v0.8.0
@@ -36,10 +38,13 @@ require (
 	github.com/zenta-dev/zever/adapters/storage/local v0.8.0
 	github.com/zenta-dev/zever/adapters/tenant/single v0.8.0
 	github.com/zenta-dev/zever/adapters/vectorstore/db v0.8.0
+	github.com/zenta-dev/zever/adapters/webhook/http v0.8.0
 	github.com/zenta-dev/zever/adapters/webhook/queue v0.8.0
 	github.com/zenta-dev/zever/adapters/workflow/memory v0.8.0
 	github.com/zenta-dev/zever/config v0.8.0
 	github.com/zenta-dev/zever/container v0.8.0
+	github.com/zenta-dev/zever/core/ai v0.8.0
+	github.com/zenta-dev/zever/core/analytics v0.8.0
 	github.com/zenta-dev/zever/core/auth v0.8.0
 	github.com/zenta-dev/zever/core/authz v0.8.0
 	github.com/zenta-dev/zever/core/billing v0.8.0
@@ -47,6 +52,7 @@ require (
 	github.com/zenta-dev/zever/core/crypto v0.8.0
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/document v0.8.0
+	github.com/zenta-dev/zever/core/eventbus v0.8.0
 	github.com/zenta-dev/zever/core/flag v0.8.0
 	github.com/zenta-dev/zever/core/geo v0.8.0
 	github.com/zenta-dev/zever/core/i18n v0.8.0
@@ -55,8 +61,10 @@ require (
 	github.com/zenta-dev/zever/core/lock v0.8.0
 	github.com/zenta-dev/zever/core/log v0.8.0
 	github.com/zenta-dev/zever/core/mailer v0.8.0
+	github.com/zenta-dev/zever/core/media v0.8.0
 	github.com/zenta-dev/zever/core/notification v0.8.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
+	github.com/zenta-dev/zever/core/outbox v0.8.0
 	github.com/zenta-dev/zever/core/password v0.8.0
 	github.com/zenta-dev/zever/core/payment v0.8.0
 	github.com/zenta-dev/zever/core/permission v0.8.0
@@ -64,12 +72,19 @@ require (
 	github.com/zenta-dev/zever/core/ratelimit v0.8.0
 	github.com/zenta-dev/zever/core/router v0.8.0
 	github.com/zenta-dev/zever/core/scheduler v0.8.0
+	github.com/zenta-dev/zever/core/search v0.8.0
+	github.com/zenta-dev/zever/core/secrets v0.8.0
+	github.com/zenta-dev/zever/core/session v0.8.0
+	github.com/zenta-dev/zever/core/storage v0.8.0
 	github.com/zenta-dev/zever/core/tenant v0.8.0
+	github.com/zenta-dev/zever/core/vectorstore v0.8.0
 	github.com/zenta-dev/zever/core/webhook v0.8.0
+	github.com/zenta-dev/zever/core/workflow v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
 	github.com/zenta-dev/zever/serve v0.8.0
 	github.com/zenta-dev/zever/shared/apperror v0.8.0
 	github.com/zenta-dev/zever/shared/codec v0.8.0
+	github.com/zenta-dev/zever/shared/dbconn v0.8.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
@@ -125,9 +140,13 @@ replace (
 
 replace github.com/zenta-dev/zever/adapters/analytics/log => ../../adapters/analytics/log
 
+replace github.com/zenta-dev/zever/adapters/ai/anthropic => ../../adapters/ai/anthropic
+
 replace github.com/zenta-dev/zever/adapters/auth/session => ../../adapters/auth/session
 
 replace github.com/zenta-dev/zever/adapters/crypto/local => ../../adapters/crypto/local
+
+replace github.com/zenta-dev/zever/adapters/outbox/db => ../../adapters/outbox/db
 
 replace github.com/zenta-dev/zever/adapters/db/postgres => ../../adapters/db/postgres
 
@@ -234,6 +253,9 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/anthonynsimon/bild v0.17.1 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.82.0 // indirect
+	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/cdproto v0.157.8 // indirect
 	github.com/chromedp/chromedp v0.21.0 // indirect
@@ -242,6 +264,7 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.11.0 // indirect
@@ -249,27 +272,21 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
+	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
+	github.com/tidwall/gjson v1.19.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/zenta-dev/zever/adapters/db/postgres v0.8.0 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/agent v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/ai v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/analytics v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/cdn v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/eventbus v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/media v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/middleware v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/outbox v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/search v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/secrets v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/session v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/storage v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/vectorstore v0.8.0 // indirect
-	github.com/zenta-dev/zever/core/workflow v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/dbconn v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/grpcclient v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/httpclient v0.8.0 // indirect
@@ -288,6 +305,7 @@ require (
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
+	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.60.0 // indirect

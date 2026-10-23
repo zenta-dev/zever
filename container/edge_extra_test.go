@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 // TestContainer_DoubleClose_NoError pins the idempotent shutdown contract:
@@ -12,8 +12,7 @@ import (
 func TestContainer_DoubleClose_NoError(t *testing.T) {
 	t.Parallel()
 
-	registerTestAdapters()
-	c := New(config.Default())
+	c := New(nil, Provide(cache.DefaultRef(), newFakeCache))
 	if _, err := c.Cache(); err != nil {
 		t.Fatalf("Cache: %v", err)
 	}
@@ -40,7 +39,7 @@ func TestContainer_ResolveNilContainer(t *testing.T) {
 func TestContainer_ResolveUnregistered(t *testing.T) {
 	t.Parallel()
 
-	c := New(config.Default())
+	c := New(nil)
 	_, err := Resolve[any](c, "definitely-not-registered")
 	if err == nil {
 		t.Fatal("want error for unregistered plugin")

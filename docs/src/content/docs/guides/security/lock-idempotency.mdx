@@ -22,12 +22,14 @@ import (
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
     "github.com/zenta-dev/zever/core/idempotency"
+    "github.com/zenta-dev/zever/core/lock"
 )
 
 func main() {
-    lockmemory.Register()
-    idemmemory.Register()
-    c := container.New(config.Default())
+    c := container.New(config.Default(),
+        container.Provide(lock.DefaultRef(), lockmemory.New),
+        container.Provide(idempotency.DefaultRef(), idemmemory.New),
+    )
     lk, err := c.Lock()
     if err != nil {
         panic(err)
@@ -75,19 +77,15 @@ Key the lock on the contended range and the idempotency key on a stable external
 `memory` is invisible to other replicas, so a second instance can double-book or duplicate webhook effects. Move both to `redis`, or `idempotency` to `db`.
 
 ```sh
-LOCK_ADAPTER=redis
 LOCK_TTL=30s
 LOCK_RETRY_INTERVAL=50ms
 LOCK_PREFIX=bookings:
-IDEMPOTENCY_ADAPTER=redis
 IDEMPOTENCY_TTL=24h
 ```
 
 ```sh
-LOCK_ADAPTER=redis
 LOCK_TTL=30s
 LOCK_RETRY_INTERVAL=50ms
-IDEMPOTENCY_ADAPTER=redis
 IDEMPOTENCY_TTL=24h
 ```
 

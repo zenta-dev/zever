@@ -3,149 +3,11 @@ package outbox_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
 )
-
-var edgeSeq atomic.Int64
-
-func freshOutboxAdapter() outbox.Adapter {
-	return outbox.Adapter(fmt.Sprintf("edge-%d", 1000+int(edgeSeq.Add(1))))
-}
-
-func TestOpen_factoryError_wrappedWithPrefixAndNil(t *testing.T) {
-	t.Parallel()
-
-	a := freshOutboxAdapter()
-	sentinel := errors.New("boom")
-
-	if err := outbox.Register(a, func(outbox.Options) (outbox.Store, error) { return nil, sentinel }); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-
-	got, err := outbox.Open(a, outbox.Options{})
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("Open() err = %v, want wrap of sentinel", err)
-	}
-
-	if !strings.Contains(err.Error(), "outbox: open") {
-		t.Fatalf("Open() err %q missing %q prefix", err.Error(), "outbox: open")
-	}
-
-	if got != nil {
-		t.Fatalf("Open() value = %v, want nil on error", got)
-	}
-}
-
-func TestOpenShared_unknownAdapter(t *testing.T) {
-	t.Parallel()
-
-	got, err := outbox.OpenShared(outbox.Adapter("edge-nope"), nil, outbox.Options{})
-	if !errors.Is(err, outbox.ErrUnknownAdapter) {
-		t.Fatalf("OpenShared() err = %v, want ErrUnknownAdapter", err)
-	}
-
-	if got != nil {
-		t.Fatalf("OpenShared() value = %v, want nil on error", got)
-	}
-}
-
-func TestOpenShared_invalidOptions(t *testing.T) {
-	t.Parallel()
-
-	a := freshOutboxAdapter()
-	if err := outbox.RegisterShared(a, func(db.DB, outbox.Options) (outbox.Store, error) {
-		return &stubStore{}, nil
-	}); err != nil {
-		t.Fatalf("RegisterShared() error = %v", err)
-	}
-
-	got, err := outbox.OpenShared(a, nil, outbox.Options{Table: "bad name"})
-	if !errors.Is(err, outbox.ErrInvalidOptions) {
-		t.Fatalf("OpenShared() err = %v, want ErrInvalidOptions", err)
-	}
-
-	if got != nil {
-		t.Fatalf("OpenShared() value = %v, want nil on error", got)
-	}
-}
-
-func TestOpenShared_factoryError_wrappedWithPrefix(t *testing.T) {
-	t.Parallel()
-
-	a := freshOutboxAdapter()
-	sentinel := errors.New("shared boom")
-
-	if err := outbox.RegisterShared(a, func(db.DB, outbox.Options) (outbox.Store, error) {
-		return nil, sentinel
-	}); err != nil {
-		t.Fatalf("RegisterShared() error = %v", err)
-	}
-
-	got, err := outbox.OpenShared(a, nil, outbox.Options{})
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("OpenShared() err = %v, want wrap of sentinel", err)
-	}
-
-	if !strings.Contains(err.Error(), "outbox: open shared") {
-		t.Fatalf("OpenShared() err %q missing %q prefix", err.Error(), "outbox: open shared")
-	}
-
-	if got != nil {
-		t.Fatalf("OpenShared() value = %v, want nil on error", got)
-	}
-}
-
-func TestRegister_concurrent_uniqueAdapters(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-
-	var wg sync.WaitGroup
-	errs := make(chan error, n)
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshOutboxAdapter()
-			if err := outbox.Register(a, func(outbox.Options) (outbox.Store, error) {
-				return &stubStore{}, nil
-			}); err != nil {
-				errs <- fmt.Errorf("Register(%v) error = %w", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
-	close(errs)
-
-	for err := range errs {
-		t.Error(err)
-	}
-}
-
-func TestRegisterShared_duplicate(t *testing.T) {
-	t.Parallel()
-
-	a := freshOutboxAdapter()
-	factory := func(db.DB, outbox.Options) (outbox.Store, error) { return &stubStore{}, nil }
-
-	if err := outbox.RegisterShared(a, factory); err != nil {
-		t.Fatalf("first RegisterShared() error = %v", err)
-	}
-
-	if err := outbox.RegisterShared(a, factory); !errors.Is(err, outbox.ErrDuplicateAdapter) {
-		t.Fatalf("second RegisterShared() err = %v, want ErrDuplicateAdapter", err)
-	}
-}
 
 func TestMessage_Validate_emptyTopic(t *testing.T) {
 	t.Parallel()
@@ -269,19 +131,6 @@ func TestPublisherFunc_errorPassthrough(t *testing.T) {
 
 	if err := p.Publish(t.Context(), outbox.Message{ID: "1", Topic: "t"}); !errors.Is(err, sentinel) {
 		t.Fatalf("Publish() err = %v, want sentinel", err)
-	}
-}
-
-func TestParseAdapter_whitespaceAccepted(t *testing.T) {
-	t.Parallel()
-
-	got, err := outbox.ParseAdapter(" ")
-	if err != nil {
-		t.Fatalf("ParseAdapter(\" \") err = %v, want nil", err)
-	}
-
-	if got != outbox.Adapter(" ") {
-		t.Fatalf("ParseAdapter(\" \") = %q, want %q", got, " ")
 	}
 }
 

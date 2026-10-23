@@ -14,6 +14,7 @@ import (
 
 	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
 	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
+	webhookqueue "github.com/zenta-dev/zever/adapters/webhook/queue"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/db"
@@ -24,11 +25,8 @@ import (
 	"github.com/zenta-dev/zever/examples/bookings/internal/service/jobs"
 	"github.com/zenta-dev/zever/shared/codec"
 
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	logslog "github.com/zenta-dev/zever/adapters/log/slog"
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	webhookqueue "github.com/zenta-dev/zever/adapters/webhook/queue"
 	"github.com/zenta-dev/zever/core/webhook"
+	"github.com/zenta-dev/zever/examples/bookings/internal/testsetup"
 )
 
 // eventually polls cond until true or timeout, failing the test on expiry.
@@ -70,14 +68,9 @@ func migrate(t *testing.T, database db.DB) {
 func newTestDB(t *testing.T) (db.DB, log.Logger, context.Context) {
 	t.Helper()
 
-	dbsqlite.Register()
-	logslog.Register()
-	queuememory.Register()
-	webhookqueue.Register()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	database, err := c.DB()
 	if err != nil {
@@ -122,7 +115,7 @@ func testDeps(t *testing.T, database db.DB, logger log.Logger) (jobs.Deps, *byte
 	if err != nil {
 		t.Fatalf("notifier: %v", err)
 	}
-	wh, err := webhook.Open(webhook.AdapterQueue, webhook.Options{
+	wh, err := webhookqueue.New(webhook.Options{
 		AllowPrivateTargets: true,
 		QueueAdapter:        "memory",
 		// Short poll so a lost push wakeup in the memory queue costs at most

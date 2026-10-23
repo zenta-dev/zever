@@ -12,7 +12,7 @@ import (
 )
 
 // Conformance verifies factory-built hashers implement the
-// password.Hasher contract: open/register round-trip, Hash/Verify
+// password.Hasher contract: Hash/Verify
 // round-trip with salt uniqueness, wrong-password rejection,
 // NeedsRehash, invalid-hash sentinels, and overlong rejection. Each
 // subtest takes a fresh instance from factory so cases stay
@@ -25,35 +25,10 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) password.Hasher) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("HashVerify", func(t *testing.T) { conformanceHashVerify(t, factory) })
 	t.Run("WrongPassword", func(t *testing.T) { conformanceWrongPassword(t, factory) })
 	t.Run("NeedsRehash", func(t *testing.T) { conformanceNeedsRehash(t, factory) })
 	t.Run("InvalidHash", func(t *testing.T) { conformanceInvalidHash(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := password.Open(password.Adapter("conformance-missing-adapter"), password.Options{Time: password.DefaultTime, Memory: password.DefaultMemory, Threads: password.DefaultThreads, SaltLen: password.DefaultSaltLen, KeyLen: password.DefaultKeyLen}); !errors.Is(err, password.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := password.Adapter("conformance-probe-password")
-
-	if err := password.Register(probe, nil); !errors.Is(err, password.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(password.Options) (password.Hasher, error) {
-		return nil, errors.New("passwordtest: probe factory must not run")
-	}
-
-	_ = password.Register(probe, stub)
-
-	if err := password.Register(probe, stub); !errors.Is(err, password.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceHashVerify(t *testing.T, factory func(t *testing.T) password.Hasher) {

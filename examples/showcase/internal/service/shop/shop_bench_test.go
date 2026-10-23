@@ -17,10 +17,8 @@ import (
 func benchService(b *testing.B) *shopsvc.ShopServiceImpl {
 	b.Helper()
 
-	dbsqlite.Register()
-
 	ctx := b.Context()
-	conn, err := db.Open(db.SQLite, db.Options{Path: filepath.Join(b.TempDir(), "bench.db")})
+	conn, err := dbsqlite.New(db.Options{Path: filepath.Join(b.TempDir(), "bench.db")})
 	if err != nil {
 		b.Fatalf("open: %v", err)
 	}

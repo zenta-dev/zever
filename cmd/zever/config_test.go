@@ -74,7 +74,7 @@ func TestRunConfigShowWithCoreListsServices(t *testing.T) {
 	}
 
 	got := out.String()
-	for _, want := range []string{"ai", "db", "cache", "queue", "workflow", "adapter="} {
+	for _, want := range []string{"ai", "db", "cache", "queue", "workflow", "driver="} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("output missing %q:\n%s", want, got)
 		}
@@ -98,7 +98,7 @@ func TestRunConfigShowWithCoreRedactsSecrets(t *testing.T) {
 
 func TestRunConfigShowWithCoreConfigFile(t *testing.T) {
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	writeInspectFixture(t, dir, ".env", "LOG_MIN_LEVEL=1\n")
 	t.Chdir(dir)
 
 	var out bytes.Buffer
@@ -127,15 +127,15 @@ func TestRunConfigShowWithCoreBadConfigFile(t *testing.T) {
 // so env overrides apply exactly as they do when the container builds its
 // config.
 func TestRunConfigShowWithAppliesEnvOverrides(t *testing.T) {
-	t.Setenv("DB_ADAPTER", "postgres")
+	t.Setenv("DB_MAX_CONNS", "42")
 
 	var out bytes.Buffer
 	if err := runConfigShowWith(ConfigConfig{Out: &out}); err != nil {
 		t.Fatalf("runConfigShowWith: %v", err)
 	}
 
-	if got := out.String(); !strings.Contains(got, "db  adapter=postgres") {
-		t.Fatalf("output = %q, want db adapter=postgres from DB_ADAPTER env", got)
+	if got := out.String(); !strings.Contains(got, "max_conns: 42") {
+		t.Fatalf("output = %q, want max_conns 42 from DB_MAX_CONNS env", got)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestPrintConfigUsageColoredBox(t *testing.T) {
 // default row, and secret values never appear raw.
 func TestRunConfigShowPrintsNamedInstances(t *testing.T) {
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "DB_ADAPTER=sqlite\nDB__ANALYTICS__ADAPTER=postgres\nDB__ANALYTICS__DSN=postgres://user:s3cret@localhost/db?sslmode=disable\n")
+	writeInspectFixture(t, dir, ".env", "DB__ANALYTICS__DSN=postgres://user:s3cret@localhost/db?sslmode=disable\n")
 	t.Chdir(dir)
 
 	var out bytes.Buffer

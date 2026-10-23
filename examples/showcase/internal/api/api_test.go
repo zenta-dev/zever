@@ -39,19 +39,16 @@ type testSetup struct {
 func newTestSetup(t *testing.T) testSetup {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 	cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: api.LocalesFS, Dir: "locales", Fallback: "en"}
-	cfg.Permission.Adapter = "rbac"
 	cfg.Permission.Options.Rules = []permission.Rule{
 		{Role: "admin", Action: "product.delete"},
 		{Role: "user", Action: "product.delete", OwnedOnly: true, OwnedAttr: "owner"},
 	}
 
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 
 	ctx := t.Context()
 	database, err := c.DB()

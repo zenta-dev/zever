@@ -10,15 +10,15 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 ## Quick start
 
 ```sh
-I18N_ADAPTER=embed    # default: compiled-in catalog
 I18N_EMBED_DIR=locales
 I18N_EMBED_FALLBACK=en
 ```
 
+The default wiring already embeds the catalog (`i18nembed.New` in `internal/app/wiring.go`); `remote` is a wiring change, not an env key.
+
 Switch to `remote` for a shared catalog service:
 
 ```sh
-I18N_ADAPTER=remote
 I18N_REMOTE_ENDPOINT=https://i18n.internal:8080
 ```
 
@@ -47,10 +47,9 @@ import (
 //go:embed locales/*.json
 var localesFS embed.FS
 
-i18nembed.Register()
 cfg := config.Default()
 cfg.I18n.Options.Embed = i18n.EmbedOptions{FS: localesFS, Dir: "locales", Fallback: "en"}
-c := container.New(cfg)
+c := container.New(cfg, container.Provide(i18n.DefaultRef(), i18nembed.New))
 t, _ := c.I18n()
 
 msg, _ := t.Translate(ctx, "fr", "hello", map[string]string{"name": "Ada"})

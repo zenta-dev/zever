@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateDefaultPasses(t *testing.T) {
@@ -16,7 +17,7 @@ func TestValidateFailClosed(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	cfg.Crypto.Options.Key = "x"
-	cfg.DB.Adapter = ""
+	cfg.DB.Options.MaxConns = -1
 	err := cfg.Validate()
 	if err == nil {
 		t.Fatal("want error")
@@ -29,12 +30,16 @@ func TestValidateFailClosed(t *testing.T) {
 	}
 }
 
-func TestValidateBadAdapter(t *testing.T) {
+func TestValidateNegativeTimeout(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	cfg.Router.Adapter = ""
-	if err := cfg.Validate(); err == nil {
+	cfg.Webhook.Options.Timeout = -time.Second
+	err := cfg.Validate()
+	if err == nil {
 		t.Fatal("want error")
+	}
+	if !strings.Contains(err.Error(), "webhook") {
+		t.Fatalf("missing service name: %v", err)
 	}
 }
 

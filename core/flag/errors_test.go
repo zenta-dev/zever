@@ -29,10 +29,10 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(DuplicateAdapterError{Adapter: Static}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: "static"}, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(UnknownAdapterError{Adapter: Static}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: "static"}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
 	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
@@ -43,24 +43,5 @@ func TestErrors_typed_unwrap(t *testing.T) {
 	}
 	if !errors.Is(InvalidKeyError{KeyLen: 0}, ErrInvalidKey) {
 		t.Error("InvalidKeyError does not unwrap to ErrInvalidKey")
-	}
-}
-
-func TestErrors_carried_fields(t *testing.T) {
-	t.Parallel()
-	if de := (DuplicateAdapterError{Adapter: Static}); de.Adapter != Static {
-		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
-	}
-	if ue := (UnknownAdapterError{Adapter: Static}); ue.Adapter != Static {
-		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
-	}
-	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
-		t.Errorf("InvalidAdapterError adapter = %q", iae.Adapter)
-	}
-	if ioe := (InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
-		t.Errorf("InvalidOptionsError reason = %q", ioe.Reason)
-	}
-	if ike := (InvalidKeyError{KeyLen: 5}); ike.KeyLen != 5 {
-		t.Errorf("InvalidKeyError keylen = %d", ike.KeyLen)
 	}
 }

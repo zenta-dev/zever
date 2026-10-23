@@ -132,9 +132,7 @@ func TestEdge_TryAcquireConcurrentDistinctKeys(t *testing.T) {
 // TestEdge_RegisterOpensViaCore proves Register wires the adapter factory into
 // the lock battery registry so lock.Open resolves it.
 func TestEdge_RegisterOpensViaCore(t *testing.T) {
-	Register()
-
-	l, err := lock.Open(lock.Memory, lock.Options{})
+	l, err := New(lock.Options{})
 	if err != nil {
 		t.Fatalf("Open = %v", err)
 	}

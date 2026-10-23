@@ -527,17 +527,17 @@ func TestRunNewWritesEnvFiles(t *testing.T) {
 
 	example := readFile(t, filepath.Join(out, ".env.example"))
 	for _, fragment := range []string{
-		"# --- db (adapter sqlite) ---",
-		"DB_ADAPTER=sqlite",
-		"# --- log (adapter slog) ---",
-		"LOG_ADAPTER=slog",
-		"# --- router (adapter stdhttp) ---",
-		"ROUTER_ADAPTER=stdhttp",
+		"# --- db (adapter sqlite",
+		"# --- log (adapter slog",
+		"# --- router (adapter stdhttp",
 		"DB_MAX_CONNS=",
 	} {
 		if !strings.Contains(example, fragment) {
 			t.Errorf(".env.example lacks %q:\n%s", fragment, example)
 		}
+	}
+	if strings.Contains(example, "_ADAPTER=") {
+		t.Errorf(".env.example must not emit an adapter env key:\n%s", example)
 	}
 }
 
@@ -1126,15 +1126,15 @@ func TestNestedModuleDirsMatchCheckout(t *testing.T) {
 func TestAllServiceAdaptersMatchDefault(t *testing.T) {
 	live := config.Default().RedactedServices()
 
-	for name, want := range live {
+	for name := range live {
 		got, ok := allServiceAdapters[name]
 		if !ok {
 			t.Errorf("allServiceAdapters missing runtime service %q", name)
 			continue
 		}
 
-		if got != want.Adapter {
-			t.Errorf("allServiceAdapters[%q] = %q, want live default %q", name, got, want.Adapter)
+		if got != cliDefaultDriver(name) {
+			t.Errorf("allServiceAdapters[%q] = %q, want CLI default %q", name, got, cliDefaultDriver(name))
 		}
 	}
 
@@ -1449,10 +1449,10 @@ func TestRenderNewReadmeTellsTheTruth(t *testing.T) {
 	for _, fragment := range []string{
 		"zever db migrate --adapter=sqlite --dsn=data/app.db schema/app.zen",
 		"zever doctor",
-		"DB_ADAPTER=sqlite",
-		"LOG_ADAPTER=slog",
-		"AUTH_ADAPTER=jwt",
-		"ROUTER_ADAPTER=stdhttp",
+		"- db (adapter sqlite)",
+		"- log (adapter slog)",
+		"- auth (adapter jwt)",
+		"- router (adapter stdhttp)",
 		"CRYPTO_KEY",
 		"AUTH_JWT_SECRET",
 		"zever config show",

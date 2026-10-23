@@ -7,29 +7,6 @@ import (
 
 // benchWebhookAdapter registers a stub webhook once and returns its adapter so
 // Open can be measured without the one-shot registration cost.
-func benchWebhookAdapter(b *testing.B) Adapter {
-	b.Helper()
-
-	a := freshAdapter()
-	if err := Register(a, func(Options) (Webhook, error) { return &stubWebhook{}, nil }); err != nil {
-		b.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	return a
-}
-
-func BenchmarkOpen(b *testing.B) {
-	a := benchWebhookAdapter(b)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if _, err := Open(a, Options{}); err != nil {
-			b.Fatalf("Open(%v) error = %v", a, err)
-		}
-	}
-}
 
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{Timeout: 5, MaxRetries: 3, ReplayTolerance: 300}

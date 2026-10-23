@@ -12,7 +12,6 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 `stub` (the default) moves no money or network traffic. `auto_approve: true` marks payments `succeeded` immediately, testing the success path without a webhook.
 
 ```sh
-PAYMENT_ADAPTER=stub
 PAYMENT_AUTO_APPROVE=true
 PAYMENT_MAX_WEBHOOK_BYTES=1048576
 ```
@@ -33,10 +32,9 @@ import (
 )
 
 func main() {
-	paymentstub.Register() // container wires nothing
-	cfg := config.Default()
-	cfg.Payment.Options.AutoApprove = true
-	c := container.New(cfg)
+	c := container.New(config.Default(), container.Provide(payment.DefaultRef(), paymentstub.New,
+		container.WithOptions(func(o *payment.Options) { o.AutoApprove = true }),
+	))
 	ctx := context.Background()
 	defer c.Close(ctx)
 

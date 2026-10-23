@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
+	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/webhook"
@@ -869,6 +870,17 @@ func newSafeClient(timeout time.Duration, allowPrivate bool) *http.Client {
 	return webhook.NewSafeClient(timeout, allowPrivate)
 }
 
+// openQueue builds the nested queue backend named by QueueAdapter.
+// Compile-time wiring: only the memory backend is compiled in here; anything
+// else fails closed directing to app-level wiring. Tests stub it.
+var openQueue = func(adapter string, opts queue.Options) (queue.Queue, error) {
+	if a := strings.ToLower(strings.TrimSpace(adapter)); a != "memory" {
+		return nil, fmt.Errorf("queue: unsupported queue adapter %q (this build wires memory; construct the queue in the app for other backends): %w", adapter, queue.ErrUnknownAdapter)
+	}
+
+	return queuememory.New(opts)
+}
+
 // New builds a queue-backed Webhook from o.
 // QueueAdapter names a registered queue backend and QueueOpts carries its settings.
 func New(o webhook.Options) (webhook.Webhook, error) {
@@ -912,12 +924,12 @@ func New(o webhook.Options) (webhook.Webhook, error) {
 		)
 	}
 
-	qa, err := queue.ParseAdapter(queueAdapter)
-	if err != nil {
-		return nil, fmt.Errorf("queue: %w", err)
-	}
-
-	q, err := queue.Open(qa, o.QueueOpts)
+	// The nested queue backend is selected in code: only the compiled-in
+	// memory backend is wired here (openQueue, stubbed in tests). For redis
+	// or db, construct the queue in the app (queueredis.New /
+	// queuedb.NewFromDB via container.Provide) and use the http webhook
+	// adapter alongside it.
+	q, err := openQueue(queueAdapter, o.QueueOpts)
 	if err != nil {
 		return nil, err
 	}

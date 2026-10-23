@@ -28,7 +28,7 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_duplicate_aliases_compat(t *testing.T) {
 	t.Parallel()
-	err := DuplicateAdapterError{Adapter: AdapterHTTP}
+	err := DuplicateAdapterError{Adapter: "http"}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate alias")
 	}
@@ -43,10 +43,10 @@ func TestErrors_duplicate_aliases_compat(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(DuplicateAdapterError{Adapter: AdapterHTTP}, ErrDuplicateAdapter) {
+	if !errors.Is(DuplicateAdapterError{Adapter: "http"}, ErrDuplicateAdapter) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicateAdapter")
 	}
-	if !errors.Is(UnknownAdapterError{Adapter: AdapterHTTP}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: "http"}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
 	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
@@ -59,10 +59,10 @@ func TestErrors_typed_unwrap(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	if de := (DuplicateAdapterError{Adapter: AdapterQueue}); de.Adapter != AdapterQueue {
+	if de := (DuplicateAdapterError{Adapter: "queue"}); de.Adapter != "queue" {
 		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
 	}
-	if ue := (UnknownAdapterError{Adapter: AdapterQueue}); ue.Adapter != AdapterQueue {
+	if ue := (UnknownAdapterError{Adapter: "queue"}); ue.Adapter != "queue" {
 		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
 	}
 	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
@@ -76,8 +76,8 @@ func TestErrors_carried_fields(t *testing.T) {
 func TestErrors_messages_prefixSentinel(t *testing.T) {
 	t.Parallel()
 	msgs := []string{
-		(DuplicateAdapterError{Adapter: AdapterHTTP}).Error(),
-		(UnknownAdapterError{Adapter: AdapterHTTP}).Error(),
+		(DuplicateAdapterError{Adapter: "http"}).Error(),
+		(UnknownAdapterError{Adapter: "http"}).Error(),
 		(InvalidAdapterError{Adapter: "bogus"}).Error(),
 		(InvalidOptionsError{Reason: "bad"}).Error(),
 	}

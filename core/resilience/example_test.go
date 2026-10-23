@@ -23,12 +23,3 @@ func ExampleDo() {
 }
 
 // ExampleParseAdapter parses a custom adapter name.
-func ExampleParseAdapter() {
-	a, err := resilience.ParseAdapter("memory")
-	if err != nil {
-		return
-	}
-
-	fmt.Println(a)
-	// Output: memory
-}

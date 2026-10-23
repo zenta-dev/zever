@@ -2,9 +2,9 @@
 //
 // It renders byte sources to PDF, PNG, or JPG through local, remote, or LaTeX backends. It is not a document editor or storage layer; inputs are bounded byte slices.
 //
-// Type safety: Document plus typed Options plus Adapter enum plus Factory. OutputFormat is a string type limited to pdf, png, and jpg; Quality is clamped to 0-100. Unsupported features fail closed.
+// Type safety: Document plus typed Options plus Factory. OutputFormat is a string type limited to pdf, png, and jpg; Quality is clamped to 0-100. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. DOCUMENT_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Document(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package document

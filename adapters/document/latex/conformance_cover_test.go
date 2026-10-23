@@ -1,9 +1,7 @@
 package latex
 
 import (
-	"fmt"
 	"os/exec"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/document"
@@ -20,10 +18,6 @@ func requirePDFLatex(t *testing.T) {
 	}
 }
 
-// kitAdapterSeq suffixes TestOpenRegister's adapter name so every
-// invocation registers a name no earlier -count iteration has claimed.
-var kitAdapterSeq atomic.Int64
-
 // TestOpenRegister proves Register wiring plus Open round-trip. It uses a
 // test-only adapter name so it cannot collide with other registrations in
 // this binary; the kit factory below opens via New directly. Open requires
@@ -35,13 +29,7 @@ func TestOpenRegister(t *testing.T) {
 
 	// A fresh name per invocation keeps the test idempotent under
 	// -count=N: the registry is process-global and has no unregister.
-	adapter := document.Adapter(fmt.Sprintf("kit-document-latex-%d", kitAdapterSeq.Add(1)))
-
-	if err := document.Register(adapter, New); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-
-	d, err := document.Open(adapter, document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}

@@ -23,13 +23,13 @@ func TestErrorMessages(t *testing.T) {
 		},
 		{
 			name:     "duplicate adapter",
-			err:      DuplicateAdapterError{Adapter: SQLite},
+			err:      DuplicateAdapterError{Adapter: "sqlite"},
 			wantSub:  "db: duplicate adapter",
 			sentinel: ErrDuplicateAdapter,
 		},
 		{
 			name:     "unknown adapter",
-			err:      UnknownAdapterError{Adapter: Adapter("test-42")},
+			err:      UnknownAdapterError{Adapter: "test-42"},
 			wantSub:  "db: unknown adapter",
 			sentinel: ErrUnknownAdapter,
 		},
@@ -71,7 +71,7 @@ func TestErrorMessages(t *testing.T) {
 func TestDuplicateAliases_compat(t *testing.T) {
 	t.Parallel()
 
-	err := DuplicateAdapterError{Adapter: SQLite}
+	err := DuplicateAdapterError{Adapter: "sqlite"}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Error("does not unwrap to ErrDuplicate alias")
 	}
@@ -145,7 +145,7 @@ func TestErrorUnwrap(t *testing.T) {
 	t.Run("duplicate unwraps", func(t *testing.T) {
 		t.Parallel()
 
-		err := DuplicateAdapterError{Adapter: Postgres}
+		err := DuplicateAdapterError{Adapter: "postgres"}
 		if !errors.Is(err, ErrDuplicateAdapter) {
 			t.Error("does not unwrap to ErrDuplicateAdapter")
 		}
@@ -158,7 +158,7 @@ func TestErrorUnwrap(t *testing.T) {
 	t.Run("unknown unwraps", func(t *testing.T) {
 		t.Parallel()
 
-		err := UnknownAdapterError{Adapter: Postgres}
+		err := UnknownAdapterError{Adapter: "postgres"}
 		if !errors.Is(err, ErrUnknownAdapter) {
 			t.Error("does not unwrap to ErrUnknownAdapter")
 		}

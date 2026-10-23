@@ -40,7 +40,7 @@ func BenchmarkStubSend(b *testing.B) {
 }
 
 // BenchmarkBuildFromConfig measures decoding cfg.Plugins["sms"] and opening
-// the selected adapter: the container plugin build path.
+// the code-wired adapter: the container plugin build path.
 func BenchmarkBuildFromConfig(b *testing.B) {
 	if err := ensureRegistered(); err != nil {
 		b.Fatalf("RegisterPlugin: %v", err)
@@ -48,7 +48,7 @@ func BenchmarkBuildFromConfig(b *testing.B) {
 
 	cfg := config.Default()
 	cfg.Plugins = map[string]config.Service[jsontext.Value]{
-		"sms": {Adapter: "stub", Options: jsontext.Value(`{"from":"+15550000"}`)},
+		"sms": {Options: jsontext.Value(`{"from":"+15550000"}`)},
 	}
 
 	b.ReportAllocs()

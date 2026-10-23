@@ -32,10 +32,10 @@ func TestErrors_sentinel_messages(t *testing.T) {
 
 func TestErrors_typed_unwrap(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(DuplicateAdapterError{Adapter: SMTP}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: "smtp"}, ErrDuplicate) {
 		t.Error("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(UnknownAdapterError{Adapter: SMTP}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: "smtp"}, ErrUnknownAdapter) {
 		t.Error("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
 	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
@@ -46,24 +46,5 @@ func TestErrors_typed_unwrap(t *testing.T) {
 	}
 	if !errors.Is(InvalidAddressError{Field: "To", Value: "x"}, ErrInvalidAddress) {
 		t.Error("InvalidAddressError does not unwrap to ErrInvalidAddress")
-	}
-}
-
-func TestErrors_carried_fields(t *testing.T) {
-	t.Parallel()
-	if de := (DuplicateAdapterError{Adapter: SMTP}); de.Adapter != SMTP {
-		t.Errorf("DuplicateAdapterError adapter = %v", de.Adapter)
-	}
-	if ue := (UnknownAdapterError{Adapter: Log}); ue.Adapter != Log {
-		t.Errorf("UnknownAdapterError adapter = %v", ue.Adapter)
-	}
-	if iae := (InvalidAdapterError{Adapter: "bogus"}); iae.Adapter != "bogus" {
-		t.Errorf("InvalidAdapterError adapter = %q", iae.Adapter)
-	}
-	if ioe := (InvalidOptionsError{Reason: "bad"}); ioe.Reason != "bad" {
-		t.Errorf("InvalidOptionsError reason = %q", ioe.Reason)
-	}
-	if iae := (InvalidAddressError{Field: "From", Value: "bad"}); iae.Field != "From" || iae.Value != "bad" {
-		t.Errorf("InvalidAddressError fields = %+v", iae)
 	}
 }

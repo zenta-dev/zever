@@ -8,9 +8,6 @@ import (
 	"testing"
 	"time"
 
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	logslog "github.com/zenta-dev/zever/adapters/log/slog"
-	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
 	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
@@ -27,12 +24,14 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/search"
 	"github.com/zenta-dev/zever/core/session"
 	"github.com/zenta-dev/zever/core/storage"
 	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/examples/demoapp/internal/api"
+	"github.com/zenta-dev/zever/examples/demoapp/internal/testsetup"
 )
 
 // errBoom is the generic backend failure stubs report.
@@ -462,8 +461,9 @@ func (stubPassword) NeedsRehash(context.Context, string) (bool, error) { return 
 func newBareAPI(t *testing.T, deps api.Deps) http.Handler {
 	t.Helper()
 
-	routerstdhttp.Register()
-	c := container.New(config.Default())
+	c := container.New(config.Default(),
+		container.Provide(router.DefaultRef(), routerstdhttp.New),
+	)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	r, err := c.Router()
 	if err != nil {
@@ -808,14 +808,9 @@ func TestDemoAuthEdge(t *testing.T) {
 func TestDemoMinimalDeps(t *testing.T) {
 	full := newTestSetup(t)
 
-	authjwt.Register()
-	passwordargon2.Register()
-	logslog.Register()
-	routerstdhttp.Register()
-
 	cfg := config.Default()
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 	authInst, err := c.Auth()
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 )
 
 // Conformance verifies factory-built backends implement the geo.Geo
-// contract: open/register round-trip, empty-query and invalid-
+// contract: empty-query and invalid-
 // coordinate sentinels, same-point distance, and Close. Each subtest
 // takes a fresh instance from factory so cases stay isolated. Tests
 // never call time.Sleep and never touch the network.
@@ -26,35 +26,10 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) geo.Geo) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("EmptyQuery", func(t *testing.T) { conformanceEmptyQuery(t, factory) })
 	t.Run("InvalidCoordinate", func(t *testing.T) { conformanceInvalidCoordinate(t, factory) })
 	t.Run("SamePointDistance", func(t *testing.T) { conformanceSamePointDistance(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := geo.Open(geo.Adapter("conformance-missing-adapter"), geo.Options{}); !errors.Is(err, geo.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := geo.Adapter("conformance-probe-geo")
-
-	if err := geo.Register(probe, nil); !errors.Is(err, geo.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(geo.Options) (geo.Geo, error) {
-		return nil, errors.New("geotest: probe factory must not run")
-	}
-
-	_ = geo.Register(probe, stub)
-
-	if err := geo.Register(probe, stub); !errors.Is(err, geo.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceEmptyQuery(t *testing.T, factory func(t *testing.T) geo.Geo) {

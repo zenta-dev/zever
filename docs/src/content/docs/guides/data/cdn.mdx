@@ -14,12 +14,10 @@ Pick `noop` for local development (default, no infra); pick `cloudflare` when fi
 <Tabs>
   <TabItem label="noop">
 ```sh
-CDN_ADAPTER=noop
 ```
   </TabItem>
   <TabItem label="cloudflare">
 ```sh
-CDN_ADAPTER=cloudflare
 CDN_API_TOKEN=cf-api-token-here
 CDN_ZONE_ID=023e105f4ecef8ad9ca31a8372d0c353
 CDN_BASE_URL=https://api.cloudflare.com/client/v4
@@ -27,11 +25,11 @@ CDN_BASE_URL=https://api.cloudflare.com/client/v4
   </TabItem>
 </Tabs>
 
-Env vars: `CDN_ADAPTER`, `CDN_API_TOKEN`, `CDN_ZONE_ID`. The `cloudflare` adapter requires `api_token` and `zone_id` at construction; `base_url` defaults to `https://api.cloudflare.com/client/v4`. API tokens are never logged: display goes through `config.RedactedServices`. See the [cdn options](../../../reference/config/#cdn) for every key.
+Env vars: `CDN_API_TOKEN`, `CDN_ZONE_ID` (the backend is wired in code, not env). The `cloudflare` adapter requires `api_token` and `zone_id` at construction; `base_url` defaults to `https://api.cloudflare.com/client/v4`. API tokens are never logged: display goes through `config.RedactedServices`. See the [cdn options](../../../reference/config/#cdn) for every key.
 
 ## Purge content
 
-Register the adapter, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
+Wire the adapter with a `container.Provide` entry, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
 
 ```go title="main.go" check
 package main
@@ -46,9 +44,8 @@ import (
 )
 
 func main() {
-	cdncloudflare.Register()
 	ctx := context.Background()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(cdn.DefaultRef(), cdncloudflare.New))
 	defer c.Close(ctx)
 
 	cd, err := c.CDN()

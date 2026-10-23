@@ -10,7 +10,7 @@ import (
 )
 
 // Conformance verifies factory-built loggers implement the log.Logger
-// contract: open/register round-trip, every level emits with every
+// contract: every level emits with every
 // field type without panicking, With/Context chaining preserves the
 // logger, Enabled/Sync/Name behave, and ParseLevel sentinels hold.
 // Each subtest takes a fresh instance from factory so cases stay
@@ -24,36 +24,11 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) log.Logger) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("EmitLevels", func(t *testing.T) { conformanceEmitLevels(t, factory) })
 	t.Run("WithChaining", func(t *testing.T) { conformanceWithChaining(t, factory) })
 	t.Run("Context", func(t *testing.T) { conformanceContext(t, factory) })
 	t.Run("ParseLevel", func(t *testing.T) { conformanceParseLevel(t) })
 	t.Run("Sync", func(t *testing.T) { conformanceSync(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := log.Open(log.Adapter("conformance-missing-adapter"), log.Options{}); !errors.Is(err, log.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := log.Adapter("conformance-probe-log")
-
-	if err := log.Register(probe, nil); !errors.Is(err, log.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(log.Options) (log.Logger, error) {
-		return nil, errors.New("logtest: probe factory must not run")
-	}
-
-	_ = log.Register(probe, stub)
-
-	if err := log.Register(probe, stub); !errors.Is(err, log.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceEmitLevels(t *testing.T, factory func(t *testing.T) log.Logger) {

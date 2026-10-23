@@ -19,7 +19,7 @@ import (
 func TestContainer_ShutdownSIGTERM_NoGoroutineLeak(t *testing.T) {
 	defer goleak.VerifyNone(t, leakOptions()...)
 
-	c := New(testConfig(t))
+	c := New(nil, fakeProviders()...)
 
 	for _, resolve := range []func() (any, error){
 		func() (any, error) { return c.Cache() },

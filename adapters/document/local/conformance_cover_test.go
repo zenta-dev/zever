@@ -1,34 +1,17 @@
 package local
 
 import (
-	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/document"
 	"github.com/zenta-dev/zever/core/document/documenttest"
 )
 
-// kitAdapterSeq suffixes TestOpenRegister's adapter name so every
-// invocation registers a name no earlier -count iteration has claimed.
-var kitAdapterSeq atomic.Int64
-
-// TestOpenRegister proves Register wiring plus Open round-trip. It uses a
-// test-only adapter name: registering document.Local itself would collide
-// with example tests' strict Register in this same binary, so the kit
-// factory below opens via New directly.
-func TestOpenRegister(t *testing.T) {
+// TestOpenDirect proves direct construction opens a working backend.
+func TestOpenDirect(t *testing.T) {
 	t.Parallel()
 
-	// A fresh name per invocation keeps the test idempotent under
-	// -count=N: the registry is process-global and has no unregister.
-	adapter := document.Adapter(fmt.Sprintf("kit-document-local-%d", kitAdapterSeq.Add(1)))
-
-	if err := document.Register(adapter, New); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-
-	d, err := document.Open(adapter, document.Options{})
+	d, err := New(document.Options{})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}

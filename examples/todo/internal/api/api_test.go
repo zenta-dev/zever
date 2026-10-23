@@ -23,13 +23,11 @@ const testJWTSecret = "test-secret-for-todo-app-32-bytes-min!"
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
 
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 
 	database, err := c.DB()
 	if err != nil {

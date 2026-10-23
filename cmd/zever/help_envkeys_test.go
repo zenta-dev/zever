@@ -93,12 +93,12 @@ func TestUsageNamesTheEnvKey(t *testing.T) {
 		{
 			name: "generate adapter",
 			body: adapterUsageBody,
-			want: []string{"<BATTERY>_ADAPTER", "CACHE_ADAPTER=redis", ".env at the project root"},
+			want: []string{"container.Provide", "internal/app/wiring.go", "no adapter env key"},
 		},
 		{
 			name: "generate worker",
 			body: workerUsageBody,
-			want: []string{"QUEUE_ADAPTER=redis", ".env at the project root", "ZEVER_WORKER_ENTRY"},
+			want: []string{"container.Provide", "internal/app/wiring.go", "ZEVER_WORKER_ENTRY"},
 		},
 		{
 			name: "generate server",

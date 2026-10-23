@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,19 +57,16 @@ func TestResolveDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DB.Adapter != "sqlite" {
-		t.Fatalf("got %q, want sqlite", cfg.DB.Adapter)
+	if cfg.Crypto.Options.Key == "" {
+		t.Fatal("want default crypto dev key")
 	}
 }
 
 func TestResolveEnvOverrides(t *testing.T) {
 	seedHostileEnv(t)
-	cfg, err := Resolve(Env{"DB_ADAPTER": "postgres", "DB_MAXCONNS": "20"})
+	cfg, err := Resolve(Env{"DB_MAXCONNS": "20"})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
 	}
 	if cfg.DB.Options.MaxConns != 20 {
 		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
@@ -77,7 +75,7 @@ func TestResolveEnvOverrides(t *testing.T) {
 
 func TestResolveInvalidFailsNil(t *testing.T) {
 	seedHostileEnv(t)
-	cfg, err := Resolve(Env{"CRYPTO_ADAPTER": "local", "CRYPTO_KEY": "x"})
+	cfg, err := Resolve(Env{"CRYPTO_KEY": "x"})
 	if err == nil {
 		t.Fatal("want error")
 	}
@@ -93,35 +91,62 @@ func TestResolveEnvTypeError(t *testing.T) {
 	}
 }
 
-func TestResolveEnvBadAdapterFails(t *testing.T) {
+// TestResolveEnvAdapterRejected pins the removal: any *_ADAPTER key fails
+// resolution with an UnknownFieldError carrying the removal message —
+// never silently ignored, never a did-you-mean suggestion. On failure
+// Resolve returns nil.
+func TestResolveEnvAdapterRejected(t *testing.T) {
 	seedHostileEnv(t)
-	cfg, err := Resolve(Env{"DB_ADAPTER": ""})
-	if err == nil {
-		t.Fatal("want error")
-	}
-	if cfg != nil {
-		t.Fatal("want nil config")
+	for _, key := range []string{
+		"DB_ADAPTER",
+		"db_adapter",
+		"DB__REPORTING__ADAPTER",
+		"FOO_ADAPTER",
+		"FOO_BAR_ADAPTER",
+	} {
+		t.Run(key, func(t *testing.T) {
+			cfg, err := Resolve(Env{key: "sqlite"})
+			if err == nil {
+				t.Fatalf("%s: want error", key)
+			}
+			if cfg != nil {
+				t.Fatalf("%s: want nil config", key)
+			}
+			var unknown *UnknownFieldError
+			if !errors.As(err, &unknown) {
+				t.Fatalf("%s: want UnknownFieldError, got %T: %v", key, err, err)
+			}
+			if !errors.Is(err, ErrUnknownField) {
+				t.Fatalf("%s: want ErrUnknownField match: %v", key, err)
+			}
+			if unknown.Suggestion != "" {
+				t.Fatalf("%s: suggestion = %q, want empty", key, unknown.Suggestion)
+			}
+			if !strings.Contains(err.Error(), "adapter selection removed") {
+				t.Fatalf("%s: error = %v, want removal message", key, err)
+			}
+		})
 	}
 }
 
 func TestFromEnvReadsDotEnv(t *testing.T) {
 	seedHostileEnv(t)
 	dir := t.TempDir()
-	writeFile(t, dir, ".env", "DB_ADAPTER=postgres\n")
+	writeFile(t, dir, ".env", "DB_MAXCONNS=20\n")
 	t.Chdir(dir)
 	env, err := FromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if env["DB_ADAPTER"] != "postgres" {
-		t.Fatalf("got %q", env["DB_ADAPTER"])
+	if env["DB_MAXCONNS"] != "20" {
+		t.Fatalf("got %q", env["DB_MAXCONNS"])
 	}
 	cfg, err := Resolve(env)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DB.Adapter != "postgres" {
-		t.Fatalf("got %q", cfg.DB.Adapter)
+	if cfg.DB.Options.MaxConns != 20 {
+		t.Fatalf("got %d", cfg.DB.Options.MaxConns)
 	}
 }
 
@@ -142,9 +167,6 @@ func TestRedactedServices(t *testing.T) {
 		t.Fatalf("got %d services, want 37", len(got))
 	}
 	cryptoSvc := got["crypto"]
-	if cryptoSvc.Adapter != "local" {
-		t.Fatalf("got %q", cryptoSvc.Adapter)
-	}
 	if cryptoSvc.Options["key"] != RedactedValue {
 		t.Fatalf("key not redacted: %v", cryptoSvc.Options["key"])
 	}

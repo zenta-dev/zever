@@ -110,9 +110,15 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return listUnregistered(*root, entries, stdout, stderr)
 	}
 
+	removed, err := loadRemoved(filepath.Join(*root, "tools", "tagcheck", "golden_wire_removed.txt"))
+	if err != nil {
+		fmt.Fprintf(stderr, "taggolden: %v\n", err)
+		return 2
+	}
+
 	git := &repo{dir: *root}
 
-	data, err := generate(ctx, git, entries, *release)
+	data, err := generate(ctx, git, entries, *release, removed)
 	if err != nil {
 		fmt.Fprintf(stderr, "taggolden: %v\n", err)
 		return 2
@@ -227,6 +233,35 @@ func loadExcepted(path string) (map[string]bool, error) {
 	return excepted, nil
 }
 
+// loadRemoved parses the removed-key allowlist: tab-separated package dir,
+// struct name, Go field name, and the justification. A listed key is an
+// intentional wire break blessed at a breaking release; generate omits it
+// from the output instead of pinning it.
+func loadRemoved(path string) (map[string]bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read removed-key list: %w", err)
+	}
+
+	removed := map[string]bool{}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		text := strings.TrimSpace(line)
+		if text == "" || strings.HasPrefix(text, "#") {
+			continue
+		}
+
+		parts := strings.Split(text, "\t")
+		if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
+			return nil, fmt.Errorf("taggolden: malformed removed-key line %q", text)
+		}
+
+		removed[parts[0]+"\t"+parts[1]+"\t"+parts[2]] = true
+	}
+
+	return removed, nil
+}
+
 // countKeys counts the data lines of the generated file.
 func countKeys(data []byte) int {
 	count := 0
@@ -295,11 +330,18 @@ func loadRegistry(path string) ([]entry, error) {
 	return entries, nil
 }
 
-// generate builds the golden field file content.
-func generate(ctx context.Context, git *repo, entries []entry, release string) ([]byte, error) {
+// generate builds the golden field file content, omitting the wire keys
+// listed in the removed-key allowlist. The base revision column of every
+// remaining field is the revision it resolves to, as if the removed keys
+// had never been pinned.
+func generate(ctx context.Context, git *repo, entries []entry, release string, removed map[string]bool) ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.WriteString(header)
+
+	if err := checkRemovedRegistered(entries, removed); err != nil {
+		return nil, err
+	}
 
 	for _, e := range entries {
 		fields, base, err := git.resolve(ctx, e.dir, e.name, release)
@@ -307,12 +349,87 @@ func generate(ctx context.Context, git *repo, entries []entry, release string) (
 			return nil, err
 		}
 
+		if err := checkRemovedKeys(e, fields, base, removed); err != nil {
+			return nil, err
+		}
+
 		for _, field := range fields {
+			if removed[e.dir+"\t"+e.name+"\t"+field.Name] {
+				continue
+			}
+
 			fmt.Fprintf(&buf, "%s\t%s\t%s\t%s\t%s\n", e.dir, e.name, field.Name, pinnedKey(field), base)
 		}
 	}
 
 	return buf.Bytes(), nil
+}
+
+// checkRemovedRegistered rejects a removed-key entry that names a struct
+// which is not registered in golden_wire_structs.txt: there is nothing to
+// bless, so the entry is a typo or rot.
+func checkRemovedRegistered(entries []entry, removed map[string]bool) error {
+	registered := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		registered[e.dir+"\t"+e.name] = true
+	}
+
+	var stale []string
+
+	for key := range removed {
+		parts := strings.Split(key, "\t")
+		if !registered[parts[0]+"\t"+parts[1]] {
+			stale = append(stale, key)
+		}
+	}
+
+	sort.Strings(stale)
+
+	if len(stale) > 0 {
+		parts := strings.Split(stale[0], "\t")
+
+		return fmt.Errorf("taggolden: removed wire key %s of struct %s in %s is not registered in golden_wire_structs.txt; delete the entry", parts[2], parts[1], parts[0])
+	}
+
+	return nil
+}
+
+// checkRemovedKeys rejects a removed-key entry that matches no field of
+// the struct at its base revision: there is nothing to bless, so the entry
+// is a typo or rot. The comparison is against the immutable history, the
+// same ground truth generate pins from, because the committed golden file
+// omits blessed keys by design.
+func checkRemovedKeys(e entry, fields []wire.Field, base string, removed map[string]bool) error {
+	prefix := e.dir + "\t" + e.name + "\t"
+
+	var names []string
+
+	for key := range removed {
+		name, ok := strings.CutPrefix(key, prefix)
+		if ok {
+			names = append(names, name)
+		}
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		known := false
+
+		for _, field := range fields {
+			if field.Name == name {
+				known = true
+
+				break
+			}
+		}
+
+		if !known {
+			return fmt.Errorf("taggolden: removed wire key %s of wire struct %s in %s matches no field at base revision %s; nothing to bless, delete the entry", name, e.name, e.dir, base)
+		}
+	}
+
+	return nil
 }
 
 // repo reads files and history from a git repository.

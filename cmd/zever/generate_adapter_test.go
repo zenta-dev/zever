@@ -32,8 +32,7 @@ func TestRunGenerateAdapterCache(t *testing.T) {
 		"package memcached",
 		`"github.com/zenta-dev/zever/core/cache"`,
 		"func New(_ cache.Options) (cache.Cache, error)",
-		"core/cache/adapter.go",
-		"scaffolded register.go",
+		"container.Provide(cache.DefaultRef(), cachememcached.New)",
 		"type adapter struct{}",
 		`errors.New("cache: memcached: not implemented")`,
 		// every method of cache.Cache, with its real signature
@@ -72,22 +71,11 @@ func TestRunGenerateAdapterCache(t *testing.T) {
 		}
 	}
 
-	register := readGenerated(t, filepath.Join(dir, "adapters", "cache", "memcached", "register.go"))
-
-	for _, fragment := range []string{
-		"package memcached",
-		`"github.com/zenta-dev/zever/core/cache"`,
-		"func Register()",
-		`cache.ParseAdapter("memcached")`,
-		"cache.Register(adapter, New)",
-	} {
-		if !strings.Contains(register, fragment) {
-			t.Fatalf("generated register.go lacks %q:\n%s", fragment, register)
-		}
+	if _, err := os.Stat(filepath.Join(dir, "adapters", "cache", "memcached", "register.go")); !os.IsNotExist(err) {
+		t.Fatal("generated register.go must not exist: wiring is a container.Provide entry, not a file")
 	}
 
 	assertGolden(t, "generate_adapter_cache.golden", []byte(adapter))
-	assertGolden(t, "generate_adapter_register.golden", []byte(register))
 }
 
 // TestRunGenerateAdapterInterfaceNameDiffersFromPackage covers the batteries
@@ -368,7 +356,10 @@ func TestRunGenerateAdapterEveryBattery(t *testing.T) {
 
 			readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "acme.go"))
 			readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "options.go"))
-			readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "register.go"))
+
+			if _, err := os.Stat(filepath.Join(dir, "adapters", battery, "acme", "register.go")); !os.IsNotExist(err) {
+				t.Fatalf("battery %s: generated register.go must not exist", battery)
+			}
 		})
 	}
 }
@@ -402,9 +393,9 @@ func TestBatterySpecsCoverEveryBattery(t *testing.T) {
 
 		battery := entry.Name()
 
-		// A battery package is one whose own <name>.go declares the registry
-		// entry point, `func Open(`.
-		if !declaresBatteryOpen(t, filepath.Join(root, "core", battery)) {
+		// A battery package is one that carries a ref.go (the typed
+		// DefaultRef the container resolves).
+		if !declaresBatteryRef(t, filepath.Join(root, "core", battery)) {
 			continue
 		}
 
@@ -417,7 +408,7 @@ func TestBatterySpecsCoverEveryBattery(t *testing.T) {
 		}
 
 		if _, listed := batterySpecs[battery]; !listed {
-			t.Fatalf("battery %q has a registry but no batterySpecs entry — "+
+			t.Fatalf("battery %q has a ref but no batterySpecs entry — "+
 				"add it so `zever generate adapter %s` works", battery, battery)
 		}
 	}
@@ -430,34 +421,24 @@ func TestBatterySpecsCoverEveryBattery(t *testing.T) {
 	}
 }
 
-func declaresBatteryOpen(t *testing.T, dir string) bool {
+func declaresBatteryRef(t *testing.T, dir string) bool {
 	t.Helper()
 
-	files, err := filepath.Glob(filepath.Join(dir, "*.go"))
-	if err != nil {
-		t.Fatalf("glob %s: %v", dir, err)
+	if _, err := os.Stat(filepath.Join(dir, "ref.go")); err != nil {
+		return false
 	}
 
-	for _, file := range files {
-		if strings.HasSuffix(file, "_test.go") {
-			continue
-		}
-
-		if strings.Contains(mustRead(t, file), "func Open(") {
-			return true
-		}
-	}
-
-	return false
+	return true
 }
 
 // TestGeneratedAdapterScaffoldIsComplete proves a scaffold is the whole
-// adapter module shape: stub, options and register files, each valid
-// gofmt-clean Go. Real compilation belongs to each adapter module's own
-// build (one module per adapters/<battery>/<adapter> since the layout
-// split): a cross-module `go build` from this test would need the full
-// transitive replace set, so syntax plus the register-content pins below
-// are the contract here, not a compiler run.
+// adapter module shape: stub plus options, each valid gofmt-clean Go, with
+// the container.Provide wiring documented in the stub. Real compilation
+// belongs to each adapter module's own build (one module per
+// adapters/<battery>/<adapter> since the layout split): a cross-module
+// `go build` from this test would need the full transitive replace set,
+// so syntax plus the wiring-comment pins below are the contract here, not
+// a compiler run.
 //
 // cache exercises the common shape; router exercises the embedded
 // http.Handler and the value-returning methods with no error result.
@@ -466,13 +447,15 @@ func TestGeneratedAdapterScaffoldIsComplete(t *testing.T) {
 		t.Run(battery, func(t *testing.T) {
 			dir := generateAdapter(t, battery, "acme", "--field", "api_key:string", "--field", "timeout:duration")
 
-			readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "acme.go"))
+			stub := readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "acme.go"))
 			readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "options.go"))
 
-			register := readGenerated(t, filepath.Join(dir, "adapters", battery, "acme", "register.go"))
+			if _, err := os.Stat(filepath.Join(dir, "adapters", battery, "acme", "register.go")); !os.IsNotExist(err) {
+				t.Fatalf("battery %s: generated register.go must not exist", battery)
+			}
 
-			if !strings.Contains(register, "func Register()") {
-				t.Fatalf("register.go lacks Register:\n%s", register)
+			if !strings.Contains(stub, "container.Provide") {
+				t.Fatalf("stub lacks the Provide wiring comment:\n%s", stub)
 			}
 		})
 	}

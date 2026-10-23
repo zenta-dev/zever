@@ -170,7 +170,7 @@ func (a *adapter) Ping(ctx context.Context) error {
 }
 
 // Dialect reports this adapter's registration name, matching db.Register(db.SQLite, New).
-func (a *adapter) Dialect() string { return db.SQLite.String() }
+func (a *adapter) Dialect() string { return "sqlite" }
 
 // Close releases database resources in order: statements, then the pool.
 // Each stage is distinctly wrapped so callers can tell which failed.
@@ -331,7 +331,7 @@ func (t *sqliteTx) Exec(ctx context.Context, query string, args ...any) (int64, 
 }
 
 // Dialect reports this transaction's SQL dialect, matching the adapter it was opened from.
-func (t *sqliteTx) Dialect() string { return db.SQLite.String() }
+func (t *sqliteTx) Dialect() string { return "sqlite" }
 
 // Ping verifies the transaction is still open. sql.Tx has no Ping, so this
 // reports the done flag instead of touching the database.

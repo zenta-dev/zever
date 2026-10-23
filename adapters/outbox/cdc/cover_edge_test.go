@@ -12,28 +12,25 @@ import (
 )
 
 func TestRegisterWiresCDCAdapter(t *testing.T) {
-	Register()
-	Register()
-
-	s, err := outbox.Open(outbox.CDC, outbox.Options{
+	s, err := New(Options{Options: outbox.Options{
 		DSN:         "postgres://localhost/db",
 		Slot:        "s",
 		Publication: "p",
 		Prefix:      "x",
-	})
+	}})
 	if err != nil {
 		t.Fatalf("Open(cdc) error = %v", err)
 	}
 
-	if s.Name() != string(outbox.CDC) {
-		t.Errorf("Name() = %q, want %q", s.Name(), outbox.CDC)
+	if s.Name() != "cdc" {
+		t.Errorf("Name() = %q, want %q", s.Name(), "cdc")
 	}
 
 	if err := s.Close(); err != nil {
 		t.Errorf("Close() error = %v", err)
 	}
 
-	if _, err := outbox.Open(outbox.CDC, outbox.Options{}); err == nil {
+	if _, err := New(Options{}); err == nil {
 		t.Error("Open(cdc, empty) = nil error, want error")
 	}
 }

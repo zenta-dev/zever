@@ -1,79 +1,8 @@
 package observability
 
 import (
-	"context"
-	"errors"
 	"testing"
 )
-
-type stubProvider struct{}
-
-func (stubProvider) Tracer(string) Tracer           { return nil }
-func (stubProvider) Meter(string) Metrics           { return nil }
-func (stubProvider) Shutdown(context.Context) error { return nil }
-
-func TestParseAdapterRoundtrip(t *testing.T) {
-	t.Parallel()
-
-	for _, tc := range []struct {
-		a    Adapter
-		name string
-	}{
-		{Noop, "noop"},
-		{Stdout, "stdout"},
-		{OTLP, "otlp"},
-	} {
-		if got := tc.a.String(); got != tc.name {
-			t.Fatalf("String() = %q, want %q", got, tc.name)
-		}
-
-		got, err := ParseAdapter(tc.name)
-		if err != nil {
-			t.Fatalf("ParseAdapter(%q) error = %v", tc.name, err)
-		}
-
-		if got != tc.a {
-			t.Fatalf("ParseAdapter(%q) = %v, want %v", tc.name, got, tc.a)
-		}
-	}
-}
-
-func TestParseAdapterInvalid(t *testing.T) {
-	t.Parallel()
-
-	if _, err := ParseAdapter(""); !errors.Is(err, ErrInvalidAdapter) {
-		t.Fatalf("ParseAdapter invalid err = %v, want ErrInvalidAdapter", err)
-	}
-}
-
-func TestRegisterNilAndDuplicate(t *testing.T) {
-	a := Adapter("test-9001")
-	if err := Register(a, nil); !errors.Is(err, ErrNilFactory) {
-		t.Fatalf("Register nil err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(Options) (Provider, error) { return stubProvider{}, nil }
-	if err := Register(a, stub); err != nil {
-		var dup DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("Register() error = %v", err)
-		}
-		// Duplicate means an earlier run in this process already registered
-		// this adapter (e.g. -count=2); the duplicate assertion below holds.
-	}
-
-	if err := Register(a, stub); !errors.Is(err, ErrDuplicate) {
-		t.Fatalf("Register dup err = %v, want ErrDuplicate", err)
-	}
-}
-
-func TestOpenUnknown(t *testing.T) {
-	t.Parallel()
-
-	if _, err := Open(Adapter("test-9999"), Options{ServiceName: "test"}); !errors.Is(err, ErrUnknownAdapter) {
-		t.Fatalf("Open unknown err = %v, want ErrUnknownAdapter", err)
-	}
-}
 
 func TestOptionsValidateMutualExclusion(t *testing.T) {
 	t.Parallel()

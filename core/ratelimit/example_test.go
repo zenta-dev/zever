@@ -7,11 +7,9 @@ import (
 	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
-// ExampleOpen opens the in-memory limiter and allows one token.
-func ExampleOpen() {
-	_ = ratelimit.Register(ratelimit.Memory, memory.New)
-
-	lim, err := ratelimit.Open(ratelimit.Memory, ratelimit.Options{Rate: 10, Burst: 20})
+// Example opens the in-memory limiter and allows one token.
+func Example() {
+	lim, err := memory.New(ratelimit.Options{Rate: 10, Burst: 20})
 	if err != nil {
 		return
 	}

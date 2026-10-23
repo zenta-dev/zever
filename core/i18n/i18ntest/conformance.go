@@ -10,7 +10,7 @@ import (
 )
 
 // Conformance verifies factory-built backends implement the i18n.I18n
-// contract: open/register round-trip, template translation, missing-
+// contract: template translation, missing-
 // key sentinel, locale listing, and Close. Each subtest takes a fresh
 // instance from factory so cases stay isolated. Tests never call
 // time.Sleep and never touch the network.
@@ -24,35 +24,10 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) i18n.I18n) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Translate", func(t *testing.T) { conformanceTranslate(t, factory) })
 	t.Run("MissingKey", func(t *testing.T) { conformanceMissingKey(t, factory) })
 	t.Run("Locales", func(t *testing.T) { conformanceLocales(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := i18n.Open(i18n.Adapter("conformance-missing-adapter"), i18n.Options{}); !errors.Is(err, i18n.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := i18n.Adapter("conformance-probe-i18n")
-
-	if err := i18n.Register(probe, nil); !errors.Is(err, i18n.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(i18n.Options) (i18n.I18n, error) {
-		return nil, errors.New("i18ntest: probe factory must not run")
-	}
-
-	_ = i18n.Register(probe, stub)
-
-	if err := i18n.Register(probe, stub); !errors.Is(err, i18n.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceTranslate(t *testing.T, factory func(t *testing.T) i18n.I18n) {

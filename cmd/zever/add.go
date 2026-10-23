@@ -1337,9 +1337,10 @@ func diffOps(a, b []string) []diffOp {
 
 // --- .env.example editing ---
 
-// envExampleSection renders one .env.example section for sel: the adapter
-// line plus every key and default from the battery's Options structs,
-// sharing renderEnvExample's generator so `new` and `add` cannot drift.
+// envExampleSection renders one .env.example section for sel: every key
+// and default from the battery's Options structs, sharing
+// renderEnvExample's generator so `new` and `add` cannot drift. The adapter
+// pick lives in wiring.go, so no *_ADAPTER line is emitted.
 func envExampleSection(sel batterySelection, name string) string {
 	var b strings.Builder
 
@@ -1354,7 +1355,6 @@ func envExampleSection(sel batterySelection, name string) string {
 	}
 
 	b.WriteString(header)
-	fmt.Fprintf(&b, "%s%sADAPTER=%s\n", prefix, sep, sel.Adapter)
 
 	if opts := config.DefaultOptions(sel.Battery, name); opts != nil {
 		appendEnvKeys(&b, prefix, sep, opts, scaffoldEnvDefaults(sel.Battery, name))

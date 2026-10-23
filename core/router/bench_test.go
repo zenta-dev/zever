@@ -9,30 +9,6 @@ import (
 
 // benchRouterAdapter registers a stub router once and returns its adapter so
 // Open can be measured without paying the one-shot registration cost.
-func benchRouterAdapter(b *testing.B) Adapter {
-	b.Helper()
-
-	a := freshRouterAdapter()
-	if err := Register(a, func(Options) (Router, error) { return &mockRouter{}, nil }); err != nil {
-		b.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	return a
-}
-
-func BenchmarkOpen(b *testing.B) {
-	a := benchRouterAdapter(b)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if _, err := Open(a, Options{AppName: "shop"}); err != nil {
-			b.Fatalf("Open(%v) error = %v", a, err)
-		}
-	}
-}
-
 func BenchmarkChiPattern(b *testing.B) {
 	pattern := "/api/v1/users/:id<[0-9]+>/items/{item:[a-z]+}"
 

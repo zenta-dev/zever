@@ -32,16 +32,13 @@ func TestRedactedServicesPluginCorruptOptions(t *testing.T) {
 
 	cfg := Default()
 	cfg.Plugins = map[string]Service[jsontext.Value]{
-		"plugintest_corrupt": {Adapter: "custom", Options: jsontext.Value(`{not json`)},
+		"plugintest_corrupt": {Options: jsontext.Value(`{not json`)},
 	}
 
 	got := cfg.RedactedServices()
 	sc, ok := got["plugintest_corrupt"]
 	if !ok {
 		t.Fatal("missing plugintest_corrupt")
-	}
-	if sc.Adapter != "custom" {
-		t.Fatalf("adapter = %q, want custom", sc.Adapter)
 	}
 	if len(sc.Options) != 0 {
 		t.Fatalf("corrupt options = %v, want empty map", sc.Options)

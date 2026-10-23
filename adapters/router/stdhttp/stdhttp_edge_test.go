@@ -113,10 +113,8 @@ func TestHasBraceColon_table(t *testing.T) {
 // resolution.
 func TestEdgeRegister_resolvesAdapter(t *testing.T) {
 	// Serial: Register mutates the process-global battery registry.
-	Register()
-	Register()
 
-	r, err := router.Open(router.AdapterStdHTTP, router.Options{})
+	r, err := New(router.Options{})
 	if err != nil {
 		t.Fatalf("router.Open() after Register = %v, want nil", err)
 	}

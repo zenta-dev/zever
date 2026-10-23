@@ -4,15 +4,14 @@
 // delete with ID validation and size caps. It does not serve HTTP or run
 // transcoders itself beyond invoking configured ffmpeg tooling.
 //
-// Type safety: Media interface with typed Options plus Adapter enum plus
+// Type safety: Media interface with typed Options  plus
 // Factory. Asset, Info, Probe, TransformOps, UploadOptions, and MediaKind plus
 // ValidID, GenerateID, and extension helpers. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with
 // zero-infra defaults for tests, with the local adapter using the filesystem
 // only. Configuration comes from the environment only: .env, .env.local, and
-// the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g.
-// MEDIA_ADAPTER). See config/README.md.
+// the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Media(). Lazy per-service singleton,
 // retry on error. See container/README.md.
@@ -39,5 +38,5 @@
 // Concurrency: safe for concurrent use unless noted. No globals, no init
 // wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package media

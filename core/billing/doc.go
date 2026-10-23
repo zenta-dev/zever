@@ -10,15 +10,15 @@
 // FormatMinorUnits encodes them back; every Amount field across billing and
 // payment is minor units.
 //
-// Type safety: Billing plus typed Options plus Adapter enum plus Factory.
+// Type safety: Billing plus typed Options plus Factory.
 // Customer, Subscription, Invoice, SubscriptionStatus and InvoiceStatus are
 // typed; ParseMinorUnits handles currency precision. Unsupported features fail
 // closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with
 // zero-infra defaults for tests. Configuration comes from the environment
 // only: .env, .env.local, and the process environment, with keys named
-// <SERVICE>_<FIELD> (no prefix, e.g. BILLING_ADAPTER). See config/README.md.
+// <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Billing(). Lazy per-service singleton,
 // retry on error. See container/README.md.
@@ -37,5 +37,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package billing

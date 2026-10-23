@@ -13,7 +13,6 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 )
 
 replace github.com/zenta-dev/zever/core/cdn => ../../../core/cdn

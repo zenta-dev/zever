@@ -20,11 +20,10 @@ import (
 func benchHandler(b *testing.B) (http.Handler, string) {
 	b.Helper()
 
-	testsetup.RegisterDefaults()
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(b.TempDir(), "bench.db")
 	cfg.Auth.Options.JWT.Secret = testJWTSecret
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	b.Cleanup(func() { _ = c.Close(b.Context()) })
 
 	database, err := c.DB()

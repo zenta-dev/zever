@@ -15,27 +15,9 @@ import (
 // page and the code together.
 const referenceDoc = "../../docs/src/content/docs/reference/session.mdx"
 
-// sessionDBAdapter is the adapter name registered by
-// adapters/session/db (adapters/session/db/register.go). It has no core
-// constant, so the literal is pinned here with its source.
-const sessionDBAdapter = "db"
-
 // TestReferencePageListsAdapters pins the reference adapters table to the
 // Adapter constants plus the db adapter: every known adapter has a cell,
 // and the config service key names the battery.
-func TestReferencePageListsAdapters(t *testing.T) {
-	t.Parallel()
-
-	raw := mustReadReference(t)
-	for _, a := range []Adapter{Memory, Redis, Adapter(sessionDBAdapter)} {
-		if !strings.Contains(raw, "`"+a.String()+"`") {
-			t.Errorf("adapter %q missing from reference page", a.String())
-		}
-	}
-	if !strings.Contains(raw, "Service key: `session`") {
-		t.Errorf("config service key `session` missing from reference page")
-	}
-}
 
 // TestReferencePageListsOptionKeys pins the reference options table to the
 // Options struct: every JSON key (recursing into named blocks, skipping the

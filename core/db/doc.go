@@ -2,9 +2,9 @@
 //
 // It runs queries through Query and Exec and groups work in Tx via WithTx for sqlite and postgres. It is not a query builder or migration runner; use orm for typed queries.
 //
-// Type safety: DB plus Rows plus Stmt plus Preparer plus Tx plus Transactor plus typed Options plus Adapter enum plus Factory. Options is a union of DSN, pool bounds, lifetimes, and Path; Dialect reports the SQL dialect per call. Unsupported features fail closed.
+// Type safety: DB plus Rows plus Stmt plus Preparer plus Tx plus Transactor plus typed Options plus Factory. Options is a union of DSN, pool bounds, lifetimes, and Path; Dialect reports the SQL dialect per call. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. DB_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.DB(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package db

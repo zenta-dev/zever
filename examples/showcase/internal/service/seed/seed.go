@@ -32,8 +32,6 @@ const (
 // products, one tag linked to both products, and one pending order.
 // Seeding is idempotent: existing rows are left untouched.
 func Run(ctx context.Context, database db.DB) error {
-	passwordargon2.Register()
-
 	if err := ensureUser(ctx, database, AdminID, AdminEmail, "Ada Admin", gen.RoleAdmin); err != nil {
 		return err
 	}
@@ -68,7 +66,18 @@ func ensureUser(ctx context.Context, database db.DB, id, email, name string, rol
 		return nil
 	}
 
-	hash, err := password.Hash(ctx, DemoPassword)
+	hasher, err := passwordargon2.New(password.Options{
+		Time:    password.DefaultTime,
+		Memory:  password.DefaultMemory,
+		Threads: password.DefaultThreads,
+		SaltLen: password.DefaultSaltLen,
+		KeyLen:  password.DefaultKeyLen,
+	})
+	if err != nil {
+		return fmt.Errorf("seed: hasher: %w", err)
+	}
+
+	hash, err := hasher.Hash(ctx, DemoPassword)
 	if err != nil {
 		return fmt.Errorf("seed: hash password: %w", err)
 	}

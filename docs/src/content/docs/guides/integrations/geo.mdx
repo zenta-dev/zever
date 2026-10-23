@@ -12,7 +12,6 @@ One `Geo` interface covers `Geocode`, `ReverseGeocode`, and `Distance` (meters),
 `static` (the default) serves a file-backed list from memory, offline and deterministic; `path` points at a JSON fixture.
 
 ```sh
-GEO_ADAPTER=static
 GEO_PATH=data/cities.json
 ```
 
@@ -23,15 +22,14 @@ import (
     "context"
     "fmt"
 
-    "github.com/zenta-dev/zever/adapters/geo/static"
+    geostatic "github.com/zenta-dev/zever/adapters/geo/static"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
     "github.com/zenta-dev/zever/core/geo"
 )
 
 func main() {
-    static.Register()
-    c := container.New(config.Default())
+    c := container.New(config.Default(), container.Provide(geo.DefaultRef(), geostatic.New))
     g, _ := c.Geo()
     defer g.Close()
 
@@ -50,20 +48,18 @@ func main() {
 
 The `1` assumes the fixture lists Berlin; `Distance` is haversine over a 6371 km sphere, in meters.
 
-The bookings example pins `GEO_ADAPTER=static`; its tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. `ValidCoord` checks WGS84 range and finiteness before coordinates reach a provider.
+The bookings example wires the `static` backend; its tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. `ValidCoord` checks WGS84 range and finiteness before coordinates reach a provider.
 
 ## Use OSM or Google in production
 
 `osm` is free OpenStreetMap geocoding when Google-grade accuracy is not needed; it requires a `user_agent` per Nominatim policy. `google` is for accuracy with an API key budget.
 
 ```sh
-GEO_ADAPTER=osm
 GEO_ENDPOINT=https://nominatim.openstreetmap.org
 GEO_USER_AGENT=bookings-demo/1.0
 ```
 
 ```sh
-GEO_ADAPTER=google
 GEO_API_KEY=your-key
 GEO_BASE_URL=https://maps.googleapis.com
 ```

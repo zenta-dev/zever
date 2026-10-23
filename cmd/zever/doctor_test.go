@@ -83,7 +83,7 @@ func TestRunDoctorWithCoreListsBatteries(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\nROUTER_ADAPTER=stdhttp\nDB_ADAPTER=sqlite\nPASSWORD_ADAPTER=argon2id\nQUEUE_ADAPTER=memory\nWORKFLOW_ADAPTER=memory\n")
+	writeInspectFixture(t, dir, ".env", "LOG_MIN_LEVEL=1\nDB_PATH=data/test.db\nPASSWORD_TIME=1\nQUEUE_BUFFER=8\nWORKFLOW_TABLE=wf\n")
 	t.Chdir(dir)
 
 	var out bytes.Buffer
@@ -117,7 +117,7 @@ func TestRunDoctorWithCoreConfigFile(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	writeInspectFixture(t, dir, ".env", "LOG_MIN_LEVEL=1\n")
 	t.Chdir(dir)
 
 	var out bytes.Buffer
@@ -148,7 +148,7 @@ func TestRunDoctorWithCoreBadConfigFile(t *testing.T) {
 // so env overrides apply before batteries are resolved -- the same config
 // the container would build.
 func TestRunDoctorWithAppliesEnvOverrides(t *testing.T) {
-	t.Setenv("DB_ADAPTER", "postgres")
+	t.Setenv("DB_MAX_CONNS", "42")
 
 	// The CLI's own package directory holds a cmd/server fixture, which
 	// would make the doctor check the project inside the built server
@@ -158,10 +158,10 @@ func TestRunDoctorWithAppliesEnvOverrides(t *testing.T) {
 	prev := doctorChecksFor
 	t.Cleanup(func() { doctorChecksFor = prev })
 
-	var gotAdapter string
+	var gotMaxConns int
 
 	doctorChecksFor = func(_ *container.Container, resolved *config.Config) map[string]func() error {
-		gotAdapter = resolved.DB.Adapter
+		gotMaxConns = resolved.DB.Options.MaxConns
 
 		return map[string]func() error{"config": func() error { return nil }}
 	}
@@ -171,8 +171,22 @@ func TestRunDoctorWithAppliesEnvOverrides(t *testing.T) {
 		t.Fatalf("runDoctorWith: %v", err)
 	}
 
-	if gotAdapter != "postgres" {
-		t.Fatalf("resolved DB adapter = %q, want postgres from DB_ADAPTER env", gotAdapter)
+	if gotMaxConns != 42 {
+		t.Fatalf("resolved DB max_conns = %d, want 42 from DB_MAX_CONNS env", gotMaxConns)
+	}
+}
+
+// TestRunDoctorRejectsAdapterEnv pins the removal: a legacy *_ADAPTER key
+// fails resolution instead of selecting anything.
+func TestRunDoctorRejectsAdapterEnv(t *testing.T) {
+	t.Setenv("DB_ADAPTER", "postgres")
+	t.Chdir(t.TempDir())
+
+	var out bytes.Buffer
+	if err := runDoctorWith(DoctorConfig{Out: &out}); err == nil {
+		t.Fatal("runDoctorWith with DB_ADAPTER set = nil error, want removal failure")
+	} else if !strings.Contains(err.Error(), "adapter selection removed") {
+		t.Fatalf("runDoctorWith error = %q, want removal message", err)
 	}
 }
 

@@ -8,13 +8,9 @@ import (
 	"github.com/zenta-dev/zever/core/db"
 )
 
-// ExampleOpen opens an in-memory sqlite database and reads a row back.
-func ExampleOpen() {
-	if err := db.Register(db.SQLite, sqlite.New); err != nil {
-		return
-	}
-
-	conn, err := db.Open(db.SQLite, db.Options{Path: ":memory:"})
+// Example opens an in-memory sqlite database and reads a row back.
+func Example() {
+	conn, err := sqlite.New(db.Options{Path: ":memory:"})
 	if err != nil {
 		return
 	}

@@ -14,14 +14,12 @@ import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components
 <Tabs>
   <TabItem label="db">
 ```sh
-VECTORSTORE_ADAPTER=db
 VECTORSTORE_DIMENSION=1536
 VECTORSTORE_DSN=:memory:
 ```
   </TabItem>
   <TabItem label="qdrant">
 ```sh
-VECTORSTORE_ADAPTER=qdrant
 VECTORSTORE_URL=http://localhost:6333
 VECTORSTORE_ALLOW_INSECURE=true
 VECTORSTORE_API_KEY=dev-only-key
@@ -29,7 +27,7 @@ VECTORSTORE_API_KEY=dev-only-key
   </TabItem>
 </Tabs>
 
-Env vars: `VECTORSTORE_ADAPTER`, `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION`. `dimension` defaults to 1536 (OpenAI `text-embedding-3-small`) on pgvector and fixes the column size; Qdrant checks it only when set, and embedded sqlite learns it from the first write. A mismatched vector fails with `vectorstore.ErrDimensionMismatch`, and negatives are rejected. `url` needs a scheme and host. `dedicated_pool: true` opts out of per-DSN pool sharing. The DB-backed adapter is named `db`: a sqlite path gives embedded SQLite, a postgres URL gives pgvector. See the [vectorstore options](../../../reference/config/#vectorstore).
+Env vars: `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION` (the backend is wired in code, not env). `dimension` defaults to 1536 (OpenAI `text-embedding-3-small`) on pgvector and fixes the column size; Qdrant checks it only when set, and embedded sqlite learns it from the first write. A mismatched vector fails with `vectorstore.ErrDimensionMismatch`, and negatives are rejected. `url` needs a scheme and host. `dedicated_pool: true` opts out of per-DSN pool sharing. The DB-backed adapter is named `db`: a sqlite path gives embedded SQLite, a postgres URL gives pgvector. See the [vectorstore options](../../../reference/config/#vectorstore).
 
 ## Upsert and query vectors
 
@@ -49,9 +47,8 @@ import (
 )
 
 func main() {
-	vectorstoredb.Register()
 	ctx := context.Background()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(vectorstore.DefaultRef(), vectorstoredb.New))
 	defer c.Close(ctx)
 
 	vs, err := c.VectorStore()

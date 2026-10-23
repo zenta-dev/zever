@@ -63,7 +63,7 @@ ok  	github.com/zenta-dev/zever/examples/transactions/cmd/app	0.004s
 
 The signal is `ok` on every line and no `FAIL`.
 
-The focused ports open sqlite directly, so they ignore `DB_ADAPTER`. To run the ORM against postgres, use the ORM suite: `POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...`. Features a dialect lacks fail closed with `dialect.ErrUnsupportedByDialect`.
+The focused ports open sqlite directly through the wired constructor, so there is no adapter key to set. To run the ORM against postgres, use the ORM suite: `POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable' go test ./orm/...`. Features a dialect lacks fail closed with `dialect.ErrUnsupportedByDialect`.
 
 ## Set up the full apps
 

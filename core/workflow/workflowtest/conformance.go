@@ -5,16 +5,10 @@ package workflowtest
 import (
 	"context"
 	"errors"
-	"strconv"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/workflow"
 )
-
-// adapterSeq keeps throwaway registry names unique across Conformance runs
-// in one process.
-var adapterSeq atomic.Uint64
 
 // Conformance verifies factory-built engines implement the
 // workflow.Workflow contract: Start/Query round-trip, duplicate workflow
@@ -34,7 +28,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) workflow.Workflow) {
 	t.Run("UnknownRun", func(t *testing.T) { conformanceUnknownRun(t, factory) })
 	t.Run("CompletedGuards", func(t *testing.T) { conformanceCompletedGuards(t, factory) })
 	t.Run("UnknownQuery", func(t *testing.T) { conformanceUnknownQuery(t, factory) })
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
@@ -188,34 +181,6 @@ func conformanceUnknownQuery(t *testing.T, factory func(t *testing.T) workflow.W
 	var out string
 	if err := w.Query(ctx, id, "kit-no-such-query", &out); !errors.Is(err, workflow.ErrUnknownQuery) {
 		t.Errorf("Query(unknown) err = %v, want ErrUnknownQuery", err)
-	}
-}
-
-func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) workflow.Workflow) {
-	t.Helper()
-
-	name := workflow.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
-	probe := factory(t)
-
-	if err := workflow.Register(name, func(workflow.Options) (workflow.Workflow, error) { return probe, nil }); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-
-	if err := workflow.Register(name, func(workflow.Options) (workflow.Workflow, error) { return probe, nil }); !errors.Is(err, workflow.ErrDuplicate) {
-		t.Fatalf("Register(dup) err = %v, want ErrDuplicate", err)
-	}
-
-	opened, err := workflow.Open(name, workflow.Options{})
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
-
-	if opened != probe {
-		t.Error("Open() did not return the registered engine")
-	}
-
-	if _, err := workflow.Open("kit-no-such-adapter", workflow.Options{}); !errors.Is(err, workflow.ErrUnknownAdapter) {
-		t.Errorf("Open(unknown) err = %v, want ErrUnknownAdapter", err)
 	}
 }
 

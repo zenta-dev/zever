@@ -26,7 +26,6 @@ type OpenFunc func(t *testing.T, opts resilience.Options) resilience.Manager
 func Conformance(t *testing.T, open OpenFunc) {
 	t.Helper()
 
-	t.Run("OpenRegister", conformanceOpenRegister)
 	t.Run("ClosedAllows", func(t *testing.T) { conformanceClosedAllows(t, open) })
 	t.Run("BreakerTrips", func(t *testing.T) { conformanceBreakerTrips(t, open) })
 	t.Run("Retry", func(t *testing.T) { conformanceRetry(t, open) })
@@ -34,30 +33,6 @@ func Conformance(t *testing.T, open OpenFunc) {
 	t.Run("Timeout", func(t *testing.T) { conformanceTimeout(t, open) })
 	t.Run("CallerCancellation", func(t *testing.T) { conformanceCallerCancellation(t, open) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, open) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := resilience.Open(resilience.Adapter("conformance-missing-adapter"), resilience.Options{}); !errors.Is(err, resilience.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := resilience.Adapter("conformance-probe-resilience")
-
-	if err := resilience.Register(probe, nil); !errors.Is(err, resilience.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(resilience.Options) (resilience.Manager, error) {
-		return nil, errors.New("resiliencetest: probe factory must not run")
-	}
-
-	_ = resilience.Register(probe, stub)
-
-	if err := resilience.Register(probe, stub); !errors.Is(err, resilience.ErrDuplicateAdapter) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicateAdapter", err)
-	}
 }
 
 func conformanceClosedAllows(t *testing.T, open OpenFunc) {

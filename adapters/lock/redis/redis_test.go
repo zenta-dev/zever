@@ -237,11 +237,7 @@ func TestClose_idempotent(t *testing.T) {
 }
 
 func TestRegisterAndOpen(t *testing.T) {
-	if err := lock.Register(lock.Redis, New); err != nil && !errors.Is(err, lock.ErrDuplicate) {
-		t.Fatalf("Register: %v", err)
-	}
-
-	if _, err := lock.Open(lock.Redis, lock.Options{Addr: "127.0.0.1:1"}); err == nil {
+	if _, err := New(lock.Options{Addr: "127.0.0.1:1"}); err == nil {
 		t.Fatal("Open with refused addr succeeded, want ping error")
 	}
 }

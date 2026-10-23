@@ -18,8 +18,6 @@ func TestConformance(t *testing.T) {
 		vectorstoretest.Conformance(t, func(t *testing.T) vectorstore.VectorStore {
 			t.Helper()
 
-			Register()
-
 			// A per-store sqlite file, not the default ":memory:": the
 			// sqlite adapter opens in-memory databases with cache=shared,
 			// so every ":memory:" connection in this test binary sees the
@@ -27,7 +25,7 @@ func TestConformance(t *testing.T) {
 			// TestNewFromDB's "borrowed") leak into the kit's queries.
 			dsn := filepath.Join(t.TempDir(), "conformance.db")
 
-			s, err := vectorstore.Open(vectorstore.DB, vectorstore.Options{DSN: dsn})
+			s, err := New(vectorstore.Options{DSN: dsn})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}
@@ -51,9 +49,7 @@ func TestConformance(t *testing.T) {
 		vectorstoretest.Conformance(t, func(t *testing.T) vectorstore.VectorStore {
 			t.Helper()
 
-			Register()
-
-			s, err := vectorstore.Open(vectorstore.DB, vectorstore.Options{DSN: dsn, Dimension: 3})
+			s, err := New(vectorstore.Options{DSN: dsn, Dimension: 3})
 			if err != nil {
 				t.Fatalf("Open() error = %v", err)
 			}

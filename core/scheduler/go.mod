@@ -9,7 +9,6 @@ require (
 	github.com/zenta-dev/zever/core/log v0.8.0
 	github.com/zenta-dev/zever/core/queue v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
-	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
 
 require (

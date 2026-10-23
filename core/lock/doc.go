@@ -4,16 +4,15 @@
 // with ownership checks so release never steals another holder. It does not
 // manage job queues or general caching, only TTL-bounded leases.
 //
-// Type safety: Locker plus Lock interfaces with typed Options plus Adapter enum
+// Type safety: Locker plus Lock interfaces with typed Options
 // plus Factory. TTL and RetryInterval are typed durations with memory and redis
 // backends. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with
 // zero-infra defaults for tests: empty Options falls back to DefaultTTL and
 // DefaultRetryInterval, and the memory adapter needs no server. Configuration
 // comes from the environment only: .env, .env.local, and the process
-// environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g.
-// LOCK_ADAPTER). See config/README.md.
+// environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Lock(). Lazy per-service singleton,
 // retry on error. See container/README.md.
@@ -38,5 +37,5 @@
 // Concurrency: safe for concurrent use unless noted. No globals, no init
 // wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package lock

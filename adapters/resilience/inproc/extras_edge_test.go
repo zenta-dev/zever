@@ -162,10 +162,7 @@ func TestConcurrentGuardSameName(t *testing.T) {
 func TestDoubleRegisterThenOpen(t *testing.T) {
 	t.Parallel()
 
-	inproc.Register()
-	inproc.Register()
-
-	m, err := resilience.Open(resilience.Memory, resilience.Options{})
+	m, err := inproc.New(resilience.Options{})
 	if err != nil {
 		t.Fatalf("Open(Memory) error = %v", err)
 	}

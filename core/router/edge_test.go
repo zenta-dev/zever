@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 )
 
@@ -82,32 +81,4 @@ func TestValidMethod_unicode(t *testing.T) {
 	if ValidMethod("GÉT") {
 		t.Fatal("ValidMethod(GÉT) = true, want false")
 	}
-}
-
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	adapters := make([]Adapter, 8)
-	for i := range adapters {
-		adapters[i] = freshRouterAdapter()
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(adapters))
-
-	for _, a := range adapters {
-		go func(a Adapter) {
-			defer wg.Done()
-
-			if err := Register(a, func(Options) (Router, error) { return &mockRouter{}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}(a)
-	}
-
-	wg.Wait()
 }

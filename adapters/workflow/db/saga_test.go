@@ -491,9 +491,7 @@ func TestSagaImplementsContracts(t *testing.T) {
 func TestSagaRegisterViaWorkflowOpen(t *testing.T) {
 	t.Parallel()
 
-	Register()
-
-	wf, err := workflow.Open(workflow.DB, workflow.Options{})
+	wf, err := New(Options{})
 	if err != nil {
 		t.Fatalf("Open(db) failed: %v", err)
 	}

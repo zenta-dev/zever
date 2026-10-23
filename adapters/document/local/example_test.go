@@ -5,13 +5,9 @@ import (
 	"github.com/zenta-dev/zever/core/document"
 )
 
-// ExampleOpen opens the local renderer and releases it without rendering.
-func ExampleOpen() {
-	if err := document.Register(document.Local, local.New); err != nil {
-		return
-	}
-
-	doc, err := document.Open(document.Local, document.Options{})
+// Example opens the local renderer and releases it without rendering.
+func Example() {
+	doc, err := local.New(document.Options{})
 	if err != nil {
 		return
 	}

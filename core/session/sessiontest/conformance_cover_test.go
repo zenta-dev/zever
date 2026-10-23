@@ -541,12 +541,6 @@ func (f *failGetBeforeExpiryStore) Delete(ctx context.Context, id string) error 
 
 func (f *failGetBeforeExpiryStore) Close() error { return f.stub.Close() }
 
-func TestCheckOpenRegisterSuccess(t *testing.T) {
-	t.Parallel()
-
-	mustPass(t, checkOpenRegister(healthyStubStore()))
-}
-
 func TestCheckErrorsReportsAll(t *testing.T) {
 	t.Parallel()
 

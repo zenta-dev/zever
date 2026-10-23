@@ -3,60 +3,8 @@ package db
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 )
-
-func TestDBEdge_OpenConcurrent(t *testing.T) {
-	t.Parallel()
-
-	adapter := dbFreshAdapter()
-	if err := Register(adapter, func(Options) (DB, error) { return &stubDB{dialect: "sqlite"}, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
-	}
-
-	var wg sync.WaitGroup
-
-	for range 50 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			if _, err := Open(adapter, Options{}); err != nil {
-				t.Errorf("Open err = %v", err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestDBEdge_RegisterConcurrentUnique(t *testing.T) {
-	t.Parallel()
-
-	var wg sync.WaitGroup
-
-	errs := make([]error, 20)
-
-	for i := range errs {
-		wg.Add(1)
-
-		go func(i int) {
-			defer wg.Done()
-
-			errs[i] = Register(dbFreshAdapter(), func(Options) (DB, error) { return &stubDB{}, nil })
-		}(i)
-	}
-
-	wg.Wait()
-
-	for i, err := range errs {
-		if err != nil {
-			t.Errorf("Register worker %d err = %v", i, err)
-		}
-	}
-}
 
 func TestDBEdge_WithTxNilDB(t *testing.T) {
 	t.Parallel()

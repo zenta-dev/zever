@@ -3,8 +3,6 @@ package redis
 import (
 	"sync"
 	"testing"
-
-	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 func TestRedis_costExactlyBurst_allowed(t *testing.T) {
@@ -91,9 +89,7 @@ func TestRedis_Name(t *testing.T) {
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
 	s := testServer(t)
 
-	Register()
-
-	l, err := ratelimit.Open(ratelimit.Redis, optionsFor(s))
+	l, err := New(optionsFor(s))
 	if err != nil {
 		t.Fatalf("Open = %v", err)
 	}

@@ -12,9 +12,6 @@ The `middleware` package builds plain HTTP middleware and gRPC unary interceptor
 Middleware has no config block of its own (only [CORS](../cors/) takes an `Options` value). Configure the services it wraps:
 
 ```sh
-LOG_ADAPTER=slog
-RATELIMIT_ADAPTER=memory
-OBSERVABILITY_ADAPTER=stdout
 ```
 
 Defaults from `config.Default()` run with no external services. Options: [Config reference](../../../reference/config/#ratelimit).
@@ -32,15 +29,18 @@ import (
     ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/log"
     "github.com/zenta-dev/zever/core/middleware"
+    "github.com/zenta-dev/zever/core/observability"
+    "github.com/zenta-dev/zever/core/ratelimit"
 )
 
 func main() {
-    logslog.Register()
-    ratelimitmemory.Register()
-    observabilitystdout.Register()
-
-    c := container.New(config.Default())
+    c := container.New(config.Default(),
+        container.Provide(log.DefaultRef(), func(o log.Options) (log.Logger, error) { return logslog.New(o), nil }),
+        container.Provide(ratelimit.DefaultRef(), ratelimitmemory.New),
+        container.Provide(observability.DefaultRef(), observabilitystdout.New),
+    )
     logger, _ := c.Log()
     limiter, _ := c.RateLimit()
     obs, _ := c.Observability()
@@ -158,7 +158,7 @@ A custom wrapper hides the real writer. Forward `Unwrap` so `http.ResponseContro
 <details>
 <summary>Traces are missing</summary>
 
-The provider is probably `noop`. Set `OBSERVABILITY_ADAPTER=stdout` (or OTLP) and check for spans named by path with `http.response.status_code`.
+The provider is probably `noop`. Wire `stdout` (or OTLP) in `internal/app/wiring.go` and check for spans named by path with `http.response.status_code`.
 </details>
 
 <details>

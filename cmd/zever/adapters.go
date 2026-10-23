@@ -1,49 +1,38 @@
 package main
 
 import (
-	aiollama "github.com/zenta-dev/zever/adapters/ai/ollama"
 	analyticslog "github.com/zenta-dev/zever/adapters/analytics/log"
-	authsession "github.com/zenta-dev/zever/adapters/auth/session"
 	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	cryptolocal "github.com/zenta-dev/zever/adapters/crypto/local"
-	documentlatex "github.com/zenta-dev/zever/adapters/document/latex"
-	documentremote "github.com/zenta-dev/zever/adapters/document/remote"
 	eventbusmemory "github.com/zenta-dev/zever/adapters/eventbus/memory"
 	flagstatic "github.com/zenta-dev/zever/adapters/flag/static"
-	geoosm "github.com/zenta-dev/zever/adapters/geo/osm"
 	geostatic "github.com/zenta-dev/zever/adapters/geo/static"
 	i18nembed "github.com/zenta-dev/zever/adapters/i18n/embed"
-	i18nremote "github.com/zenta-dev/zever/adapters/i18n/remote"
 	idempotencymemory "github.com/zenta-dev/zever/adapters/idempotency/memory"
 	lockmemory "github.com/zenta-dev/zever/adapters/lock/memory"
-	lognoop "github.com/zenta-dev/zever/adapters/log/noop"
-	logpretty "github.com/zenta-dev/zever/adapters/log/pretty"
 	logslog "github.com/zenta-dev/zever/adapters/log/slog"
 	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
-	mailersmtp "github.com/zenta-dev/zever/adapters/mailer/smtp"
 	notificationlog "github.com/zenta-dev/zever/adapters/notification/log"
-	observabilitynoop "github.com/zenta-dev/zever/adapters/observability/noop"
 	observabilitystdout "github.com/zenta-dev/zever/adapters/observability/stdout"
 	paymentstub "github.com/zenta-dev/zever/adapters/payment/stub"
 	permissionnoop "github.com/zenta-dev/zever/adapters/permission/noop"
-	permissionrbac "github.com/zenta-dev/zever/adapters/permission/rbac"
 	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
 	ratelimitmemory "github.com/zenta-dev/zever/adapters/ratelimit/memory"
 	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
 	secretsenv "github.com/zenta-dev/zever/adapters/secrets/env"
 	sessionmemory "github.com/zenta-dev/zever/adapters/session/memory"
 	storagelocal "github.com/zenta-dev/zever/adapters/storage/local"
-	tenantheader "github.com/zenta-dev/zever/adapters/tenant/header"
 	tenantsingle "github.com/zenta-dev/zever/adapters/tenant/single"
 	webhookhttp "github.com/zenta-dev/zever/adapters/webhook/http"
-	webhookqueue "github.com/zenta-dev/zever/adapters/webhook/queue"
 	workflowmemory "github.com/zenta-dev/zever/adapters/workflow/memory"
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/core/analytics"
 	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/core/billing"
 	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/core/cdn"
 	"github.com/zenta-dev/zever/core/crypto"
+	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/document"
 	"github.com/zenta-dev/zever/core/eventbus"
 	"github.com/zenta-dev/zever/core/flag"
@@ -53,182 +42,285 @@ import (
 	"github.com/zenta-dev/zever/core/lock"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/mailer"
+	"github.com/zenta-dev/zever/core/media"
 	"github.com/zenta-dev/zever/core/notification"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/core/password"
 	"github.com/zenta-dev/zever/core/payment"
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/ratelimit"
+	"github.com/zenta-dev/zever/core/resilience"
 	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/core/scheduler"
+	"github.com/zenta-dev/zever/core/search"
 	"github.com/zenta-dev/zever/core/secrets"
 	"github.com/zenta-dev/zever/core/session"
 	"github.com/zenta-dev/zever/core/storage"
 	"github.com/zenta-dev/zever/core/tenant"
+	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/core/workflow"
+	"github.com/zenta-dev/zever/shared/dbconn"
 
 	aianthropic "github.com/zenta-dev/zever/adapters/ai/anthropic"
-	aigemini "github.com/zenta-dev/zever/adapters/ai/gemini"
-	aiopenai "github.com/zenta-dev/zever/adapters/ai/openai"
-	analyticsposthog "github.com/zenta-dev/zever/adapters/analytics/posthog"
 	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	authoidc "github.com/zenta-dev/zever/adapters/auth/oidc"
-	billingpaddle "github.com/zenta-dev/zever/adapters/billing/paddle"
-	billingstripe "github.com/zenta-dev/zever/adapters/billing/stripe"
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
-	cachedb "github.com/zenta-dev/zever/adapters/cache/db"
-	cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
-	cdncloudflare "github.com/zenta-dev/zever/adapters/cdn/cloudflare"
 	cdnnoop "github.com/zenta-dev/zever/adapters/cdn/noop"
-	cryptokms "github.com/zenta-dev/zever/adapters/crypto/kms"
-	dbpostgres "github.com/zenta-dev/zever/adapters/db/postgres"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	documentlocal "github.com/zenta-dev/zever/adapters/document/local"
-	eventbusredis "github.com/zenta-dev/zever/adapters/eventbus/redis"
-	flagfirebase "github.com/zenta-dev/zever/adapters/flag/firebase"
-	geogoogle "github.com/zenta-dev/zever/adapters/geo/google"
-	idempotencydb "github.com/zenta-dev/zever/adapters/idempotency/db"
-	idempotencyredis "github.com/zenta-dev/zever/adapters/idempotency/redis"
-	lockredis "github.com/zenta-dev/zever/adapters/lock/redis"
-	logzerolog "github.com/zenta-dev/zever/adapters/log/zerolog"
 	medialocal "github.com/zenta-dev/zever/adapters/media/local"
-	medias3 "github.com/zenta-dev/zever/adapters/media/s3"
-	notificationfcm "github.com/zenta-dev/zever/adapters/notification/fcm"
-	notificationtwilio "github.com/zenta-dev/zever/adapters/notification/twilio"
-	observabilityotlp "github.com/zenta-dev/zever/adapters/observability/otlp"
-	outboxcdc "github.com/zenta-dev/zever/adapters/outbox/cdc"
 	outboxdb "github.com/zenta-dev/zever/adapters/outbox/db"
-	outboxmemory "github.com/zenta-dev/zever/adapters/outbox/memory"
 	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	paymentpaddle "github.com/zenta-dev/zever/adapters/payment/paddle"
-	paymentstripe "github.com/zenta-dev/zever/adapters/payment/stripe"
-	permissioncasbin "github.com/zenta-dev/zever/adapters/permission/casbin"
-	queuedb "github.com/zenta-dev/zever/adapters/queue/db"
-	queueredis "github.com/zenta-dev/zever/adapters/queue/redis"
-	ratelimitredis "github.com/zenta-dev/zever/adapters/ratelimit/redis"
 	resilienceinproc "github.com/zenta-dev/zever/adapters/resilience/inproc"
-	resilienceredis "github.com/zenta-dev/zever/adapters/resilience/redis"
-	routerfiber "github.com/zenta-dev/zever/adapters/router/fiber"
 	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
-	schedulerpostgres "github.com/zenta-dev/zever/adapters/scheduler/postgres"
 	searchdb "github.com/zenta-dev/zever/adapters/search/db"
-	searchmeilisearch "github.com/zenta-dev/zever/adapters/search/meilisearch"
-	secretsvault "github.com/zenta-dev/zever/adapters/secrets/vault"
-	sessiondb "github.com/zenta-dev/zever/adapters/session/db"
-	sessionredis "github.com/zenta-dev/zever/adapters/session/redis"
-	storager2 "github.com/zenta-dev/zever/adapters/storage/r2"
-	storages3 "github.com/zenta-dev/zever/adapters/storage/s3"
 	vectorstoredb "github.com/zenta-dev/zever/adapters/vectorstore/db"
-	vectorstoreqdrant "github.com/zenta-dev/zever/adapters/vectorstore/qdrant"
-	workflowdb "github.com/zenta-dev/zever/adapters/workflow/db"
+	"github.com/zenta-dev/zever/container"
 )
 
-// Adapters in this binary are registered explicitly: adapter packages
-// expose constructors but never self-register, and the container wires
-// nothing itself, so the composition root registers every adapter here,
-// once, at startup (the composition root). Registration performs no I/O.
+// Adapters in this binary are wired explicitly: adapter packages expose
+// constructors but never self-register, and the container resolves only
+// what is Provided, so the composition root below wires every default
+// adapter here, once, at startup. Wiring performs no I/O.
 //
-// This binary is developer tooling, so it registers every adapter: it must
-// handle arbitrary user projects. Generated apps should import and register
-// only the adapters they selected (see renderAppContent).
-func init() {
-	_ = ai.Register(ai.Ollama, aiollama.New)
-	_ = analytics.Register(analytics.Log, analyticslog.New)
-	_ = auth.Register(auth.Session, authsession.New)
-	_ = cache.Register(cache.Memory, cachememory.New)
-	_ = cdn.Register(cdn.AdapterNoop, cdnnoop.New)
-	_ = cdn.Register(cdn.AdapterCloudflare, cdncloudflare.New)
-	_ = crypto.Register(crypto.AdapterLocal, cryptolocal.New)
-	_ = document.Register(document.Remote, documentremote.New)
-	_ = document.Register(document.Latex, documentlatex.New)
-	_ = eventbus.Register(eventbus.Memory, eventbusmemory.New)
-	_ = flag.Register(flag.Static, flagstatic.New)
-	_ = geo.Register(geo.Static, geostatic.New)
-	_ = geo.Register(geo.OSM, geoosm.New)
-	_ = i18n.Register(i18n.Embed, i18nembed.New)
-	_ = i18n.Register(i18n.Remote, i18nremote.New)
-	_ = idempotency.Register(idempotency.Memory, idempotencymemory.New)
-	_ = lock.Register(lock.Memory, lockmemory.New)
-	_ = log.Register(log.Noop, func(log.Options) (log.Logger, error) { return lognoop.New(), nil })
-	_ = log.Register(log.Slog, func(o log.Options) (log.Logger, error) { return logslog.New(o), nil })
-	_ = log.Register(log.Pretty, func(o log.Options) (log.Logger, error) { return logpretty.New(o), nil })
-	_ = mailer.Register(mailer.Log, mailerlog.New)
-	_ = mailer.Register(mailer.SMTP, mailersmtp.New)
-	_ = notification.Register(notification.Log, notificationlog.New)
-	_ = observability.Register(observability.Noop, func(observability.Options) (observability.Provider, error) {
-		return observabilitynoop.New(), nil
-	})
-	_ = observability.Register(observability.Stdout, observabilitystdout.New)
-	_ = payment.Register(payment.Stub, paymentstub.New)
-	_ = permission.Register(permission.Noop, permissionnoop.New)
-	_ = permission.Register(permission.RBAC, permissionrbac.New)
-	_ = queue.Register(queue.Memory, queuememory.New)
-	_ = ratelimit.Register(ratelimit.Memory, ratelimitmemory.New)
-	_ = router.Register(router.AdapterStdHTTP, routerstdhttp.New)
-	_ = secrets.Register(secrets.Env, func(o secrets.Options) (secrets.Secrets, error) {
-		return secretsenv.New(secretsenv.Options{Prefix: o.Prefix})
-	})
-	_ = session.Register(session.Memory, sessionmemory.New)
-	_ = storage.Register(storage.AdapterLocal, storagelocal.New)
-	_ = tenant.Register(tenant.Single, tenantsingle.New)
-	_ = tenant.Register(tenant.Header, tenantheader.New)
-	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
-	_ = webhook.Register(webhook.AdapterQueue, webhookqueue.New)
-	_ = workflow.Register(workflow.Memory, workflowmemory.New)
+// This binary is developer tooling, so it wires every battery's default: it
+// must check arbitrary user projects. Generated apps should Provide only
+// the adapters they selected (see renderAppContent).
+func cliProviders() []container.Provider {
+	return []container.Provider{
+		container.Provide(ai.DefaultRef(), aianthropic.New),
+		container.Provide(analytics.DefaultRef(), analyticslog.New),
+		container.Provide(auth.DefaultRef(), authjwt.New),
+		container.Provide(billing.DefaultRef(), func(_ billing.Options) (billing.Billing, error) {
+			return billingstub.New(), nil
+		}),
+		container.Provide(cache.DefaultRef(), cachememory.New),
+		container.Provide(cdn.DefaultRef(), cdnnoop.New),
+		container.Provide(crypto.DefaultRef(), cryptolocal.New),
+		container.Provide(db.DefaultRef(), dbsqlite.New),
+		container.Provide(document.DefaultRef(), documentlocal.New),
+		container.Provide(eventbus.DefaultRef(), eventbusmemory.New),
+		container.Provide(flag.DefaultRef(), flagstatic.New),
+		container.Provide(geo.DefaultRef(), geostatic.New),
+		container.Provide(i18n.DefaultRef(), i18nembed.New),
+		container.Provide(idempotency.DefaultRef(), idempotencymemory.New),
+		container.Provide(lock.DefaultRef(), lockmemory.New),
+		container.Provide(log.DefaultRef(), func(o log.Options) (log.Logger, error) {
+			return logslog.New(o), nil
+		}),
+		container.Provide(mailer.DefaultRef(), mailerlog.New),
+		container.Provide(media.DefaultRef(), medialocal.New),
+		container.Provide(notification.DefaultRef(), notificationlog.New),
+		container.Provide(observability.DefaultRef(), observabilitystdout.New),
+		container.Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+			poolOpts := dbconn.SplitDSN(o.DSN)
+			poolOpts.DedicatedPool = o.DedicatedPool
+			return outboxdb.New(outboxdb.Options{
+				Options:      poolOpts,
+				Table:        o.Table,
+				InboxTable:   o.InboxTable,
+				Transport:    o.Publisher,
+				PollInterval: o.PollInterval,
+				BatchSize:    o.BatchSize,
+				MaxAttempts:  o.MaxAttempts,
+				Retry:        o.Retry,
+				Retention:    o.Retention,
+				LockSeconds:  o.LockSeconds,
+				Provider:     o.Provider,
+			})
+		}),
+		container.Provide(password.DefaultRef(), passwordargon2.New),
+		container.Provide(payment.DefaultRef(), paymentstub.New),
+		container.Provide(permission.DefaultRef(), permissionnoop.New),
+		container.Provide(queue.DefaultRef(), queuememory.New),
+		container.Provide(ratelimit.DefaultRef(), ratelimitmemory.New),
+		container.Provide(resilience.DefaultRef(), resilienceinproc.New),
+		container.Provide(router.DefaultRef(), routerstdhttp.New),
+		container.Provide(scheduler.DefaultRef(), schedulerembedded.New),
+		container.Provide(search.DefaultRef(), func(o search.Options) (search.Search, error) {
+			poolOpts := dbconn.SplitDSN(o.DSN)
+			poolOpts.DedicatedPool = o.DedicatedPool
+			return searchdb.New(searchdb.Options{Options: poolOpts})
+		}),
+		container.Provide(secrets.DefaultRef(), func(o secrets.Options) (secrets.Secrets, error) {
+			return secretsenv.New(secretsenv.Options{Prefix: o.Prefix})
+		}),
+		container.Provide(session.DefaultRef(), sessionmemory.New),
+		container.Provide(storage.DefaultRef(), storagelocal.New),
+		container.Provide(tenant.DefaultRef(), tenantsingle.New),
+		container.Provide(vectorstore.DefaultRef(), vectorstoredb.New),
+		container.Provide(webhook.DefaultRef(), webhookhttp.New),
+		container.Provide(workflow.DefaultRef(), workflowmemory.New),
+	}
+}
 
-	aianthropic.Register()
-	aigemini.Register()
-	aiopenai.Register()
-	analyticsposthog.Register()
-	authjwt.Register()
-	authoidc.Register()
-	billingpaddle.Register()
-	billingstripe.Register()
-	billingstub.Register()
-	cachedb.Register()
-	cacheredis.Register()
-	cdncloudflare.Register()
-	cdnnoop.Register()
-	dbpostgres.Register()
-	dbsqlite.Register()
-	documentlocal.Register()
-	eventbusredis.Register()
-	flagfirebase.Register()
-	geogoogle.Register()
-	idempotencyredis.Register()
-	lockredis.Register()
-	logzerolog.Register()
-	medialocal.Register()
-	medias3.Register()
-	notificationfcm.Register()
-	notificationtwilio.Register()
-	observabilityotlp.Register()
-	passwordargon2.Register()
-	paymentpaddle.Register()
-	paymentstripe.Register()
-	permissioncasbin.Register()
-	queuedb.Register()
-	queueredis.Register()
-	ratelimitredis.Register()
-	routerfiber.Register()
-	schedulerembedded.Register()
-	searchmeilisearch.Register()
-	searchdb.Register()
-	sessionredis.Register()
-	storager2.Register()
-	storages3.Register()
-	vectorstoredb.Register()
-	vectorstoreqdrant.Register()
-	workflowdb.Register()
+// cliDriverNames lists every adapter this binary ships per service: the
+// explain "drivers" column. The wired pick is cliDefaultDriver; anything
+// else in the list needs app-level wiring (container.Provide + rebuild).
+// Keep in sync with adapters/ directories when adding an adapter.
+func cliDriverNames(service string) []string {
+	switch service {
+	case "ai":
+		return []string{"anthropic", "gemini", "ollama", "openai"}
+	case "analytics":
+		return []string{"log", "posthog"}
+	case "auth":
+		return []string{"jwt", "oidc", "session"}
+	case "billing":
+		return []string{"paddle", "stripe", "stub"}
+	case "cache":
+		return []string{"db", "memory", "redis"}
+	case "cdn":
+		return []string{"cloudflare", "noop"}
+	case "crypto":
+		return []string{"kms", "local"}
+	case "db":
+		return []string{"postgres", "sqlite"}
+	case "document":
+		return []string{"latex", "local", "remote"}
+	case "eventbus":
+		return []string{"memory", "redis"}
+	case "flag":
+		return []string{"firebase", "static"}
+	case "geo":
+		return []string{"google", "osm", "static"}
+	case "i18n":
+		return []string{"embed", "remote"}
+	case "idempotency":
+		return []string{"db", "memory", "redis"}
+	case "lock":
+		return []string{"memory", "redis"}
+	case "log":
+		return []string{"noop", "pretty", "slog", "zerolog"}
+	case "mailer":
+		return []string{"log", "smtp"}
+	case "media":
+		return []string{"local", "s3"}
+	case "notification":
+		return []string{"fcm", "log", "twilio"}
+	case "observability":
+		return []string{"noop", "otlp", "stdout"}
+	case "outbox":
+		return []string{"cdc", "db", "memory"}
+	case "password":
+		return []string{"argon2id"}
+	case "payment":
+		return []string{"paddle", "stripe", "stub"}
+	case "permission":
+		return []string{"casbin", "noop", "rbac"}
+	case "queue":
+		return []string{"db", "memory", "redis"}
+	case "ratelimit":
+		return []string{"memory", "redis"}
+	case "resilience":
+		return []string{"memory", "redis"}
+	case "router":
+		return []string{"fiber", "stdhttp"}
+	case "scheduler":
+		return []string{"embedded", "postgres"}
+	case "search":
+		return []string{"db", "meilisearch"}
+	case "secrets":
+		return []string{"env", "vault"}
+	case "session":
+		return []string{"db", "memory", "redis"}
+	case "storage":
+		return []string{"local", "r2", "s3"}
+	case "tenant":
+		return []string{"header", "single"}
+	case "vectorstore":
+		return []string{"db", "qdrant"}
+	case "webhook":
+		return []string{"http", "queue"}
+	case "workflow":
+		return []string{"db", "memory"}
+	default:
+		return nil
+	}
+}
 
-	cryptokms.Register()
-	idempotencydb.Register()
-	outboxcdc.Register()
-	outboxdb.Register()
-	outboxmemory.Register()
-	resilienceinproc.Register()
-	resilienceredis.Register()
-	schedulerpostgres.Register()
-	secretsvault.Register()
-	sessiondb.Register()
+// cliDefaultDriver names the adapter cliProviders wires for service: the
+// explain "driver" column. Changing it means editing cliProviders above and
+// rebuilding.
+func cliDefaultDriver(service string) string {
+	switch service {
+	case "ai":
+		return "anthropic"
+	case "analytics":
+		return "log"
+	case "auth":
+		return "jwt"
+	case "billing":
+		return "stub"
+	case "cache":
+		return "memory"
+	case "cdn":
+		return "noop"
+	case "crypto":
+		return "local"
+	case "db":
+		return "sqlite"
+	case "document":
+		return "local"
+	case "eventbus":
+		return "memory"
+	case "flag":
+		return "static"
+	case "geo":
+		return "static"
+	case "i18n":
+		return "embed"
+	case "idempotency":
+		return "memory"
+	case "lock":
+		return "memory"
+	case "log":
+		return "slog"
+	case "mailer":
+		return "log"
+	case "media":
+		return "local"
+	case "notification":
+		return "log"
+	case "observability":
+		return "stdout"
+	case "outbox":
+		return "db"
+	case "password":
+		return "argon2id"
+	case "payment":
+		return "stub"
+	case "permission":
+		return "noop"
+	case "queue":
+		return "memory"
+	case "ratelimit":
+		return "memory"
+	case "resilience":
+		return "memory"
+	case "router":
+		return "stdhttp"
+	case "scheduler":
+		return "embedded"
+	case "search":
+		return "db"
+	case "secrets":
+		return "env"
+	case "session":
+		return "memory"
+	case "storage":
+		return "local"
+	case "tenant":
+		return "single"
+	case "vectorstore":
+		return "db"
+	case "webhook":
+		return "http"
+	case "workflow":
+		return "memory"
+	default:
+		return ""
+	}
 }

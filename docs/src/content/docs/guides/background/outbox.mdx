@@ -102,7 +102,6 @@ The relay is not started here. `Start` publishes stored messages through the sam
 ## Configure the outbox
 
 ```sh
-OUTBOX_ADAPTER=db
 OUTBOX_DSN=postgres://app:secret@db:5432/app
 OUTBOX_TABLE=outbox
 OUTBOX_INBOX_TABLE=inbox
@@ -116,7 +115,6 @@ OUTBOX_DEDICATED_POOL=false
 ```
 
 ```sh
-OUTBOX_ADAPTER=db
 OUTBOX_DSN=postgres://app:secret@db:5432/app
 OUTBOX_POLL_INTERVAL=1s
 ```
@@ -136,7 +134,6 @@ Core never imports `eventbus` or `queue`. Your wiring bridges a transport to the
 The cdc adapter emits inside the caller's transaction, so a rollback drops the event. Its consumer tails the WAL through a replication slot and acknowledges the LSN only after a successful publish.
 
 ```sh
-OUTBOX_ADAPTER=cdc
 OUTBOX_DSN=postgres://app:secret@db:5432/app
 OUTBOX_PREFIX=zever_outbox
 OUTBOX_SLOT=zever_outbox_slot

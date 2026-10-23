@@ -55,8 +55,6 @@ func TestNewInvalidOptions(t *testing.T) {
 }
 
 func TestRegisterSharedOpens(t *testing.T) {
-	Register()
-
 	conn, err := openSQLite(t)
 	if err != nil {
 		t.Fatalf("openSQLite() error = %v", err)
@@ -64,7 +62,7 @@ func TestRegisterSharedOpens(t *testing.T) {
 
 	defer func() { _ = conn.Close(context.Background()) }()
 
-	s, err := outbox.OpenShared(outbox.DB, conn, outbox.Options{})
+	s, err := NewFromDB(conn, Options{})
 	if err != nil {
 		t.Fatalf("OpenShared() error = %v", err)
 	}

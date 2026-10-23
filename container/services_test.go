@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/core/analytics"
 	"github.com/zenta-dev/zever/core/auth"
@@ -54,65 +53,62 @@ import (
 	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
-// testConfig returns Default with every default adapter name wired to a
-// zero-value fake below, so no API keys, secrets, DB paths, or fixture files
-// are needed. The container no longer wires any adapter itself: resolution
-// requires caller-side registration, and tests stand in for the caller here.
-// All fixtures are local and deterministic; nothing touches the network.
-func testConfig(t *testing.T) *config.Config {
-	t.Helper()
-
-	registerFakeAdapters()
-
-	return config.Default()
+// fakeProviders wires every service's default ref to a zero-value fake
+// below, so no API keys, secrets, DB paths, or fixture files are needed.
+// The container resolves only explicitly wired providers, and tests stand
+// in for the caller here. All fixtures are local and deterministic;
+// nothing touches the network.
+func fakeProviders() []Provider {
+	return []Provider{
+		Provide(ai.DefaultRef(), newFakeAI),
+		Provide(analytics.DefaultRef(), newFakeAnalytics),
+		Provide(auth.DefaultRef(), newFakeAuth),
+		Provide(billing.DefaultRef(), newFakeBilling),
+		Provide(cache.DefaultRef(), newFakeCache),
+		Provide(cdn.DefaultRef(), newFakeCDN),
+		Provide(crypto.DefaultRef(), newFakeCrypto),
+		Provide(db.DefaultRef(), newFakeDB),
+		Provide(document.DefaultRef(), newFakeDocument),
+		Provide(eventbus.DefaultRef(), newFakeEventBus),
+		Provide(flag.DefaultRef(), newFakeFlag),
+		Provide(geo.DefaultRef(), newFakeGeo),
+		Provide(i18n.DefaultRef(), newFakeI18n),
+		Provide(idempotency.DefaultRef(), newFakeIdempotency),
+		Provide(lock.DefaultRef(), newFakeLock),
+		Provide(log.DefaultRef(), newFakeLog),
+		Provide(mailer.DefaultRef(), newFakeMailer),
+		Provide(media.DefaultRef(), newFakeMedia),
+		Provide(notification.DefaultRef(), newFakeNotification),
+		Provide(observability.DefaultRef(), newFakeObservability),
+		Provide(outbox.DefaultRef(), newFakeOutbox),
+		Provide(password.DefaultRef(), newFakePassword),
+		Provide(payment.DefaultRef(), newFakePayment),
+		Provide(permission.DefaultRef(), newFakePermission),
+		Provide(queue.DefaultRef(), newFakeQueue),
+		Provide(ratelimit.DefaultRef(), newFakeRateLimit),
+		Provide(resilience.DefaultRef(), newFakeResilience),
+		Provide(router.DefaultRef(), newFakeRouter),
+		Provide(scheduler.DefaultRef(), newFakeScheduler),
+		Provide(search.DefaultRef(), newFakeSearch),
+		Provide(secrets.DefaultRef(), newFakeSecrets),
+		Provide(session.DefaultRef(), newFakeSession),
+		Provide(storage.DefaultRef(), newFakeStorage),
+		Provide(tenant.DefaultRef(), newFakeTenant),
+		Provide(vectorstore.DefaultRef(), newFakeVectorStore),
+		Provide(webhook.DefaultRef(), newFakeWebhook),
+		Provide(workflow.DefaultRef(), newFakeWorkflow),
+	}
 }
 
-// registerFakeAdapters wires zero-value fakes under the default adapter
-// names of every service, so container tests import zero nested modules.
-// Registries are global; duplicate errors from repeated or cross-file
-// registration are ignored — first registration wins and every fake here
-// satisfies the same battery interface.
-func registerFakeAdapters() {
-	_ = ai.Register(ai.Anthropic, newFakeAI)
-	_ = analytics.Register(analytics.Log, newFakeAnalytics)
-	_ = auth.Register(auth.JWT, newFakeAuth)
-	_ = billing.Register(billing.Stub, newFakeBilling)
-	_ = cache.Register(cache.Memory, newFakeCache)
-	_ = cdn.Register(cdn.AdapterNoop, newFakeCDN)
-	_ = crypto.Register(crypto.AdapterLocal, newFakeCrypto)
-	_ = db.Register(db.SQLite, newFakeDB)
-	_ = document.Register(document.Local, newFakeDocument)
-	_ = eventbus.Register(eventbus.Memory, newFakeEventBus)
-	_ = flag.Register(flag.Static, newFakeFlag)
-	_ = geo.Register(geo.Static, newFakeGeo)
-	_ = i18n.Register(i18n.Embed, newFakeI18n)
-	_ = idempotency.Register(idempotency.Memory, newFakeIdempotency)
-	_ = lock.Register(lock.Memory, newFakeLock)
-	_ = log.Register(log.Noop, newFakeLog)
-	_ = log.Register(log.Slog, newFakeLog)
-	_ = log.Register(log.Pretty, newFakeLog)
-	_ = mailer.Register(mailer.Log, newFakeMailer)
-	_ = media.Register(media.Local, newFakeMedia)
-	_ = notification.Register(notification.Log, newFakeNotification)
-	_ = observability.Register(observability.Noop, newFakeObservability)
-	_ = observability.Register(observability.Stdout, newFakeObservability)
-	_ = outbox.Register(outbox.DB, newFakeOutbox)
-	_ = password.Register(password.AdapterArgon2ID, newFakePassword)
-	_ = payment.Register(payment.Stub, newFakePayment)
-	_ = permission.Register(permission.Noop, newFakePermission)
-	_ = queue.Register(queue.Memory, newFakeQueue)
-	_ = ratelimit.Register(ratelimit.Memory, newFakeRateLimit)
-	_ = resilience.Register(resilience.Memory, newFakeResilience)
-	_ = router.Register(router.AdapterStdHTTP, newFakeRouter)
-	_ = scheduler.Register(scheduler.Embedded, newFakeScheduler)
-	_ = search.Register(search.DB, newFakeSearch)
-	_ = secrets.Register(secrets.Env, newFakeSecrets)
-	_ = session.Register(session.Memory, newFakeSession)
-	_ = storage.Register(storage.AdapterLocal, newFakeStorage)
-	_ = tenant.Register(tenant.Single, newFakeTenant)
-	_ = vectorstore.Register(vectorstore.DB, newFakeVectorStore)
-	_ = webhook.Register(webhook.AdapterHTTP, newFakeWebhook)
-	_ = workflow.Register(workflow.Memory, newFakeWorkflow)
+// newTestContainer builds a container with every service faked
+// and closes it on cleanup.
+func newTestContainer(t *testing.T) *Container {
+	t.Helper()
+
+	c := New(nil, fakeProviders()...)
+	closeContainer(t, c)
+
+	return c
 }
 
 func newFakeAI(_ ai.Options) (ai.AI, error) { return &fakeAI{}, nil }
@@ -879,8 +875,7 @@ func sameInstance(t *testing.T, a, b any) {
 func TestAccessors_resolve(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	tests := []struct {
 		name    string
@@ -944,44 +939,6 @@ func TestAccessors_resolve(t *testing.T) {
 	}
 }
 
-func TestAccessors_alternateAdapters(t *testing.T) {
-	t.Parallel()
-
-	// Covers the infallible factory wrappers (log noop/slog/pretty,
-	// observability noop) that defaults never exercise.
-	tests := []struct {
-		name    string
-		mutate  func(cfg *config.Config)
-		resolve func(c *Container) (any, error)
-	}{
-		{"log/noop", func(cfg *config.Config) { cfg.Log.Adapter = "noop" }, func(c *Container) (any, error) { return c.Log() }},
-		{"log/slog", func(cfg *config.Config) { cfg.Log.Adapter = "slog" }, func(c *Container) (any, error) { return c.Log() }},
-		{"log/pretty", func(cfg *config.Config) { cfg.Log.Adapter = "pretty" }, func(c *Container) (any, error) { return c.Log() }},
-		{"observability/noop", func(cfg *config.Config) { cfg.Observability.Adapter = "noop" }, func(c *Container) (any, error) { return c.Observability() }},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			cfg := testConfig(t)
-			tt.mutate(cfg)
-
-			c := New(cfg)
-			closeContainer(t, c)
-
-			v, err := tt.resolve(c)
-			if err != nil {
-				t.Fatalf("resolve failed: %v", err)
-			}
-
-			if v == nil {
-				t.Fatal("resolve returned nil instance")
-			}
-		})
-	}
-}
-
 func mustResolve(t *testing.T, resolve func() (any, error)) any {
 	t.Helper()
 
@@ -993,67 +950,72 @@ func mustResolve(t *testing.T, resolve func() (any, error)) any {
 	return v
 }
 
-func TestAccessors_lazy(t *testing.T) {
+func TestAccessors_providerSingleton(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
-	if c.ai.resolved() || c.db.resolved() || c.cache.resolved() {
-		t.Fatal("fresh container has resolved services")
-	}
-
-	if _, err := c.AI(); err != nil {
+	a, err := c.AI()
+	if err != nil {
 		t.Fatalf("AI() failed: %v", err)
 	}
 
-	if !c.ai.resolved() {
-		t.Error("AI() did not mark ai resolved")
+	sameInstance(t, a, mustResolve(t, func() (any, error) { return c.AI() }))
+}
+
+// TestAccessors_unwiredFailsNotWired pins the provider-only contract: with
+// zero providers every accessor fails fast with NotWiredError naming the
+// service, instead of falling back to any config-based path.
+func TestAccessors_unwiredFailsNotWired(t *testing.T) {
+	t.Parallel()
+
+	c := New(nil)
+	closeContainer(t, c)
+
+	if _, err := c.Cache(); !isNotWiredFor(err, "cache") {
+		t.Fatalf("Cache() = %v, want NotWiredError for cache", err)
 	}
 
-	if c.db.resolved() || c.cache.resolved() {
-		t.Error("resolving AI resolved unrelated services")
+	if _, err := c.DB(); !isNotWiredFor(err, "db") {
+		t.Fatalf("DB() = %v, want NotWiredError for db", err)
 	}
 }
 
-func TestAccessors_badAdapterThenRetry(t *testing.T) {
+// isNotWiredFor reports whether err is a NotWiredError for service wrapping
+// ErrNotWired.
+func isNotWiredFor(err error, service string) bool {
+	if err == nil {
+		return false
+	}
+
+	var nw NotWiredError
+	if !errors.As(err, &nw) {
+		return false
+	}
+
+	return errors.Is(err, ErrNotWired) && nw.Service == service
+}
+
+func TestAccessors_failedBuildRetries(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	calls := 0
+	c := New(nil, Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) {
+		calls++
+		if calls == 1 {
+			return nil, errors.New("container: db: boom")
+		}
 
-	c.cfg.DB.Adapter = "bogus-adapter"
+		return &fakeDB{}, nil
+	}))
+	closeContainer(t, c)
 
 	if _, err := c.DB(); err == nil {
-		t.Fatal("expected error for bogus db adapter, got nil")
+		t.Fatal("expected error for failing db build, got nil")
 	}
-
-	if c.db.resolved() {
-		t.Fatal("failed build must not mark the service resolved")
-	}
-
-	c.cfg.DB.Adapter = "sqlite"
 
 	if _, err := c.DB(); err != nil {
-		t.Fatalf("retry after config fix failed: %v", err)
-	}
-}
-
-func TestAccessors_badAdapterError(t *testing.T) {
-	t.Parallel()
-
-	c := New(testConfig(t))
-	closeContainer(t, c)
-
-	c.cfg.Cache.Adapter = "bogus-adapter"
-
-	_, err := c.Cache()
-	if err == nil {
-		t.Fatal("expected error for bogus cache adapter, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "cache") {
-		t.Errorf("error should name the service, got: %v", err)
+		t.Fatalf("retry after failed build failed: %v", err)
 	}
 }
 
@@ -1062,10 +1024,17 @@ func TestCrypto_failureCarriesNoSecretText(t *testing.T) {
 
 	const marker = "s3cr3t-marker-zz9"
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	// The container adds no option content to provider errors: the factory
+	// below fails closed on a bad key without echoing it, and the accessor
+	// surfaces that error unchanged.
+	c := New(nil, Provide(crypto.DefaultRef(), func(o crypto.Options) (crypto.Crypto, error) {
+		if o.Key == "" {
+			return nil, errors.New("container: crypto: missing key")
+		}
 
-	c.cfg.Crypto.Options.Key = "NOT-BASE64!!-" + marker
+		return nil, errors.New("container: crypto: invalid key")
+	}, WithOptions(func(o *crypto.Options) { o.Key = "NOT-BASE64!!-" + marker })))
+	closeContainer(t, c)
 
 	_, err := c.Crypto()
 	if err == nil {
@@ -1080,8 +1049,7 @@ func TestCrypto_failureCarriesNoSecretText(t *testing.T) {
 func TestAccessors_concurrent(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	const n = 8
 
@@ -1116,8 +1084,7 @@ func TestAccessors_concurrent(t *testing.T) {
 func TestJob_sharesQueue(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	q, err := c.Queue()
 	if err != nil {
@@ -1150,21 +1117,19 @@ func TestJob_sharesQueue(t *testing.T) {
 func TestJob_queueFailure(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := New(nil)
 	closeContainer(t, c)
 
-	c.cfg.Queue.Adapter = "bogus-adapter"
-
-	if _, err := c.Job(); err == nil {
-		t.Fatal("expected Job error for bogus queue adapter, got nil")
+	_, err := c.Job()
+	if !isNotWiredFor(err, "queue") {
+		t.Fatalf("Job() = %v, want the unwired queue NotWiredError", err)
 	}
 }
 
 func TestAgent_sharesAI(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	if _, err := c.AI(); err != nil {
 		t.Fatalf("AI() failed: %v", err)
@@ -1192,21 +1157,19 @@ func TestAgent_sharesAI(t *testing.T) {
 func TestAgent_aiFailure(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := New(nil)
 	closeContainer(t, c)
 
-	c.cfg.AI.Adapter = "bogus-adapter"
-
-	if _, err := c.Agent(); err == nil {
-		t.Fatal("expected Agent error for bogus ai adapter, got nil")
+	_, err := c.Agent()
+	if !isNotWiredFor(err, "ai") {
+		t.Fatalf("Agent() = %v, want the unwired ai NotWiredError", err)
 	}
 }
 
 func TestRAG_sharesAIVectorStore(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	if _, err := c.AI(); err != nil {
 		t.Fatalf("AI() failed: %v", err)
@@ -1238,21 +1201,19 @@ func TestRAG_sharesAIVectorStore(t *testing.T) {
 func TestRAG_vectorStoreFailure(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := New(nil, Provide(ai.DefaultRef(), newFakeAI))
 	closeContainer(t, c)
 
-	c.cfg.VectorStore.Adapter = "bogus-adapter"
-
-	if _, err := c.RAG(); err == nil {
-		t.Fatal("expected RAG error for bogus vectorstore adapter, got nil")
+	_, err := c.RAG()
+	if !isNotWiredFor(err, "vectorstore") {
+		t.Fatalf("RAG() = %v, want the unwired vectorstore NotWiredError", err)
 	}
 }
 
 func TestScheduler_resolve(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	s, err := c.Scheduler()
 	if err != nil {
@@ -1277,62 +1238,22 @@ func TestScheduler_resolve(t *testing.T) {
 	}
 }
 
-func TestScheduler_injectsJobDispatcher(t *testing.T) {
+func TestScheduler_unwiredFailsNotWired(t *testing.T) {
 	t.Parallel()
 
-	cfg := testConfig(t)
-	cfg.Scheduler.Options.Dispatcher = nil
-
-	c := New(cfg)
+	c := New(nil)
 	closeContainer(t, c)
 
-	s, err := c.Scheduler()
-	if err != nil {
-		t.Fatalf("Scheduler() with nil dispatcher failed: %v", err)
-	}
-
-	if s == nil {
-		t.Fatal("Scheduler() returned nil")
-	}
-
-	if !c.job.resolved() {
-		t.Error("nil dispatcher should resolve the shared job dispatcher")
-	}
-}
-
-func TestScheduler_jobFailure(t *testing.T) {
-	t.Parallel()
-
-	cfg := testConfig(t)
-	cfg.Scheduler.Options.Dispatcher = nil
-	cfg.Queue.Adapter = "bogus-adapter"
-
-	c := New(cfg)
-	closeContainer(t, c)
-
-	if _, err := c.Scheduler(); err == nil {
-		t.Fatal("expected Scheduler error for bogus queue adapter, got nil")
-	}
-}
-
-func TestScheduler_badAdapter(t *testing.T) {
-	t.Parallel()
-
-	c := New(testConfig(t))
-	closeContainer(t, c)
-
-	c.cfg.Scheduler.Adapter = "bogus-adapter"
-
-	if _, err := c.Scheduler(); err == nil {
-		t.Fatal("expected error for bogus scheduler adapter, got nil")
+	_, err := c.Scheduler()
+	if !isNotWiredFor(err, "scheduler") {
+		t.Fatalf("Scheduler() = %v, want NotWiredError for scheduler", err)
 	}
 }
 
 func TestTransactor_ok(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	tr, err := c.Transactor()
 	if err != nil {
@@ -1347,19 +1268,18 @@ func TestTransactor_ok(t *testing.T) {
 func TestTransactor_dbFailure(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := New(nil)
 	closeContainer(t, c)
 
-	c.cfg.DB.Adapter = "bogus-adapter"
-
-	if _, err := c.Transactor(); err == nil {
-		t.Fatal("expected Transactor error for bogus db adapter, got nil")
+	_, err := c.Transactor()
+	if !isNotWiredFor(err, "db") {
+		t.Fatalf("Transactor() = %v, want the unwired db NotWiredError", err)
 	}
 }
 
 // stubDB implements db.DB by embedding it but never Transactor, so
-// Transactor must reject it. Seeded through lazy.get, which is the only
-// same-package seam the frozen lazy contract exposes.
+// Transactor must reject it. It is wired through Provide, the only seam
+// the provider-only container exposes.
 type stubDB struct {
 	db.DB
 }
@@ -1367,12 +1287,10 @@ type stubDB struct {
 func TestTransactor_unsupported(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := New(nil, Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) {
+		return stubDB{}, nil
+	}))
 	closeContainer(t, c)
-
-	if _, err := c.db.get(func() (db.DB, error) { return stubDB{}, nil }); err != nil {
-		t.Fatalf("seeding stub db failed: %v", err)
-	}
 
 	_, err := c.Transactor()
 	if err == nil {
@@ -1396,8 +1314,7 @@ func TestTransactor_unsupported(t *testing.T) {
 func TestGRPC_singletonOptsIgnored(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	if c.grpcServer.resolved() {
 		t.Fatal("fresh container has grpc server resolved")
@@ -1425,8 +1342,7 @@ func TestGRPC_singletonOptsIgnored(t *testing.T) {
 func TestGRPCClient_cachesPerTarget(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	opts := []grpcclient.Option{
 		grpcclient.WithInsecure(),
@@ -1463,8 +1379,7 @@ func TestGRPCClient_cachesPerTarget(t *testing.T) {
 func TestGRPCClient_buildFailureNotCached(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
-	closeContainer(t, c)
+	c := newTestContainer(t)
 
 	if _, err := c.GRPCClient("static:///alpha"); err == nil {
 		t.Fatal("expected error without credentials, got nil")
@@ -1485,7 +1400,7 @@ func TestGRPCClient_buildFailureNotCached(t *testing.T) {
 func TestGRPCClient_closeClosesConns(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := New(nil)
 
 	conn, err := c.GRPCClient("static:///alpha",
 		grpcclient.WithInsecure(),

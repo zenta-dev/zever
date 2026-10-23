@@ -120,7 +120,7 @@ func TestRunExplainUnknownOperation(t *testing.T) {
 // not-found guidance: the error says how to see every wired service.
 func TestRunExplainUnknownServiceNamesTheListCommand(t *testing.T) {
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	writeInspectFixture(t, dir, ".env", "LOG_MIN_LEVEL=1\n")
 	t.Chdir(dir)
 
 	err := runExplain([]string{"nosuchservice"})
@@ -144,7 +144,7 @@ func TestRunExplainNotFoundSilencesHints(t *testing.T) {
 	t.Setenv("ZEVER_NO_HINT", "1")
 
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "LOG_ADAPTER=slog\n")
+	writeInspectFixture(t, dir, ".env", "LOG_MIN_LEVEL=1\n")
 	t.Chdir(dir)
 
 	err := runExplain([]string{"nosuchservice"})
@@ -449,7 +449,7 @@ func TestRunExplainWiringUnknownService(t *testing.T) {
 
 func TestRunExplainWiringNamedInstance(t *testing.T) {
 	dir := t.TempDir()
-	writeInspectFixture(t, dir, ".env", "DB_ADAPTER=sqlite\nDB__ANALYTICS__ADAPTER=postgres\n")
+	writeInspectFixture(t, dir, ".env", "DB__ANALYTICS__PATH=data/analytics.db\n")
 	t.Chdir(dir)
 
 	var out bytes.Buffer

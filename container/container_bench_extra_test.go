@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/queue"
 )
 
 // BenchmarkContainer_NewNilConfig measures the lazy root constructor: no
@@ -21,7 +22,6 @@ func BenchmarkContainer_NewNilConfig(b *testing.B) {
 // (registry lookup, per-container slot creation, typed assertion) from a
 // cold container.
 func BenchmarkContainer_ResolvePlugin(b *testing.B) {
-	registerTestAdapters()
 	name := mustUniquePluginName(b, "bench-widget")
 	if err := RegisterPlugin(name, PluginAPIVersion, func(_ *config.Config) (*fakePluginWidget, error) {
 		return &fakePluginWidget{label: "bench"}, nil
@@ -43,7 +43,6 @@ func BenchmarkContainer_ResolvePlugin(b *testing.B) {
 // under concurrent callers; Resolve takes pluginsMu on every call, so this
 // captures the steady-state contention.
 func BenchmarkContainer_ResolvePluginParallel(b *testing.B) {
-	registerTestAdapters()
 	name := mustUniquePluginName(b, "bench-widget-par")
 	if err := RegisterPlugin(name, PluginAPIVersion, func(_ *config.Config) (*fakePluginWidget, error) {
 		return &fakePluginWidget{label: "bench"}, nil
@@ -69,12 +68,10 @@ func BenchmarkContainer_ResolvePluginParallel(b *testing.B) {
 // BenchmarkContainer_JobResolve measures resolving the job dispatcher, which
 // resolves and shares the queue as a side effect.
 func BenchmarkContainer_JobResolve(b *testing.B) {
-	registerTestAdapters()
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c := New(config.Default())
+		c := New(nil, Provide(queue.DefaultRef(), newFakeQueue))
 		if _, err := c.Job(); err != nil {
 			b.Fatalf("Job: %v", err)
 		}
@@ -84,12 +81,10 @@ func BenchmarkContainer_JobResolve(b *testing.B) {
 // BenchmarkContainer_CloseEmpty measures the shutdown cost of a container
 // that never resolved anything.
 func BenchmarkContainer_CloseEmpty(b *testing.B) {
-	registerTestAdapters()
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c := New(config.Default())
+		c := New(nil)
 		if err := c.Close(b.Context()); err != nil {
 			b.Fatalf("Close: %v", err)
 		}

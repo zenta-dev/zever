@@ -1,9 +1,9 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// Explicit Register calls below are the whole of the "wiring" a zever app
-// has to do: nested adapter modules expose no init magic, so an app calls
-// Register for exactly the adapters it actually uses and nothing else.
+// Wiring lives in wiring.go: one container.Provide entry per battery naming
+// the compiled-in adapter constructor. Changing an adapter means editing
+// that entry and rebuilding; nothing is selected from the environment.
 //
 // JWT secret comes from the environment only: set AUTH_JWT_SECRET to at
 // least 32 bytes. It is never stored in a file. `zever doctor` reports
@@ -15,15 +15,6 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
-
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
-	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
-	logslog "github.com/zenta-dev/zever/adapters/log/slog"
-	passwordargon2 "github.com/zenta-dev/zever/adapters/password/argon2"
-	queuememory "github.com/zenta-dev/zever/adapters/queue/memory"
-	routerstdhttp "github.com/zenta-dev/zever/adapters/router/stdhttp"
-	schedulerembedded "github.com/zenta-dev/zever/adapters/scheduler/embedded"
 )
 
 // DefaultDBPath is the sqlite file used when nothing else supplies one. It is
@@ -64,14 +55,5 @@ func New() (*container.Container, error) {
 		return nil, err
 	}
 
-	authjwt.Register()
-	cachememory.Register()
-	dbsqlite.Register()
-	logslog.Register()
-	passwordargon2.Register()
-	queuememory.Register()
-	routerstdhttp.Register()
-	schedulerembedded.Register()
-
-	return container.New(cfg), nil
+	return container.New(cfg, Providers()...), nil
 }

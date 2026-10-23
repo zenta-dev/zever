@@ -6,8 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,11 +26,9 @@ const (
 	DefaultPollInterval = 5 * time.Millisecond
 )
 
-var adapterSeq atomic.Uint64
-
 // Conformance verifies factory-built stores implement the session.Store
 // contract: Create/Get round-trip, Save mutation, Delete idempotency, TTL
-// expiry, Open/Register registry wiring, and Close. Each subtest takes a
+// expiry, and Close. Each subtest takes a
 // fresh instance from factory so cases stay isolated. Expiry waits poll
 // with a context deadline; they never synchronize with time.Sleep and
 // never touch the network.
@@ -58,7 +54,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Run("Save", func(t *testing.T) { conformanceSave(t, factory) })
 	t.Run("Delete", func(t *testing.T) { conformanceDelete(t, factory) })
 	t.Run("TTLExpiry", func(t *testing.T) { conformanceTTLExpiry(t, factory) })
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t, factory) })
 	t.Run("Errors", func(t *testing.T) { conformanceErrors(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
@@ -229,47 +224,8 @@ func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Dura
 	return errors.Join(errs...)
 }
 
-func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) session.Store) {
-	t.Helper()
-
-	if err := checkOpenRegister(factory(t)); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // checkOpenRegister proves the production Open path returns the
 // registered probe, rejects duplicates, and reports unknown adapters.
-func checkOpenRegister(probe session.Store) error {
-	name := session.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
-
-	// Register the factory-built behavior under a throwaway name through
-	// the production Open path: factory proves the backend, Open proves
-	// the wiring.
-	if err := session.Register(name, func(session.Options) (session.Store, error) { return probe, nil }); err != nil {
-		return fmt.Errorf("sessiontest: Register() error = %w", err)
-	}
-
-	if err := session.Register(name, func(session.Options) (session.Store, error) { return probe, nil }); !errors.Is(err, session.ErrDuplicate) {
-		return fmt.Errorf("sessiontest: Register(dup) err = %w, want ErrDuplicate", err)
-	}
-
-	opened, err := session.Open(name, session.Options{})
-	if err != nil {
-		return fmt.Errorf("sessiontest: Open() error = %w", err)
-	}
-
-	var errs []error
-
-	if opened != probe {
-		errs = append(errs, errors.New("sessiontest: Open() did not return the registered store"))
-	}
-
-	if _, err := session.Open("kit-no-such-adapter", session.Options{}); !errors.Is(err, session.ErrUnknownAdapter) {
-		errs = append(errs, errf("Open(unknown) err = %v, want ErrUnknownAdapter", err))
-	}
-
-	return errors.Join(errs...)
-}
 
 func conformanceErrors(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()

@@ -9,7 +9,7 @@ import (
 )
 
 // Conformance verifies factory-built providers implement the
-// observability.Provider contract: open/register round-trip, tracer
+// observability.Provider contract: tracer
 // spans with attributes and error recording, the optional SpanStarter
 // interface (kind/attrs/links when implemented), metrics
 // counter/gauge/histogram, and Shutdown cleanup. Each subtest takes
@@ -24,35 +24,10 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) observability.Provider) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Tracing", func(t *testing.T) { conformanceTracing(t, factory) })
 	t.Run("SpanStart", func(t *testing.T) { conformanceSpanStart(t, factory) })
 	t.Run("Metrics", func(t *testing.T) { conformanceMetrics(t, factory) })
 	t.Run("Shutdown", func(t *testing.T) { conformanceShutdown(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := observability.Open(observability.Adapter("conformance-missing-adapter"), observability.Options{ServiceName: "kit"}); !errors.Is(err, observability.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := observability.Adapter("conformance-probe-observability")
-
-	if err := observability.Register(probe, nil); !errors.Is(err, observability.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(observability.Options) (observability.Provider, error) {
-		return nil, errors.New("observabilitytest: probe factory must not run")
-	}
-
-	_ = observability.Register(probe, stub)
-
-	if err := observability.Register(probe, stub); !errors.Is(err, observability.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceTracing(t *testing.T, factory func(t *testing.T) observability.Provider) {

@@ -400,22 +400,12 @@ func TestDecodeHashTable(t *testing.T) {
 	}
 }
 
-// TestRegistryIntegration is the sole serial test: it mutates the global
-// registry and performs the single full-default roundtrip.
-func TestRegistryIntegration(t *testing.T) {
+// TestDefaultRoundtrip is the sole serial test: it performs the single
+// full-default roundtrip through a directly constructed hasher.
+func TestDefaultRoundtrip(t *testing.T) {
 	ctx := t.Context()
 
-	if err := password.Register(password.AdapterArgon2ID, New); err != nil {
-		var dup password.DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("Register() = %v, want nil", err)
-		}
-		// Duplicate means an earlier run in this process already wired New
-		// (e.g. -count=2); the Open roundtrip below still holds since New is
-		// a process-shared factory.
-	}
-
-	reduced, err := password.Open(password.AdapterArgon2ID, password.Options{
+	reduced, err := New(password.Options{
 		Time:    1,
 		Memory:  8 * 1024,
 		Threads: 1,
@@ -440,26 +430,37 @@ func TestRegistryIntegration(t *testing.T) {
 		t.Fatal("Verify() = false, want true")
 	}
 
-	defHash, err := password.Hash(ctx, "secret")
+	defHash, err := New(password.Options{
+		Time:    password.DefaultTime,
+		Memory:  password.DefaultMemory,
+		Threads: password.DefaultThreads,
+		SaltLen: password.DefaultSaltLen,
+		KeyLen:  password.DefaultKeyLen,
+	})
 	if err != nil {
-		t.Fatalf("password.Hash() = %v, want nil", err)
+		t.Fatalf("New() = %v, want nil", err)
 	}
 
-	ok, err = password.Verify(ctx, defHash, "secret")
+	defHashStr, err := defHash.Hash(ctx, "secret")
 	if err != nil {
-		t.Fatalf("password.Verify() = %v, want nil", err)
+		t.Fatalf("Hash() = %v, want nil", err)
+	}
+
+	ok, err = defHash.Verify(ctx, defHashStr, "secret")
+	if err != nil {
+		t.Fatalf("Verify() = %v, want nil", err)
 	}
 
 	if !ok {
-		t.Fatal("password.Verify() = false, want true")
+		t.Fatal("Verify() = false, want true")
 	}
 
-	ok, err = password.Verify(ctx, defHash, "wrong")
+	ok, err = defHash.Verify(ctx, defHashStr, "wrong")
 	if err != nil {
-		t.Fatalf("password.Verify(wrong) = %v, want nil", err)
+		t.Fatalf("Verify(wrong) = %v, want nil", err)
 	}
 
 	if ok {
-		t.Fatal("password.Verify(wrong) = true, want false")
+		t.Fatal("Verify(wrong) = true, want false")
 	}
 }

@@ -43,7 +43,7 @@ c := container.New(cfg, Providers())
 
 The `Provide` call names the adapter: the factory it binds is the implementation that opens. The options come from the environment. `config.DefaultOptions(service, name)` seeds a fresh typed Options value, `<SERVICE>_<FIELD>` overlays one field at a time (a named instance reads `<SERVICE>__<NAME>__<FIELD>`), and `container.WithOptions` appliers run last, so explicit options win over env ([Config reference](../../reference/config/#db)).
 
-A container built with a config and no providers takes the config-based path instead: every accessor resolves its service from the config and from the battery registry, and the adapter is the one `<SERVICE>_ADAPTER` names (`DB_ADAPTER=postgres`). Adapters register caller-side through each battery's core registry (`adapters/<battery>/<name>` calls `Register()`), and resolving an unregistered adapter fails with `UnknownAdapterError` naming the missing `Register` call. `cmd/zever` registers every adapter at startup, so CLI behavior is unchanged. Prefer `Provide` for new code.
+A container built with a config and no providers resolves nothing: every accessor needs a `container.Provide` entry naming a compiled-in constructor, and an unwired service fails with `NotWiredError` naming the fix. Adapters are plain imports (`adapters/<battery>/<name>`), never registrations. `cmd/zever` wires every battery's default at startup, so CLI behavior covers everything out of the box.
 
 ## Resolve services
 

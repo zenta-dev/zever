@@ -9,7 +9,7 @@ import (
 )
 
 // Conformance verifies factory-built backends implement the
-// mailer.Mailer contract: open/register round-trip, valid delivery,
+// mailer.Mailer contract: valid delivery,
 // nil-message / no-recipient / bad-address sentinels, and Close.
 // Each subtest takes a fresh instance from factory so cases stay
 // isolated. Tests never call time.Sleep and never touch the network.
@@ -23,36 +23,11 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) mailer.Mailer) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Send", func(t *testing.T) { conformanceSend(t, factory) })
 	t.Run("NilMessage", func(t *testing.T) { conformanceNilMessage(t, factory) })
 	t.Run("NoRecipients", func(t *testing.T) { conformanceNoRecipients(t, factory) })
 	t.Run("InvalidAddress", func(t *testing.T) { conformanceInvalidAddress(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := mailer.Open(mailer.Adapter("conformance-missing-adapter"), mailer.Options{Host: "kit.example", Port: 587}); !errors.Is(err, mailer.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := mailer.Adapter("conformance-probe-mailer")
-
-	if err := mailer.Register(probe, nil); !errors.Is(err, mailer.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(mailer.Options) (mailer.Mailer, error) {
-		return nil, errors.New("mailertest: probe factory must not run")
-	}
-
-	_ = mailer.Register(probe, stub)
-
-	if err := mailer.Register(probe, stub); !errors.Is(err, mailer.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 // kitMail returns a minimal valid message for delivery probes.

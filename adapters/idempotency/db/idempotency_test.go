@@ -250,9 +250,7 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-	Register()
-
-	s, err := idempotency.Open(Adapter, idempotency.Options{})
+	s, err := New(Options{})
 	if err != nil {
 		t.Fatalf("Open = %v", err)
 	}

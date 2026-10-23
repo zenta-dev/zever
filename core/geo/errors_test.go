@@ -38,7 +38,7 @@ func TestSentinels(t *testing.T) {
 
 func TestDuplicateAliases_compat(t *testing.T) {
 	t.Parallel()
-	err := DuplicateAdapterError{Adapter: Google}
+	err := DuplicateAdapterError{Adapter: "google"}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("expected errors.Is ErrDuplicate alias, got %v", err)
 	}
@@ -73,7 +73,7 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("DuplicateAdapterError", func(t *testing.T) {
 		t.Parallel()
-		err := DuplicateAdapterError{Adapter: Google}
+		err := DuplicateAdapterError{Adapter: "google"}
 		if !strings.Contains(err.Error(), ErrDuplicateAdapter.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrDuplicateAdapter)
 		}
@@ -91,7 +91,7 @@ func TestTypedErrors(t *testing.T) {
 
 	t.Run("UnknownAdapterError", func(t *testing.T) {
 		t.Parallel()
-		err := UnknownAdapterError{Adapter: Adapter("")}
+		err := UnknownAdapterError{Adapter: ""}
 		if !strings.Contains(err.Error(), ErrUnknownAdapter.Error()) {
 			t.Fatalf("Error() = %q, want prefix %q", err.Error(), ErrUnknownAdapter)
 		}

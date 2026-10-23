@@ -7,10 +7,8 @@ import (
 )
 
 // ExampleOpen opens the embedded scheduler with an in-process dispatcher.
-func ExampleOpen() {
-	_ = scheduler.Register(scheduler.Embedded, schedulerembedded.New)
-
-	s, err := scheduler.Open(scheduler.Embedded, scheduler.Options{Dispatcher: &job.Dispatcher{}})
+func Example() {
+	s, err := schedulerembedded.New(scheduler.Options{Dispatcher: &job.Dispatcher{}})
 	if err != nil {
 		return
 	}

@@ -57,12 +57,11 @@ import (
 	cachememory "github.com/zenta-dev/zever/adapters/cache/memory"
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/core/cache"
 )
 
 func TestCacheRoundTrip(t *testing.T) {
-	cachememory.Register()
-
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(cache.DefaultRef(), cachememory.New))
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	ch, err := c.Cache()

@@ -28,6 +28,13 @@
 //   - golden-nofields: a registered wire struct with no pinned keys: the
 //     golden field data was not regenerated after the struct was
 //     registered.
+//   - golden-removed: a registered wire struct that disappeared from the
+//     tree, or a stale entry in the removed-key allowlist
+//     (golden_wire_removed.txt): an entry that names a struct which is not
+//     registered, or a Go field that still exists in the tree. (An entry
+//     that matches no field of the struct at its base revision is rejected
+//     by the generator instead: the committed golden file omits blessed
+//     keys by design, so only the history can judge it.)
 //   - no-config-file: a non-test Go file (generated files included) names
 //     a retired project config file (the project name plus a retired
 //     extension: json/yaml/yml/toml/cfg/conf/ini/properties), in a
@@ -93,6 +100,12 @@ type goldenFields map[string]map[string]map[string]string
 // justification.
 type exceptions map[string]map[string]string
 
+// removedKeys lists wire keys deliberately deleted from the golden
+// contract at a breaking release: package dir -> struct name -> Go field
+// name -> justification. A listed key suppresses the golden-missing
+// violation its deletion would otherwise produce.
+type removedKeys map[string]map[string]map[string]string
+
 // allowlist holds permitted yaml:/toml: tag locations: bare paths allow the
 // whole file, path:line allows one field line (1-based).
 type allowlist map[string]bool
@@ -102,6 +115,7 @@ type rules struct {
 	structs goldenStructs
 	fields  goldenFields
 	except  exceptions
+	removed removedKeys
 	allowed allowlist
 
 	// legacy is the retired-config-file rule data, and noConfigAllowed
@@ -117,9 +131,10 @@ type rules struct {
 
 // structInfo summarizes one struct type found in the tree.
 type structInfo struct {
-	line     int
-	exported int
-	tagged   int
+	line       int
+	exported   int
+	tagged     int
+	fieldNames []string
 }
 
 // fieldInfo is one exported struct field with its source line.
@@ -168,6 +183,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	removed, err := loadRemoved(toolDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "tagcheck: load golden removed-key list: %v\n", err)
+		return 2
+	}
+
 	noConfigAllowed, err := loadNoConfigAllowlist(toolDir)
 	if err != nil {
 		fmt.Fprintf(stderr, "tagcheck: load no-config-file allowlist: %v\n", err)
@@ -184,6 +205,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		structs:         structs,
 		fields:          fields,
 		except:          except,
+		removed:         removed,
 		allowed:         allowed,
 		legacy:          newLegacyConfigRule(),
 		noConfigAllowed: noConfigAllowed,
@@ -281,22 +303,23 @@ func loadGolden(dir string) (goldenStructs, error) {
 	return g, nil
 }
 
-// loadGoldenFields parses golden_wire_fields.txt in dir: tab-separated
-// package dir, struct name, Go field name, pinned wire key, and the base
-// revision the key was taken from. Blank lines and # comments are ignored.
-func loadGoldenFields(dir string) (goldenFields, error) {
-	f, closeFile, err := openContained(dir, "golden_wire_fields.txt")
+// loadNested4 parses a tab-separated data file in dir whose rows carry at
+// least four columns (package dir, struct name, field name, value) into a
+// three-level map, ignoring blank lines and # comments. file names the data
+// file for error messages; noun names the row kind (e.g. "golden field").
+func loadNested4(dir, file, noun string) (map[string]map[string]map[string]string, error) {
+	f, closeFile, err := openContained(dir, file)
 	if err != nil {
-		return nil, fmt.Errorf("tagcheck: open golden field list: %w", err)
+		return nil, fmt.Errorf("tagcheck: open %s list: %w", noun, err)
 	}
 	defer closeFile()
 
-	g := goldenFields{}
+	g := map[string]map[string]map[string]string{}
 
-	parseErr := eachDataLine(f, "golden_wire_fields.txt", func(line string) error {
+	parseErr := eachDataLine(f, file, func(line string) error {
 		parts := strings.Split(line, "\t")
 		if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
-			return fmt.Errorf("tagcheck: malformed golden field line %q", line)
+			return fmt.Errorf("tagcheck: malformed %s line %q", noun, line)
 		}
 
 		names := g[parts[0]]
@@ -320,6 +343,18 @@ func loadGoldenFields(dir string) (goldenFields, error) {
 	}
 
 	return g, nil
+}
+
+// loadGoldenFields parses golden_wire_fields.txt in dir: tab-separated
+// package dir, struct name, Go field name, pinned wire key, and the base
+// revision the key was taken from. Blank lines and # comments are ignored.
+func loadGoldenFields(dir string) (goldenFields, error) {
+	g, err := loadNested4(dir, "golden_wire_fields.txt", "golden field")
+	if err != nil {
+		return nil, err
+	}
+
+	return goldenFields(g), nil
 }
 
 // loadExceptions parses golden_wire_exceptions.txt in dir: tab-separated
@@ -355,6 +390,18 @@ func loadExceptions(dir string) (exceptions, error) {
 	}
 
 	return e, nil
+}
+
+// loadRemoved parses golden_wire_removed.txt in dir: tab-separated package
+// dir, struct name, Go field name, and the justification for the removal.
+// Blank lines and # comments are ignored.
+func loadRemoved(dir string) (removedKeys, error) {
+	r, err := loadNested4(dir, "golden_wire_removed.txt", "golden removed-key")
+	if err != nil {
+		return nil, err
+	}
+
+	return removedKeys(r), nil
 }
 
 // loadAllowlist parses tag_allowlist.txt in dir: one entry per line,
@@ -462,6 +509,7 @@ func scan(root string, r rules) ([]violation, error) {
 
 	vs = append(vs, checkGoldenPresent(r.structs, seen)...)
 	vs = append(vs, checkExceptions(r.except, r.structs, found)...)
+	vs = append(vs, checkRemoved(r.removed, r.structs, found)...)
 
 	return vs, nil
 }
@@ -521,6 +569,70 @@ func checkExceptions(except exceptions, structs goldenStructs, found map[string]
 					rule: "exception-unnecessary",
 					msg:  fmt.Sprintf("wire struct %s is fully json-tagged; register it in golden_wire_structs.txt instead of excepting it", name),
 				})
+			}
+		}
+	}
+
+	return vs
+}
+
+// checkRemoved validates the removed-key allowlist: every entry must name a
+// registered wire struct and a Go field that no longer exists in the tree.
+// A stale entry fails the gate so the allowlist cannot rot.
+func checkRemoved(removed removedKeys, structs goldenStructs, found map[string]map[string]structInfo) []violation {
+	var vs []violation
+
+	dirs := make([]string, 0, len(removed))
+	for dir := range removed {
+		dirs = append(dirs, dir)
+	}
+
+	sort.Strings(dirs)
+
+	for _, dir := range dirs {
+		names := removed[dir]
+
+		sortedNames := make([]string, 0, len(names))
+		for name := range names {
+			sortedNames = append(sortedNames, name)
+		}
+
+		sort.Strings(sortedNames)
+
+		for _, name := range sortedNames {
+			keys := names[name]
+
+			sortedFields := make([]string, 0, len(keys))
+			for field := range keys {
+				sortedFields = append(sortedFields, field)
+			}
+
+			sort.Strings(sortedFields)
+
+			if _, registered := structs[dir][name]; !registered {
+				for _, field := range sortedFields {
+					vs = append(vs, violation{
+						path: dir + "/MISSING",
+						line: 0,
+						rule: "golden-removed",
+						msg:  fmt.Sprintf("removed wire key %s of struct %s in %s is not registered in golden_wire_structs.txt; delete the entry", field, name, dir),
+					})
+				}
+
+				continue
+			}
+
+			info, inTree := found[dir][name]
+
+			for _, field := range sortedFields {
+				if inTree && slices.Contains(info.fieldNames, field) {
+					vs = append(vs, violation{
+						path: dir,
+						line: info.line,
+						rule: "golden-removed",
+						msg:  fmt.Sprintf("removed wire key %s of wire struct %s names field %s, which still exists in %s; delete the entry", field, name, field, dir),
+					})
+				}
 			}
 		}
 	}
@@ -669,6 +781,7 @@ func checkFile(rel, path string, r rules) (vs []violation, generated bool, decls
 
 			info := structInfo{line: fset.Position(st.Pos()).Line, exported: len(fields)}
 			for _, field := range fields {
+				info.fieldNames = append(info.fieldNames, field.Name)
 				if field.State() != wire.StateMissing {
 					info.tagged++
 				}
@@ -777,7 +890,7 @@ func checkStruct(rel, dir string, line int, name string, fields []fieldInfo, r r
 		}
 	}
 
-	vs = append(vs, checkPinnedKeys(rel, line, name, fields, pinned, registered)...)
+	vs = append(vs, checkPinnedKeys(rel, dir, line, name, fields, pinned, registered, r.removed)...)
 
 	return vs
 }
@@ -866,8 +979,10 @@ func effectiveKey(field fieldInfo) (string, bool) {
 }
 
 // checkPinnedKeys reports pinned wire keys the struct no longer exposes and
-// registered structs whose keys were never pinned.
-func checkPinnedKeys(rel string, line int, name string, fields []fieldInfo, pinned map[string]string, registered bool) []violation {
+// registered structs whose keys were never pinned. A key listed in the
+// removed-key allowlist (golden_wire_removed.txt) is an intentional wire
+// break blessed at a breaking release and is not reported.
+func checkPinnedKeys(rel, dir string, line int, name string, fields []fieldInfo, pinned map[string]string, registered bool, removed removedKeys) []violation {
 	var vs []violation
 
 	if !registered {
@@ -915,6 +1030,10 @@ func checkPinnedKeys(rel string, line int, name string, fields []fieldInfo, pinn
 
 		if slices.ContainsFunc(fields, func(f fieldInfo) bool { return f.Name == field }) {
 			continue
+		}
+
+		if _, ok := removed[dir][name][field]; ok {
+			continue // intentionally removed at a breaking release; see golden_wire_removed.txt
 		}
 
 		if key == "-" {

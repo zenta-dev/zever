@@ -8,8 +8,8 @@ import (
 	"github.com/zenta-dev/zever/core/cache"
 )
 
-// ExampleOpen opens the memory backend, stores a value and reads it back.
-func ExampleOpen() {
+// Example opens the memory backend, stores a value and reads it back.
+func Example() {
 	backend, err := memory.New(cache.Options{})
 	if err != nil {
 		fmt.Println("open error")

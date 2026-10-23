@@ -2,52 +2,10 @@ package queue
 
 import (
 	"testing"
-	"time"
 )
 
 // benchQueueAdapter registers a stub queue once and returns its adapter so
 // Open can be measured without paying the one-shot registration cost.
-func benchQueueAdapter(b *testing.B) Adapter {
-	b.Helper()
-
-	a := freshQueueAdapter()
-	if err := Register(a, func(Options) (Queue, error) { return stubQueue{}, nil }); err != nil {
-		b.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	return a
-}
-
-func BenchmarkOpen(b *testing.B) {
-	a := benchQueueAdapter(b)
-	opts := Options{VisibilityTimeout: time.Minute}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if _, err := Open(a, opts); err != nil {
-			b.Fatalf("Open(%v) error = %v", a, err)
-		}
-	}
-}
-
-func BenchmarkOpenParallel(b *testing.B) {
-	a := benchQueueAdapter(b)
-	opts := Options{VisibilityTimeout: time.Minute}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			if _, err := Open(a, opts); err != nil {
-				b.Errorf("Open(%v) error = %v", a, err)
-				return
-			}
-		}
-	})
-}
-
 func BenchmarkNewMessage(b *testing.B) {
 	payload := NewPayload([]byte("hello world"))
 	headers := NewHeaders(map[string]string{"content-type": "text/plain"})

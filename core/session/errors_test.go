@@ -38,10 +38,10 @@ func TestErrors_sentinels_match(t *testing.T) {
 
 func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(DuplicateAdapterError{Adapter: Memory}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: "memory"}, ErrDuplicate) {
 		t.Fatal("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(UnknownAdapterError{Adapter: Memory}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: "memory"}, ErrUnknownAdapter) {
 		t.Fatal("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
 	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
@@ -57,12 +57,12 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 
 func TestErrors_carried_fields(t *testing.T) {
 	t.Parallel()
-	de := DuplicateAdapterError{Adapter: Memory}
-	if de.Adapter != Memory {
+	de := DuplicateAdapterError{Adapter: "memory"}
+	if de.Adapter != "memory" {
 		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
 	}
-	ue := UnknownAdapterError{Adapter: Memory}
-	if ue.Adapter != Memory {
+	ue := UnknownAdapterError{Adapter: "memory"}
+	if ue.Adapter != "memory" {
 		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
 	}
 	iae := InvalidAdapterError{Adapter: "nope"}

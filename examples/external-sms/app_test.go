@@ -26,7 +26,6 @@ func TestEndToEnd(t *testing.T) {
 	cfg := config.Default()
 	cfg.Plugins = map[string]config.Service[jsontext.Value]{
 		"sms": {
-			Adapter: "stub",
 			Options: jsontext.Value(`{"from":"+15550000"}`),
 		},
 	}

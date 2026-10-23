@@ -29,8 +29,7 @@ const (
 // in one process. jobSeq keeps globally registered job names unique so
 // parallel adapter suites never collide on the process-wide job registry.
 var (
-	adapterSeq atomic.Uint64
-	jobSeq     atomic.Uint64
+	jobSeq atomic.Uint64
 )
 
 // Conformance verifies factory-built schedulers implement the
@@ -73,7 +72,6 @@ func Conformance(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) sch
 	t.Run("UnknownJob", func(t *testing.T) { conformanceUnknownJob(t, factory) })
 	t.Run("StartStop", func(t *testing.T) { conformanceStartStop(t, factory) })
 	t.Run("Fire", func(t *testing.T) { conformanceFire(t, factory) })
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t, factory) })
 }
 
 // stubQueue is an in-memory queue.Queue recording pushes for fire polling.
@@ -421,48 +419,6 @@ func checkFire(ctx context.Context, s scheduler.Scheduler, q queue.Queue, jobNam
 	}
 }
 
-func conformanceOpenRegister(t *testing.T, factory func(t *testing.T, d *job.Dispatcher) scheduler.Scheduler) {
-	t.Helper()
-
-	s, _ := kitScheduler(t, factory)
-
-	if err := checkOpenRegister(s); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // checkOpenRegister proves the production Open path returns the
 // registered scheduler, rejects duplicates, and reports unknown
 // adapters. The dispatcher for Open uses a throwaway stub queue.
-func checkOpenRegister(s scheduler.Scheduler) error {
-	name := scheduler.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
-
-	if err := scheduler.Register(name, func(scheduler.Options) (scheduler.Scheduler, error) { return s, nil }); err != nil {
-		return fmt.Errorf("schedulertest: Register() error = %w", err)
-	}
-
-	if err := scheduler.Register(name, func(scheduler.Options) (scheduler.Scheduler, error) { return s, nil }); !errors.Is(err, scheduler.ErrDuplicate) {
-		return fmt.Errorf("schedulertest: Register(dup) err = %w, want ErrDuplicate", err)
-	}
-
-	opened, err := scheduler.Open(name, scheduler.Options{Dispatcher: &job.Dispatcher{Q: newStubQueue()}})
-	if err != nil {
-		return fmt.Errorf("schedulertest: Open() error = %w", err)
-	}
-
-	var errs []error
-
-	if opened != s {
-		errs = append(errs, errors.New("schedulertest: Open() did not return the registered scheduler"))
-	}
-
-	if _, err := scheduler.Open("kit-no-such-adapter", scheduler.Options{Dispatcher: &job.Dispatcher{Q: newStubQueue()}}); !errors.Is(err, scheduler.ErrUnknownAdapter) {
-		errs = append(errs, errf("Open(unknown) err = %v, want ErrUnknownAdapter", err))
-	}
-
-	if err := s.Stop(); err != nil {
-		errs = append(errs, fmt.Errorf("schedulertest: Stop() error = %w", err))
-	}
-
-	return errors.Join(errs...)
-}

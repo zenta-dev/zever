@@ -8,21 +8,47 @@ import (
 	"time"
 )
 
-func TestEnvAdapterAll(t *testing.T) {
+// TestEnvAdapterKeysRejected pins the removal across every service: a
+// SERVICE_ADAPTER key for any known service fails resolution with an
+// UnknownFieldError carrying the removal message.
+func TestEnvAdapterKeysRejected(t *testing.T) {
 	t.Parallel()
-	env := make(Env, len(knownServiceNames()))
 	for _, svc := range knownServiceNames() {
-		env[strings.ToUpper(svc)+"_ADAPTER"] = "custom-" + svc
+		t.Run(svc, func(t *testing.T) {
+			t.Parallel()
+			key := strings.ToUpper(svc) + "_ADAPTER"
+			cfg, err := Resolve(Env{key: "custom"})
+			if err == nil {
+				t.Fatalf("%s: want error", key)
+			}
+			if cfg != nil {
+				t.Fatalf("%s: want nil config", key)
+			}
+			var unknown *UnknownFieldError
+			if !errors.As(err, &unknown) {
+				t.Fatalf("%s: want UnknownFieldError, got %T: %v", key, err, err)
+			}
+			if unknown.Suggestion != "" {
+				t.Fatalf("%s: suggestion = %q, want empty", key, unknown.Suggestion)
+			}
+			if !strings.Contains(err.Error(), "adapter selection removed") {
+				t.Fatalf("%s: error = %v, want removal message", key, err)
+			}
+		})
 	}
-	cfg, err := Resolve(env)
+}
+
+// TestEnvAdapterLikeOptionStillApplies pins the carve-out: a key ending in
+// _ADAPTER that resolves to a real settable option field applies normally
+// instead of failing as a removed adapter key.
+func TestEnvAdapterLikeOptionStillApplies(t *testing.T) {
+	t.Parallel()
+	cfg, err := Resolve(Env{"WEBHOOK_QUEUE_ADAPTER": "custom-queue"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, svc := range knownServiceNames() {
-		adapter, _, _ := serviceRefs(cfg, svc)
-		if *adapter != "custom-"+svc {
-			t.Fatalf("%s: got %q", svc, *adapter)
-		}
+	if cfg.Webhook.Options.QueueAdapter != "custom-queue" {
+		t.Fatalf("got %q", cfg.Webhook.Options.QueueAdapter)
 	}
 }
 
@@ -106,7 +132,7 @@ func TestEnvCryptoSignKey(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
 	env := Env{"CRYPTO_SIGN_KEY": "e30="}
-	if err := ApplyEnv(env, "crypto", "", &cfg.Crypto); err != nil {
+	if err := ApplyEnv(env, "crypto", "", &cfg.Crypto.Options); err != nil {
 		t.Fatal(err)
 	}
 	if cfg.Crypto.Options.SignKey != "e30=" {
@@ -152,7 +178,7 @@ func TestEnvIgnoreUnknownHeads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DB.Options.DSN != "" || cfg.DB.Adapter != "sqlite" {
+	if cfg.DB.Options.DSN != "" {
 		t.Fatal("hostile env leaked into db")
 	}
 }
@@ -230,7 +256,7 @@ func TestEnvTypeErrors(t *testing.T) {
 
 func TestServiceRefsUnknown(t *testing.T) {
 	t.Parallel()
-	_, _, ok := serviceRefs(Default(), "nope")
+	_, ok := serviceRefs(Default(), "nope")
 	if ok {
 		t.Fatal("want not ok")
 	}

@@ -6,7 +6,6 @@ require (
 	github.com/zenta-dev/zever/adapters/billing/stub v0.8.0
 	github.com/zenta-dev/zever/shared/providersopt v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
-	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
 
 require github.com/oklog/ulid/v2 v2.1.2 // indirect

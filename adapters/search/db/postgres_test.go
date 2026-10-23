@@ -575,10 +575,9 @@ func TestClose_idempotent(t *testing.T) {
 }
 
 func TestOpenRegister_canonicalName(t *testing.T) {
-	Register()
-
-	for _, adapter := range []search.Adapter{search.DB} {
-		s, err := search.Open(adapter, search.Options{})
+	for _, adapter := range []string{"db"} {
+		poolOpts := dbconn.SplitDSN("")
+		s, err := New(Options{Options: poolOpts})
 		if err != nil {
 			t.Fatalf("Open(%s) error = %v", adapter, err)
 		}

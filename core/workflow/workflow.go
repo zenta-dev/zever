@@ -2,9 +2,6 @@ package workflow
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // RunID uniquely identifies a workflow run.
@@ -63,46 +60,4 @@ type StepFunc func(ctx context.Context, input any) (any, error)
 type StepRegistrar interface {
 	// RegisterStep registers fn under name, replacing any prior step.
 	RegisterStep(name string, fn StepFunc)
-}
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(a Adapter) error { return DuplicateError{Adapter: a} },
-	func(a Adapter) error { return UnknownAdapterError{Adapter: a} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("workflow: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates a Workflow for adapter using the registered Factory and opts.
-func Open(adapter Adapter, opts Options) (Workflow, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	w, err := factory(opts)
-	if err != nil {
-		return nil, fmt.Errorf("workflow: open %s: %w", adapter, err)
-	}
-
-	return w, nil
 }

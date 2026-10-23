@@ -111,8 +111,9 @@ func TestAdapterString(t *testing.T) {
 	}
 }
 
-// TestBuildFromConfigErrorPaths covers nil config, missing entry, corrupt
-// options, and an unknown adapter.
+// TestBuildFromConfigErrorPaths covers nil config, missing entry, and
+// corrupt options. Adapter selection is code (RegisterStub wires the stub),
+// so there is no unknown-adapter path through config.
 func TestBuildFromConfigErrorPaths(t *testing.T) {
 	t.Parallel()
 
@@ -139,17 +140,9 @@ func TestBuildFromConfigErrorPaths(t *testing.T) {
 
 	corrupt := config.Default()
 	corrupt.Plugins = map[string]config.Service[jsontext.Value]{
-		"sms": {Adapter: "stub", Options: jsontext.Value(`{bad`)},
+		"sms": {Options: jsontext.Value(`{bad`)},
 	}
 	if _, err := sms.BuildFromConfig(corrupt); err == nil {
 		t.Fatal("corrupt options: want error")
-	}
-
-	unknown := config.Default()
-	unknown.Plugins = map[string]config.Service[jsontext.Value]{
-		"sms": {Adapter: "nope", Options: jsontext.Value(`{"from":"x"}`)},
-	}
-	if _, err := sms.BuildFromConfig(unknown); !errors.Is(err, sms.ErrUnknownAdapter) {
-		t.Fatalf("unknown adapter = %v, want ErrUnknownAdapter", err)
 	}
 }

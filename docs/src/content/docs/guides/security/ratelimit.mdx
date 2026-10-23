@@ -10,7 +10,6 @@ description: Bound request rates per key with token buckets in memory or shared 
 The default is `memory` with `rate: 10`, `burst: 20`. `rate` (refill per second) and `burst` (bucket size) are both required, over zero, and finite.
 
 ```sh
-RATELIMIT_ADAPTER=memory
 RATELIMIT_RATE=10
 RATELIMIT_BURST=20
 ```
@@ -35,14 +34,13 @@ true 17 <nil>
 
 ## Limit a request path
 
-The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!dec.Allowed`, and `500` on error. Charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when `RATELIMIT_ADAPTER` is set; both fail open, and `WithFailMode(FailClosed)` opts in.
+The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!dec.Allowed`, and `500` on error. Charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when the ratelimit battery has a provider; both fail open, and `WithFailMode(FailClosed)` opts in.
 
 ## Share limits across replicas
 
 Per-instance buckets multiply the effective limit (`limit x replica count`); switch to `redis` once more than one replica serves traffic.
 
 ```sh
-RATELIMIT_ADAPTER=redis
 RATELIMIT_RATE=100
 RATELIMIT_BURST=200
 RATELIMIT_REDIS_ADDR=127.0.0.1:6379
@@ -50,7 +48,6 @@ RATELIMIT_REDIS_PREFIX=rl
 ```
 
 ```sh
-RATELIMIT_ADAPTER=redis
 RATELIMIT_RATE=100
 RATELIMIT_BURST=200
 ```

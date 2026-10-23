@@ -12,8 +12,10 @@ You will build a support assistant that answers from your docs (RAG), calls tool
 Every agent app starts from the container. `Agent()` builds a tool-calling loop over the shared `AI` backend, and `RAG()` builds a retrieval engine over `AI` plus `VectorStore`:
 
 ```sh
-AI_ADAPTER=openai AI_API_KEY=sk-... zever doctor --json | head -5
+AI_API_KEY=sk-... zever doctor --json | head -5
 ```
+
+The AI backend (`aianthropic.New` by default) is wired in `internal/app/wiring.go`; only the key comes from env.
 
 ## Index your docs
 

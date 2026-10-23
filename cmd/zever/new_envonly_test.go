@@ -56,10 +56,13 @@ func TestRunNewEnvOnlyContract(t *testing.T) {
 	example := readFile(t, filepath.Join(out, ".env.example"))
 
 	for _, s := range selections {
-		want := strings.ToUpper(s.Battery) + "_ADAPTER=" + s.Adapter
-		if !strings.Contains(example, want) {
-			t.Errorf(".env.example lacks wired selector %q", want)
+		header := "# --- " + s.Battery + " (adapter " + s.Adapter
+		if !strings.Contains(example, header) {
+			t.Errorf(".env.example lacks wired section %q", header)
 		}
+	}
+	if strings.Contains(example, "_ADAPTER=") {
+		t.Errorf(".env.example must not emit an adapter env key:\n%s", example)
 	}
 
 	dev := readFile(t, filepath.Join(out, ".env"))
@@ -97,10 +100,13 @@ func TestRunNewEnvOnlyContract(t *testing.T) {
 	}
 
 	for _, s := range selections {
-		want := strings.ToUpper(s.Battery) + "_ADAPTER=" + s.Adapter
+		want := "- " + s.Battery + " (adapter " + s.Adapter + ")"
 		if !strings.Contains(readme, want) {
-			t.Errorf("README lacks wired selector %q", want)
+			t.Errorf("README lacks wired battery %q", want)
 		}
+	}
+	if strings.Contains(readme, "_ADAPTER=") {
+		t.Errorf("README must not document an adapter env key:\n%s", readme)
 	}
 }
 

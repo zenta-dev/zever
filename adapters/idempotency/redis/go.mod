@@ -7,7 +7,6 @@ require (
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/zenta-dev/zever/core/db v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 )

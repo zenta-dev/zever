@@ -69,7 +69,7 @@ A v0.7.x project keeps its service configuration in `zever.yaml` (or `.yml`, `.j
 | `workflow.Postgres` | `db` (the DSN picks postgres or sqlite) |
 | the `--config` file flag | gone from every command |
 
-Env keys carry no prefix: `<SERVICE>_<FIELD>` for the default instance, `<SERVICE>__<NAME>__<FIELD>` for a named one. So `db.adapter` becomes `DB_ADAPTER`, `db.options.dsn` becomes `DB_DSN`, `ai.options.api_key` becomes `AI_API_KEY`, and `auth.options.jwt.secret` becomes `AUTH_JWT_SECRET`.
+Env keys carry no prefix: `<SERVICE>_<FIELD>` for the default instance, `<SERVICE>__<NAME>__<FIELD>` for a named one. So `db.options.dsn` becomes `DB_DSN`, `ai.options.api_key` becomes `AI_API_KEY`, and `auth.options.jwt.secret` becomes `AUTH_JWT_SECRET`. (Adapter selection was an env key in v0.8 and moved to `internal/app/wiring.go` afterwards; see the migration guide.)
 
 Two commands prove the migration is done: `zever config show` prints the resolved values per service, and `zever doctor` resolves every wired battery and exits non-zero when one fails. A wrong value is loud: a removed adapter alias fails with `unknown adapter`, and a misspelled key fails with a did-you-mean hint. The [migration guide](../migration/) has the key-by-key map, a before and after example, and the exact messages a wrong value produces.
 

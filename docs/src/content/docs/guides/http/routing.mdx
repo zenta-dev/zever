@@ -11,10 +11,10 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
 ## Register a route
 
-Switch with `ROUTER_ADAPTER=fiber`; handler signatures do not change. Full options: [Config reference](../../../reference/config/#router).
+Switch with a `container.Provide(Router, routerfiber.New)` wiring change; handler signatures do not change. Full options: [Config reference](../../../reference/config/#router).
 
 ```sh
-ROUTER_ADAPTER=stdhttp   # or: fiber
+# wired in code (routerstdhttp.New by default; swap the import + Provide entry for fiber)
 ```
 
 ```go title="main.go" check
@@ -31,8 +31,7 @@ import (
 )
 
 func main() {
-    routerstdhttp.Register()
-    c := container.New(config.Default())
+    c := container.New(config.Default(), container.Provide(router.DefaultRef(), routerstdhttp.New))
     r, _ := c.Router()
 
     r.Handle("GET", "/users/{id}", func(w http.ResponseWriter, req *http.Request) {

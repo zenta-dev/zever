@@ -7,19 +7,16 @@ import (
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/showcase/internal/service/seed"
-
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+	"github.com/zenta-dev/zever/examples/showcase/internal/testsetup"
 )
 
 // TestEnsureJoinTableCreatesAndIsIdempotent proves the hand-owned
 // product_tags join table is created on demand and that a second call is a
 // no-op (CREATE TABLE IF NOT EXISTS semantics).
 func TestEnsureJoinTableCreatesAndIsIdempotent(t *testing.T) {
-	dbsqlite.Register()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "join.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 	t.Cleanup(func() { _ = c.Close(t.Context()) })
 
 	ctx := t.Context()

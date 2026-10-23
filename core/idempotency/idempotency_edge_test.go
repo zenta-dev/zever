@@ -3,11 +3,8 @@ package idempotency
 import (
 	"errors"
 	"strings"
-	"sync"
 	"testing"
 	"time"
-
-	coredb "github.com/zenta-dev/zever/core/db"
 )
 
 func TestIdempotencyEdge_KeyBoundaries(t *testing.T) {
@@ -78,87 +75,5 @@ func TestIdempotencyEdge_OptionsValidateBoundary(t *testing.T) {
 				t.Fatalf("Validate() error present = %v, want %v", got, tt.wantErr)
 			}
 		})
-	}
-}
-
-func TestIdempotencyEdge_RegisterConcurrentUnique(t *testing.T) {
-	t.Parallel()
-
-	var wg sync.WaitGroup
-
-	errs := make([]error, 20)
-
-	for i := range errs {
-		wg.Add(1)
-
-		go func(i int) {
-			defer wg.Done()
-
-			errs[i] = Register(freshAdapter(), func(Options) (Store, error) { return &stubStore{}, nil })
-		}(i)
-	}
-
-	wg.Wait()
-
-	for i, err := range errs {
-		if err != nil {
-			t.Errorf("Register worker %d err = %v", i, err)
-		}
-	}
-}
-
-func TestIdempotencyEdge_OpenConcurrent(t *testing.T) {
-	t.Parallel()
-
-	adapter := freshAdapter()
-	if err := Register(adapter, func(Options) (Store, error) { return &stubStore{}, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
-	}
-
-	var wg sync.WaitGroup
-
-	for range 50 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			store, err := Open(adapter, Options{})
-			if err != nil {
-				t.Errorf("Open err = %v", err)
-
-				return
-			}
-
-			_ = store.Close()
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestIdempotencyEdge_OpenSharedNilConn(t *testing.T) {
-	t.Parallel()
-
-	adapter := freshAdapter()
-	want := &stubStore{}
-
-	if err := RegisterShared(adapter, func(conn coredb.DB, _ Options) (Store, error) {
-		if conn != nil {
-			t.Errorf("conn = %v, want nil", conn)
-		}
-
-		return want, nil
-	}); err != nil {
-		t.Fatalf("RegisterShared err = %v", err)
-	}
-
-	got, err := OpenShared(adapter, nil, Options{})
-	if err != nil {
-		t.Fatalf("OpenShared err = %v", err)
-	}
-
-	if got != want {
-		t.Fatal("OpenShared did not return the factory store")
 	}
 }

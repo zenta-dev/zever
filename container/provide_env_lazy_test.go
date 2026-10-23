@@ -91,7 +91,6 @@ func TestNewWithoutProvidersSkipsEnvironment(t *testing.T) {
 func TestNewWithProvidersReadsEnvironmentAtBuild(t *testing.T) {
 	// No t.Parallel: the test replaces os.Stderr and changes the working
 	// directory.
-	registerTestAdapters()
 
 	for _, ext := range []string{"yaml", "yml", "json", "toml"} {
 		t.Run(ext, func(t *testing.T) {
@@ -149,7 +148,6 @@ func TestNewWithProvidersReadsEnvironmentAtBuild(t *testing.T) {
 func TestProviderEnvironmentReadOnce(t *testing.T) {
 	// No t.Parallel: the test replaces os.Stderr and changes the working
 	// directory.
-	registerTestAdapters()
 
 	for _, ext := range []string{"yaml", "yml", "json", "toml"} {
 		t.Run(ext, func(t *testing.T) {
@@ -223,12 +221,11 @@ func TestProviderEnvironmentReadOnce(t *testing.T) {
 }
 
 // TestNewWithoutProvidersIgnoresUnreadableEnvironment proves the
-// config-based path keeps working when the environment cannot be read: a
-// broken .env fails the provider builds, and the zero-provider container
-// still resolves its services from the config it was given.
+// provider-only contract when the environment cannot be read: a broken
+// .env fails provider builds with the env error, and an unwired accessor
+// fails with NotWiredError.
 func TestNewWithoutProvidersIgnoresUnreadableEnvironment(t *testing.T) {
 	// No t.Parallel: the test changes the working directory.
-	registerTestAdapters()
 
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("DB_PATH=\"unclosed\n"), 0o600); err != nil {
@@ -240,8 +237,8 @@ func TestNewWithoutProvidersIgnoresUnreadableEnvironment(t *testing.T) {
 	c := New(nil)
 	mustCloseContainer(t, c)
 
-	if _, err := c.DB(); err != nil {
-		t.Fatalf("DB with an unreadable environment = %v, want nil (the config-based path never reads the environment)", err)
+	if _, err := c.DB(); !isNotWiredFor(err, "db") {
+		t.Fatalf("DB with an unreadable environment = %v, want NotWiredError (no providers wired)", err)
 	}
 }
 

@@ -25,7 +25,6 @@ require (
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.8.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect

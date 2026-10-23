@@ -3,21 +3,8 @@ package permission
 import (
 	"errors"
 	"strings"
-	"sync"
 	"testing"
 )
-
-func TestAdapter_Parse_custom_nonempty(t *testing.T) {
-	t.Parallel()
-
-	got, err := ParseAdapter("custom-backend")
-	if err != nil {
-		t.Fatalf("ParseAdapter(custom) error = %v, want nil", err)
-	}
-	if got != Adapter("custom-backend") {
-		t.Fatalf("ParseAdapter(custom) = %v, want custom-backend", got)
-	}
-}
 
 func TestOptions_Validate_length_boundary(t *testing.T) {
 	t.Parallel()
@@ -68,38 +55,4 @@ func TestSubject_roundtrip_zero(t *testing.T) {
 	if got.ID != "" || got.Roles != nil || got.Attributes != nil {
 		t.Fatalf("zero subject roundtrip = %+v, want zero", got)
 	}
-}
-
-func TestOpen_invalid_options(t *testing.T) {
-	t.Parallel()
-
-	_, err := Open(Noop, Options{ModelPath: "model.conf"})
-	if !errors.Is(err, ErrInvalidOptions) {
-		t.Fatalf("Open(bad options) err = %v, want ErrInvalidOptions", err)
-	}
-}
-
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshAdapter()
-			if err := Register(a, func(Options) (Checker, error) { return stubChecker{}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
 }

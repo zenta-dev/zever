@@ -14,7 +14,6 @@ Pick `local` for a single instance: it writes under `root` and needs no infra. P
 <Tabs>
   <TabItem label="local">
 ```sh
-STORAGE_ADAPTER=local
 STORAGE_ROOT=./data/storage
 STORAGE_SECRET=dev-only-hmac-secret
 STORAGE_URL_BASE=http://localhost:8080/files
@@ -22,7 +21,6 @@ STORAGE_URL_BASE=http://localhost:8080/files
   </TabItem>
   <TabItem label="s3">
 ```sh
-STORAGE_ADAPTER=s3
 STORAGE_REGION=us-east-1
 STORAGE_ENDPOINT=https://s3.us-east-1.amazonaws.com
 STORAGE_ACCESS_KEY_ID=AKIAEXAMPLE
@@ -34,7 +32,7 @@ STORAGE_URL_BASE=https://files.example.com
   </TabItem>
 </Tabs>
 
-Env vars: `STORAGE_ADAPTER`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, `STORAGE_URL_BASE`. `policy_sync` is `manual` or `auto`; `sync_fail` is `warn` or `require`. `endpoint` needs a scheme and host, and a custom `endpoint` also requires `url_base`. `r2` needs `account_id`. `local` defaults `root` to `/tmp/storage`; without `secret` it uses an ephemeral key (presigned URLs break on restart) and refuses to start under `ZEVER_ENV=production` or `prod`. See the [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
+Env vars: `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, `STORAGE_URL_BASE` (the backend is wired in code, not env). `policy_sync` is `manual` or `auto`; `sync_fail` is `warn` or `require`. `endpoint` needs a scheme and host, and a custom `endpoint` also requires `url_base`. `r2` needs `account_id`. `local` defaults `root` to `/tmp/storage`; without `secret` it uses an ephemeral key (presigned URLs break on restart) and refuses to start under `ZEVER_ENV=production` or `prod`. See the [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
 
 ## Mint a presigned URL
 
@@ -86,7 +84,6 @@ The interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a
 `policy` is a flat map: `default` covers unlisted buckets, every other key is a bucket. Each bucket sets `read`, `write`, `update`, and `delete` rules with `public`, `allow`, and `deny` (deny wins). `*` matches any authenticated subject, `anonymous` matches everyone.
 
 ```sh
-STORAGE_ADAPTER=local
 # STORAGE_POLICY_DEFAULT_READ: no string form in env; set it in Go with container.WithOptions
 # STORAGE_POLICY_RECEIPTS_READ: no string form in env; set it in Go with container.WithOptions
 # STORAGE_POLICY_RECEIPTS_WRITE: no string form in env; set it in Go with container.WithOptions

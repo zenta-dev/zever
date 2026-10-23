@@ -36,7 +36,7 @@ func UnresolvedKeys(env Env) []UnresolvedKey {
 	keys := sortedEnvKeys(env)
 	var out []UnresolvedKey
 	for _, svc := range knownServiceNames() {
-		_, opts, ok := serviceRefs(cfg, svc)
+		opts, ok := serviceRefs(cfg, svc)
 		if !ok {
 			continue
 		}
@@ -49,6 +49,9 @@ func UnresolvedKeys(env Env) []UnresolvedKey {
 				continue
 			}
 			if normEqualFold(rest, "adapter") {
+				// Adapter-selection keys are hard errors at
+				// Resolve/ApplyEnv time, never ignored input, so they
+				// are not "unresolved".
 				continue
 			}
 			match := matchEnvField(target, rest)

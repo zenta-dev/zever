@@ -2,9 +2,9 @@
 //
 // It resolves Bool, String, Int, and JSON values with per-request targeting context. It is not a config system or rollout analytics store; missing keys return fallbacks, never errors.
 //
-// Type safety: Flag plus EvalContext plus typed Options plus Adapter enum plus Factory. StaticOptions and FirebaseOptions carry per-backend settings; keys are validated for shape and length. Unsupported features fail closed.
+// Type safety: Flag plus EvalContext plus typed Options plus Factory. StaticOptions and FirebaseOptions carry per-backend settings; keys are validated for shape and length. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. FLAG_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Flag(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package flag

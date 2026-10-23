@@ -174,12 +174,6 @@ func mustPass(t *testing.T, err error) {
 	}
 }
 
-func TestCheckOpenRegister_success(t *testing.T) {
-	t.Parallel()
-
-	mustPass(t, checkOpenRegister())
-}
-
 func TestCheckAllowDeny_success(t *testing.T) {
 	t.Parallel()
 

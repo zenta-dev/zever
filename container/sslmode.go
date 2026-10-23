@@ -4,32 +4,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
-
-	"github.com/zenta-dev/zever/core/crypto"
 )
-
-// warnPostgresSSLMode logs a one-line warning when the configured postgres
-// DSN would silently fall back to an unencrypted connection to a remote host
-// (sslmode unset, "prefer" or "allow"). It stays quiet in a dev ZEVER_ENV,
-// for loopback or unix-socket hosts, and when no logger can be resolved. The
-// message never contains DSN content.
-func (c *Container) warnPostgresSSLMode(dsn string, getenv func(string) string) {
-	if crypto.IsDevEnv(getenv("ZEVER_ENV")) {
-		return
-	}
-
-	msg := postgresSSLModeWarning(dsn, getenv)
-	if msg == "" {
-		return
-	}
-
-	lg, err := c.Log()
-	if err != nil {
-		return
-	}
-
-	lg.Warn().Str("service", "db").Msg(msg)
-}
 
 // postgresSSLModeWarning returns a warning when dsn (URL or key=value form,
 // with PGSSLMODE/PGHOST consulted when the DSN is silent) leaves TLS

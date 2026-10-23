@@ -7,36 +7,6 @@ import (
 )
 
 // BenchmarkRegister measures registry insertion for a fresh adapter key.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if err := Register(freshAdapter(), func(Options) (EventBus, error) { return stubBus{}, nil }); err != nil {
-			b.Fatalf("Register err = %v", err)
-		}
-	}
-}
-
-// BenchmarkOpen measures validated lookup plus the pull-wrapper upgrade.
-func BenchmarkOpen(b *testing.B) {
-	adapter := freshAdapter()
-	if err := Register(adapter, func(Options) (EventBus, error) { return stubBus{}, nil }); err != nil {
-		b.Fatalf("Register err = %v", err)
-	}
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		bus, err := Open(adapter, Options{})
-		if err != nil {
-			b.Fatalf("Open err = %v", err)
-		}
-
-		_ = bus.Close()
-	}
-}
-
-// BenchmarkPublish measures the push publish path through a wrapped pusher.
 func BenchmarkPublish(b *testing.B) {
 	bus := Wrap(newFakeBus())
 	ctx := b.Context()

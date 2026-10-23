@@ -14,7 +14,6 @@ import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 - `remote` sends the job to a rendering API over HTTP. It needs `endpoint` (https, or http with `allow_insecure: true`); a non-empty `api_key` is sent as a bearer token. Outbound requests dial only globally routable addresses and never follow redirects; a local rendering sidecar needs `allow_private: true`, which logs a line at startup.
 
 ```sh
-DOCUMENT_ADAPTER=local
 DOCUMENT_QUALITY=80
 DOCUMENT_DPI=150
 DOCUMENT_TMP_DIR=/tmp/zever-doc
@@ -43,9 +42,8 @@ import (
 )
 
 func main() {
-	documentlocal.Register()
 	ctx := context.Background()
-	c := container.New(config.Default())
+	c := container.New(config.Default(), container.Provide(document.DefaultRef(), documentlocal.New))
 	defer c.Close(ctx)
 
 	d, err := c.Document()

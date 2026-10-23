@@ -3,66 +3,10 @@ package eventbus
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 )
-
-func TestPullCoverTopicTooLong(t *testing.T) {
-	t.Parallel()
-
-	b := openPullBus(t, newFakeBus())
-
-	_, err := b.SubscribeChan(t.Context(), strings.Repeat("a", MaxTopicLen+1), 1)
-	if err == nil {
-		t.Fatal("SubscribeChan overlong topic = nil, want InvalidOptionsError")
-	}
-
-	var inv InvalidOptionsError
-	if !errors.As(err, &inv) {
-		t.Fatalf("err = %T %v, want InvalidOptionsError", err, err)
-	}
-}
-
-func TestPullCoverForwarderClosedSkips(t *testing.T) {
-	t.Parallel()
-
-	inner := newFakeBus()
-	b := openPullBus(t, inner)
-
-	ch, err := b.SubscribeChan(t.Context(), "t-closed-skip", 4)
-	if err != nil {
-		t.Fatalf("SubscribeChan: %v", err)
-	}
-
-	pb, ok := b.(*pullBus)
-	if !ok {
-		t.Fatalf("bus = %T, want *pullBus", b)
-	}
-	pb.mu.Lock()
-	entry, ok := pb.subs[ch]
-	pb.mu.Unlock()
-	if !ok {
-		t.Fatal("pull entry missing after SubscribeChan")
-	}
-
-	// Mark the pull sub closed while the push subscription still delivers:
-	// the forwarder must drop the message instead of sending.
-	entry.sub.mu.Lock()
-	entry.sub.closed = true
-	entry.sub.mu.Unlock()
-
-	if err := inner.Publish(t.Context(), "t-closed-skip", NewPayload([]byte("x")), nil); err != nil {
-		t.Fatalf("Publish: %v", err)
-	}
-
-	select {
-	case m := <-ch:
-		t.Fatalf("received %+v on closed pull sub, want drop", m)
-	case <-time.After(200 * time.Millisecond):
-	}
-}
 
 func TestPullCoverInnerSubscribeError(t *testing.T) {
 	t.Parallel()

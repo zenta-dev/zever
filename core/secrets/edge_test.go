@@ -70,18 +70,3 @@ func TestOptionsValidate_alwaysNil(t *testing.T) {
 		}
 	}
 }
-
-func TestParseAdapter_custom(t *testing.T) {
-	t.Parallel()
-
-	a, err := secrets.ParseAdapter("custom")
-	if err != nil {
-		t.Fatalf("ParseAdapter(custom) error = %v", err)
-	}
-	if a != secrets.Adapter("custom") {
-		t.Fatalf("ParseAdapter(custom) = %v, want custom", a)
-	}
-	if a.String() != "custom" {
-		t.Fatalf("String() = %q, want custom", a.String())
-	}
-}

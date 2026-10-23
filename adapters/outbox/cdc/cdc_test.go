@@ -232,7 +232,7 @@ func TestName(t *testing.T) {
 	t.Parallel()
 
 	s := &store{}
-	if s.Name() != string(outbox.CDC) {
-		t.Errorf("Name() = %q, want %q", s.Name(), outbox.CDC)
+	if s.Name() != "cdc" {
+		t.Errorf("Name() = %q, want %q", s.Name(), "cdc")
 	}
 }

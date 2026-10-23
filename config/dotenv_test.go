@@ -21,13 +21,13 @@ func writeDotEnv(t *testing.T, dir, name, content string) string {
 func TestLoadEnvBasic(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	p := writeDotEnv(t, dir, ".env", "DB_ADAPTER=postgres\nDB_MAXCONNS=20\n")
+	p := writeDotEnv(t, dir, ".env", "DB_DSN=postgres://localhost/db\nDB_MAXCONNS=20\n")
 	env, err := LoadEnv(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if env["DB_ADAPTER"] != "postgres" {
-		t.Fatalf("got %q", env["DB_ADAPTER"])
+	if env["DB_DSN"] != "postgres://localhost/db" {
+		t.Fatalf("got %q", env["DB_DSN"])
 	}
 	if env["DB_MAXCONNS"] != "20" {
 		t.Fatalf("got %q", env["DB_MAXCONNS"])

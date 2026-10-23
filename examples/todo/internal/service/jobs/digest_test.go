@@ -19,11 +19,9 @@ import (
 func newTestDB(t *testing.T) (*container.Container, context.Context) {
 	t.Helper()
 
-	testsetup.RegisterDefaults()
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
-	c := container.New(cfg)
+	c := container.New(cfg, testsetup.Providers(cfg)...)
 
 	database, err := c.DB()
 	if err != nil {

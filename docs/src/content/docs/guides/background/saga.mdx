@@ -10,7 +10,6 @@ Use a saga for multi-resource operations you cannot fit in one database transact
 ## Quick start
 
 ```sh
-WORKFLOW_ADAPTER=memory
 WORKFLOW_NAMESPACE=bookings
 ```
 
@@ -28,8 +27,8 @@ import (
 )
 
 func main() {
-	workflowmemory.Register()
-	wf, _ := container.New(config.Default()).Workflow()
+	c := container.New(config.Default(), container.Provide(workflow.DefaultRef(), workflowmemory.New))
+	wf, _ := c.Workflow()
 
 	wf.(workflow.SagaRegistrar).RegisterSaga("booking", []workflow.SagaStep{
 		{Name: "reserve-seat", Execute: func(context.Context, any) (any, error) { return "seat-7", nil },
@@ -151,7 +150,7 @@ if ok {
 | `memory` | `adapters/workflow/memory` | Default. In-process saga state, non-durable. A restart loses all runs. |
 | `db` | `adapters/workflow/db` | Durable runs, lease-based crash recovery, `RecoverStuckSagas`. |
 
-Switching `memory` to `db` needs no call-site change. The db adapter shares the container pool for its DSN (first opener's `max_conns` wins); use `dedicated_pool: true` with a separate database under load. Keys: [workflow config reference](../../../reference/config/#workflow).
+Switching `memory` to `db` needs no call-site change, only a different `container.Provide` entry. The db adapter can share one pool with the other batteries on its DSN via `NewFromDB` (first opener's `max_conns` wins); use `dedicated_pool: true` with a separate database under load. Keys: [workflow config reference](../../../reference/config/#workflow).
 
 ## Production checklist
 

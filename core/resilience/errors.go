@@ -38,12 +38,12 @@ var ErrClosed = errors.New("resilience: closed")
 // DuplicateError reports a duplicate adapter registration.
 type DuplicateError struct {
 	// Adapter is the already-registered adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // Error returns a human-readable duplicate-registration message.
 func (e DuplicateError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrDuplicateAdapter.
@@ -52,12 +52,12 @@ func (e DuplicateError) Unwrap() error { return ErrDuplicateAdapter }
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {
 	// Adapter is the unregistered adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // Error returns a human-readable unknown-adapter message.
 func (e UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrUnknownAdapter.

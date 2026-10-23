@@ -5,36 +5,6 @@ import (
 )
 
 // BenchmarkRegister measures registry insertion for a fresh adapter key.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if err := Register(freshAdapter(), func(Options) (Flag, error) { return &stubFlag{}, nil }); err != nil {
-			b.Fatalf("Register err = %v", err)
-		}
-	}
-}
-
-// BenchmarkOpen measures validated registry lookup plus the factory call.
-func BenchmarkOpen(b *testing.B) {
-	adapter := freshAdapter()
-	if err := Register(adapter, func(Options) (Flag, error) { return &stubFlag{}, nil }); err != nil {
-		b.Fatalf("Register err = %v", err)
-	}
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		f, err := Open(adapter, Options{})
-		if err != nil {
-			b.Fatalf("Open err = %v", err)
-		}
-
-		_ = f.Close()
-	}
-}
-
-// BenchmarkValidateKey measures flag key shape validation.
 func BenchmarkValidateKey(b *testing.B) {
 	b.ReportAllocs()
 
@@ -88,23 +58,3 @@ func BenchmarkEvalContextRoundTrip(b *testing.B) {
 }
 
 // BenchmarkAdapterString measures canonical adapter naming.
-func BenchmarkAdapterString(b *testing.B) {
-	a := Firebase
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		_ = a.String()
-	}
-}
-
-// BenchmarkParseAdapter measures adapter name parsing.
-func BenchmarkParseAdapter(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if _, err := ParseAdapter("firebase"); err != nil {
-			b.Fatalf("ParseAdapter err = %v", err)
-		}
-	}
-}

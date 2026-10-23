@@ -25,7 +25,6 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0 // indirect

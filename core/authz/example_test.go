@@ -32,8 +32,8 @@ func (openChecker) Can(_ context.Context, _ permission.Subject, _ string, _ perm
 	return permission.Decision{Allowed: true}, nil
 }
 
-// ExampleOpen authorizes a request with stub backends and prints the subject.
-func ExampleOpen() {
+// Example authorizes a request with stub backends and prints the subject.
+func Example() {
 	claims, err := authz.Authorize(
 		context.Background(),
 		openAuth{},

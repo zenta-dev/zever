@@ -5,7 +5,6 @@ go 1.27.3
 require (
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
-	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
 
 replace (

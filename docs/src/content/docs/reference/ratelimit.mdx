@@ -7,28 +7,26 @@ Token-bucket rate limiting. `ratelimit` allows or denies keyed requests through 
 
 ## Adapters
 
-| Adapter | Module | Register | Default |
+| Adapter | Module | Constructor | Wired default |
 |---|---|---|---|
-| `memory` | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.Register()` | Yes |
-| `redis` | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.Register()` | No |
+| `memory` | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.New` | Yes |
+| `redis` | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.New` | No |
 
-Resolve through the container with `c.RateLimit()`. Use `redis` when limits must be shared across replicas; a `memory` limiter is per-instance. Swapping backends is a config change: set `ratelimit.adapter`, no code change.
+Resolve through the container with `c.RateLimit()`. Use `redis` when limits must be shared across replicas; a `memory` limiter is per-instance. Swapping backends is a wiring change: swap the `container.Provide` entry and rebuild.
 
 ## Configuration
 
 Service key: `ratelimit`. `rate` and `burst` are required. File example:
 
 ```sh
-RATELIMIT_ADAPTER=memory
 RATELIMIT_RATE=100
 RATELIMIT_BURST=200
 ```
 
 ```sh
-RATELIMIT_ADAPTER=memory
 ```
 
-Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix (for example `RATELIMIT_ADAPTER`). A non-empty `options` block replaces the default options wholesale, so repeat `rate` and `burst`; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
+Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix (for example `RATELIMIT_RATE`). A non-empty `options` block replaces the default options wholesale, so repeat `rate` and `burst`; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
 
 ## Options
 
@@ -56,11 +54,11 @@ Every sentinel below is a package-level `ErrXxx` in `core/ratelimit` (see `error
 | Sentinel | Cause | Fix |
 |---|---|---|
 | `ErrClosed` | Limiter used after close | Open a new limiter; do not reuse the closed one |
-| `ErrNilFactory` | `Register` called with a nil factory | Pass a non-nil constructor |
-| `ErrDuplicateAdapter` | Same adapter registered twice | Register each adapter once; check for a duplicate `Register` call |
+| `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
+| `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `memory.Register()`) before `Open` |
-| `ErrInvalidAdapter` | Empty adapter name to `ParseAdapter` | Pass a non-empty adapter name |
+| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `memory.New`) before `Open` |
+| `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
 | `ErrInvalidOptions` | `Options.Validate` failed (bad `rate`/`burst`, negative TTLs, bad Redis address or prefix, bad `trusted_proxies` entry) | Fix the named field; blank or unparsable proxy entries name the entry |
 | `ErrInvalidKey` | Rate-limit key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the length only, never the key |
 | `ErrInvalidCost` | Token cost or burst not > 0 or not finite | Pass a positive finite cost |

@@ -56,45 +56,9 @@ func TestInvalidAdapterError(t *testing.T) {
 	}
 }
 
-func TestDuplicateAdapterError(t *testing.T) {
-	t.Parallel()
-	err := DuplicateAdapterError{Adapter: OpenAI}
-	if !errors.Is(err, ErrDuplicateAdapter) {
-		t.Fatalf("Is = false")
-	}
-	var target DuplicateAdapterError
-	if !errors.As(err, &target) {
-		t.Fatalf("As failed")
-	}
-	if target.Adapter != OpenAI {
-		t.Errorf("Adapter = %v, want %v", target.Adapter, OpenAI)
-	}
-	if !strings.Contains(err.Error(), "openai") {
-		t.Errorf("Error() %q missing openai", err.Error())
-	}
-}
-
-func TestDuplicateError_alias_compat(t *testing.T) {
-	t.Parallel()
-	err := DuplicateAdapterError{Adapter: OpenAI}
-	if !errors.Is(err, ErrDuplicate) {
-		t.Fatalf("Is = false, want true for ErrDuplicate alias")
-	}
-	var target DuplicateError
-	if !errors.As(err, &target) {
-		t.Fatalf("As failed for DuplicateError alias")
-	}
-	if target.Adapter != OpenAI {
-		t.Errorf("Adapter = %v, want %v", target.Adapter, OpenAI)
-	}
-	if !errors.Is(ErrDuplicateAdapter, ErrDuplicate) {
-		t.Errorf("alias ErrDuplicate does not match ErrDuplicateAdapter")
-	}
-}
-
 func TestUnknownAdapterError(t *testing.T) {
 	t.Parallel()
-	err := UnknownAdapterError{Adapter: Adapter("test-123")}
+	err := UnknownAdapterError{Adapter: "test-123"}
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("Is = false")
 	}
@@ -102,7 +66,7 @@ func TestUnknownAdapterError(t *testing.T) {
 	if !errors.As(err, &target) {
 		t.Fatalf("As failed")
 	}
-	if target.Adapter != Adapter("test-123") {
+	if target.Adapter != "test-123" {
 		t.Errorf("Adapter = %v, want 123", target.Adapter)
 	}
 	if !strings.Contains(err.Error(), "unknown") {

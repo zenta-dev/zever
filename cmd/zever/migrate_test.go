@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/orm/migrate"
 )
@@ -215,8 +214,6 @@ func TestMigrateDSNHintOnlyForAMissingDSN(t *testing.T) {
 // via flexibleParse, using --dry-run with a live DSN so the diff path runs
 // without executing anything.
 func TestRunDBMigrateFlagsAfterPositional(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	dir := t.TempDir()
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
 	dbPath := filepath.Join(dir, "test.db")
@@ -256,8 +253,6 @@ func TestRunDBMigrateFlagsAfterPositional(t *testing.T) {
 // file and asserts the tables and index exist, then re-runs to prove
 // checksum idempotency makes the second run a no-op.
 func TestRunDBMigrateAppliesToSQLite(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	dir := t.TempDir()
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
 	dbPath := filepath.Join(dir, "migrate.db")
@@ -299,8 +294,6 @@ func TestRunDBMigrateAppliesToSQLite(t *testing.T) {
 // a live database prints the would-be statements without executing or
 // recording anything.
 func TestRunDBMigrateDryRunWithDBReportsWithoutApplying(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	dir := t.TempDir()
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
 	dbPath := filepath.Join(dir, "migrate.db")
@@ -401,8 +394,6 @@ func zeverSQLiteColumns(t *testing.T, path string) map[string]bool {
 	return out
 }
 
-var _ = db.SQLite
-
 // TestRunDBMigrateHelp proves -h prints usage to stderr and returns
 // flag.ErrHelp without touching the filesystem.
 func TestRunDBMigrateHelp(t *testing.T) {
@@ -498,8 +489,6 @@ func TestMigrateOptionsPostgres(t *testing.T) {
 
 // TestOpenZeverDBRejectsUnknownAdapter pins the suggestion on typos.
 func TestOpenZeverDBRejectsUnknownAdapter(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	if _, err := openZeverDB("sqllite", "x"); err == nil {
 		t.Fatal("expected an error, got nil")
 	} else if !strings.Contains(err.Error(), "sqlite") {
@@ -509,8 +498,6 @@ func TestOpenZeverDBRejectsUnknownAdapter(t *testing.T) {
 
 // TestOpenZeverDBReportsOpenFailure pins driver failures with context.
 func TestOpenZeverDBReportsOpenFailure(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	badPath := filepath.Join(t.TempDir(), "no-such-dir", "x.db")
 	if _, err := openZeverDB("sqlite", badPath); err == nil {
 		t.Fatal("expected an open error, got nil")
@@ -549,8 +536,6 @@ entity Order {
 // TestRunDBMigrateSQLiteTypeChangeWarns proves the sqlite limitation is real:
 // a detected type change warns and applies nothing.
 func TestRunDBMigrateSQLiteTypeChangeWarns(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
@@ -625,8 +610,6 @@ func TestMigrateOptionsSuggestsClosest(t *testing.T) {
 
 // TestOpenZeverDBUnknownWithoutSuggestion pins the suggestion-free branch.
 func TestOpenZeverDBUnknownWithoutSuggestion(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	if _, err := openZeverDB("xyz", "x"); err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -634,8 +617,6 @@ func TestOpenZeverDBUnknownWithoutSuggestion(t *testing.T) {
 
 // TestDryRunDiffOpenFailure pins the connection error branch directly.
 func TestDryRunDiffOpenFailure(t *testing.T) {
-	ensureZeverDBAdapters()
-
 	result := &compile.Result{Schema: nil, Outputs: map[string]map[string][]byte{}}
 
 	if err := dryRunDiff("oracle", "x", result, migrate.PlanOptions{}, false); err == nil {

@@ -9,15 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/core/db"
-	"github.com/zenta-dev/zever/core/idempotency"
-	"github.com/zenta-dev/zever/core/queue"
-	"github.com/zenta-dev/zever/core/scheduler"
-	"github.com/zenta-dev/zever/core/search"
-	"github.com/zenta-dev/zever/core/session"
-	"github.com/zenta-dev/zever/core/vectorstore"
-	"github.com/zenta-dev/zever/core/workflow"
 	"github.com/zenta-dev/zever/shared/dbconn"
 )
 
@@ -94,15 +86,6 @@ func postgresPreview(dsn string) string {
 	return "host=" + u.Hostname() + " dbname=" + name
 }
 
-// sharedPoolOpts maps a core DSN onto pool options for a registry build,
-// carrying the opt-out flag so adapter options stay faithful.
-func sharedPoolOpts(dsn string, dedicated bool) db.Options {
-	opts := dbconn.SplitDSN(dsn)
-	opts.DedicatedPool = dedicated
-
-	return opts
-}
-
 // poolEntry is one shared pool: the opened db.DB, the first opener's knobs,
 // and the borrowing services for observability. ready closes when the entry
 // leaves the in-flight state; building reports an in-flight open.
@@ -161,9 +144,12 @@ type poolRegistry struct {
 	// diagnostics (doctor) can surface them after the fact. It carries no
 	// DSN content (see PoolMismatch).
 	mismatchLog []PoolMismatch
-	// open builds a fresh pool. Production resolves via the db registry so
-	// the container wires no adapters itself; tests inject a fake.
-	open func(adapter db.Adapter, opts db.Options) (db.DB, error)
+	// open builds a fresh pool for backend ("postgres", "sqlite", ...).
+	// Sharing is explicit in user code now (db-backed adapters expose
+	// NewFromDB wired through container.Provide), so the production
+	// default fails: tests inject a fake, and Close only snapshots pools
+	// tests borrowed.
+	open func(backend string, opts db.Options) (db.DB, error)
 	// warn reports pool lifecycle notes (shared opens, cap mismatches,
 	// dedicated opens). Default writes one line to stderr without DSN
 	// content; tests inject a recorder.
@@ -175,9 +161,16 @@ type poolRegistry struct {
 // Container that never resolves a shareable DSN allocates nothing for it.
 func newPoolRegistry() *poolRegistry {
 	return &poolRegistry{
-		open: db.Open,
+		open: unsupportedPoolOpen,
 		warn: defaultPoolWarn,
 	}
+}
+
+// unsupportedPoolOpen is the production pool opener. Implicit shared pools
+// no longer exist: wire sharing explicitly with NewFromDB through
+// container.Provide. It fails if a borrow ever reaches it outside tests.
+func unsupportedPoolOpen(backend string, _ db.Options) (db.DB, error) {
+	return nil, fmt.Errorf("container: shared %s pool: implicit opens removed, wire NewFromDB via container.Provide", backend)
 }
 
 // poolInfoPrefix marks the purely informational "pool shared ..." lines
@@ -200,7 +193,7 @@ func defaultPoolWarn(msg string) {
 // first opener's knobs. Later borrowers reuse the pool: their pool knobs
 // are ignored, and a nonzero MaxConns differing from the pool's warns
 // without DSN content. Every successful borrow records the service.
-func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Options, key, backend string) (db.DB, error) {
+func (r *poolRegistry) borrow(service string, opts db.Options, key, backend string) (db.DB, error) {
 	for {
 		r.mu.Lock()
 		if r.pools == nil {
@@ -213,7 +206,7 @@ func (r *poolRegistry) borrow(service string, adapter db.Adapter, opts db.Option
 			r.pools[key] = e
 			r.mu.Unlock()
 
-			conn, err := r.open(adapter, opts)
+			conn, err := r.open(backend, opts)
 			r.mu.Lock()
 			if err != nil {
 				delete(r.pools, key)
@@ -376,209 +369,4 @@ func containsService(services []string, service string) bool {
 	}
 
 	return false
-}
-
-// isDBAdapter reports whether adapter names one of the db-backed adapters
-// for service.
-func isDBAdapter(adapter string, names ...string) bool {
-	for _, n := range names {
-		if adapter == n {
-			return true
-		}
-	}
-
-	return false
-}
-
-// openShared borrows (or opens) the registry pool for an exact-DSN match
-// and builds the service over it via fromDB with owns=false. It reports
-// shared=false when the caller falls back to openService: a non-db-backed
-// adapter, an explicit DedicatedPool opt-out, or a non-shareable DSN
-// (empty or :memory:). A dedicated opt-out on a db-backed adapter logs one
-// line naming the service only.
-func openShared[T any](c *Container, service, adapter string, dbAdapters []string, key, backend string, shareable bool, dedicated bool, poolOpts db.Options, fromDB func(conn db.DB) (T, error)) (T, bool, error) {
-	var zero T
-
-	if !isDBAdapter(adapter, dbAdapters...) {
-		return zero, false, nil
-	}
-
-	if dedicated {
-		c.pools.warn(fmt.Sprintf("container: pool dedicated service=%s backend=%s", service, backend))
-
-		return zero, false, nil
-	}
-
-	if !shareable {
-		return zero, false, nil
-	}
-
-	var poolAdapter db.Adapter
-	if backend == poolPostgres {
-		poolAdapter = db.Postgres
-	} else {
-		poolAdapter = db.SQLite
-	}
-
-	conn, err := c.pools.borrow(service, poolAdapter, poolOpts, key, backend)
-	if err != nil {
-		return zero, true, err
-	}
-
-	v, err := fromDB(conn)
-	if err != nil {
-		return zero, true, fmt.Errorf("container: %s (shared pool): %w", service, err)
-	}
-
-	return v, true, nil
-}
-
-// openDB resolves the db service, registering shareable pools in the
-// registry for borrowers. DedicatedPool is meaningless on db itself and is
-// ignored. Non-shareable pools (:memory:) open directly and close with the
-// registry band via the db lazy field.
-func (c *Container) openDB() (db.DB, error) {
-	adapterName := c.cfg.DB.Adapter
-	opts := c.cfg.DB.Options
-
-	switch db.Adapter(adapterName) {
-	case db.Postgres:
-		c.warnPostgresSSLMode(opts.DSN, os.Getenv)
-
-		key, ok := postgresPoolKey(opts.DSN)
-		if !ok {
-			return openService("db", adapterName, db.ParseAdapter, db.Open, opts)
-		}
-
-		return c.pools.borrow("db", db.Postgres, opts, key, poolPostgres)
-	case db.SQLite:
-		path := strings.TrimSpace(opts.Path)
-		if path == "" {
-			path = "app.db"
-		}
-		key, ok := sqlitePoolKey(path)
-		if !ok {
-			return openService("db", adapterName, db.ParseAdapter, db.Open, opts)
-		}
-
-		return c.pools.borrow("db", db.SQLite, opts, key, poolSQLite)
-	default:
-		return openService("db", adapterName, db.ParseAdapter, db.Open, opts)
-	}
-}
-
-// openSharedCache resolves the cache service over the shared pool on an
-// exact-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedCache() (cache.Cache, bool, error) {
-	o := c.cfg.Cache.Options
-	key, backend, ok := coreDSNPoolKey(o.DSN)
-	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
-
-	return openShared(c, "cache", c.cfg.Cache.Adapter, []string{string(cache.DB)},
-		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (cache.Cache, error) {
-			return cache.OpenShared(cache.Adapter(c.cfg.Cache.Adapter), conn, o)
-		})
-}
-
-// openSharedQueue resolves the queue service over the shared pool on an
-// exact-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedQueue() (queue.Queue, bool, error) {
-	o := c.cfg.Queue.Options
-	key, backend, ok := coreDSNPoolKey(o.DSN)
-	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
-
-	return openShared(c, "queue", c.cfg.Queue.Adapter, []string{string(queue.DB)},
-		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (queue.Queue, error) {
-			return queue.OpenShared(queue.Adapter(c.cfg.Queue.Adapter), conn, o)
-		})
-}
-
-// openSharedSearch resolves the search service over the shared pool on an
-// exact-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedSearch() (search.Search, bool, error) {
-	o := c.cfg.Search.Options
-	key, backend, ok := coreDSNPoolKey(o.DSN)
-	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
-
-	return openShared(c, "search", c.cfg.Search.Adapter,
-		[]string{string(search.DB)},
-		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (search.Search, error) {
-			return search.OpenShared(search.Adapter(c.cfg.Search.Adapter), conn, o)
-		})
-}
-
-// openSharedSession resolves the session service over the shared pool on an
-// exact-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedSession() (session.Store, bool, error) {
-	o := c.cfg.Session.Options
-	key, backend, ok := coreDSNPoolKey(o.DSN)
-	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
-
-	return openShared(c, "session", c.cfg.Session.Adapter, []string{"db"}, // "db" is sessiondb.Adapter; core/session defines no DB const.
-		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (session.Store, error) {
-			return session.OpenShared(session.Adapter(c.cfg.Session.Adapter), conn, o)
-		})
-}
-
-// openSharedIdempotency resolves the idempotency service over the shared
-// pool on an exact-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedIdempotency() (idempotency.Store, bool, error) {
-	o := c.cfg.Idempotency.Options
-	key, backend, ok := coreDSNPoolKey(o.DSN)
-	poolOpts := sharedPoolOpts(o.DSN, o.DedicatedPool)
-
-	return openShared(c, "idempotency", c.cfg.Idempotency.Adapter, []string{"db"}, // "db" is idemdb.Adapter; core/idempotency defines no DB const.
-		key, backend, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (idempotency.Store, error) {
-			return idempotency.OpenShared(idempotency.Adapter(c.cfg.Idempotency.Adapter), conn, o)
-		})
-}
-
-// openSharedWorkflow resolves the workflow service over the shared pool on
-// an exact postgres-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedWorkflow() (workflow.Workflow, bool, error) {
-	o := c.cfg.Workflow.Options
-	key, ok := postgresPoolKey(o.DSN)
-	poolOpts := db.Options{DSN: o.DSN, DedicatedPool: o.DedicatedPool}
-
-	return openShared(c, "workflow", c.cfg.Workflow.Adapter, []string{string(workflow.DB)},
-		key, poolPostgres, ok, o.DedicatedPool, poolOpts, func(conn db.DB) (workflow.Workflow, error) {
-			return workflow.OpenShared(workflow.Adapter(c.cfg.Workflow.Adapter), conn, o)
-		})
-}
-
-// openSharedScheduler resolves the scheduler service over the shared pool
-// on an exact-DSN match, injecting the resolved job dispatcher as today. It
-// reports shared=false for the direct path.
-func (c *Container) openSharedScheduler() (scheduler.Scheduler, bool, error) {
-	opts := c.cfg.Scheduler.Options
-	if opts.Dispatcher == nil {
-		d, err := c.Job()
-		if err != nil {
-			return nil, true, fmt.Errorf("container: scheduler: resolve job: %w", err)
-		}
-
-		opts.Dispatcher = d
-	}
-
-	key, backend, ok := coreDSNPoolKey(opts.DSN)
-	poolOpts := sharedPoolOpts(opts.DSN, opts.DedicatedPool)
-
-	return openShared(c, "scheduler", c.cfg.Scheduler.Adapter, []string{"postgres"}, // "postgres" is schedpostgres.Adapter; core/scheduler defines no Postgres const.
-		key, backend, ok, opts.DedicatedPool, poolOpts, func(conn db.DB) (scheduler.Scheduler, error) {
-			return scheduler.OpenShared(scheduler.Adapter(c.cfg.Scheduler.Adapter), conn, opts)
-		})
-}
-
-// openSharedVectorStore resolves the vectorstore service over the shared
-// pool on an exact-DSN match. It reports shared=false for the direct path.
-func (c *Container) openSharedVectorStore() (vectorstore.VectorStore, bool, error) {
-	o := c.cfg.VectorStore.Options
-	key, backend, ok := coreDSNPoolKey(o.DSN)
-
-	return openShared(c, "vectorstore", c.cfg.VectorStore.Adapter,
-		[]string{string(vectorstore.DB)},
-		key, backend, ok, o.DedicatedPool, sharedPoolOpts(o.DSN, o.DedicatedPool),
-		func(conn db.DB) (vectorstore.VectorStore, error) {
-			return vectorstore.OpenShared(vectorstore.Adapter(c.cfg.VectorStore.Adapter), conn, o)
-		})
 }

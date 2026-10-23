@@ -215,12 +215,6 @@ func mustPass(t *testing.T, err error) {
 
 func boom() error { return errors.New("paymenttest: boom") }
 
-func TestCheckOpenRegister_success(t *testing.T) {
-	t.Parallel()
-
-	mustPass(t, checkOpenRegister())
-}
-
 func TestCheckCreateGet_success(t *testing.T) {
 	t.Parallel()
 

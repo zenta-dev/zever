@@ -38,7 +38,7 @@ var ErrRemoteError = errors.New("i18n: remote error")
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // DuplicateError aliases DuplicateAdapterError for compatibility.
@@ -46,7 +46,7 @@ type DuplicateError = DuplicateAdapterError
 
 // Error returns a human-readable duplicate-registration message.
 func (e DuplicateAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrDuplicateAdapter.
@@ -55,12 +55,12 @@ func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {
 	// Adapter is the unregistered adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // Error returns a human-readable unknown-adapter message.
 func (e UnknownAdapterError) Error() string {
-	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter.String())
+	return fmt.Sprintf("%s: %s (forgotten import?)", ErrUnknownAdapter, e.Adapter)
 }
 
 // Unwrap returns ErrUnknownAdapter.

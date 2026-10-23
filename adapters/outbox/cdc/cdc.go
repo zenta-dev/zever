@@ -98,7 +98,7 @@ func New(o Options) (outbox.Store, error) {
 		retry:       o.Retry,
 		maxAttempts: maxAttempts,
 		sleep:       sleepCtx,
-		recorder:    outbox.NewRecorder(o.Provider, string(outbox.CDC), "", o.Options.Publisher),
+		recorder:    outbox.NewRecorder(o.Provider, "cdc", "", o.Options.Publisher),
 	}
 
 	return s, nil
@@ -134,7 +134,7 @@ func (s *store) Record(ctx context.Context, tx db.Tx, msg outbox.Message) error 
 }
 
 // Name returns the adapter name.
-func (s *store) Name() string { return string(outbox.CDC) }
+func (s *store) Name() string { return "cdc" }
 
 // SetPublisher attaches p as the consumer's destination transport.
 //

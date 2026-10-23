@@ -7,7 +7,6 @@ require (
 	github.com/zenta-dev/zever/adapters/db/sqlite v0.8.0
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/idempotency v0.8.0
-	github.com/zenta-dev/zever/shared/dbconn v0.8.0
 	github.com/zenta-dev/zever/shared/kvstore v0.8.0
 )
 
@@ -25,7 +24,6 @@ require (
 	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/redisopt v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/retry v0.8.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect

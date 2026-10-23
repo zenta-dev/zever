@@ -1,54 +1,12 @@
 package permission
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-// coverStubChecker is a distinct stub for cover tests.
-// It avoids clashing with stubChecker in permission_test.go.
-type coverStubChecker struct{}
-
-// Can always allows with reason allow.
-func (coverStubChecker) Can(_ context.Context, _ Subject, _ string, _ Resource) (Decision, error) {
-	return Decision{Allowed: true, Reason: "allow"}, nil
-}
-
-func TestCover_Errors_ExactStrings(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name string
-		err  error
-		want string
-	}{
-		{"duplicate rbac", DuplicateError{Adapter: RBAC}, "permission: duplicate adapter: rbac"},
-		{"unknown rbac", UnknownAdapterError{Adapter: RBAC}, "permission: unknown adapter: rbac (forgotten import?)"},
-		{"unknown unregistered", UnknownAdapterError{Adapter: Adapter("test-9401")}, "permission: unknown adapter: test-9401 (forgotten import?)"},
-		{"invalid x", InvalidAdapterError{Adapter: "x"}, "permission: invalid adapter: \"x\""},
-		{"invalid options", InvalidOptionsError{Reason: "boom"}, "permission: invalid options: boom"},
-	}
-	for _, tc := range cases {
-		if got := tc.err.Error(); got != tc.want {
-			t.Errorf("%s: Error() = %q want %q", tc.name, got, tc.want)
-		}
-	}
-	if !errors.Is(DuplicateError{Adapter: RBAC}, ErrDuplicate) {
-		t.Error("DuplicateError does not match ErrDuplicate")
-	}
-	if !errors.Is(UnknownAdapterError{Adapter: RBAC}, ErrUnknownAdapter) {
-		t.Error("UnknownAdapterError does not match ErrUnknownAdapter")
-	}
-	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
-		t.Error("InvalidAdapterError does not match ErrInvalidAdapter")
-	}
-	if !errors.Is(InvalidOptionsError{Reason: "boom"}, ErrInvalidOptions) {
-		t.Error("InvalidOptionsError does not match ErrInvalidOptions")
-	}
-}
 
 func TestCover_Options_Validate_Gaps(t *testing.T) {
 	t.Parallel()
@@ -101,55 +59,5 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 	}
 	if ioe.Reason != "policy_path does not exist" {
 		t.Fatalf("reason = %q want %q", ioe.Reason, "policy_path does not exist")
-	}
-}
-
-// errCoverOpenFactory is process-shared so repeat runs (-count=2)
-// rewire the same sentinel instance; Register tolerates the duplicate.
-var errCoverOpenFactory = errors.New("cover boom 9202")
-
-func TestCover_Open_Success9201(t *testing.T) {
-	a := Adapter("test-9201")
-	if err := Register(a, func(Options) (Checker, error) { return coverStubChecker{}, nil }); err != nil {
-		var dup DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("Register err = %v", err)
-		}
-		// Duplicate means an earlier run in this process already wired the
-		// same stub (e.g. -count=2); the Open/Can checks below still hold.
-	}
-	c, err := Open(a, Options{})
-	if err != nil {
-		t.Fatalf("Open err = %v", err)
-	}
-	if c == nil {
-		t.Fatal("Open checker is nil")
-	}
-	d, err := c.Can(t.Context(), Subject{}, "read", Resource{})
-	if err != nil {
-		t.Fatalf("Can err = %v", err)
-	}
-	if !d.Allowed || d.Reason != "allow" {
-		t.Fatalf("decision = %+v, want {Allowed:true Reason:allow}", d)
-	}
-}
-
-func TestCover_Open_FactoryError9202(t *testing.T) {
-	a := Adapter("test-9202")
-	sentinel := errCoverOpenFactory
-	if err := Register(a, func(Options) (Checker, error) { return nil, sentinel }); err != nil {
-		var dup DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("Register err = %v", err)
-		}
-		// Duplicate means an earlier run already wired the same shared
-		// sentinel; the errors.Is check below still holds.
-	}
-	_, err := Open(a, Options{})
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("Open err = %v, want wrap of sentinel", err)
-	}
-	if !strings.Contains(err.Error(), "permission: open") {
-		t.Fatalf("Open err %q missing %q", err.Error(), "permission: open")
 	}
 }

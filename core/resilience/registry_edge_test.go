@@ -8,15 +8,6 @@ import (
 	"github.com/zenta-dev/zever/core/resilience"
 )
 
-func TestOpen_invalidOptionsPrecedenceOverUnknown(t *testing.T) {
-	t.Parallel()
-
-	_, err := resilience.Open(resilience.Adapter("registry-edge-missing"), resilience.Options{Timeout: -1})
-	if !errors.Is(err, resilience.ErrInvalidOptions) {
-		t.Fatalf("Open(invalid+unknown) err = %v, want ErrInvalidOptions", err)
-	}
-}
-
 func TestDo_cancelledContext(t *testing.T) {
 	t.Parallel()
 
@@ -59,27 +50,6 @@ func TestDo_fnErrorZeroValue(t *testing.T) {
 	}
 }
 
-func TestErrorUnwrapChains(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		err  error
-		want error
-	}{
-		{"duplicate", resilience.DuplicateError{Adapter: resilience.Memory}, resilience.ErrDuplicateAdapter},
-		{"unknown", resilience.UnknownAdapterError{Adapter: resilience.Memory}, resilience.ErrUnknownAdapter},
-		{"invalid_adapter", resilience.InvalidAdapterError{Adapter: "x"}, resilience.ErrInvalidAdapter},
-		{"invalid_options", resilience.InvalidOptionsError{Reason: "x"}, resilience.ErrInvalidOptions},
-	}
-
-	for _, c := range cases {
-		if !errors.Is(c.err, c.want) {
-			t.Errorf("%s errors.Is = false, want true for %v", c.name, c.want)
-		}
-	}
-}
-
 func TestDefault_matchesConsts(t *testing.T) {
 	t.Parallel()
 
@@ -115,40 +85,5 @@ func TestValidate_jitterBoundariesValid(t *testing.T) {
 		if err := o.Validate(); err != nil {
 			t.Errorf("Jitter %v err = %v, want nil", j, err)
 		}
-	}
-}
-
-func TestAdapterString_custom(t *testing.T) {
-	t.Parallel()
-
-	if got := resilience.Adapter("custom-edge").String(); got != "custom-edge" {
-		t.Errorf("String() = %q, want custom-edge", got)
-	}
-}
-
-func TestRegister_duplicateKeepsFirstFactory(t *testing.T) {
-	t.Parallel()
-
-	a := freshAdapter()
-	first := func(resilience.Options) (resilience.Manager, error) { return stubManager{}, nil }
-	second := func(resilience.Options) (resilience.Manager, error) {
-		return nil, errors.New("registry-edge: must not run")
-	}
-
-	if err := resilience.Register(a, first); err != nil {
-		t.Fatalf("first Register err = %v", err)
-	}
-
-	if err := resilience.Register(a, second); !errors.Is(err, resilience.ErrDuplicateAdapter) {
-		t.Fatalf("second Register err = %v, want ErrDuplicateAdapter", err)
-	}
-
-	m, err := resilience.Open(a, resilience.Options{})
-	if err != nil {
-		t.Fatalf("Open err = %v, want first factory", err)
-	}
-
-	if err := m.Close(); err != nil {
-		t.Fatalf("Close err = %v", err)
 	}
 }

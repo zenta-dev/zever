@@ -2,21 +2,11 @@ package memory
 
 import (
 	"context"
-	"fmt"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/zenta-dev/zever/core/eventbus"
 )
-
-var benchAdapterSeq atomic.Int64
-
-// benchFreshAdapter returns an adapter name unique to this benchmark run so
-// Register never collides with a previously registered factory.
-func benchFreshAdapter() eventbus.Adapter {
-	return eventbus.Adapter(fmt.Sprintf("bench-%d", benchAdapterSeq.Add(1)))
-}
 
 func benchOpts() eventbus.Options {
 	return eventbus.Options{
@@ -42,30 +32,13 @@ func BenchmarkNew(b *testing.B) {
 	}
 }
 
-// BenchmarkRegister measures registering a factory into the eventbus registry.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if err := eventbus.Register(benchFreshAdapter(), New); err != nil {
-			b.Fatalf("Register() error = %v", err)
-		}
-	}
-}
-
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-	a := benchFreshAdapter()
-	if err := eventbus.Register(a, New); err != nil {
-		b.Fatalf("Register() error = %v", err)
-	}
-
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		bus, err := eventbus.Open(a, eventbus.Options{})
+		bus, err := New(eventbus.Options{})
 		if err != nil {
 			b.Fatalf("Open() error = %v", err)
 		}

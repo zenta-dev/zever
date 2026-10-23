@@ -29,11 +29,9 @@
 //      forgiving spelling still compiles and runs - and still fails here,
 //      with the canonical key in the message. This is exactly the DB_MAXCONNS
 //      class.
-//    - `*_ADAPTER=value` values (via envKeyProblems) must be in the
-//      service's extracted adapter set. The set is built from BOTH
-//      registration const spellings (string literal and conversion of the
-//      battery type; merged in PR #738), so IDEMPOTENCY_ADAPTER=db and
-//      SESSION_ADAPTER=db are validated genuinely - no allowlist hacks.
+//    - `*_ADAPTER=value` shapes are rejected outright by envKeyProblems:
+//      adapter selection is compile-time wiring (`container.Provide`), so
+//      any exact ADAPTER key in docs teaches a removed mechanism.
 // 2. Cross-references: file references (`config/README.md`,
 //    `example_test.go`) must resolve - package dir first, then repo root -
 //    and a "see SYMBOL in FILE" reference must have SYMBOL appear verbatim
@@ -288,9 +286,8 @@ function selfTest() {
         '// Package cache pools typed values.',
         '//',
         '// DB_MAX_CONNS caps the pool; DB__REPORTING__DSN names an instance and',
-        '// DB_MAX_CONN_LIFETIME bounds connection age. CACHE_ADAPTER=memory selects',
-        '// the default adapter: see ExampleOpen in example_test.go and',
-        '// config/README.md.',
+        '// DB_MAX_CONN_LIFETIME bounds connection age. Backends are wired in code:',
+        '// see DefaultRef in ref.go and config/README.md.',
       ].join('\n'), expect: [] },
     { name: 'ambient and placeholder heads with citations pass', relFile: 'core/secrets/doc.go', src: [
         '// NO_COLOR, GRPC_ADDR, GRPC_REFLECTION, PPROF_ADDR, ZEVER_ENV are',
@@ -303,7 +300,7 @@ function selfTest() {
         '"some" is not a config service',
         '"__DEFAULT__" is a named instance',
       ] },
-    { name: 'a wrong adapter value is rejected', relFile: 'core/cache/doc.go', src: '// CACHE_ADAPTER=nope\n', expect: ['"nope" is not a cache adapter'] },
+    { name: 'an adapter selector is rejected', relFile: 'core/cache/doc.go', src: '// CACHE_ADAPTER=nope\n', expect: ['adapter selection is code, not config'] },
     { name: 'a broken file reference is rejected', relFile: 'core/cache/doc.go', src: '// See nope/README.md\n', expect: ['file reference nope/README.md does not resolve'] },
     { name: 'an env claim backed by a missing file is rejected', relFile: 'core/cache/doc.go', src: '// CACHE_ADAPTER is documented in docs/env-keys.md\n', expect: ['file reference docs/env-keys.md does not resolve'] },
     { name: 'DB_MAXCONNS (the #737 class) is rejected as a non-canonical spelling', relFile: 'config/doc.go', src: '// DB_MAXCONNS caps the pool.\n', expect: ['is not the canonical spelling'] },
@@ -311,8 +308,8 @@ function selfTest() {
   ];
 
   const checks = [
-    { name: 'the conversion-form const feeds the session adapter set on the real tree', ok: truth.session?.adapters?.has('db') === true },
-    { name: 'the conversion-form const feeds the idempotency adapter set on the real tree', ok: truth.idempotency?.adapters?.has('db') === true },
+    { name: 'the directory scan feeds the session adapter set on the real tree', ok: truth.session?.adapters?.has('db') === true },
+    { name: 'the directory scan feeds the idempotency adapter set on the real tree', ok: truth.idempotency?.adapters?.has('db') === true },
     {
       name: 'adapterNamesFromRegister parses both registration spellings',
       ok: adapterNamesFromRegister('package p\n\nconst Adapter a.Adapter = "a"\nconst Adapter b.Adapter = b.Adapter("b")\n').join(',') === 'a,b',
@@ -387,12 +384,11 @@ for (const rel of files) {
 }
 if (auditFactsError)
   problems.unshift(`audit-facts.mjs failed to import (docs node_modules missing?): ${auditFactsError}`);
-// Guard the truth extraction itself: if the BOTH-forms adapter const scan
-// (merged in PR #738) ever stops yielding the db adapters, *_ADAPTER values
-// could no longer be validated genuinely - report that instead of failing
-// to fail.
+// Guard the truth extraction itself: if the adapter-directory scan ever
+// stops yielding the db adapters, *_ADAPTER rejections could no longer be
+// validated genuinely - report that instead of failing to fail.
 if (!truth.session?.adapters?.has('db') || !truth.idempotency?.adapters?.has('db'))
-  problems.unshift('go-truth: the session/idempotency "db" adapter consts are not extracted; the BOTH-forms registration scan (PR #738) broke, so *_ADAPTER values cannot be validated genuinely');
+  problems.unshift('go-truth: the session/idempotency "db" adapters are not extracted; the adapter-directory scan broke, so *_ADAPTER values cannot be validated genuinely');
 
 console.log(`${files.length} doc.go files`);
 for (const p of problems) console.log(p);

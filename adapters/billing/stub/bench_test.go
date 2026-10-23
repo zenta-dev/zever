@@ -1,21 +1,10 @@
 package stub
 
 import (
-	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/billing"
 )
-
-// benchAdapterSeq yields a unique adapter key per Register call so the
-// registry benchmark never collides with an existing factory.
-var benchAdapterSeq atomic.Int64
-
-// benchFreshAdapter returns an adapter name unique to this benchmark run.
-func benchFreshAdapter() billing.Adapter {
-	return billing.Adapter(fmt.Sprintf("bench-%d", benchAdapterSeq.Add(1)))
-}
 
 // BenchmarkCreateCustomer measures in-memory customer creation.
 func BenchmarkCreateCustomer(b *testing.B) {
@@ -103,28 +92,13 @@ func BenchmarkCancelSubscription(b *testing.B) {
 	}
 }
 
-// BenchmarkOpen measures option validation plus construction.
+// BenchmarkOpen measures construction.
 func BenchmarkOpen(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		if _, err := Open(billing.Options{}); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-// BenchmarkRegister measures registering the stub factory into the billing
-// registry.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if err := billing.Register(benchFreshAdapter(), Open); err != nil {
-			b.Fatal(err)
-		}
+		_ = New()
 	}
 }
 

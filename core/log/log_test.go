@@ -2,17 +2,8 @@ package log
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"sync"
-	"sync/atomic"
-	"testing"
 	"time"
 )
-
-var adapterSeq atomic.Int64
-
-func freshAdapter() Adapter { return Adapter(fmt.Sprintf("test-%d", 1000+adapterSeq.Add(1))) }
 
 type stubEvent struct{}
 
@@ -62,98 +53,3 @@ var (
 	_ Event   = stubEvent{}
 	_ Context = stubContext{}
 )
-
-func TestOpen_registeredFactory_returnsLogger(t *testing.T) {
-	adapter := freshAdapter()
-	wantOpts := Options{MinLevel: LevelWarn}
-	var gotOpts Options
-
-	err := Register(adapter, func(opts Options) (Logger, error) {
-		gotOpts = opts
-		return stubLogger{}, nil
-	})
-	if err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-
-	got, err := Open(adapter, wantOpts)
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
-
-	if got == nil {
-		t.Fatal("Open() = nil, want logger")
-	}
-
-	if gotOpts != wantOpts {
-		t.Errorf("factory opts = %+v, want %+v", gotOpts, wantOpts)
-	}
-}
-
-func TestOpen_factoryError_wrappedWithAdapter(t *testing.T) {
-	adapter := freshAdapter()
-	sentinel := errors.New("boom")
-
-	_ = Register(adapter, func(Options) (Logger, error) { return nil, sentinel })
-
-	_, err := Open(adapter, Options{})
-	if err == nil {
-		t.Fatal("Open() = nil, want wrapped factory error")
-	}
-
-	if !errors.Is(err, sentinel) {
-		t.Errorf("errors.Is(err, sentinel) = false (err = %v)", err)
-	}
-}
-
-func TestRegister_concurrent_uniqueAdapters_allSucceed(t *testing.T) {
-	t.Parallel()
-
-	const workers = 20
-
-	var wg sync.WaitGroup
-
-	errs := make([]error, workers)
-	for i := range workers {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			a := freshAdapter()
-			errs[i] = Register(a, func(Options) (Logger, error) { return stubLogger{}, nil })
-		}()
-	}
-
-	wg.Wait()
-
-	for i, err := range errs {
-		if err != nil {
-			t.Errorf("Register() worker %d error = %v", i, err)
-		}
-	}
-}
-
-func TestOpen_concurrentReads_safe(t *testing.T) {
-	t.Parallel()
-
-	adapter := freshAdapter()
-	_ = Register(adapter, func(Options) (Logger, error) { return stubLogger{}, nil })
-
-	const workers = 50
-
-	var wg sync.WaitGroup
-
-	for range workers {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			if _, err := Open(adapter, Options{}); err != nil {
-				t.Errorf("Open() error = %v", err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
