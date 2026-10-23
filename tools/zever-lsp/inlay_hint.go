@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"go.lsp.dev/protocol"
 
@@ -87,6 +88,10 @@ func inlayHintsFor(schema *ir.Schema, file *ast.File, settings Settings) []proto
 		hints = append(hints, errorCaseHints(file)...)
 	}
 
+	if settings.ParamNames {
+		hints = append(hints, paramNameHints(schema, file)...)
+	}
+
 	return hints
 }
 
@@ -112,6 +117,134 @@ func errorCaseHints(file *ast.File) []protocol.InlayHint {
 			Label:    protocol.String(fmt.Sprintf(" (%d %s)", code.HTTPStatus(), code.GRPCName())),
 		})
 	})
+
+	return hints
+}
+
+// paramNameHints annotates positional call arguments with their resolved
+// `name:` parameter labels: for every schedule `dispatch: Job(...)` call it
+// shows the job's parameter names ahead of each positional argument.
+//
+// Saga steps are deliberately absent from the walk, not an oversight: a
+// step's execute/compensate options are bare `Service.RPC` references
+// (parseRPCRef rejects `(` with a diagnostic), so the grammar has no call
+// site there to annotate. Should the grammar ever gain step arguments, the
+// shared paramNameHintsForCall helper below takes them unchanged.
+//
+// Parameter names come from the resolved ir.Job.Params, so a nil schema (or
+// a dispatch naming no known job) yields no hints rather than guesses.
+// Settings.ParamNames gates the whole family, off by default.
+func paramNameHints(schema *ir.Schema, file *ast.File) []protocol.InlayHint {
+	if schema == nil || file == nil {
+		return nil
+	}
+
+	var hints []protocol.InlayHint
+
+	walkDispatchCalls(file, func(call *ast.CallValue) {
+		params := findJobParams(schema, call.Name)
+		if len(params) == 0 {
+			return
+		}
+
+		hints = append(hints, paramNameHintsForCall(params, call)...)
+	})
+
+	return hints
+}
+
+// walkDispatchCalls calls fn once for every schedule dispatch call in the
+// file, in declaration order -- the call-argument counterpart of
+// walkErrorCases, which walks every rpc's errors set the same way. A
+// dispatch that is not a call (mid-edit) is skipped.
+func walkDispatchCalls(file *ast.File, fn func(call *ast.CallValue)) {
+	for _, decl := range flattenDecls(file) {
+		sched, ok := decl.(*ast.ScheduleDecl)
+		if !ok {
+			continue
+		}
+
+		call, ok := sched.Dispatch.(*ast.CallValue)
+		if !ok {
+			continue
+		}
+
+		fn(call)
+	}
+}
+
+// findJobParams returns the resolved parameter list of the job named name,
+// or nil when no module declares it.
+func findJobParams(schema *ir.Schema, name string) []*ir.Param {
+	if schema == nil || name == "" {
+		return nil
+	}
+
+	for _, module := range schema.Modules {
+		for _, job := range module.Jobs {
+			if job.Name == name {
+				return job.Params
+			}
+		}
+	}
+
+	return nil
+}
+
+// paramNameHintsForCall renders one `name:` hint per positional argument of
+// call, anchored at the argument's start so the editor shows the label
+// ahead of the value. Two rust-analyzer-style noise heuristics apply: an
+// argument that already carries a `name:` label is never annotated, and a
+// single-argument call whose value identifier case-insensitively equals the
+// parameter name (dispatch: Send(user) for a (user: string) job) is left
+// alone -- the name is already visible. Positional arguments past the end
+// of the parameter list, and empty parameter names, are skipped rather than
+// guessed at.
+func paramNameHintsForCall(params []*ir.Param, call *ast.CallValue) []protocol.InlayHint {
+	if call == nil {
+		return nil
+	}
+
+	var args []*ast.Arg
+
+	for _, arg := range call.Args {
+		if arg != nil {
+			args = append(args, arg)
+		}
+	}
+
+	var hints []protocol.InlayHint
+
+	positional := 0
+
+	for _, arg := range args {
+		if arg.Name != "" {
+			continue
+		}
+
+		paramName := ""
+		if positional < len(params) && params[positional] != nil {
+			paramName = params[positional].Name
+		}
+
+		positional++
+
+		if paramName == "" {
+			continue
+		}
+
+		if len(args) == 1 {
+			if ident, ok := arg.Value.(*ast.IdentValue); ok && strings.EqualFold(ident.Name, paramName) {
+				continue
+			}
+		}
+
+		hints = append(hints, protocol.InlayHint{
+			Position: lspPosition(arg.Pos),
+			Label:    protocol.String(paramName + ":"),
+			Kind:     protocol.InlayHintKindParameter,
+		})
+	}
 
 	return hints
 }

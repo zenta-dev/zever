@@ -20,6 +20,11 @@ type Settings struct {
 	ErrorCaseHints bool
 	// CodeLensReferences gates the "N reference(s)" code lens family.
 	CodeLensReferences bool
+	// ParamNames gates the `name:` parameter-name inlay hint family for
+	// schedule dispatch (and saga step) call arguments. Off by default:
+	// unlike the families above, parameter names are usually obvious from
+	// context, so they are noise unless explicitly asked for.
+	ParamNames bool
 	// DebounceDelay is how long an edit burst must settle before recompiling.
 	DebounceDelay time.Duration
 }
@@ -31,6 +36,7 @@ func defaultSettings() Settings {
 		ImplicitModuleHints: true,
 		ErrorCaseHints:      true,
 		CodeLensReferences:  true,
+		ParamNames:          false,
 		DebounceDelay:       debounceDelay,
 	}
 }
@@ -39,7 +45,7 @@ func defaultSettings() Settings {
 //
 //	{
 //	  "zever": {
-//	    "inlayHints": { "implicitModule": true, "errorCases": true },
+//	    "inlayHints": { "implicitModule": true, "errorCases": true, "paramNames": false },
 //	    "codelens": { "references": true },
 //	    "diagnostics": { "debounceMs": 250 }
 //	  }
@@ -51,6 +57,7 @@ const (
 	settingsErrorCasesKey = "errorCases"
 	settingsCodeLensKey   = "codelens"
 	settingsReferencesKey = "references"
+	settingsParamNamesKey = "paramNames"
 	settingsDiagKey       = "diagnostics"
 	settingsDebounceKey   = "debounceMs"
 )
@@ -94,6 +101,10 @@ func parseSettings(raw protocol.LSPAny) (parsed Settings, ok bool) {
 
 		if b, bOK := jsonBool(hints[settingsErrorCasesKey]); bOK {
 			parsed.ErrorCaseHints = b
+		}
+
+		if b, bOK := jsonBool(hints[settingsParamNamesKey]); bOK {
+			parsed.ParamNames = b
 		}
 	}
 

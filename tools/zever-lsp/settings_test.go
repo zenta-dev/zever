@@ -25,6 +25,10 @@ func TestDefaultSettings(t *testing.T) {
 		t.Errorf("defaultSettings hint gates = %+v, want both enabled", got)
 	}
 
+	if got.ParamNames {
+		t.Errorf("defaultSettings.ParamNames = true, want false (opt-in noise)")
+	}
+
 	if got.DebounceDelay != debounceDelay {
 		t.Errorf("defaultSettings.DebounceDelay = %v, want %v", got.DebounceDelay, debounceDelay)
 	}
@@ -73,6 +77,17 @@ func TestParseSettings(t *testing.T) {
 				ErrorCaseHints:      false,
 				CodeLensReferences:  true,
 				DebounceDelay:       900 * time.Millisecond,
+			},
+			wantOK: true,
+		},
+		{
+			name:    "paramNames on enables the call-argument hint family",
+			payload: `{"zever":{"inlayHints":{"paramNames":true}}}`,
+			want: Settings{
+				ImplicitModuleHints: true,
+				ErrorCaseHints:      true,
+				ParamNames:          true,
+				DebounceDelay:       debounceDelay,
 			},
 			wantOK: true,
 		},

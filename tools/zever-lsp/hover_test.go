@@ -691,3 +691,148 @@ func TestHoverOnEmptyMessageDecl(t *testing.T) {
 		t.Errorf("hover markdown missing the empty field marker:\n%s", got)
 	}
 }
+
+// hoverRefSrc names User from a relation target and an rpc return type in
+// the same file, so the entity hover can list both reference sites.
+const hoverRefSrc = "entity User {\n" +
+	"\tid: uuid @primary\n" +
+	"}\n" +
+	"\n" +
+	"entity Order {\n" +
+	"\tid: uuid @primary\n" +
+	"\tuser_id: uuid\n" +
+	"\tbelongs_to user: User @foreign_key(user_id)\n" +
+	"}\n" +
+	"\n" +
+	"service UserService {\n" +
+	"\trpc GetUser(id: uuid) -> User {\n" +
+	"\t\tauth: none\n" +
+	"\t}\n" +
+	"}\n"
+
+func TestHoverOnEntityDeclDefinedInAndReferencedBy(t *testing.T) {
+	got := hoverTextForSrc(t, hoverRefSrc, cursorOn(t, hoverRefSrc, 0, "User"))
+
+	for _, want := range []string{
+		"`defined in main.zen`",
+		"Referenced by:",
+		"`Order.user`",
+		"`UserService.GetUser`",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// TestHoverOnEntityDeclWithoutReferencesOmitsSection proves a declaration
+// nothing else names renders no "Referenced by" section rather than an
+// empty one: Order is referenced by nothing in hoverRefSrc.
+func TestHoverOnEntityDeclWithoutReferencesOmitsSection(t *testing.T) {
+	got := hoverTextForSrc(t, hoverRefSrc, cursorOn(t, hoverRefSrc, 4, "Order"))
+
+	if strings.Contains(got, "Referenced by:") {
+		t.Errorf("hover markdown should omit the section when unreferenced:\n%s", got)
+	}
+
+	if !strings.Contains(got, "`defined in main.zen`") {
+		t.Errorf("hover markdown missing the defined-in line:\n%s", got)
+	}
+}
+
+// hoverMsgRefSrc names Cart from a message field type, an rpc parameter
+// type and an rpc return type, the three message reference kinds.
+const hoverMsgRefSrc = "message Cart {\n" +
+	"\tid: uuid\n" +
+	"}\n" +
+	"\n" +
+	"message Order {\n" +
+	"\tcart: Cart\n" +
+	"}\n" +
+	"\n" +
+	"service Shop {\n" +
+	"\trpc Checkout(cart: Cart) -> Cart {\n" +
+	"\t\tauth: none\n" +
+	"\t}\n" +
+	"}\n"
+
+func TestHoverOnMessageDeclReferencedBy(t *testing.T) {
+	got := hoverDeclText(t, hoverMsgRefSrc, cursorOn(t, hoverMsgRefSrc, 0, "Cart"))
+
+	for _, want := range []string{
+		"`defined in decl.zen`",
+		"Referenced by:",
+		"`Order.cart`",
+		"`Shop.Checkout(cart)`",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("hover markdown missing %q:\n%s", want, got)
+		}
+	}
+
+	// The rpc's return type is not a messageRefsIn site (that walker
+	// covers declarations, field types and parameter types only), so no
+	// bare `Shop.Checkout` bullet may appear.
+	if strings.Contains(got, "- `Shop.Checkout`") {
+		t.Errorf("hover lists a return-type site the walker does not cover:\n%s", got)
+	}
+}
+
+// TestHoverOnEnumDeclReferencedByCapped proves the referenced-by list uses
+// the same hoverFieldLimit convention with the "… N more" tail as the
+// field lists: 12 fields of enum type, 10 shown, 2 elided.
+func TestHoverOnEnumDeclReferencedByCapped(t *testing.T) {
+	var src strings.Builder
+
+	src.WriteString("enum Status {\n\tok\n}\n\nentity Task {\n\tid: uuid @primary\n")
+
+	for i := range 12 {
+		fmt.Fprintf(&src, "\ts%d: Status\n", i)
+	}
+
+	src.WriteString("}\n")
+
+	got := hoverDeclText(t, src.String(), cursorOn(t, src.String(), 0, "Status"))
+
+	if !strings.Contains(got, "`Task.s9`") {
+		t.Errorf("hover should show the first %d references:\n%s", hoverFieldLimit, got)
+	}
+
+	if strings.Contains(got, "`Task.s10`") {
+		t.Errorf("hover should stop at %d references:\n%s", hoverFieldLimit, got)
+	}
+
+	if !strings.Contains(got, "… 2 more") {
+		t.Errorf("hover should end with the two-more tail:\n%s", got)
+	}
+}
+
+func TestDefinedInDisplay(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"relative file", "main.zen", "main.zen"},
+		{"nested relative file", "schema/billing/x.zen", "schema/billing/x.zen"},
+		{"absolute path outside cwd falls back to base", "/definitely/not/cwd/x.zen", "x.zen"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := definedInDisplay(tc.in); got != tc.want {
+				t.Errorf("definedInDisplay(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDefinedInLine_emptyFile_returnsEmpty(t *testing.T) {
+	if got := definedInLine(nil); got != "" {
+		t.Errorf("definedInLine(nil) = %q, want empty", got)
+	}
+
+	if got := definedInLine(&ast.File{}); got != "" {
+		t.Errorf("definedInLine(nameless file) = %q, want empty", got)
+	}
+}

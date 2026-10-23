@@ -54,8 +54,13 @@ import (
 // space every tokenSpan.TokenType refers to. It is the standard LSP token
 // type list in its canonical order; this server uses a subset, but publishes
 // the whole list so a client theme keyed to the standard names resolves
-// every index the same way it would for any other server. No modifiers are
-// produced, so the modifier list is empty rather than absent.
+// every index the same way it would for any other server. One modifier,
+// "definition", marks declaration identifiers (decl names and field names
+// at their declaration); references to those names carry none, so a theme
+// can style definitions distinctly. Growing the modifier list (rather than
+// renumbering the type list) is the spec-tolerated direction for old
+// clients: tokenTypes/tokenModifiers are extensible enumerations, and a
+// client that does not know "definition" ignores the bit.
 var semanticTokenLegend = protocol.SemanticTokensLegend{
 	TokenTypes: []string{
 		"namespace", "type", "class", "enum", "interface", "struct",
@@ -63,8 +68,13 @@ var semanticTokenLegend = protocol.SemanticTokensLegend{
 		"event", "function", "method", "macro", "keyword", "modifier",
 		"comment", "string", "number", "regexp", "operator",
 	},
-	TokenModifiers: []string{},
+	TokenModifiers: []string{"definition"},
 }
+
+// semTokDefinitionBit is the modifier bit for the legend's "definition"
+// modifier: bit N of a token's modifier mask refers to the Nth entry of
+// TokenModifiers, and "definition" is entry 0.
+const semTokDefinitionBit = 1 << 0
 
 // The token type indices this server actually emits. They are derived from
 // semanticTokenLegend at init time rather than written as literals, so
@@ -116,6 +126,11 @@ type tokenSpan struct {
 	StartChar int
 	Length    int
 	TokenType int // index into semanticTokenLegend.TokenTypes
+	// Modifiers is the token's modifier bitmask: bit N refers to the Nth
+	// entry of semanticTokenLegend.TokenModifiers. Only
+	// semTokDefinitionBit is ever set, on declaration identifiers; every
+	// reference span carries 0.
+	Modifiers uint32
 }
 
 // classifyFile returns every classified span in one document, sorted by
@@ -177,6 +192,21 @@ func (c *spanCollector) add(pos diag.Position, ident string, tokenType int) {
 // addSpan records a span of an explicitly measured length, for text whose
 // source extent is not simply the identifier itself.
 func (c *spanCollector) addSpan(pos diag.Position, length, tokenType int) {
+	c.addSpanWithModifiers(pos, length, tokenType, 0)
+}
+
+// addDefinition records a declaration-identifier span: a decl name
+// (entity/message/service/rpc/job/schedule/saga/enum) or a field name at
+// its declaration. The span carries the legend's "definition" modifier
+// bit; every reference span added via add/addSpan carries none.
+func (c *spanCollector) addDefinition(pos diag.Position, ident string, tokenType int) {
+	c.addSpanWithModifiers(pos, utf16Len(ident), tokenType, semTokDefinitionBit)
+}
+
+// addSpanWithModifiers records a span of an explicitly measured length
+// carrying modifier bits, for declaration identifiers (via addDefinition)
+// and every other span (with a zero mask).
+func (c *spanCollector) addSpanWithModifiers(pos diag.Position, length, tokenType int, modifiers uint32) {
 	if pos.Line <= 0 || pos.Col <= 0 || length <= 0 || tokenType < 0 {
 		return
 	}
@@ -193,6 +223,7 @@ func (c *spanCollector) addSpan(pos diag.Position, length, tokenType int) {
 		StartChar: key[1],
 		Length:    length,
 		TokenType: tokenType,
+		Modifiers: modifiers,
 	})
 }
 
@@ -226,7 +257,7 @@ func (c *spanCollector) entity(decl *ast.EntityDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokClass)
+	c.addDefinition(decl.NamePos, decl.Name, semTokClass)
 	c.attributes(decl.Attributes)
 
 	for _, field := range decl.Fields {
@@ -234,7 +265,7 @@ func (c *spanCollector) entity(decl *ast.EntityDecl) {
 			continue
 		}
 
-		c.add(field.NamePos, field.Name, semTokProperty)
+		c.addDefinition(field.NamePos, field.Name, semTokProperty)
 		c.typeExpr(field.Type)
 		c.attributes(field.Attributes)
 	}
@@ -256,14 +287,14 @@ func (c *spanCollector) message(decl *ast.MessageDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokClass)
+	c.addDefinition(decl.NamePos, decl.Name, semTokClass)
 
 	for _, field := range decl.Fields {
 		if field == nil {
 			continue
 		}
 
-		c.add(field.NamePos, field.Name, semTokProperty)
+		c.addDefinition(field.NamePos, field.Name, semTokProperty)
 		c.typeExpr(field.Type)
 		c.attributes(field.Attributes)
 	}
@@ -281,7 +312,7 @@ func (c *spanCollector) enumDecl(decl *ast.EnumDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokClass)
+	c.addDefinition(decl.NamePos, decl.Name, semTokClass)
 
 	for i, val := range decl.Values {
 		if i >= len(decl.ValuePos) {
@@ -304,7 +335,7 @@ func (c *spanCollector) saga(decl *ast.SagaDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokFunction)
+	c.addDefinition(decl.NamePos, decl.Name, semTokFunction)
 
 	for _, step := range decl.Steps {
 		for _, ref := range []*ast.RPCRef{step.Execute, step.Compensate} {
@@ -329,7 +360,7 @@ func (c *spanCollector) relation(decl *ast.RelationDecl) {
 		return
 	}
 
-	c.add(decl.FieldNamePos, decl.FieldName, semTokProperty)
+	c.addDefinition(decl.FieldNamePos, decl.FieldName, semTokProperty)
 	c.add(decl.TargetPos, decl.Target, semTokClass)
 	c.attributes(decl.Attributes)
 
@@ -383,7 +414,7 @@ func (c *spanCollector) service(decl *ast.ServiceDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokInterface)
+	c.addDefinition(decl.NamePos, decl.Name, semTokInterface)
 
 	for _, rpc := range decl.RPCs {
 		c.rpc(rpc)
@@ -397,7 +428,7 @@ func (c *spanCollector) rpc(decl *ast.RPCDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokMethod)
+	c.addDefinition(decl.NamePos, decl.Name, semTokMethod)
 	c.add(decl.ReturnsPos, decl.Returns, semTokClass)
 
 	for _, param := range decl.Params {
@@ -439,7 +470,7 @@ func (c *spanCollector) job(decl *ast.JobDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokFunction)
+	c.addDefinition(decl.NamePos, decl.Name, semTokFunction)
 	c.add(decl.QueuePos, decl.Queue, semTokEnumMember)
 
 	for _, param := range decl.Params {
@@ -459,7 +490,7 @@ func (c *spanCollector) schedule(decl *ast.ScheduleDecl) {
 		return
 	}
 
-	c.add(decl.NamePos, decl.Name, semTokEvent)
+	c.addDefinition(decl.NamePos, decl.Name, semTokEvent)
 	c.value(decl.Dispatch)
 }
 
@@ -652,7 +683,7 @@ func encodeSemanticTokens(spans []tokenSpan) []uint32 {
 			uint32(deltaChar),      //nolint:gosec // spans sorted ascending: deltas never negative
 			uint32(span.Length),    //nolint:gosec // token lengths never negative
 			uint32(span.TokenType), //nolint:gosec // token types are non-negative kind indexes
-			0,                      // no modifiers: the legend declares none
+			span.Modifiers,         // declaration identifiers carry the definition bit, references none
 		)
 
 		prevLine, prevChar = span.Line, span.StartChar

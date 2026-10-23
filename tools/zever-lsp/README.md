@@ -47,8 +47,8 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets) |
 | Rename | `textDocument/prepareRename`, `textDocument/rename` (entities, fields, jobs, services, RPCs) |
 | Code lens | `textDocument/codeLens`, `codeLens/resolve` (per-declaration `N reference(s)` counts; info-only, gated by `zever.codelens.references`) |
-| Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` |
-| Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module and `errors:`-case annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
+| Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` (the `definition` modifier marks declaration identifiers) |
+| Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module, `errors:`-case, and `paramNames:` parameter-name annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
 | Configuration | `workspace/didChangeConfiguration` (`zever.*` settings, see [Configuration](#configuration) below) |
 | Lifecycle | `initialize`, `initialized`, `shutdown`, `exit`, `$/setTrace` |
 
@@ -87,7 +87,8 @@ ignored and keep their default.
   "zever": {
     "inlayHints": {
       "implicitModule": true,
-      "errorCases": true
+      "errorCases": true,
+      "paramNames": false
     },
     "codelens": {
       "references": true
@@ -104,6 +105,7 @@ ignored and keep their default.
 | `zever.inlayHints.implicitModule` | `true` | `(module: public)` hints on declarations resolving to the implicit public module (shown only when the schema mixes public and named modules) |
 | `zever.inlayHints.errorCases` | `true` | status/gRPC-name annotations on `errors: { ... }` case names |
 | `zever.codelens.references` | `true` | `N reference(s)` lenses on top-level declarations (entities, messages, services, RPCs, jobs, schedules, sagas, enums) |
+| `zever.inlayHints.paramNames` | `false` | `name:` annotations on positional `dispatch: Job(...)` call arguments (skipped for already-named arguments and same-name single-argument calls) |
 | `zever.diagnostics.debounceMs` | `250` | how long an edit burst must settle before recompiling (values ≤ 0 keep the default) |
 
 ## Diagnostic codes
