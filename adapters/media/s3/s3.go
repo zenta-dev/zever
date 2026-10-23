@@ -27,6 +27,8 @@ import (
 	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
+var _ media.Media = (*driver)(nil)
+
 // driver stores media assets in an S3-compatible bucket.
 type driver struct {
 	client      *s3sdk.Client
@@ -438,7 +440,7 @@ func stageTemp(ext string, data []byte) (string, string, error) {
 
 	path := filepath.Join(dir, "in"+ext)
 	if err := writeFile(path, data, 0o600); err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		return "", "", fmt.Errorf("s3: temp: %w", err)
 	}
 

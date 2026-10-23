@@ -32,7 +32,7 @@ func main() {
 }
 
 // dirPerms is the permission mode for created grammar directories.
-const dirPerms = 0o755
+const dirPerms = 0o750
 
 // run writes every generated file returned by gengrammar.Files() to its
 // path relative to the current working directory, which must be the

@@ -117,6 +117,38 @@ linters:
     govet:
       enable:
         - shadow
+    gosec:
+      # Curated security rules: enable only high-confidence, actionable checks.
+      # Excluded false-positive-heavy rules:
+      #  G103: unsafe in generated protobuf code
+      #  G104: unhandled errors (often intentional pass-through)
+      #  G109-G114: strconv unchecked (validated at boundaries)
+      #  G115: integer overflow (bounds-checked at call sites)
+      #  G204: subprocess launch (CLI tools, validated adapters)
+      #  G301/G302/G306: file perms (CLI scaffolds, non-secret files)
+      #  G402: TLS InsecureSkipVerify (explicit opt-in for testing)
+      #  G404: weak random (retry/pruner jitter, non-security)
+      #  G703: taint analysis (high FP rate on validated paths)
+      enable:
+        - G101  # hardcoded credentials
+        - G102  # bind to all interfaces
+        - G106  # ssh.InsecureIgnoreHostKey
+        - G107  # URL taint to HTTP request
+        - G108  # profiling endpoint exposed
+        - G201  # SQL string concatenation
+        - G202  # SQL string concatenation
+        - G203  # unchecked SQL parameter
+        - G303  # predictable tempfile
+        - G305  # zip path traversal
+        - G307  # temp file permissions
+        - G401  # weak crypto
+        - G403  # weak crypto min key size
+        - G501  # import blacklist
+        - G502  # import blacklist
+        - G503  # import blacklist
+        - G504  # import blacklist
+        - G505  # import blacklist
+        - G601  # implicit memory aliasing
   exclusions:
     presets:
       - comments
