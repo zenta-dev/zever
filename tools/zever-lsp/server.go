@@ -240,6 +240,11 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 				TriggerCharacters: []string{"@", ":", " "},
 				ResolveProvider:   &enabled,
 			},
+			// Unlike CompletionProvider above, this one is a bare bool:
+			// ghost text has no trigger characters to configure (see
+			// inline_completion.go for the single skeleton offered per
+			// declaration slot).
+			InlineCompletionProvider: protocol.Boolean(true),
 			// Same options-struct shape as CompletionProvider above: the
 			// trigger characters are part of the capability itself. '('
 			// opens a call's argument list and ',' moves to the next
@@ -772,6 +777,35 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 // to the lowercase implementation that completion.go owns.
 func (s *Server) CompletionResolve(ctx context.Context, params *protocol.CompletionItem) (*protocol.CompletionItem, error) {
 	return s.completionResolve(ctx, params)
+}
+
+// InlineCompletion offers the single ghost-text skeleton for the declaration
+// slot enclosing the cursor, or null when the cursor is not on an
+// otherwise-empty line with one obvious skeleton (or the document is
+// unknown). The offer arrives as a one-item InlineCompletionList; nil
+// encodes LSP null, the same "nothing to offer" answer Completion gives.
+func (s *Server) InlineCompletion(ctx context.Context, params *protocol.InlineCompletionParams) (protocol.InlineCompletionResult, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return nil, nil //nolint:nilnil // LSP encodes "no ghost text" as a null result
+	}
+
+	schema, file := s.schemaAndFile(uriStr)
+
+	s.mu.Lock()
+	caps := s.completionCaps
+	s.mu.Unlock()
+
+	item := inlineCompletionAt(schema, file, content, params.Position, caps)
+	if item == nil {
+		return nil, nil //nolint:nilnil // LSP encodes "no ghost text" as a null result
+	}
+
+	return &protocol.InlineCompletionList{Items: []protocol.InlineCompletionItem{*item}}, nil
 }
 
 // SignatureHelp describes the call-like construct whose argument list holds
