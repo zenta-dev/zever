@@ -1,7 +1,7 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"sort"
@@ -15,7 +15,7 @@ import (
 // tests registering distinct names stay race-free.
 var (
 	pluginValidatorsMu sync.RWMutex
-	pluginValidators   = make(map[string]func(string, json.RawMessage) error)
+	pluginValidators   = make(map[string]func(string, jsontext.Value) error)
 )
 
 // RegisterPluginValidator registers validate as the Validate hook for the
@@ -23,7 +23,7 @@ var (
 // raw options; a nil error means the plugin's config is valid. Names must
 // be unique: re-registering a name fails so two plugins can never silently
 // share one validator. A nil validate or empty name also fails.
-func RegisterPluginValidator(name string, validate func(adapter string, opts json.RawMessage) error) error {
+func RegisterPluginValidator(name string, validate func(adapter string, opts jsontext.Value) error) error {
 	if name == "" {
 		return errors.New("config: plugin validator name must not be empty")
 	}
@@ -42,7 +42,7 @@ func RegisterPluginValidator(name string, validate func(adapter string, opts jso
 // lookupPluginValidator returns the validator registered for name, or false
 // when none is registered. Unregistered plugins skip validation: their
 // options are opaque to this package.
-func lookupPluginValidator(name string) (func(string, json.RawMessage) error, bool) {
+func lookupPluginValidator(name string) (func(string, jsontext.Value) error, bool) {
 	pluginValidatorsMu.RLock()
 	defer pluginValidatorsMu.RUnlock()
 	validate, ok := pluginValidators[name]
@@ -51,7 +51,7 @@ func lookupPluginValidator(name string) (func(string, json.RawMessage) error, bo
 
 // sortedPluginNames returns the plugin map's keys in sorted order so
 // Validate and RedactedServices iterate deterministically.
-func sortedPluginNames(m map[string]Service[json.RawMessage]) []string {
+func sortedPluginNames(m map[string]Service[jsontext.Value]) []string {
 	names := make([]string, 0, len(m))
 	for name := range m {
 		names = append(names, name)

@@ -2,7 +2,6 @@ package serve
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -14,6 +13,8 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/scheduler"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // mustFullProviders wires every battery the doctor report resolves: the
@@ -50,7 +51,7 @@ func decodeDoctorReport(t *testing.T, buf *bytes.Buffer) (bool, map[string]strin
 		} `json:"batteries"`
 	}
 
-	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+	if err := codec.Unmarshal(buf.Bytes(), &doc); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, buf.String())
 	}
 
@@ -99,7 +100,7 @@ func TestDoctorReportCoversTheWiredBatteries(t *testing.T) {
 		} `json:"batteries"`
 	}
 
-	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+	if err := codec.Unmarshal(buf.Bytes(), &doc); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, buf.String())
 	}
 

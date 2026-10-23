@@ -1,29 +1,31 @@
 package mcpclient
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"net"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // scriptedServer answers canned responses keyed by method name.
 type scriptedServer struct {
 	t       *testing.T
 	conn    net.Conn
-	methods map[string]func(id int64, raw json.RawMessage)
+	methods map[string]func(id int64, raw jsontext.Value)
 }
 
 func (s *scriptedServer) respond(id int64, result any) {
 	s.t.Helper()
 
-	raw, err := json.Marshal(result)
+	raw, err := codec.Marshal(result)
 	if err != nil {
 		s.t.Fatalf("marshal result: %v", err)
 	}
 
-	out, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "result": json.RawMessage(raw)})
+	out, err := codec.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "result": jsontext.Value(raw)})
 	if err != nil {
 		s.t.Fatalf("marshal response: %v", err)
 	}
@@ -38,7 +40,7 @@ func (s *scriptedServer) respond(id int64, result any) {
 func (s *scriptedServer) fail(id int64, code int, msg string) {
 	s.t.Helper()
 
-	out, err := json.Marshal(map[string]any{
+	out, err := codec.Marshal(map[string]any{
 		"jsonrpc": "2.0", "id": id,
 		"error": map[string]any{"code": code, "message": msg},
 	})
@@ -56,16 +58,16 @@ func (s *scriptedServer) fail(id int64, code int, msg string) {
 func (s *scriptedServer) serve() {
 	defer s.conn.Close()
 
-	dec := json.NewDecoder(s.conn)
+	dec := jsontext.NewDecoder(s.conn)
 
 	for {
 		var req struct {
-			ID     int64           `json:"id"`
-			Method string          `json:"method"`
-			Params json.RawMessage `json:"params"`
+			ID     int64          `json:"id"`
+			Method string         `json:"method"`
+			Params jsontext.Value `json:"params"`
 		}
 
-		if err := dec.Decode(&req); err != nil {
+		if err := codec.UnmarshalDecode(dec, &req); err != nil {
 			return
 		}
 
@@ -84,7 +86,7 @@ func startScriptedServer(t *testing.T) (*scriptedServer, *Client) {
 
 	server, client := net.Pipe()
 
-	s := &scriptedServer{t: t, conn: server, methods: map[string]func(id int64, raw json.RawMessage){}}
+	s := &scriptedServer{t: t, conn: server, methods: map[string]func(id int64, raw jsontext.Value){}}
 
 	go s.serve()
 
@@ -96,20 +98,20 @@ func startScriptedServer(t *testing.T) (*scriptedServer, *Client) {
 func TestClient_handshakeListCall(t *testing.T) {
 	s, c := startScriptedServer(t)
 
-	s.methods["initialize"] = func(id int64, _ json.RawMessage) {
+	s.methods["initialize"] = func(id int64, _ jsontext.Value) {
 		s.respond(id, map[string]any{"protocolVersion": "2024-11-05"})
 	}
-	s.methods["tools/list"] = func(id int64, _ json.RawMessage) {
+	s.methods["tools/list"] = func(id int64, _ jsontext.Value) {
 		s.respond(id, map[string]any{"tools": []any{
 			map[string]any{"name": "echo", "description": "Echo back.", "inputSchema": map[string]any{"type": "object"}},
 		}})
 	}
-	s.methods["tools/call"] = func(id int64, raw json.RawMessage) {
+	s.methods["tools/call"] = func(id int64, raw jsontext.Value) {
 		var p struct {
 			Name      string         `json:"name"`
 			Arguments map[string]any `json:"arguments"`
 		}
-		if err := json.Unmarshal(raw, &p); err != nil {
+		if err := codec.Unmarshal(raw, &p); err != nil {
 			s.fail(id, -32602, "bad params")
 			return
 		}
@@ -150,7 +152,7 @@ func TestClient_handshakeListCall(t *testing.T) {
 func TestClient_rpcError(t *testing.T) {
 	s, c := startScriptedServer(t)
 
-	s.methods["tools/list"] = func(id int64, _ json.RawMessage) {
+	s.methods["tools/list"] = func(id int64, _ jsontext.Value) {
 		s.fail(id, -32602, "bad call")
 	}
 

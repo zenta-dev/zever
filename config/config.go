@@ -1,7 +1,7 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 
 	"github.com/zenta-dev/zever/core/ai"
 	"github.com/zenta-dev/zever/core/analytics"
@@ -40,6 +40,7 @@ import (
 	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/core/workflow"
+
 	"github.com/zenta-dev/zever/shared/codec"
 )
 
@@ -105,7 +106,7 @@ type Config struct {
 	// options: unknown option fields pass through untouched because the
 	// plugin validates them itself (see RegisterPluginValidator). Nil by
 	// default; Default leaves it nil and merge initializes it on first use.
-	Plugins map[string]Service[json.RawMessage] `json:"plugins"`
+	Plugins map[string]Service[jsontext.Value] `json:"plugins"`
 }
 
 // knownServiceNames returns the 37 lowercase service names in sorted order.
@@ -205,7 +206,7 @@ func (c *Config) RedactedServices() map[string]ServiceConfig {
 		if len(svc.Options) > 0 {
 			// Best-effort: corrupt raw options degrade to an empty
 			// redacted map rather than failing display.
-			if err := json.Unmarshal(svc.Options, &m); err != nil {
+			if err := codec.Unmarshal(svc.Options, &m); err != nil {
 				m = nil
 			}
 		}

@@ -1,11 +1,12 @@
 package config
 
 import (
-	"encoding/json"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // RedactedValue replaces secret values in redacted option maps.
@@ -598,12 +599,12 @@ func redactTypedValue(v any) any {
 		return v
 	}
 
-	b, err := json.Marshal(v)
+	b, err := codec.Marshal(v)
 	if err != nil {
 		return RedactedValue
 	}
 	var node any
-	if err := json.Unmarshal(b, &node); err != nil {
+	if err := codec.Unmarshal(b, &node); err != nil {
 		return RedactedValue
 	}
 

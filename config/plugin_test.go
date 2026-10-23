@@ -1,13 +1,15 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
-func mustRegisterPlugin(t *testing.T, name string, validate func(string, json.RawMessage) error) {
+func mustRegisterPlugin(t *testing.T, name string, validate func(string, jsontext.Value) error) {
 	t.Helper()
 	if err := RegisterPluginValidator(name, validate); err != nil {
 		t.Fatalf("RegisterPluginValidator(%q): %v", name, err)
@@ -21,19 +23,19 @@ func mustRegisterPlugin(t *testing.T, name string, validate func(string, json.Ra
 	})
 }
 
-func pluginRaw(t *testing.T, m map[string]any) json.RawMessage {
+func pluginRaw(t *testing.T, m map[string]any) jsontext.Value {
 	t.Helper()
-	b, err := json.Marshal(m)
+	b, err := codec.Marshal(m)
 	if err != nil {
 		t.Fatalf("marshal plugin options: %v", err)
 	}
-	return json.RawMessage(b)
+	return jsontext.Value(b)
 }
 
 func TestPluginOptionsStayRaw(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_merge": {
 			Adapter: "custom",
 			Options: pluginRaw(t, map[string]any{
@@ -50,7 +52,7 @@ func TestPluginOptionsStayRaw(t *testing.T) {
 		t.Fatalf("adapter = %q, want custom", svc.Adapter)
 	}
 	var opts map[string]any
-	if err := json.Unmarshal(svc.Options, &opts); err != nil {
+	if err := codec.Unmarshal(svc.Options, &opts); err != nil {
 		t.Fatalf("unmarshal plugin options: %v", err)
 	}
 	if opts["anything_goes"] != float64(1) {
@@ -61,7 +63,7 @@ func TestPluginOptionsStayRaw(t *testing.T) {
 func TestPluginEnvAdapterOverride(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_env": {Adapter: "default-adapter", Options: pluginRaw(t, map[string]any{"k": "v"})},
 	}
 	applyPluginEnv(Env{"PLUGINTEST_ENV_ADAPTER": "env-adapter"}, cfg)
@@ -85,12 +87,12 @@ func TestPluginEnvNoPluginsNoop(t *testing.T) {
 func TestPluginValidateSuccess(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
-	mustRegisterPlugin(t, "plugintest_valid_ok", func(adapter string, opts json.RawMessage) error {
+	mustRegisterPlugin(t, "plugintest_valid_ok", func(adapter string, opts jsontext.Value) error {
 		if adapter != "custom" {
 			return errors.New("want adapter custom")
 		}
 		var m map[string]any
-		if err := json.Unmarshal(opts, &m); err != nil {
+		if err := codec.Unmarshal(opts, &m); err != nil {
 			return err
 		}
 		if m["k"] != "v" {
@@ -99,7 +101,7 @@ func TestPluginValidateSuccess(t *testing.T) {
 		return nil
 	})
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_valid_ok": {Adapter: "custom", Options: pluginRaw(t, map[string]any{"k": "v"})},
 	}
 	if err := cfg.Validate(); err != nil {
@@ -110,11 +112,11 @@ func TestPluginValidateSuccess(t *testing.T) {
 func TestPluginValidateFailure(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
-	mustRegisterPlugin(t, "plugintest_valid_fail", func(string, json.RawMessage) error {
+	mustRegisterPlugin(t, "plugintest_valid_fail", func(string, jsontext.Value) error {
 		return errors.New("boom")
 	})
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_valid_fail": {Adapter: "custom"},
 	}
 	err := cfg.Validate()
@@ -130,7 +132,7 @@ func TestPluginValidateUnregisteredSkips(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_unregistered_xyz": {Adapter: "whatever", Options: pluginRaw(t, map[string]any{"any": 1})},
 	}
 	if err := cfg.Validate(); err != nil {
@@ -141,15 +143,15 @@ func TestPluginValidateUnregisteredSkips(t *testing.T) {
 func TestPluginDuplicateValidator(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
-	mustRegisterPlugin(t, "plugintest_dup", func(string, json.RawMessage) error { return nil })
-	err := RegisterPluginValidator("plugintest_dup", func(string, json.RawMessage) error { return nil })
+	mustRegisterPlugin(t, "plugintest_dup", func(string, jsontext.Value) error { return nil })
+	err := RegisterPluginValidator("plugintest_dup", func(string, jsontext.Value) error { return nil })
 	if err == nil {
 		t.Fatal("want duplicate registration error")
 	}
 	if !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("error = %v, want duplicate mention", err)
 	}
-	if err := RegisterPluginValidator("", func(string, json.RawMessage) error { return nil }); err == nil {
+	if err := RegisterPluginValidator("", func(string, jsontext.Value) error { return nil }); err == nil {
 		t.Fatal("want empty-name error")
 	}
 	if err := RegisterPluginValidator("plugintest_nil", nil); err == nil {
@@ -161,7 +163,7 @@ func TestPluginRedactedServices(t *testing.T) {
 	ctx := t.Context()
 	_ = ctx
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_redact": {
 			Adapter: "custom",
 			Options: pluginRaw(t, map[string]any{"api_key": "s3cret", "endpoint": "https://example.com"}),
@@ -188,14 +190,14 @@ func TestPluginRedactedServices(t *testing.T) {
 
 func TestPluginEnvEndToEnd(t *testing.T) {
 	t.Parallel()
-	mustRegisterPlugin(t, "plugintest_load", func(adapter string, _ json.RawMessage) error {
+	mustRegisterPlugin(t, "plugintest_load", func(adapter string, _ jsontext.Value) error {
 		if adapter != "custom" {
 			return errors.New("want adapter custom")
 		}
 		return nil
 	})
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
+	cfg.Plugins = map[string]Service[jsontext.Value]{
 		"plugintest_load": {Adapter: "default", Options: pluginRaw(t, map[string]any{"api_key": "s3cret"})},
 	}
 	applyPluginEnv(Env{"PLUGINTEST_LOAD_ADAPTER": "custom"}, cfg)

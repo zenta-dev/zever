@@ -1,7 +1,6 @@
 package serve
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // doctorBattery is one row of the doctor JSON document.
@@ -118,7 +118,7 @@ func doctorChecksBattery(c *container.Container, name string) bool {
 // writeDoctorReport encodes the report and maps a failing aggregate to
 // ErrDoctorFailed.
 func writeDoctorReport(w io.Writer, ok bool, rows []doctorBattery) error {
-	if err := json.NewEncoder(w).Encode(map[string]any{"ok": ok, "batteries": rows}); err != nil {
+	if err := codec.MarshalLine(w, map[string]any{"ok": ok, "batteries": rows}); err != nil {
 		return fmt.Errorf("serve: encode doctor report: %w", err)
 	}
 

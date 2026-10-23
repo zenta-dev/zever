@@ -2,13 +2,15 @@ package mcpclient
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"io"
 	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // request is a JSON-RPC 2.0 request.
@@ -38,9 +40,9 @@ type Tool struct {
 // TextContent is one text content block in a tool result.
 type TextContent struct {
 	// Type is always "text".
-	Type string
+	Type string `json:"type"`
 	// Text is the block payload.
-	Text string
+	Text string `json:"text"`
 }
 
 // CallResult is a tools/call result.
@@ -62,8 +64,8 @@ type CallResult struct {
 // to the configured hooks while a call waits. Hooks must not call Client
 // methods: the transport lock is held during dispatch.
 type Client struct {
-	enc  *json.Encoder
-	dec  *json.Decoder
+	w    io.Writer
+	dec  *jsontext.Decoder
 	mu   sync.Mutex
 	next atomic.Int64
 
@@ -73,7 +75,7 @@ type Client struct {
 
 // New builds a Client over r and w. It performs no I/O until the first call.
 func New(r io.Reader, w io.Writer, opts ...Option) *Client {
-	c := &Client{enc: json.NewEncoder(w), dec: json.NewDecoder(r)}
+	c := &Client{w: w, dec: jsontext.NewDecoder(r)}
 
 	for _, opt := range opts {
 		opt(c)
@@ -183,6 +185,21 @@ func DialStdioRetry(ctx context.Context, path string, opts DialOptions, args ...
 	return nil, nil, fmt.Errorf("mcpclient: dial %q failed after %d attempts: %w", path, attempts, err)
 }
 
+// encodeMessage writes v as one newline-terminated JSON line with a single
+// Write. The framing matches v1 Encoder.Encode (value plus '\n'); a single
+// Write matters because synchronous transports such as net.Pipe rendezvous
+// every Write with a peer Read, so splitting the value and its terminator
+// can deadlock against a peer that answers before reading the newline.
+func encodeMessage(w io.Writer, v any) error {
+	raw, err := codec.Marshal(v)
+	if err != nil {
+		return err
+	}
+	raw = append(raw, '\n')
+	_, err = w.Write(raw)
+	return err
+}
+
 // call sends one request and decodes the matching response.
 func (c *Client) call(ctx context.Context, method string, params, out any) error {
 	if err := ctx.Err(); err != nil {
@@ -194,7 +211,7 @@ func (c *Client) call(ctx context.Context, method string, params, out any) error
 
 	id := c.next.Add(1)
 
-	if err := c.enc.Encode(request{JSONRPC: "2.0", ID: id, Method: method, Params: params}); err != nil {
+	if err := encodeMessage(c.w, request{JSONRPC: "2.0", ID: id, Method: method, Params: params}); err != nil {
 		return fmt.Errorf("mcpclient: encode %s: %w", method, err)
 	}
 
@@ -204,7 +221,7 @@ func (c *Client) call(ctx context.Context, method string, params, out any) error
 		}
 
 		var msg inbound
-		if err := c.dec.Decode(&msg); err != nil {
+		if err := codec.UnmarshalDecode(c.dec, &msg); err != nil {
 			return fmt.Errorf("mcpclient: decode %s: %w", method, err)
 		}
 
@@ -236,7 +253,7 @@ func (c *Client) call(ctx context.Context, method string, params, out any) error
 			return fmt.Errorf("mcpclient: empty %s result: %w", method, ErrProtocol)
 		}
 
-		if err := json.Unmarshal(msg.Result, out); err != nil {
+		if err := codec.Unmarshal(msg.Result, out); err != nil {
 			return fmt.Errorf("mcpclient: decode %s result: %w", method, err)
 		}
 
@@ -247,17 +264,17 @@ func (c *Client) call(ctx context.Context, method string, params, out any) error
 // inbound is the wire shape of any incoming message: responses carry
 // result/error, server requests carry a method.
 type inbound struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      *int64          `json:"id"`
-	Method  string          `json:"method,omitempty"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *rpcErrorWire   `json:"error,omitempty"`
+	JSONRPC string         `json:"jsonrpc"`
+	ID      *int64         `json:"id"`
+	Method  string         `json:"method,omitempty"`
+	Params  jsontext.Value `json:"params,omitempty"`
+	Result  jsontext.Value `json:"result,omitempty"`
+	Error   *rpcErrorWire  `json:"error,omitempty"`
 }
 
 // dispatchRequest answers one server-initiated request. Notifications (nil
 // ID) return before the switch: hooks never run for them.
-func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, params json.RawMessage) error {
+func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, params jsontext.Value) error {
 	if id == nil {
 		return nil
 	}
@@ -267,12 +284,12 @@ func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, 
 			return c.sendResponse(id, nil, rpcErr)
 		}
 
-		raw, err := json.Marshal(result)
+		raw, err := codec.Marshal(result)
 		if err != nil {
 			return c.sendResponse(id, nil, &RPCError{Code: -32603, Message: err.Error()})
 		}
 
-		return c.sendResponse(id, raw, nil)
+		return c.sendResponse(id, jsontext.Value(raw), nil)
 	}
 
 	switch method {
@@ -288,11 +305,11 @@ func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, 
 
 		if len(params) > 0 {
 			var full map[string]any
-			if err := json.Unmarshal(params, &full); err != nil {
+			if err := codec.Unmarshal(params, &full); err != nil {
 				return answer(nil, &RPCError{Code: -32602, Message: "invalid sampling params"})
 			}
 
-			if err := json.Unmarshal(params, &p); err != nil {
+			if err := codec.Unmarshal(params, &p); err != nil {
 				return answer(nil, &RPCError{Code: -32602, Message: "invalid sampling params"})
 			}
 
@@ -311,7 +328,7 @@ func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, 
 			Schema  map[string]any `json:"requestedSchema"`
 		}
 		if len(params) > 0 {
-			if err := json.Unmarshal(params, &p); err != nil {
+			if err := codec.Unmarshal(params, &p); err != nil {
 				return answer(nil, &RPCError{Code: -32602, Message: "invalid elicitation params"})
 			}
 		}
@@ -337,7 +354,7 @@ func (c *Client) dispatchRequest(ctx context.Context, id *int64, method string, 
 }
 
 // sendResponse encodes one response or error for id.
-func (c *Client) sendResponse(id *int64, result json.RawMessage, rpcErr *RPCError) error {
+func (c *Client) sendResponse(id *int64, result jsontext.Value, rpcErr *RPCError) error {
 	msg := map[string]any{"jsonrpc": "2.0", "id": *id}
 
 	if rpcErr != nil {
@@ -346,7 +363,7 @@ func (c *Client) sendResponse(id *int64, result json.RawMessage, rpcErr *RPCErro
 		msg["result"] = result
 	}
 
-	if err := c.enc.Encode(msg); err != nil {
+	if err := encodeMessage(c.w, msg); err != nil {
 		return fmt.Errorf("mcpclient: encode response: %w", err)
 	}
 
