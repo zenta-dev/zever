@@ -13,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/sms"
 	"github.com/zenta-dev/zever/examples/sms/stub"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // ErrPluginConfig indicates a missing or malformed plugin configuration entry.
@@ -43,7 +44,7 @@ func run(ctx context.Context) error {
 		var opts sms.Options
 
 		if len(entry.Options) > 0 {
-			if err := json.Unmarshal(entry.Options, &opts); err != nil {
+			if err := codec.Unmarshal(entry.Options, &opts); err != nil {
 				return nil, fmt.Errorf("sms: decode options: %w", err)
 			}
 		}

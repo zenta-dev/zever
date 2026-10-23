@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/zenta-dev/zever/core/webhook"
 	genapp "github.com/zenta-dev/zever/examples/bookings/generated/zenorm/orm/gen/app"
 	"github.com/zenta-dev/zever/orm"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // ErrBookingNotFound indicates a booking ID has no matching row.
@@ -27,15 +27,15 @@ var errEmptyBookingID = errors.New("jobs: booking id is empty")
 // SendConfirmationArgs is the payload of the SendConfirmation job declared in
 // the schema.
 type SendConfirmationArgs struct {
-	BookingID string `json:"booking_id"`
+	BookingID string `json:"booking_id,omitzero"`
 }
 
 // confirmationPayload is the webhook payload fanned out on booking.created.
 type confirmationPayload struct {
-	ID      string `json:"id"`
-	SpaceID string `json:"space_id"`
-	GuestID string `json:"guest_id"`
-	Status  string `json:"status"`
+	ID      string `json:"id,omitzero"`
+	SpaceID string `json:"space_id,omitzero"`
+	GuestID string `json:"guest_id,omitzero"`
+	Status  string `json:"status,omitzero"`
 }
 
 // RunConfirmation loads the booking, sends a mail receipt to the guest,
@@ -90,7 +90,7 @@ func RunConfirmation(ctx context.Context, deps Deps, bookingID string) error {
 		return fmt.Errorf("jobs: confirmation: notify guest: %w", nerr)
 	}
 
-	payload, err := json.Marshal(confirmationPayload{
+	payload, err := codec.Marshal(confirmationPayload{
 		ID: booking.ID, SpaceID: booking.SpaceID, GuestID: booking.GuestID, Status: booking.Status,
 	})
 	if err != nil {

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
@@ -27,13 +27,13 @@ import (
 var ErrInsufficientStock = errors.New("api: insufficient stock")
 
 type checkoutItem struct {
-	ProductID string `json:"product_id"`
-	Quantity  int32  `json:"quantity"`
+	ProductID string `json:"product_id,omitzero"`
+	Quantity  int32  `json:"quantity,omitzero"`
 }
 
 type checkoutRequest struct {
-	Coupon   string         `json:"coupon"`
-	GiftNote string         `json:"gift_note"`
+	Coupon   string         `json:"coupon,omitzero"`
+	GiftNote string         `json:"gift_note,omitzero"`
 	Items    []checkoutItem `json:"items"`
 }
 
@@ -145,7 +145,7 @@ func (a *API) handleCheckout(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if a.Queue != nil {
-		body, _ := json.Marshal(map[string]string{"order_id": orderID})
+		body, _ := codec.Marshal(map[string]string{"order_id": orderID})
 		_ = a.Queue.Push(ctx, "orders.confirm", queue.NewPayload(body), queue.NewHeaders(nil))
 	}
 
@@ -184,9 +184,9 @@ func (a *API) handleGetOrder(w http.ResponseWriter, req *http.Request) {
 }
 
 type reviewRequest struct {
-	ProductID string `json:"product_id"`
-	Rating    int32  `json:"rating"`
-	Body      string `json:"body"`
+	ProductID string `json:"product_id,omitzero"`
+	Rating    int32  `json:"rating,omitzero"`
+	Body      string `json:"body,omitzero"`
 }
 
 // handleCreateReview stores a 1-5 rating for a product.

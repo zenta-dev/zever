@@ -6,7 +6,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -46,6 +45,7 @@ import (
 	"github.com/zenta-dev/zever/core/vectorstore"
 	"github.com/zenta-dev/zever/core/webhook"
 	"github.com/zenta-dev/zever/core/workflow"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TokenTTL is the lifetime of issued JWTs.
@@ -188,7 +188,7 @@ func subject(req *http.Request) string {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_ = codec.MarshalLine(w, v)
 }
 
 // writeError encodes a message as a JSON error.
@@ -206,7 +206,7 @@ const maxRequestBodyBytes = 1 << 20 // 1 MiB
 func decodeJSON(req *http.Request, v any) error {
 	defer func() { _ = req.Body.Close() }()
 	body := http.MaxBytesReader(nil, req.Body, maxRequestBodyBytes)
-	return json.NewDecoder(body).Decode(v)
+	return codec.UnmarshalRead(body, v)
 }
 
 // health reports liveness.

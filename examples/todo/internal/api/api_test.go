@@ -3,7 +3,6 @@ package api_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/todo/internal/api"
 	"github.com/zenta-dev/zever/examples/todo/internal/testsetup"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const testJWTSecret = "test-secret-for-todo-app-32-bytes-min!"
@@ -79,7 +79,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any) *htt
 
 	var buf bytes.Buffer
 	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		if err := codec.MarshalLine(&buf, body); err != nil {
 			t.Fatalf("encode: %v", err)
 		}
 	}
@@ -139,7 +139,7 @@ func TestFullFlow(t *testing.T) {
 	var login struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &login); err != nil || login.Token == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &login); err != nil || login.Token == "" {
 		t.Fatalf("login token missing: %v body %s", err, rec.Body.String())
 	}
 
@@ -161,7 +161,7 @@ func TestFullFlow(t *testing.T) {
 	var created struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil || created.ID == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &created); err != nil || created.ID == "" {
 		t.Fatalf("create id missing: %v body %s", err, rec.Body.String())
 	}
 
@@ -171,7 +171,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("list: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var listed []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil || len(listed) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &listed); err != nil || len(listed) != 1 {
 		t.Fatalf("list want 1, got %s err %v", rec.Body.String(), err)
 	}
 
@@ -183,7 +183,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("patch: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var patched map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &patched); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &patched); err != nil {
 		t.Fatalf("patch decode: %v", err)
 	}
 	if patched["title"] != "buy oat milk" || patched["done"] != true {
@@ -227,7 +227,7 @@ func TestOwnerScoping(t *testing.T) {
 		var out struct {
 			Token string `json:"token"`
 		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 			t.Fatalf("token decode: %v", err)
 		}
 		tokens[u.email] = out.Token
@@ -242,7 +242,7 @@ func TestOwnerScoping(t *testing.T) {
 	var created struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
@@ -268,7 +268,7 @@ func TestOwnerScoping(t *testing.T) {
 		t.Fatalf("bob list: got %d", rec.Code)
 	}
 	var bobNotes []any
-	if err := json.Unmarshal(rec.Body.Bytes(), &bobNotes); err != nil || len(bobNotes) != 0 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &bobNotes); err != nil || len(bobNotes) != 0 {
 		t.Fatalf("bob list want empty, got %s", rec.Body.String())
 	}
 	rec = do(t, h, "GET", "/api/notes/"+created.ID, tokens["alice@example.com"], nil)
@@ -293,7 +293,7 @@ func TestTamperedToken(t *testing.T) {
 	var out struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 

@@ -1,11 +1,12 @@
 package api_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // doRaw sends a raw body for malformed-payload cases.
@@ -40,7 +41,7 @@ func mustRegister(t *testing.T, h http.Handler, email string) string {
 	var out struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
 		t.Fatalf("token: %v %s", err, rec.Body.String())
 	}
 	return out.Token
@@ -75,7 +76,7 @@ func TestMalformedJSON(t *testing.T) {
 	var seeded struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &seeded); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &seeded); err != nil {
 		t.Fatalf("seed id: %v", err)
 	}
 
@@ -151,7 +152,7 @@ func TestValidationBoundaries(t *testing.T) {
 	var created struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	rec = do(t, h, "PATCH", "/api/notes/"+created.ID, token, map[string]any{"title": "  "})
@@ -172,7 +173,7 @@ func TestDoubleDeleteNotFound(t *testing.T) {
 	var created struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if rec := do(t, h, "DELETE", "/api/notes/"+created.ID, token, nil); rec.Code != http.StatusNoContent {

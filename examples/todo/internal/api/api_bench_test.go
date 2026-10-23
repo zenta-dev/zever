@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/examples/todo/internal/api"
 	"github.com/zenta-dev/zever/examples/todo/internal/testsetup"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // benchHandler builds a seeded handler and token for benchmarks.
@@ -61,7 +61,7 @@ func benchHandler(b *testing.B) (http.Handler, string) {
 
 	post := func(path, token string, body any) *httptest.ResponseRecorder {
 		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		if err := codec.MarshalLine(&buf, body); err != nil {
 			b.Fatalf("encode: %v", err)
 		}
 		req := httptest.NewRequestWithContext(ctx, http.MethodPost, path, &buf)
@@ -80,7 +80,7 @@ func benchHandler(b *testing.B) (http.Handler, string) {
 	var out struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
 		b.Fatalf("token: %v", err)
 	}
 	for i := 0; i < 10; i++ {
