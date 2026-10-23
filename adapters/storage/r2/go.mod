@@ -23,7 +23,6 @@ require (
 	github.com/aws/smithy-go v1.28.5 // indirect
 	github.com/zenta-dev/zever/core/log v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 )
 
 replace github.com/zenta-dev/zever/shared/s3opts => ../../../shared/s3opts

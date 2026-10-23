@@ -6,7 +6,6 @@ require (
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
-	github.com/zenta-dev/zever/shared/registry v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0
 	go.opentelemetry.io/otel/trace v1.47.0

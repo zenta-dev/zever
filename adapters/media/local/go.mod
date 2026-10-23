@@ -6,7 +6,6 @@ require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
 )
 

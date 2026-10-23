@@ -7,7 +7,6 @@ require (
 	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
-	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
 
 replace github.com/zenta-dev/zever/core/db => ../db
