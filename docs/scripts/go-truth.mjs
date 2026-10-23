@@ -36,9 +36,9 @@ function camelToSnake(s) {
 // the reference form points at a core const that the core scanner already
 // captures, so it (and a sigil-free non-declaration) yields nothing.
 const ADAPTER_CONST_FORMS = [
-  [/=\s*[\w.]*Adapter\s*\(\s*"([^"]+)"\s*\)$/, (m) => m[1]], // = x.Adapter("name")
-  [/=\s*"([^"]+)"$/, (m) => m[1]], // = "name"
-  [/=\s*[\w.]+$/, () => null], // = x.DB (core const reference)
+  [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*[\w.]*Adapter\s*\(\s*"([^"]+)"\s*\)$/, (m) => m[1]], // (const) Adapter x.Adapter = x.Adapter("name")
+  [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*"([^"]+)"$/, (m) => m[1]], // (const) Adapter x.Adapter = "name"
+  [/^(?:const\s+)?Adapter\s+[\w.]+\s*=\s*[\w.]+$/, () => null], // (const) Adapter x.Adapter = x.DB (core const reference)
 ];
 
 // adapterNamesFromRegister extracts the adapter names a register.go declares:
