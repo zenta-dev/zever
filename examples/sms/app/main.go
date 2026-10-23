@@ -1,5 +1,5 @@
 // Command app shows the SMS plugin dogfood example: config plus container
-// plugin registration plus Resolve plus Send.
+// Provide plus Get plus Send.
 package main
 
 import (
@@ -14,13 +14,18 @@ import (
 	"github.com/zenta-dev/zever/examples/sms"
 	"github.com/zenta-dev/zever/examples/sms/stub"
 	"github.com/zenta-dev/zever/shared/codec"
+	"github.com/zenta-dev/zever/shared/ref"
 )
 
 // ErrPluginConfig indicates a missing or malformed plugin configuration entry.
 var ErrPluginConfig = errors.New("sms: plugin config")
 
-// pluginName is the cfg.Plugins key and container plugin name.
+// pluginName is the cfg.Plugins key and container service name.
 const pluginName = "sms"
+
+// SMSRef names the wired SMS instance. The app chooses the backend by which
+// constructor the Provide entry calls, then rebuilds to change it.
+var SMSRef = ref.Default[sms.SMS, sms.Options](pluginName)
 
 func run(ctx context.Context) error {
 	cfg := config.Default()
@@ -30,36 +35,28 @@ func run(ctx context.Context) error {
 		},
 	}
 
-	if err := stub.Register(); err != nil {
-		return fmt.Errorf("sms: register stub: %w", err)
+	entry, ok := cfg.Plugins[pluginName]
+	if !ok {
+		return fmt.Errorf("sms: %w: missing plugins[%q] entry", ErrPluginConfig, pluginName)
 	}
 
-	if err := container.RegisterPlugin[sms.SMS](pluginName, container.PluginAPIVersion, func(cfg *config.Config) (sms.SMS, error) {
-		entry, ok := cfg.Plugins[pluginName]
-		if !ok {
-			return nil, fmt.Errorf("sms: %w: missing plugins[%q] entry", ErrPluginConfig, pluginName)
+	var opts sms.Options
+
+	if len(entry.Options) > 0 {
+		if err := codec.Unmarshal(entry.Options, &opts); err != nil {
+			return fmt.Errorf("sms: decode options: %w", err)
 		}
-
-		var opts sms.Options
-
-		if len(entry.Options) > 0 {
-			if err := codec.Unmarshal(entry.Options, &opts); err != nil {
-				return nil, fmt.Errorf("sms: decode options: %w", err)
-			}
-		}
-
-		// The adapter is selected in code: this app wires the stub
-		// backend directly, then rebuilds to change it.
-		return sms.Open(sms.Stub, opts)
-	}); err != nil {
-		return fmt.Errorf("sms: register plugin: %w", err)
 	}
 
-	c := container.New(cfg)
+	// The backend is selected in code: this app wires the stub backend
+	// directly, then rebuilds to change it.
+	c := container.New(cfg, container.Provide(SMSRef, stub.Open, container.WithOptions(func(o *sms.Options) {
+		*o = opts
+	})))
 
-	svc, err := container.Resolve[sms.SMS](c, pluginName)
+	svc, err := container.Get(c, SMSRef)
 	if err != nil {
-		return fmt.Errorf("sms: resolve plugin: %w", err)
+		return fmt.Errorf("sms: resolve sms: %w", err)
 	}
 
 	if err := svc.Send(ctx, "+15550001", "hello from sms plugin"); err != nil {

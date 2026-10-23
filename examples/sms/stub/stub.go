@@ -29,19 +29,15 @@ type Message struct {
 	Body string
 }
 
-// Open validates opts and returns a stub SMS backend.
+// Open validates opts and returns a stub SMS backend. It matches
+// sms.Factory, so apps wire it in code with container.Provide instead of a
+// name-based open.
 func Open(opts sms.Options) (sms.SMS, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("stub: %w", err)
 	}
 
 	return &driver{from: opts.From}, nil
-}
-
-// Register registers the stub factory under sms.Stub for later sms.Open.
-// Call once at startup; duplicate registration returns an error.
-func Register() error {
-	return sms.Register(sms.Stub, Open)
 }
 
 // Send records a message. Empty to/body fail with sms.ErrInvalidOptions.
