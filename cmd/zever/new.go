@@ -639,8 +639,8 @@ func parseAdaptersFlag(raw string) (map[string]string, error) {
 // adapter is included even if its module dir were ever missing.
 //
 // Only names that resolve at runtime belong here: a pick the scaffolder
-// offers must be an adapter the registry knows, or the scaffold writes an
-// env value the project cannot boot with.
+// offers must be an adapter the app can wire with container.Provide, or the
+// scaffold writes a wiring entry the project cannot boot with.
 func batteryAdapters() map[string][]string {
 	out := map[string][]string{}
 

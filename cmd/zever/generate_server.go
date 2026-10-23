@@ -128,9 +128,9 @@ func writeScaffold(tag, path string, content []byte, force bool) error {
 //   - log (slog): stdlib logger; every entrypoint resolves c.Log() first.
 //   - router (stdhttp): net/http based; fiber is the heavy alternative.
 //
-// Both are adapter modules with a Register() wiring their battery registry
-// (see adapterBinding): the container wires nothing itself. Anything beyond
-// the floor is added via `zever new`'s battery picker (or `zever add`, or
+// Both are adapter modules wired with container.Provide entries (see
+// adapterBinding): the container resolves only what is Provided. Anything
+// beyond the floor is added via `zever new`'s battery picker (or `zever add`, or
 // with service env + app.go).
 var coreBatteries = []string{
 	"log", "router",
@@ -217,10 +217,10 @@ type moduleImport struct {
 // adapterBinding maps one battery selection to its adapter module: the
 // alias app.go imports it under and the adapter package import path. Every
 // battery/adapter pair binds: every adapter (stdlib-only included) is
-// a module with a Register() wiring their battery registry, and the
-// container wires nothing itself. Aliases are battery + adapter with no
-// separator; every pair is unique and collides with neither stdlib
-// names nor facade package names.
+// a module whose constructor is wired with a container.Provide entry, and
+// the container resolves only what is Provided. Aliases are battery +
+// adapter with no separator; every pair is unique and collides with neither
+// stdlib names nor facade package names.
 func adapterBinding(b batterySelection) (alias, path string) {
 	alias = b.Battery + b.Adapter
 
@@ -919,11 +919,11 @@ func writeStubIfMissing(tag, path string, content []byte) (written bool, err err
 //
 // Adapter packages expose constructors but never self-register, so wiring
 // is explicit: the named imports below pin exactly the adapters this app
-// uses, and each has a matching Register call in New wiring its battery
-// registry. This list was picked at scaffold time (`zever new`'s battery
+// uses, and each has a matching container.Provide entry in Providers wiring
+// its battery. This list was picked at scaffold time (`zever new`'s battery
 // picker, or the floor (log, router) when there was no prior `zever new`)
 // -- add a battery later with `zever add <battery>` (or with service env plus
-// one import and Register call here); this file is
+// one import and Provide entry here); this file is
 // scaffolded once and never regenerated.
 const appTemplate = `// Package app builds the config and container shared by this project's
 // binaries.
