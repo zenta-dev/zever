@@ -684,15 +684,14 @@ func (c *Container) Wired() []string {
 	return out
 }
 
-// providedDefault resolves the default Ref for one config-based service when
-// a provider was wired for it. It reports ok=false when no provider exists,
-// in which case the caller falls back to the config-based path. When a
+// providedDefault resolves the default Ref when a provider was wired for
+// it. It reports ok=false when no provider exists, in which case the
+// caller resolves via Get (which fails with NotWiredError). When a
 // provider exists, ok is true and err carries the resolution result.
 //
 // Callers guard the call with a provDefs nil check: a container built
-// without providers has none, and the guard keeps the config-based accessor
-// path a single predictable branch instead of a generic call plus a map
-// probe.
+// without providers has none, and the guard keeps the unwired fast path a
+// single predictable branch instead of a generic call plus a map probe.
 func (c *Container) providedDefault[T, O any](r ref.Ref[T, O]) (T, bool, error) {
 	var zero T
 

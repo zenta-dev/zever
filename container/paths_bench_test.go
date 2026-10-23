@@ -3,17 +3,16 @@ package container
 import (
 	"testing"
 
-	"github.com/zenta-dev/zever/config"
+	"github.com/zenta-dev/zever/core/eventbus"
+	"github.com/zenta-dev/zever/core/ratelimit"
 )
 
 // BenchmarkContainer_ResolveEventbus measures resolving the eventbus alias
 // from a cold container plus the empty shutdown that follows.
 func BenchmarkContainer_ResolveEventbus(b *testing.B) {
-	registerFakeAdapters()
-
 	b.ReportAllocs()
 	for b.Loop() {
-		c := New(config.Default())
+		c := New(nil, Provide(eventbus.DefaultRef(), newFakeEventBus))
 		if _, err := c.Eventbus(); err != nil {
 			b.Fatalf("Eventbus: %v", err)
 		}
@@ -26,11 +25,9 @@ func BenchmarkContainer_ResolveEventbus(b *testing.B) {
 // BenchmarkContainer_ResolveRatelimit measures resolving the ratelimit alias
 // from a cold container plus the empty shutdown that follows.
 func BenchmarkContainer_ResolveRatelimit(b *testing.B) {
-	registerFakeAdapters()
-
 	b.ReportAllocs()
 	for b.Loop() {
-		c := New(config.Default())
+		c := New(nil, Provide(ratelimit.DefaultRef(), newFakeRateLimit))
 		if _, err := c.Ratelimit(); err != nil {
 			b.Fatalf("Ratelimit: %v", err)
 		}

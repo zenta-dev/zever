@@ -10,11 +10,8 @@ import (
 	"testing"
 	"time"
 
-	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 	"github.com/zenta-dev/zever/config"
-	"github.com/zenta-dev/zever/core/cache"
 	"github.com/zenta-dev/zever/core/db"
-	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/search"
 )
 
@@ -325,43 +322,7 @@ func TestPoolRegistry_CloseOrdering(t *testing.T) {
 }
 
 func TestContainer_DedicatedPoolIsolation(t *testing.T) {
-	dbsqlite.Register()
-	_ = queue.Register(queue.DB, func(_ queue.Options) (queue.Queue, error) {
-		return &fakeQueue{}, nil
-	})
-
-	file := filepath.Join(t.TempDir(), "iso.db")
-	cfg := config.Default()
-	cfg.DB.Adapter = "sqlite"
-	cfg.DB.Options = db.Options{Path: file}
-	cfg.Queue.Adapter = "db"
-	cfg.Queue.Options = queue.Options{DBOptions: queue.DBOptions{DSN: file, DedicatedPool: true}}
-
-	c := New(cfg)
-	c.pools.warn = func(string) {}
-
-	if _, err := c.DB(); err != nil {
-		t.Fatalf("DB: %v", err)
-	}
-
-	if _, err := c.Queue(); err != nil {
-		t.Fatalf("Queue: %v", err)
-	}
-
-	snaps := c.pools.snapshot()
-	if len(snaps) != 1 {
-		t.Fatalf("registry entries = %d, want 1 (dedicated queue isolated)", len(snaps))
-	}
-
-	if snaps[0].name != "pool shared by db" {
-		t.Errorf("registry entry = %q, want db only", snaps[0].name)
-	}
-
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	if err := c.Close(ctx); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
+	t.Skip("container no longer shares pools: providers own their backends")
 }
 
 // stubSearch is a no-op search.Search proving the borrower path without
@@ -381,105 +342,7 @@ func (s *stubSearch) Search(_ context.Context, _ string, _ search.QueryOptions) 
 func (s *stubSearch) Close() error { return nil }
 
 func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
-	// The shared path builds pools via c.pools.open and borrowers via the
-	// batteries' OpenShared registries, so this test registers stub shared
-	// constructors: no adapter import, so container tests never drag
-	// adapter modules (and their SDKs) into downstream tidy graphs. No
-	// other test file registers shared factories, and factory-registry
-	// fakes for other adapters never shadow the separate shared
-	// registries, so this stays deterministic regardless of which fake
-	// adapters other test files registered globally (first registration
-	// wins there). Real OpenFromDB behavior stays covered per-adapter.
-	dbsqlite.Register()
-	_ = cache.RegisterShared(cache.DB, func(_ db.DB, _ cache.Options) (cache.Cache, error) {
-		return &fakeCache{}, nil
-	})
-	_ = queue.RegisterShared(queue.DB, func(_ db.DB, _ queue.Options) (queue.Queue, error) {
-		return &fakeQueue{}, nil
-	})
-	_ = search.RegisterShared(search.DB, func(_ db.DB, _ search.Options) (search.Search, error) {
-		return &stubSearch{}, nil
-	})
-
-	file := filepath.Join(t.TempDir(), "shared.db")
-	cfg := config.Default()
-	cfg.DB.Adapter = "sqlite"
-	cfg.DB.Options = db.Options{Path: file}
-	cfg.Queue.Adapter = "db"
-	cfg.Queue.Options = queue.Options{DBOptions: queue.DBOptions{DSN: file}}
-	cfg.Search.Adapter = string(search.DB)
-	cfg.Search.Options = search.Options{DSN: file}
-	cfg.Cache.Adapter = "db"
-	cfg.Cache.Options = cache.Options{DSN: file}
-
-	c := New(cfg)
-	var warns warnSink
-	c.pools.warn = warns.warn
-	var opens atomic.Int32
-	c.pools.open = func(_ db.Adapter, opts db.Options) (db.DB, error) {
-		opens.Add(1)
-
-		return dbsqlite.New(opts)
-	}
-
-	ctx := t.Context()
-	must := func(op string, err error) {
-		t.Helper()
-		if err != nil {
-			t.Fatalf("%s: %v", op, err)
-		}
-	}
-
-	d, err := c.DB()
-	must("DB", err)
-
-	if d == nil {
-		t.Fatal("DB is nil")
-	}
-
-	if _, err := c.Queue(); err != nil {
-		t.Fatalf("Queue: %v", err)
-	}
-
-	if _, err := c.Search(); err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-
-	if _, err := c.Cache(); err != nil {
-		t.Fatalf("Cache: %v", err)
-	}
-
-	if got := opens.Load(); got != 1 {
-		t.Errorf("pool opens = %d, want 1 shared pool", got)
-	}
-
-	snaps := c.pools.snapshot()
-	if len(snaps) != 1 {
-		t.Fatalf("registry entries = %d, want 1 shared pool", len(snaps))
-	}
-
-	if snaps[0].name != "pool shared by db,queue,search,cache" {
-		t.Errorf("registry entry = %q, want all four borrowers", snaps[0].name)
-	}
-
-	for _, m := range warns.all() {
-		if strings.Contains(m, file) {
-			t.Errorf("warn leaks path: %q", m)
-		}
-	}
-
-	// The shared pool is a real sqlite pool: borrowers build over it.
-	if _, err := d.Exec(ctx, "CREATE TABLE IF NOT EXISTS probe (id INTEGER PRIMARY KEY)"); err != nil {
-		t.Fatalf("Exec over shared pool: %v", err)
-	}
-
-	if err := d.Ping(ctx); err != nil {
-		t.Fatalf("Ping shared pool: %v", err)
-	}
-
-	closeCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	must("Close", c.Close(closeCtx))
+	t.Skip("container no longer shares pools: providers own their backends")
 }
 
 // TestPoolRegistry_MismatchesRecorded proves the MaxConns mismatch warn is
@@ -517,43 +380,30 @@ func TestPoolRegistry_MismatchesRecorded(t *testing.T) {
 	}
 }
 
-// TestContainer_PoolStatusAndMismatches proves the exported diagnostics over
-// a real shared sqlite pool: PoolStatus lists the pool with its borrowers
-// and effective cap, PoolMismatches is empty when caps agree.
+// TestContainer_PoolStatusAndMismatches proves the exported diagnostics
+// over a directly borrowed sqlite pool: PoolStatus lists the pool with its
+// borrowers and effective cap, PoolMismatches is empty when caps agree.
 func TestContainer_PoolStatusAndMismatches(t *testing.T) {
-	dbsqlite.Register()
-	_ = queue.RegisterShared(queue.DB, func(_ db.DB, _ queue.Options) (queue.Queue, error) {
-		return &fakeQueue{}, nil
-	})
-
-	file := filepath.Join(t.TempDir(), "status.db")
-	cfg := config.Default()
-	cfg.DB.Adapter = "sqlite"
-	cfg.DB.Options = db.Options{Path: file, MaxConns: 5}
-	cfg.Queue.Adapter = "db"
-	cfg.Queue.Options = queue.Options{DBOptions: queue.DBOptions{DSN: file}}
-
-	c := New(cfg)
-	var opens atomic.Int32
-	c.pools.open = func(_ db.Adapter, opts db.Options) (db.DB, error) {
-		opens.Add(1)
-
-		return dbsqlite.New(opts)
-	}
+	c := New(nil)
 	var warns warnSink
 	c.pools.warn = warns.warn
+	c.pools.open = func(_ db.Adapter, opts db.Options) (db.DB, error) {
+		return &stubPool{}, nil
+	}
 	t.Cleanup(func() {
-		closeCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		closeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = c.Close(closeCtx)
 	})
 
-	if _, err := c.DB(); err != nil {
-		t.Fatalf("DB: %v", err)
+	file := filepath.Join(t.TempDir(), "status.db")
+	key := "sqlite:" + file
+	if _, err := c.pools.borrow("db", db.SQLite, db.Options{Path: file, MaxConns: 5}, key, poolSQLite); err != nil {
+		t.Fatalf("borrow db: %v", err)
 	}
 
-	if _, err := c.Queue(); err != nil {
-		t.Fatalf("Queue: %v", err)
+	if _, err := c.pools.borrow("queue", db.SQLite, db.Options{Path: file}, key, poolSQLite); err != nil {
+		t.Fatalf("borrow queue: %v", err)
 	}
 
 	status := c.PoolStatus()

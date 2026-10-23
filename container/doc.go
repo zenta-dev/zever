@@ -9,10 +9,9 @@
 // struct: unexported fields plus an unexported seal method keep external
 // packages from constructing or impersonating it.
 //
-// A service resolves through one of two paths: an explicitly wired provider
-// (see Provide), or the config-based accessors, which read the service's
-// config and open the adapter registered in its battery's core registry when
-// no provider covers the default ref.
+// A service resolves through its explicitly wired provider (see Provide):
+// every accessor resolves the default ref, failing with NotWiredError when
+// New received no provider for it.
 //
 // Close shuts services down in reverse dependency order; see Close for the
 // exact ordering and timeout contract.

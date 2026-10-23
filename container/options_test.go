@@ -66,7 +66,7 @@ func TestRAGOption_applies(t *testing.T) {
 func TestAgent_withOptions(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := newTestContainer(t)
 	closeContainer(t, c)
 
 	l, err := c.Agent(WithMaxParallel(2))
@@ -82,7 +82,7 @@ func TestAgent_withOptions(t *testing.T) {
 func TestRAG_withHybridSearch(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := newTestContainer(t)
 	closeContainer(t, c)
 
 	e, err := c.RAG(WithHybridSearch())

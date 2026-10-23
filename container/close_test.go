@@ -24,20 +24,13 @@ import (
 // errFakeUnimplemented marks fakeCtx methods that tests never invoke.
 var errFakeUnimplemented = errors.New("fakeCtx: unimplemented")
 
-// registerTestAdapters wires the shared zero-value fakes (defined in
-// services_test.go) under the default adapter names. Adapter registries are
-// global; duplicates from parallel helpers are ignored. Nothing here may
-// import nested adapter modules: the container resolves only caller-side
-// registrations, and tests stand in for the caller with fakes.
+// registerTestAdapters is a no-op in the provider-only container: backends
+// are wired explicitly with container.Provide, never through global
+// adapter registries. It is kept so older call sites keep compiling.
 var registerAdaptersOnce sync.Once
 
 func registerTestAdapters() {
-	registerAdaptersOnce.Do(func() {
-		_ = cache.Register(cache.Memory, newFakeCache)
-		_ = db.Register(db.SQLite, newFakeDB)
-		_ = queue.Register(queue.Memory, newFakeQueue)
-		_ = scheduler.Register(scheduler.Embedded, newFakeScheduler)
-	})
+	registerAdaptersOnce.Do(func() {})
 }
 
 // fakeCtx implements cache.Cache and db.DB through a shared Close(ctx).
@@ -251,10 +244,12 @@ func TestContainer_Snapshots_CoversAllServices(t *testing.T) {
 }
 
 func TestContainer_Close_OnlyResolvedClosed(t *testing.T) {
-	registerTestAdapters()
-	cfg := config.Default()
-	cfg.Payment.Adapter = "no-such-adapter-zzz"
-	c := New(cfg)
+	c := New(nil,
+		Provide(db.DefaultRef(), newFakeDB),
+		Provide(cache.DefaultRef(), newFakeCache),
+		Provide(queue.DefaultRef(), newFakeQueue),
+		Provide(scheduler.DefaultRef(), newFakeScheduler),
+	)
 
 	if _, err := c.DB(); err != nil {
 		t.Fatalf("DB: %v", err)
@@ -283,10 +278,7 @@ func TestContainer_Close_OnlyResolvedClosed(t *testing.T) {
 }
 
 func TestContainer_Close_NeverOpensUntouched(t *testing.T) {
-	registerTestAdapters()
-	cfg := config.Default()
-	cfg.Auth.Adapter = "bogus-adapter-never-opened"
-	c := New(cfg)
+	c := New(nil, Provide(db.DefaultRef(), newFakeDB))
 
 	if _, err := c.DB(); err != nil {
 		t.Fatalf("DB: %v", err)

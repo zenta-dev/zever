@@ -128,14 +128,34 @@ func awaitSIGTERM(ctx context.Context, t *testing.T) {
 // database is down. It is not parallel: process-directed signals and
 // shutdown ordering do not compose with parallel package tests.
 func TestContainer_Shutdown_UnderSIGTERM(t *testing.T) {
-	c := New(testConfig(t))
+	rec := &shutdownOrder{}
+	c := New(nil,
+		Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) {
+			return &sigtermDB{rec: rec}, nil
+		}),
+		Provide(queue.DefaultRef(), func(o queue.Options) (queue.Queue, error) {
+			return &orderQueue{rec: rec}, nil
+		}),
+		Provide(cache.DefaultRef(), func(o cache.Options) (cache.Cache, error) {
+			return &orderCache{rec: rec}, nil
+		}),
+		Provide(scheduler.DefaultRef(), func(o scheduler.Options) (scheduler.Scheduler, error) {
+			return &orderScheduler{rec: rec}, nil
+		}),
+	)
 	closeRelayContainer(t, c)
 
-	rec := &shutdownOrder{}
-	mustSeed(t, &c.scheduler, scheduler.Scheduler(&orderScheduler{rec: rec}))
-	mustSeed(t, &c.cache, cache.Cache(&orderCache{rec: rec}))
-	mustSeed(t, &c.queue, queue.Queue(&orderQueue{rec: rec}))
-	mustSeed(t, &c.db, db.DB(&sigtermDB{rec: rec}))
+	if _, err := c.Scheduler(); err != nil {
+		t.Fatalf("Scheduler() = %v", err)
+	}
+
+	if _, err := c.Cache(); err != nil {
+		t.Fatalf("Cache() = %v", err)
+	}
+
+	if _, err := c.Queue(); err != nil {
+		t.Fatalf("Queue() = %v", err)
+	}
 
 	if err := c.Ready(t.Context()); err != nil {
 		t.Fatalf("Ready() before SIGTERM = %v, want nil", err)

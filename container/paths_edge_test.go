@@ -10,7 +10,7 @@ import (
 func TestContainer_EventbusAlias(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := newTestContainer(t)
 	closeContainer(t, c)
 
 	alias, err := c.Eventbus()
@@ -31,7 +31,7 @@ func TestContainer_EventbusAlias(t *testing.T) {
 func TestContainer_RatelimitAlias(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	c := newTestContainer(t)
 	closeContainer(t, c)
 
 	alias, err := c.Ratelimit()

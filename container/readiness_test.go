@@ -5,13 +5,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
 )
 
-// pingDB is a db.DB stub whose Ping outcome the test controls. It is seeded
-// through lazy.get, the only same-package seam the frozen lazy contract
-// exposes.
+// pingDB is a db.DB stub whose Ping outcome the test controls. It is wired
+// through Provide, the only seam the provider-only container exposes.
 type pingDB struct {
 	db.DB
 
@@ -23,8 +23,8 @@ func (p *pingDB) Ping(_ context.Context) error { return p.err }
 // Close satisfies db.DB so Close(ctx) on the container drains it.
 func (p *pingDB) Close(_ context.Context) error { return nil }
 
-// stalledOutbox is an outbox.Store stub reporting a fixed relay status. It is
-// seeded the same way as pingDB.
+// stalledOutbox is an outbox.Store stub reporting a fixed relay status. It
+// is wired the same way as pingDB.
 type stalledOutbox struct {
 	outbox.Store
 
@@ -36,23 +36,24 @@ func (s *stalledOutbox) Status() outbox.Status { return s.status }
 // Close satisfies outbox.Store so Close(ctx) drains it.
 func (s *stalledOutbox) Close() error { return nil }
 
-// seedReadyContainer returns a container whose db and outbox are already
-// resolved with the given doubles, so Ready never opens a real adapter.
-func seedReadyContainer(t *testing.T, dbErr error, relay outbox.Status) *Container {
+// seedReadyContainer returns a container whose db and outbox resolve to the
+// given doubles, so Ready never opens a real backend. The stall gate rides
+// the options-only config; providers supply the backends.
+func seedReadyContainer(t *testing.T, dbErr error, relay outbox.Status, gate bool) *Container {
 	t.Helper()
 
-	c := New(testConfig(t))
+	cfg := config.Default()
+	cfg.Outbox.Options.StallReadiness = gate
+
+	c := New(cfg,
+		Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) {
+			return &pingDB{err: dbErr}, nil
+		}),
+		Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+			return &stalledOutbox{status: relay}, nil
+		}),
+	)
 	closeContainer(t, c)
-
-	if _, err := c.db.get(func() (db.DB, error) { return &pingDB{err: dbErr}, nil }); err != nil {
-		t.Fatalf("seeding ping db: %v", err)
-	}
-
-	if _, err := c.outbox.get(func() (outbox.Store, error) {
-		return &stalledOutbox{status: relay}, nil
-	}); err != nil {
-		t.Fatalf("seeding outbox: %v", err)
-	}
 
 	return c
 }
@@ -104,8 +105,7 @@ func TestReady(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			c := seedReadyContainer(t, tt.dbErr, tt.relay)
-			c.cfg.Outbox.Options.StallReadiness = tt.gate
+			c := seedReadyContainer(t, tt.dbErr, tt.relay, tt.gate)
 
 			err := c.Ready(t.Context())
 
@@ -136,15 +136,17 @@ func TestReady(t *testing.T) {
 func TestReady_outboxResolutionFailureIsIgnored(t *testing.T) {
 	t.Parallel()
 
-	c := New(testConfig(t))
+	// No resolving outbox provider: the gate is on via options-only config,
+	// but the unresolvable relay is skipped rather than failing readiness.
+	cfg := config.Default()
+	cfg.Outbox.Options.StallReadiness = true
+	c := New(cfg,
+		Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) { return &pingDB{}, nil }),
+		Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+			return nil, errors.New("container: outbox: unwired in test")
+		}),
+	)
 	closeContainer(t, c)
-
-	c.cfg.Outbox.Options.StallReadiness = true
-	c.cfg.Outbox.Adapter = "bogus-outbox-adapter"
-
-	if _, err := c.db.get(func() (db.DB, error) { return &pingDB{}, nil }); err != nil {
-		t.Fatalf("seeding ping db: %v", err)
-	}
 
 	if err := c.Ready(t.Context()); err != nil {
 		t.Fatalf("Ready() = %v, want nil for an unresolvable relay", err)
@@ -156,8 +158,7 @@ func TestReady_outboxResolutionFailureIsIgnored(t *testing.T) {
 func TestReady_classifiesErrors(t *testing.T) {
 	t.Parallel()
 
-	c := seedReadyContainer(t, nil, outbox.Status{Pending: 4, Stalled: true})
-	c.cfg.Outbox.Options.StallReadiness = true
+	c := seedReadyContainer(t, nil, outbox.Status{Pending: 4, Stalled: true}, true)
 
 	err := c.Ready(t.Context())
 	if err == nil {
@@ -186,7 +187,7 @@ func TestReady_databaseErrorCarriesCause(t *testing.T) {
 
 	pingErr := errors.New("no route to host")
 
-	c := seedReadyContainer(t, pingErr, outbox.Status{})
+	c := seedReadyContainer(t, pingErr, outbox.Status{}, false)
 
 	err := c.Ready(t.Context())
 	if err == nil {
