@@ -5,16 +5,16 @@ package jobs
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 
 	"github.com/zenta-dev/zever/shared/apperror"
 )
 
 // ShipOrderArgs is the payload of the ShipOrder job declared in the schema.
 type ShipOrderArgs struct {
-	OrderId      string          `json:"order_id"`
-	AttemptCount int32           `json:"attempt_count"`
-	Extra        json.RawMessage `json:"extra"`
+	OrderId      string         `json:"order_id"`
+	AttemptCount int32          `json:"attempt_count"`
+	Extra        jsontext.Value `json:"extra"`
 }
 
 // HandleShipOrder is a starting-point implementation of the ShipOrder job

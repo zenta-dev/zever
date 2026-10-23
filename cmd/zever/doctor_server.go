@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // DefaultServerDoctorTimeout bounds `go run <entry> --doctor` in runServerDoctor.
@@ -82,7 +83,7 @@ func interpretServerDoctor(runErr error, stdout []byte, stderr string) (serverDo
 // failing closed on malformed output.
 func decodeServerDoctorReport(data []byte) (serverDoctorReport, error) {
 	var rep serverDoctorReport
-	if err := json.Unmarshal(bytes.TrimSpace(data), &rep); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(data), &rep); err != nil {
 		return serverDoctorReport{}, fmt.Errorf("zever doctor: parse server --doctor output: %w", err)
 	}
 

@@ -46,10 +46,10 @@ func TestRunGenerateWorkerWithNoSchema(t *testing.T) {
 		t.Fatalf("expected the default queue:\n%s", main)
 	}
 
-	// Nothing needs encoding/json when there are no schedules and no json
-	// -typed job parameters.
-	if strings.Contains(main, `"encoding/json"`) {
-		t.Fatalf("encoding/json imported but unused:\n%s", main)
+	// Nothing needs the JSON raw type when there are no schedules and no
+	// json-typed job parameters.
+	if strings.Contains(main, `"encoding/json/jsontext"`) {
+		t.Fatalf("encoding/json/jsontext imported but unused:\n%s", main)
 	}
 
 	if !strings.Contains(main, `c.OutboxRelay(ctx)`) {
@@ -90,10 +90,10 @@ schedule Nightly {
 	for _, fragment := range []string{
 		`"example.com/shop/internal/app"`,
 		`"example.com/shop/internal/service/jobs"`,
-		`"encoding/json"`,
+		`"encoding/json/jsontext"`,
 		`job.Register("ShipOrder", jobs.HandleShipOrder)`,
 		`job.Register("Sweep", jobs.HandleSweep)`,
-		`sched.Schedule(ctx, "0 0 * * *", "Sweep", json.RawMessage(` + "`{}`" + `))`,
+		`sched.Schedule(ctx, "0 0 * * *", "Sweep", jsontext.Value(` + "`{}`" + `))`,
 		`sched.Start()`,
 		// The worker drains recorded outbox events; the API server stays lean.
 		`c.OutboxRelay(ctx)`,
@@ -116,9 +116,9 @@ schedule Nightly {
 	for _, fragment := range []string{
 		"package jobs",
 		"type ShipOrderArgs struct {",
-		"OrderId      string          `json:\"order_id\"`",
-		"AttemptCount int32           `json:\"attempt_count\"`",
-		"Extra        json.RawMessage `json:\"extra\"`",
+		"OrderId      string         `json:\"order_id\"`",
+		"AttemptCount int32          `json:\"attempt_count\"`",
+		"Extra        jsontext.Value `json:\"extra\"`",
 		"func HandleShipOrder(ctx context.Context, args ShipOrderArgs) error {",
 		`apperror.New(apperror.Unimplemented, "ShipOrder job not implemented")`,
 	} {
@@ -309,7 +309,7 @@ func TestGoScalarType(t *testing.T) {
 		{ir.TTimestamp, "time.Time", false},
 		{ir.TDate, "time.Time", false},
 		{ir.TBytes, "[]byte", false},
-		{ir.TJSON, "json.RawMessage", true},
+		{ir.TJSON, "jsontext.Value", true},
 	}
 
 	for _, tc := range tests {

@@ -1,6 +1,6 @@
 package main
 
-import "encoding/json"
+import "encoding/json/jsontext"
 
 // This file defines the `zever tinker` wire protocol: the line-delimited JSON
 // conversation between the root-module `zever tinker` process (the client,
@@ -66,8 +66,8 @@ const (
 //
 //	{"verb":"db.query","args":{"sql":"select 1","args":[]}}
 type tinkerRequest struct {
-	Verb string          `json:"verb"`
-	Args json.RawMessage `json:"args,omitempty"`
+	Verb string         `json:"verb"`
+	Args jsontext.Value `json:"args,omitempty,omitzero"`
 }
 
 // tinkerResponse is one framed line of JSON sent back by the shim. Exactly
@@ -77,8 +77,8 @@ type tinkerRequest struct {
 //	@@zever-tinker@@{"result":{"columns":["1"],"rows":[[1]]}}
 //	@@zever-tinker@@{"error":"[sqlite] query error: no such table: todos"}
 type tinkerResponse struct {
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  string          `json:"error,omitempty"`
+	Result jsontext.Value `json:"result,omitempty,omitzero"`
+	Error  string         `json:"error,omitempty"`
 }
 
 // dbQueryArgs are the arguments to "db.query".
@@ -118,7 +118,7 @@ type cacheGetResult struct {
 type cacheSetArgs struct {
 	Key        string `json:"key"`
 	Value      string `json:"value"`
-	TTLSeconds int    `json:"ttl_seconds,omitempty"`
+	TTLSeconds int    `json:"ttl_seconds,omitempty,omitzero"`
 }
 
 // cacheDeleteArgs are the arguments to "cache.delete". No result payload.
@@ -159,6 +159,6 @@ type int64Result struct {
 // argument payload, passed through to Dispatcher.Dispatch as already-decoded
 // JSON. No result payload.
 type jobDispatchArgs struct {
-	Name string          `json:"name"`
-	Args json.RawMessage `json:"args,omitempty"`
+	Name string         `json:"name"`
+	Args jsontext.Value `json:"args,omitempty,omitzero"`
 }

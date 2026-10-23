@@ -298,7 +298,7 @@ import (
 	"bufio"
 	"context"
 	"database/sql"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"os"
@@ -308,6 +308,7 @@ import (
 
 	"github.com/zenta-dev/zever/container"
 	"github.com/zenta-dev/zever/core/db"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	app "{{.AppPkg}}"
 )
@@ -328,11 +329,11 @@ const framePrefix = ` + "`" + `{{.FramePrefix}}` + "`" + `
 
 type tinkerRequest struct {
 	Verb string          ` + "`json:\"verb\"`" + `
-	Args json.RawMessage ` + "`json:\"args,omitempty\"`" + `
+	Args jsontext.Value ` + "`json:\"args,omitempty,omitzero\"`" + `
 }
 
 type tinkerResponse struct {
-	Result json.RawMessage ` + "`json:\"result,omitempty\"`" + `
+	Result jsontext.Value ` + "`json:\"result,omitempty,omitzero\"`" + `
 	Error  string          ` + "`json:\"error,omitempty\"`" + `
 }
 
@@ -366,7 +367,7 @@ type cacheGetResult struct {
 type cacheSetArgs struct {
 	Key        string ` + "`json:\"key\"`" + `
 	Value      string ` + "`json:\"value\"`" + `
-	TTLSeconds int    ` + "`json:\"ttl_seconds,omitempty\"`" + `
+	TTLSeconds int    ` + "`json:\"ttl_seconds,omitempty,omitzero\"`" + `
 }
 
 type cacheDeleteArgs struct {
@@ -397,7 +398,7 @@ type int64Result struct {
 
 type jobDispatchArgs struct {
 	Name string          ` + "`json:\"name\"`" + `
-	Args json.RawMessage ` + "`json:\"args,omitempty\"`" + `
+	Args jsontext.Value ` + "`json:\"args,omitempty,omitzero\"`" + `
 }
 
 // --- shim -------------------------------------------------------------
@@ -432,7 +433,7 @@ func run() error {
 
 		resp := handleLine(ctx, c, line)
 
-		payload, merr := json.Marshal(resp)
+		payload, merr := codec.Marshal(resp)
 		if merr != nil {
 			payload = []byte(` + "`" + `{"error":"tinker-shim: marshal response failed"}` + "`" + `)
 		}
@@ -466,7 +467,7 @@ func run() error {
 // usable.
 func handleLine(ctx context.Context, c *container.Container, line []byte) tinkerResponse {
 	var req tinkerRequest
-	if err := json.Unmarshal(line, &req); err != nil {
+	if err := codec.Unmarshal(line, &req); err != nil {
 		return errResponse(fmt.Errorf("malformed request: %w", err))
 	}
 
@@ -479,7 +480,7 @@ func handleLine(ctx context.Context, c *container.Container, line []byte) tinker
 		return tinkerResponse{}
 	}
 
-	payload, err := json.Marshal(result)
+	payload, err := codec.Marshal(result)
 	if err != nil {
 		return errResponse(fmt.Errorf("marshal result for %q: %w", req.Verb, err))
 	}
@@ -639,7 +640,7 @@ func dispatch(ctx context.Context, c *container.Container, req tinkerRequest) (a
 
 		var jobArgs any
 		if len(a.Args) > 0 {
-			if err := json.Unmarshal(a.Args, &jobArgs); err != nil {
+			if err := codec.Unmarshal(a.Args, &jobArgs); err != nil {
 				return nil, fmt.Errorf("job.dispatch: decode args: %w", err)
 			}
 		}
@@ -656,7 +657,7 @@ func decodeArgs(req tinkerRequest, dst any) error {
 		return nil
 	}
 
-	if err := json.Unmarshal(req.Args, dst); err != nil {
+	if err := codec.Unmarshal(req.Args, dst); err != nil {
 		return fmt.Errorf("%s: decode args: %w", req.Verb, err)
 	}
 

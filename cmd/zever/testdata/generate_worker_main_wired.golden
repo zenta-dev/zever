@@ -10,7 +10,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"os"
 	"os/signal"
 	"syscall"
@@ -84,7 +84,7 @@ func run() error {
 	}
 
 	// schedule Nightly
-	if _, err := sched.Schedule(ctx, "0 0 * * *", "Sweep", json.RawMessage(`{}`)); err != nil {
+	if _, err := sched.Schedule(ctx, "0 0 * * *", "Sweep", jsontext.Value(`{}`)); err != nil {
 		return err
 	}
 

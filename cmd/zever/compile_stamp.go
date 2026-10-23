@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // schemaHashOf fingerprints the loaded schema sources: the sha256 hex digest
@@ -79,15 +82,35 @@ func stampGeneratedFile(backend, path string, content []byte, hash string) []byt
 	return stamped.Bytes()
 }
 
+// stampJSONOpts renders pretty JSON byte-identical to the previous
+// encoding/json MarshalIndent (sorted keys, two-space indent, HTML/JS
+// escaping). codec.MarshalIndent leaves map order unspecified, which would
+// make `zever generate` rewrite .json outputs on every run and break --check
+// idempotency, so the stamp path marshals with these options directly.
+var stampJSONOpts = json.JoinOptions(
+	json.Deterministic(true),
+	jsontext.Multiline(true),
+	jsontext.WithIndent("  "),
+	jsontext.EscapeForHTML(true),
+	jsontext.EscapeForJS(true),
+)
+
+// marshalStampJSON renders doc as pretty-printed JSON with two-space indent
+// plus no trailing newline (the caller appends it), matching the backends'
+// own encoding.
+func marshalStampJSON(doc map[string]any) ([]byte, error) {
+	return json.Marshal(doc, stampJSONOpts)
+}
+
 // stampGeneratedJSON embeds the provenance block into a JSON generated file
-// (see stampGeneratedFile). Output is MarshalIndent with two spaces plus a
-// trailing newline, matching the backends' own encoding. Content that does
-// not decode as a JSON object is returned byte-identical rather than
+// (see stampGeneratedFile). Output is two-space indented JSON plus a
+// trailing newline, matching the backends' own encoding. Content that
+// does not decode as a JSON object is returned byte-identical rather than
 // corrupted.
 func stampGeneratedJSON(backend string, content []byte, hash string) []byte {
 	var doc map[string]any
 
-	if err := json.Unmarshal(content, &doc); err != nil || doc == nil {
+	if err := codec.Unmarshal(content, &doc); err != nil || doc == nil {
 		return content
 	}
 
@@ -97,7 +120,7 @@ func stampGeneratedJSON(backend string, content []byte, hash string) []byte {
 		"version": "v" + buildVersion,
 	}
 
-	stamped, err := json.MarshalIndent(doc, "", "  ")
+	stamped, err := marshalStampJSON(doc)
 	if err != nil {
 		return content
 	}
@@ -200,7 +223,7 @@ func normalizeStampVersion(path string, content []byte) []byte {
 	if strings.HasSuffix(path, ".json") {
 		var doc map[string]any
 
-		if err := json.Unmarshal(content, &doc); err != nil || doc == nil {
+		if err := codec.Unmarshal(content, &doc); err != nil || doc == nil {
 			return content
 		}
 
@@ -211,7 +234,7 @@ func normalizeStampVersion(path string, content []byte) []byte {
 
 		delete(block, "version")
 
-		out, err := json.MarshalIndent(doc, "", "  ")
+		out, err := marshalStampJSON(doc)
 		if err != nil {
 			return content
 		}

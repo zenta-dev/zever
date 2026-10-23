@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"io"
 	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // agent.go implements --help --agent: a machine-readable command catalog for
@@ -89,7 +90,7 @@ func printAgentHelpOn(w io.Writer, root *cobra.Command) {
 			"emit structured data, other commands emit JSON error envelopes",
 	}
 
-	_ = json.NewEncoder(w).Encode(catalog)
+	_ = codec.MarshalLine(w, catalog)
 }
 
 // agentCommandsOn lists every subcommand of root sorted by name. It takes the

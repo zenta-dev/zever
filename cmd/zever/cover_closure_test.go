@@ -771,7 +771,7 @@ func TestClosureWorkerPureBranches(t *testing.T) {
 		{ir.TTimestamp, "time.Time", false},
 		{ir.TDate, "time.Time", false},
 		{ir.TBytes, "[]byte", false},
-		{ir.TJSON, "json.RawMessage", true},
+		{ir.TJSON, "jsontext.Value", true},
 		{ir.ScalarType(9999), "any", false},
 	}
 
