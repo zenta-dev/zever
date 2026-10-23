@@ -40,6 +40,12 @@
         "path": "./syntaxes/zen.tmLanguage.json"
       }
     ],
+    "snippets": [
+      {
+        "language": "zen",
+        "path": "./snippets/zen.json"
+      }
+    ],
     "configuration": {
       "title": "Zever",
       "properties": {

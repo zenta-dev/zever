@@ -178,6 +178,42 @@ Selection ranges and document links also work out of the box with no extra
 configuration: use `vim.lsp.buf.selection_range()` (or your editor's
 selection-expansion keymap) and click links in `//` comments.
 
+## Code lens and selection-range keymaps
+
+Reference code lens above declarations appears once the server advertises
+`textDocument/codeLens`. Neovim neither refreshes nor runs lenses unprompted,
+so refresh them on attach and after writes, and bind a key to run the lens
+under the cursor:
+
+```lua
+vim.api.nvim_create_autocmd('LspAttach', {
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client and client.name == 'zever_lsp' and client:supports_method('textDocument/codeLens') then
+      vim.lsp.codelens.refresh({ bufnr = args.buf })
+    end
+  end,
+})
+vim.api.nvim_create_autocmd('BufWritePost', {
+  pattern = '*.zen',
+  callback = function(args)
+    vim.lsp.codelens.refresh({ bufnr = args.buf })
+  end,
+})
+vim.keymap.set('n', '<leader>cl', vim.lsp.codelens.run, { desc = 'Run code lens under cursor' })
+```
+
+The display (`vim.lsp.codelens.display`) only renders what the last refresh
+returned, so if lenses look stale after a large edit, run
+`:lua vim.lsp.codelens.refresh()` manually.
+
+Selection-range expansion has no default keymap either; bind one in normal
+and visual mode:
+
+```lua
+vim.keymap.set({ 'n', 'x' }, '<leader>se', vim.lsp.buf.selection_range, { desc = 'Expand selection' })
+```
+
 ## Verifying it worked
 
 1. Open a `.zen` file and run `:set filetype?` — it should print

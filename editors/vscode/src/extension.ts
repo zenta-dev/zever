@@ -8,6 +8,83 @@ import {
 
 let client: LanguageClient | undefined;
 
+// ZenDeclCounts tallies the top-level schema declarations in one `.zen`
+// document. It is scanned from the open document text client-side, so the
+// status item needs no extra server round-trip.
+export interface ZenDeclCounts {
+  entities: number;
+  messages: number;
+  services: number;
+}
+
+const declPattern = /^\s*(entity|message|service)\s+[A-Za-z_]/;
+
+// countDecls counts top-level `entity`/`message`/`service` declarations.
+// Matching anchors at line start (after optional indentation), so `//`
+// comment lines never match. Kept pure for headless unit tests.
+export function countDecls(text: string): ZenDeclCounts {
+  const counts: ZenDeclCounts = { entities: 0, messages: 0, services: 0 };
+  for (const line of text.split('\n')) {
+    const match = declPattern.exec(line);
+    if (match === null) {
+      continue;
+    }
+    switch (match[1]) {
+      case 'entity':
+        counts.entities += 1;
+        break;
+      case 'message':
+        counts.messages += 1;
+        break;
+      case 'service':
+        counts.services += 1;
+        break;
+    }
+  }
+  return counts;
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+// errorCount tallies error-severity diagnostics on the document. A missing
+// severity defaults to Error in VS Code, so those count too. Any failure
+// reading diagnostics degrades to zero rather than breaking activation.
+function errorCount(doc: vscode.TextDocument): number {
+  let diagnostics: readonly vscode.Diagnostic[];
+  try {
+    diagnostics = vscode.languages.getDiagnostics(doc.uri);
+  } catch {
+    return 0;
+  }
+  return diagnostics.filter(
+    (d) => d.severity === undefined || d.severity === vscode.DiagnosticSeverity.Error
+  ).length;
+}
+
+function refreshStatus(item: vscode.LanguageStatusItem): void {
+  const doc = vscode.window.activeTextEditor?.document;
+  if (doc === undefined || doc.languageId !== 'zen') {
+    item.text = '$(database) Zen';
+    item.detail = 'Open a .zen file to see schema stats';
+    item.severity = vscode.LanguageStatusSeverity.Information;
+    return;
+  }
+  const counts = countDecls(doc.getText());
+  const errors = errorCount(doc);
+  item.text =
+    `$(database) Zen: ${pluralize(counts.entities, 'entity', 'entities')}, ` +
+    `${pluralize(counts.messages, 'message', 'messages')}, ` +
+    `${pluralize(counts.services, 'service', 'services')}, ` +
+    `${pluralize(errors, 'error', 'errors')}`;
+  item.detail = errors === 0 ? 'zen schema' : 'zen schema has errors — see the Problems panel';
+  item.severity =
+    errors === 0
+      ? vscode.LanguageStatusSeverity.Information
+      : vscode.LanguageStatusSeverity.Warning;
+}
+
 function serverCommand(): string {
   try {
     const cfg = vscode.workspace.getConfiguration('zever');
@@ -51,6 +128,13 @@ function startClient(): void {
 export function activate(context: vscode.ExtensionContext): void {
   startClient();
 
+  const status = vscode.languages.createLanguageStatusItem('zever.status', { language: 'zen' });
+  status.name = 'Zever schema stats';
+  refreshStatus(status);
+  const refresh = (): void => {
+    refreshStatus(status);
+  };
+
   const restartDisposable = vscode.commands.registerCommand(
     'zever.restartServer',
     async () => {
@@ -60,6 +144,22 @@ export function activate(context: vscode.ExtensionContext): void {
       startClient();
       vscode.window.showInformationMessage('Zever: Language server restarted.');
     }
+  );
+
+  context.subscriptions.push(
+    status,
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      if (e.document.languageId === 'zen') {
+        refresh();
+      }
+    }),
+    vscode.workspace.onDidOpenTextDocument((doc) => {
+      if (doc.languageId === 'zen') {
+        refresh();
+      }
+    }),
+    vscode.window.onDidChangeActiveTextEditor(refresh),
+    vscode.languages.onDidChangeDiagnostics(refresh)
   );
 
   context.subscriptions.push({
