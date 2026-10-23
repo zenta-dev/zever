@@ -939,9 +939,9 @@ tools/apidiff	baselineEntry	Module	module	v0.7.2
 tools/apidiff	baselineEntry	Reason	reason	v0.7.2
 tools/apidiff	baselineEntry	Expires	expires	v0.7.2
 tools/modgraph	modEditJSON	Module	Module	v0.7.2
-tools/vulngate	allowEntry	ID	id	c0f76ce47ced
-tools/vulngate	allowEntry	Reason	reason	c0f76ce47ced
-tools/vulngate	allowEntry	Expires	expires	c0f76ce47ced
+tools/vulngate	allowEntry	ID	id	7d931eae2040
+tools/vulngate	allowEntry	Reason	reason	7d931eae2040
+tools/vulngate	allowEntry	Expires	expires	7d931eae2040
 tools/vulngate	allowFile	Allowlist	allowlist	v0.7.2
 tools/vulngate	findingMsg	Finding	finding	v0.7.2
 tools/vulngate	frame	Function	function	v0.7.2
