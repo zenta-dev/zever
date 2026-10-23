@@ -7,7 +7,6 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/zenta-dev/zever/adapters/db/sqlite"
@@ -27,18 +26,12 @@ func compileSchema(t *testing.T, src string) *compile.Result {
 	return result
 }
 
-var registerSQLiteOnce sync.Once
-
 func openTestSQLite(t *testing.T, name string) db.DB {
 	t.Helper()
 
-	registerSQLiteOnce.Do(func() {
-		_ = db.Register(db.SQLite, sqlite.New)
-	})
-
-	conn, err := db.Open(db.SQLite, db.Options{Path: filepath.Join(t.TempDir(), name)})
+	conn, err := sqlite.New(db.Options{Path: filepath.Join(t.TempDir(), name)})
 	if err != nil {
-		t.Fatalf("db.Open: %v", err)
+		t.Fatalf("sqlite.New: %v", err)
 	}
 
 	t.Cleanup(func() { _ = conn.Close(t.Context()) })
