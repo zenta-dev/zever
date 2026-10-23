@@ -9,6 +9,8 @@ import (
 	"github.com/zenta-dev/zever/core/workflow"
 )
 
+var _ workflow.Workflow = (*Adapter)(nil)
+
 type run struct {
 	name    string
 	input   any

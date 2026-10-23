@@ -7,6 +7,8 @@ import (
 	"github.com/zenta-dev/zever/core/tenant"
 )
 
+var _ tenant.Tenant = (*adapter)(nil)
+
 // adapter is the fixed-ID single-tenant backend.
 type adapter struct {
 	// id is the tenant ID always returned by Resolve.

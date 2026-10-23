@@ -15,6 +15,8 @@ import (
 
 const maxSourceBytes = document.DefaultMaxSourceBytes
 
+var _ document.Document = (*driver)(nil)
+
 type driver struct {
 	tmpDir    string
 	tmpDirSet bool

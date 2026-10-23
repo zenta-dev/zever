@@ -20,6 +20,8 @@ import (
 	"github.com/zenta-dev/zever/shared/retry"
 )
 
+var _ ai.AI = (*adapter)(nil)
+
 var toolArgsCodec = codec.JSONCodec[map[string]any]{}
 
 // ErrValueOutOfRange is returned when an API numeric value does not fit in an int.

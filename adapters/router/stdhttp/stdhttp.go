@@ -35,6 +35,8 @@ type driver struct {
 	logger log.Logger
 }
 
+var _ router.Router = (*driver)(nil)
+
 func (d *driver) log() log.Logger {
 	if d != nil && d.logger != nil {
 		return d.logger

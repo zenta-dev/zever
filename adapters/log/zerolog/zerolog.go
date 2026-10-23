@@ -10,6 +10,8 @@ import (
 	"github.com/zenta-dev/zever/core/log"
 )
 
+var _ log.Logger = (*zerologAdapter)(nil)
+
 type zerologAdapter struct {
 	log zl.Logger
 }

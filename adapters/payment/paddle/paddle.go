@@ -20,6 +20,8 @@ import (
 	"github.com/zenta-dev/zever/shared/providersopt"
 )
 
+var _ payment.Payment = (*driver)(nil)
+
 // newSDK constructs the Paddle SDK. It is a variable so tests can stub construction.
 var newSDK = paddle.New
 

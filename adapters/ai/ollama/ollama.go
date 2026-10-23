@@ -20,6 +20,8 @@ import (
 	"github.com/zenta-dev/zever/shared/httpclient"
 )
 
+var _ ai.AI = (*adapter)(nil)
+
 const (
 	maxResponseBytes = 16 << 20
 	maxErrorBody     = 1024

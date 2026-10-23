@@ -53,6 +53,8 @@ type localAdapter struct {
 	rootRealErr  error
 }
 
+var _ storage.Storage = (*localAdapter)(nil)
+
 func (a *localAdapter) log() log.Logger {
 	if a != nil && a.logger != nil {
 		return a.logger
@@ -1061,7 +1063,7 @@ func (a *localAdapter) get(w http.ResponseWriter, full string) {
 		return
 	}
 
-	f, err := os.Open(full) // internal path validated by resolve/lexicallyContained
+	f, err := os.Open(full)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.Error(w, "not found", http.StatusNotFound)
@@ -1088,7 +1090,7 @@ func contentTypeFor(full string) string {
 		return "application/octet-stream"
 	}
 
-	f, err := os.Open(sidecar) // internal path validated by caller
+	f, err := os.Open(sidecar)
 	if err == nil {
 		defer func() { _ = f.Close() }()
 

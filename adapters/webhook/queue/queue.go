@@ -178,6 +178,8 @@ type adapter struct {
 	replayTolerance time.Duration
 }
 
+var _ webhook.Webhook = (*adapter)(nil)
+
 func (a *adapter) log() log.Logger {
 	if a != nil && a.logger != nil {
 		return a.logger

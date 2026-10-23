@@ -35,7 +35,7 @@ func (t *TTLCache[K, V]) GetWithExpiry(k K) (V, time.Time, bool) {
 		return zero, time.Time{}, false
 	}
 
-	tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+	tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 	if expired(tv, now) {
 		t.c.ll.Remove(el)
 		delete(t.c.items, k)
@@ -70,7 +70,7 @@ func (t *TTLCache[K, V]) SetIfAbsent(k K, v V, ttl time.Duration) bool {
 
 	t.c.mu.Lock()
 	if el, ok := t.c.items[k]; ok {
-		tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+		tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 		if !expired(tv, now) {
 			t.c.mu.Unlock()
 			return false
@@ -84,7 +84,7 @@ func (t *TTLCache[K, V]) SetIfAbsent(k K, v V, ttl time.Duration) bool {
 
 	if t.c.ll.Len() > t.c.capacity {
 		if back := t.c.ll.Back(); back != nil {
-			be := back.Value.(*entry[K, ttlValue[V]]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+			be := back.Value.(*entry[K, ttlValue[V]]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 			t.c.ll.Remove(back)
 			delete(t.c.items, be.key)
 			evictKey, evictVal, evicted = be.key, be.val, true
@@ -113,7 +113,7 @@ func (t *TTLCache[K, V]) CompareAndDelete(k K, expected V, equal func(a, b V) bo
 		return false
 	}
 
-	tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+	tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 	if expired(tv, now) {
 		t.c.ll.Remove(el)
 		delete(t.c.items, k)
@@ -147,7 +147,7 @@ func (t *TTLCache[K, V]) CompareAndSwap(k K, expected, replacement V, equal func
 		return false
 	}
 
-	e := el.Value.(*entry[K, ttlValue[V]]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+	e := el.Value.(*entry[K, ttlValue[V]]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 	if expired(e.val, now) {
 		t.c.ll.Remove(el)
 		delete(t.c.items, k)
@@ -178,7 +178,7 @@ func (t *TTLCache[K, V]) CompareAndExtend(k K, expected V, ttl time.Duration, eq
 		return false
 	}
 
-	e := el.Value.(*entry[K, ttlValue[V]]) //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+	e := el.Value.(*entry[K, ttlValue[V]]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 	if expired(e.val, now) {
 		t.c.ll.Remove(el)
 		delete(t.c.items, k)
@@ -211,7 +211,7 @@ func (t *TTLCache[K, V]) PurgeExpired() int {
 
 	purged := 0
 	for k, el := range t.c.items {
-		tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+		tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 		if !expired(tv, now) {
 			continue
 		}
@@ -241,7 +241,7 @@ func (t *TTLCache[K, V]) Range(fn func(k K, expiresAt time.Time) bool) {
 	t.c.mu.Lock()
 	snap := make([]pair, 0, len(t.c.items))
 	for k, el := range t.c.items {
-		tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // list elements are only ever pushed as *entry[K, ttlValue[V]]
+		tv := el.Value.(*entry[K, ttlValue[V]]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, ttlValue[V]] pushed by this Cache's own methods
 		snap = append(snap, pair{k: k, exp: tv.expiresAt})
 	}
 	t.c.mu.Unlock()

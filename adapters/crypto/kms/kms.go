@@ -92,6 +92,8 @@ type driver struct {
 	signPriv ed25519.PrivateKey
 }
 
+var _ crypto.Crypto = (*driver)(nil)
+
 // New creates a crypto.Crypto using KMS envelope encryption. It fails
 // closed unless opts.DevStub is set: the deterministic stub client provides
 // no real KMS security boundary, so production configs must inject a real
@@ -288,7 +290,7 @@ func (d *driver) Verify(_ context.Context, message, signature []byte) (bool, err
 		return false, crypto.ErrKeyNotFound
 	}
 
-	pub := d.signPriv.Public().(ed25519.PublicKey) //nolint:forcetypeassert // ed25519 PrivateKey always returns ed25519.PublicKey
+	pub := d.signPriv.Public().(ed25519.PublicKey) //nolint:forcetypeassert // stdlib guarantee: ed25519.PrivateKey.Public() always returns ed25519.PublicKey
 	return ed25519.Verify(pub, message, signature), nil
 }
 

@@ -180,7 +180,7 @@ func writeAtomically(path string, content []byte) error {
 		return fmt.Errorf("zever: close %q: %w", tmpPath, err)
 	}
 
-	if err := os.Chmod(tmpPath, 0o644); err != nil { // a schema file, not a secret
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
 		return fmt.Errorf("zever: chmod %q: %w", tmpPath, err)
 	}
 

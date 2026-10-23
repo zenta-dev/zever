@@ -50,6 +50,8 @@ type fiberDriver struct {
 	logger      log.Logger
 }
 
+var _ router.Router = (*fiberDriver)(nil)
+
 func (d *fiberDriver) log() log.Logger {
 	if d != nil && d.logger != nil {
 		return d.logger

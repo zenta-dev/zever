@@ -116,7 +116,7 @@ func (w *Workspace) Rescan() {
 			return nil
 		}
 
-		content, readErr := os.ReadFile(path) //nolint:gosec // path comes from walking the client-supplied root
+		content, readErr := os.ReadFile(path) //nolint:gosec // G122: path comes from walking the user-configured project root; LSP is a dev tool, not a production service
 		if readErr != nil {
 			return nil //nolint:nilerr // skip unreadable files: WalkDirFunc nil means keep walking
 		}

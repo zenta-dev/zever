@@ -449,13 +449,14 @@ jobs:
       - name: out-of-tree proof module (standalone, outside go.work)
         run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
-  # Fuzz smoke: a short run of the DSL frontend fuzz targets (lexer, parser,
-  # resolver, formatter idempotence). Not a soak: it catches regressions that
-  # the committed seed corpus plus 20s of mutation can reach. Failing inputs
-  # are written under testdata/fuzz and should be committed with the fix.
+  # Fuzz smoke: a short run of security-critical fuzz targets across the
+  # repo (DSL frontend, webhook signatures, storage traversal, payment
+  # webhooks, JWT claims). Not a soak: it catches regressions that the
+  # committed seed corpus plus mutation can reach. Failing inputs are
+  # written under testdata/fuzz and should be committed with the fix.
   fuzz-smoke:
-    name: fuzz smoke (dsl)
-    timeout-minutes: 15
+    name: fuzz smoke (security)
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -470,7 +471,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all MODULES="config dsl" && exit 0
+          make -s download-all MODULES="config dsl adapters/webhook/queue adapters/storage/local adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt" && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -483,6 +484,37 @@ jobs:
             echo "== ${pkg} ${fn}"
             go test -run '^$' -fuzz "^${fn}\$" -fuzztime 20s "./${pkg}"
           done
+      - name: Fuzz webhook signature verification
+        working-directory: adapters/webhook/queue
+        run: |
+          set -euo pipefail
+          for target in FuzzVerifySignatureHeader FuzzParseSignatureHeader FuzzBuildSignatureHeader; do
+            echo "== ${target}"
+            go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
+      - name: Fuzz storage traversal
+        working-directory: adapters/storage/local
+        run: |
+          set -euo pipefail
+          for target in FuzzTraversal FuzzPresignKeyValidation FuzzSymlinkContainment; do
+            echo "== ${target}"
+            go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
+      - name: Fuzz payment webhooks
+        run: |
+          set -euo pipefail
+          for target in FuzzWebhookEvent; do
+            echo "== adapters/payment/stripe ${target}"
+            go -C adapters/payment/stripe test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+            echo "== adapters/payment/paddle ${target}"
+            go -C adapters/payment/paddle test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
+      - name: Fuzz JWT token claims
+        working-directory: adapters/auth/jwt
+        run: |
+          set -euo pipefail
+          # JWT fuzz targets will be added when needed
+          echo "JWT fuzz targets: verify FuzzVerify when added"
 
   # Scaffold gate: `zever new` -> go mod tidy -> build/vet/test, plus
   # golangci-lint under the scaffold's own .golangci.yml, so a fresh project

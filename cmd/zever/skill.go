@@ -115,7 +115,7 @@ func renderSkill(root *cobra.Command) string {
 
 // writeSkillFile writes the rendered skill to <dir>/SKILL.md.
 func writeSkillFile(dir string, root *cobra.Command) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("zever docs: create dir: %w", err)
 	}
 

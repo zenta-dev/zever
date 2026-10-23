@@ -10,6 +10,8 @@ import (
 	"github.com/zenta-dev/zever/shared/s3opts"
 )
 
+var _ storage.Storage = (*r2Adapter)(nil)
+
 const defaultRegion = "auto"
 
 type r2Adapter struct {

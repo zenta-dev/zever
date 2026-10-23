@@ -9,6 +9,8 @@ import (
 	"github.com/zenta-dev/zever/core/secrets"
 )
 
+var _ secrets.Secrets = (*adapter)(nil)
+
 // adapter reads secrets from environment variables sharing a prefix.
 // It is read-only: Set and Delete report secrets.ErrNotSupported.
 type adapter struct {

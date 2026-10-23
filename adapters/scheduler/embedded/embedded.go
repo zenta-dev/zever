@@ -15,6 +15,8 @@ import (
 	"github.com/zenta-dev/zever/shared/codec"
 )
 
+var _ scheduler.Scheduler = (*embedded)(nil)
+
 var argsCodec = codec.JSONCodec[any]{}
 
 // embedded is the in-process cron Scheduler implementation.

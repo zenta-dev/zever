@@ -10,6 +10,8 @@ import (
 	"github.com/zenta-dev/zever/core/payment"
 )
 
+var _ payment.Payment = (*driver)(nil)
+
 // driver is the in-memory stub payment backend.
 type driver struct {
 	// mu guards ledger and refunded.

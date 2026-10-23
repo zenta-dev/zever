@@ -24,6 +24,8 @@ import (
 	"github.com/zenta-dev/zever/core/media"
 )
 
+var _ media.Media = (*adapter)(nil)
+
 type adapter struct {
 	root        string
 	baseURL     string

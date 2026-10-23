@@ -34,7 +34,7 @@ agent skill for zever) instead.`,
 			if dir == "" {
 				return errors.New("zever docs: --dir is required")
 			}
-			if err := os.MkdirAll(dir, 0o755); err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return fmt.Errorf("zever docs: create dir: %w", err)
 			}
 

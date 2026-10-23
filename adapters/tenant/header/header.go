@@ -12,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/core/tenant"
 )
 
+var _ tenant.Tenant = (*adapter)(nil)
+
 // maxHostLength caps host length per DNS limits (253 chars textual representation).
 const maxHostLength = 253
 

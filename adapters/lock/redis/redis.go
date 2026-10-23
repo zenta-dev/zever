@@ -50,6 +50,8 @@ type adapter struct {
 	closed        atomic.Bool
 }
 
+var _ lock.Locker = (*adapter)(nil)
+
 // handle is one acquired lock.Lock.
 type handle struct {
 	a      *adapter

@@ -2,6 +2,7 @@ package orm
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -108,21 +109,33 @@ func convertScan[T ScanValue](src any) (T, error) {
 			return zero, err
 		}
 
-		return any(s).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(s).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for string")
+		}
+		return v, nil
 	case []byte:
 		b, err := scanBytes(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(b).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(b).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for []byte")
+		}
+		return v, nil
 	case int64:
 		n, err := scanInt64(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(n).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(n).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for int64")
+		}
+		return v, nil
 	case int32:
 		n, err := scanInt64(src)
 		if err != nil {
@@ -133,42 +146,66 @@ func convertScan[T ScanValue](src any) (T, error) {
 			return zero, fmt.Errorf("orm: cannot scan int64 %d into int32: out of range", n)
 		}
 
-		return any(int32(n)).(T), nil //nolint:forcetypeassert // guarded by the outer type switch; range checked above
+		v, ok := any(int32(n)).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for int32")
+		}
+		return v, nil
 	case float64:
 		f, err := scanFloat64(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(f).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(f).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for float64")
+		}
+		return v, nil
 	case float32:
 		f, err := scanFloat64(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(float32(f)).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(float32(f)).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for float32")
+		}
+		return v, nil
 	case bool:
 		bv, err := scanBool(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(bv).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(bv).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for bool")
+		}
+		return v, nil
 	case time.Time:
 		t, err := scanTime(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(t).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(t).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for time.Time")
+		}
+		return v, nil
 	case JSONText:
 		j, err := scanJSONText(src)
 		if err != nil {
 			return zero, err
 		}
 
-		return any(j).(T), nil //nolint:forcetypeassert // guarded by the outer type switch
+		v, ok := any(j).(T)
+		if !ok {
+			return zero, errors.New("orm: convertScan: internal type assertion failed for JSONText")
+		}
+		return v, nil
 	default:
 		return zero, fmt.Errorf("orm: Option[%T] is not a supported scan type: %w", zero, ErrScanTypeMismatch)
 	}
