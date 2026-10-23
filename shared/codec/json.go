@@ -1,7 +1,10 @@
+//nolint:depguard
 package codec
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"io"
 	"reflect"
 	"time"
 )
@@ -50,6 +53,19 @@ var durationUnmarshalers = json.UnmarshalFunc(func(data []byte, d *time.Duration
 	return nil
 })
 
+// Centralized option sets for the facade.
+// Adjusting these swaps behavior repo-wide without touching call sites.
+var (
+	// defaultMarshalOpts applies Deterministic (sorted maps) + Duration string form.
+	defaultMarshalOpts = json.JoinOptions(json.Deterministic(true), json.WithMarshalers(durationMarshalers))
+
+	// defaultUnmarshalOpts applies Duration string/number round-trip.
+	defaultUnmarshalOpts = json.JoinOptions(json.WithUnmarshalers(durationUnmarshalers))
+
+	// indentOpts for MarshalIndent (2-space indent, multiline).
+	indentOpts = json.JoinOptions(jsontext.Multiline(true), jsontext.WithIndent("  "))
+)
+
 // JSONCodec is a Codec[V] implementation that uses JSON encoding.
 type JSONCodec[V any] struct{}
 
@@ -58,7 +74,7 @@ type JSONCodec[V any] struct{}
 // A failure names the value's type, so a caller can tell which payload
 // shape broke without re-deriving it from the call site.
 func (JSONCodec[V]) Encode(v V) ([]byte, error) {
-	data, err := json.Marshal(v, json.Deterministic(true), json.WithMarshalers(durationMarshalers))
+	data, err := json.Marshal(v, defaultMarshalOpts)
 	if err != nil {
 		return nil, &EncodeError{Type: encodeTypeName(v), Err: err}
 	}
@@ -71,7 +87,7 @@ func (JSONCodec[V]) Encode(v V) ([]byte, error) {
 // broke without re-deriving it from the call site.
 func (JSONCodec[V]) Decode(data []byte) (V, error) {
 	var v V
-	if err := json.Unmarshal(data, &v, json.WithUnmarshalers(durationUnmarshalers)); err != nil {
+	if err := json.Unmarshal(data, &v, defaultUnmarshalOpts); err != nil {
 		return v, &DecodeError{Type: decodeTypeName[V](), Err: err}
 	}
 	return v, nil
@@ -93,4 +109,57 @@ func encodeTypeName[V any](v V) string {
 // failed.
 func decodeTypeName[V any]() string {
 	return reflect.TypeFor[V]().String()
+}
+
+// Marshal serializes v to JSON bytes with repo-default options
+// (Deterministic + Duration string form).
+func Marshal(v any) ([]byte, error) {
+	return json.Marshal(v, defaultMarshalOpts)
+}
+
+// MarshalWrite serializes v to w with repo-default options.
+// Does NOT append a trailing newline (unlike v1 NewEncoder.Encode).
+func MarshalWrite(w io.Writer, v any) error {
+	return json.MarshalWrite(w, v, defaultMarshalOpts)
+}
+
+// MarshalIndent serializes v to pretty-printed JSON with 2-space indent.
+// prefix is accepted for v1 compatibility but is always empty in this repo.
+func MarshalIndent(v any, indent string) ([]byte, error) {
+	_ = indent // prefix not used; repo standard is indent="  "
+	return json.Marshal(v, indentOpts)
+}
+
+// MarshalLine serializes v to w followed by a newline.
+// Equivalent to v1 json.NewEncoder(w).Encode(v).
+func MarshalLine(w io.Writer, v any) error {
+	if err := json.MarshalWrite(w, v, defaultMarshalOpts); err != nil {
+		return err
+	}
+	_, err := w.Write([]byte{'\n'})
+	return err
+}
+
+// Unmarshal deserializes data into v with repo-default options
+// (Duration string/number round-trip).
+func Unmarshal(data []byte, v any) error {
+	return json.Unmarshal(data, v, defaultUnmarshalOpts)
+}
+
+// UnmarshalRead deserializes a single JSON value from r (consumes entire reader).
+// For HTTP bodies, process stdout, etc.
+func UnmarshalRead(r io.Reader, v any) error {
+	return json.UnmarshalRead(r, v, defaultUnmarshalOpts)
+}
+
+// UnmarshalDecode deserializes the next JSON value from a streaming decoder.
+// For NDJSON / multi-value streams.
+func UnmarshalDecode(dec *jsontext.Decoder, v any) error {
+	return json.UnmarshalDecode(dec, v, defaultUnmarshalOpts)
+}
+
+// IsValid reports whether data is syntactically valid JSON.
+// Replaces json.Valid from v1.
+func IsValid(data []byte) bool {
+	return jsontext.Value(data).IsValid()
 }

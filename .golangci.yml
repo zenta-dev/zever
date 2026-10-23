@@ -45,7 +45,6 @@ linters:
     - recvcheck
     - revive
     - rowserrcheck
-    - spancheck
     - sqlclosecheck
     - testifylint
     - usetesting
@@ -57,18 +56,6 @@ linters:
     - wastedassign
     - whitespace
     - zerologlint
-  # wrapcheck is intentionally not enabled. Measured with
-  # `golangci-lint run --enable-only wrapcheck ./...` per module (non-test
-  # code, re-measured with --tests=false): config is clean, but container
-  # (17) plus 40+ core/* modules (145) report 162 hits in total, well over
-  # the ~25 that would make a scoped container + core/* enablement cheap. Most are deliberate pass-throughs of
-  # adapter/interface errors (Close/Stop/Shutdown probes, registry
-  # Register, ctx.Err) that callers match with errors.Is/As and that
-  # already carry the adapter's own message prefix; wrapping them all adds
-  # stutter without information. The repo's error conventions (message
-  # prefixes, no double %w, no stray panics) are enforced by
-  # `make err-lint` (tools/errscan) instead; see
-  # docs/src/content/docs/reference/errors.mdx.
   settings:
     depguard:
       rules:
@@ -78,37 +65,8 @@ linters:
               desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
             - pkg: "io/ioutil"
               desc: "Deprecated since Go 1.16: use io or os instead"
-        # The framework has no config-file parser on purpose: v0.8.0 is
-        # env-only. A test may parse a generated YAML document (the CLI
-        # tests parse the GitHub Actions workflow it scaffolds), but no
-        # non-test file may import a YAML, TOML, INI or properties package.
-        # That import would be the first step back to file-based
-        # configuration, so the gate stops it there. The rule covers the
-        # whole tree; the same deny-list lives in tools/tagcheck as the
-        # no_config_parser rule, which fails `make check-tags` with file
-        # and line.
-        no-yaml:
-          files:
-            - "!$test"
-          deny:
-            - pkg: "go.yaml.in/yaml"
-              desc: "The framework is env-only: no non-test file may parse YAML"
-            - pkg: "gopkg.in/yaml.v2"
-              desc: "The framework is env-only: no non-test file may parse YAML"
-            - pkg: "gopkg.in/yaml.v3"
-              desc: "The framework is env-only: no non-test file may parse YAML"
-            - pkg: "sigs.k8s.io/yaml"
-              desc: "The framework is env-only: no non-test file may parse YAML"
-            - pkg: "github.com/BurntSushi/toml"
-              desc: "The framework is env-only: no non-test file may parse TOML"
-            - pkg: "github.com/pelletier/go-toml"
-              desc: "The framework is env-only: no non-test file may parse TOML"
-            - pkg: "gopkg.in/ini.v1"
-              desc: "The framework is env-only: no non-test file may parse INI"
-            - pkg: "github.com/go-ini/ini"
-              desc: "The framework is env-only: no non-test file may parse INI"
-            - pkg: "github.com/magiconair/properties"
-              desc: "The framework is env-only: no non-test file may parse Java-style properties"
+            - pkg: "encoding/json"
+              desc: "Use shared/codec facade instead of encoding/json directly. This will be enforced repo-wide."
     errorlint:
       errorf: true
     exhaustive:

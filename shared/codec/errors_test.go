@@ -1,4 +1,7 @@
+//nolint:depguard
 package codec
+
+//nolint:depguard
 
 import (
 	"encoding/json/jsontext"
