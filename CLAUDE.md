@@ -76,7 +76,7 @@ Env-only, strictly-typed configuration: `defaults < .env < .env.local < process 
   files only. There are no service config files: a legacy
   `zever.yaml`/`.yml`/`.json` in the cwd is never read.
 - Env vars — **no prefix**. The default instance is `<SERVICE>_<FIELD>=value`
-  (e.g. `DB_MAXCONNS=20`, `AUTH_JWT_SECRET=...`); a named instance is
+  (e.g. `DB_MAX_CONNS=20`, `AUTH_JWT_SECRET=...`); a named instance is
   `<SERVICE>__<NAME>__<FIELD>=value` and needs a matching named Ref. Env
   matching is **best-effort** for unknown variables (so a hostile/noisy process
   environment can't break startup) and ignores case and `_`; an unknown key

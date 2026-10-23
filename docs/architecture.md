@@ -74,7 +74,7 @@ Env-only, strictly-typed: `defaults < .env < .env.local < process env`
   explicit dotenv files only. There are no service config files: a legacy
   `zever.yaml`/`.yml`/`.json` in the working directory is never read.
 - Env vars — no prefix. The default instance is `<SERVICE>_<FIELD>` (for
-  example `DB_MAXCONNS`), a named instance `<SERVICE>__<NAME>__<FIELD>`.
+  example `DB_MAX_CONNS`), a named instance `<SERVICE>__<NAME>__<FIELD>`.
   Matching ignores case and `_`; unknown vars are ignored, unknown keys
   under a wired service prefix and parse failures on resolved fields
   error out.
