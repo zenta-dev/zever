@@ -9,7 +9,7 @@
 - `dsl/resolver/suggest.go` + message-only hint wiring in entity, message,
   service, relation, validate, job, saga sites. No new sentinels, no new
   diagnostics kinds, no interface changes. Parser untouched (never panics).
-- `cmd/zever/compile.go|check.go|breaking.go`: print excerpts via
+- `cmd/zever/compile.go`, `check.go` and `breaking.go`: print excerpts via
   `printDiagnosticsWithSources`; old `printDiagnostics` kept as wrapper.
 - Tests: `suggest_test.go`, `snippet_test.go`, `resolver_suggest_test.go`
   (28 hint cases + position/no-hint controls).

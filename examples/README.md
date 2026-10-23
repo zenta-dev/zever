@@ -135,8 +135,7 @@ Zero-infra defaults need nothing else. Infra adapters are opt-in via env
 (documented per example when added):
 
 ```sh
-# Q_ADAPTER=redis REDIS_ADDR=localhost:6379 go test ./examples/queue/...
-# DB_ADAPTER=postgres DB_DSN=... go test ./examples/db/...
+# DB_ADAPTER=postgres DB_DSN=... go test ./examples/showcase/...
 ```
 
 ## Known gaps (found via `zever doctor`, not fixed here)
