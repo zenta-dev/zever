@@ -388,7 +388,7 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) [
 // keywords first (0), then scalars (1), then entities (2). Everything else
 // defaults to the scalar bucket so it lands between keywords and entities.
 func completionGroup(kind protocol.CompletionItemKind, cand candidate) int {
-	switch kind {
+	switch kind { //nolint:exhaustive // only keyword/class buckets matter; everything else defaults
 	case protocol.CompletionItemKindKeyword:
 		return 0
 	case protocol.CompletionItemKindClass:

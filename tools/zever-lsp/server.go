@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"strconv"
 	"sync"
 
 	"go.lsp.dev/protocol"
@@ -651,7 +651,7 @@ func (s *Server) storeSemTokResult(uriStr string, data []uint32) string {
 	}
 
 	s.semTokCounter++
-	id := fmt.Sprintf("%d", s.semTokCounter)
+	id := strconv.FormatUint(s.semTokCounter, 10)
 	s.semTokCache[uriStr] = semTokCacheEntry{resultID: id, data: data}
 
 	return id

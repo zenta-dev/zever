@@ -655,46 +655,33 @@ func spanIntersectsRange(sp tokenSpan, rng protocol.Range) bool {
 	return true
 }
 
-// Aliases kept for callers/tests that use a different spelling.
-func filterTokenSpansByRange(spans []tokenSpan, rng protocol.Range) []tokenSpan {
-	return filterTokenSpansToRange(spans, rng)
-}
-
-func filterSpansByRange(spans []tokenSpan, rng protocol.Range) []tokenSpan {
-	return filterTokenSpansToRange(spans, rng)
-}
-
-func spansInRange(spans []tokenSpan, rng protocol.Range) []tokenSpan {
-	return filterTokenSpansToRange(spans, rng)
-}
-
-// computeSemTokDelta produces the edits transforming old into new.
-func computeSemTokDelta(old, new []uint32) []protocol.SemanticTokensEdit {
+// computeSemTokDelta produces the edits transforming old into next.
+func computeSemTokDelta(old, next []uint32) []protocol.SemanticTokensEdit {
 	prefix := 0
 	minLen := len(old)
-	if len(new) < minLen {
-		minLen = len(new)
+	if len(next) < minLen {
+		minLen = len(next)
 	}
 
-	for prefix < minLen && old[prefix] == new[prefix] {
+	for prefix < minLen && old[prefix] == next[prefix] {
 		prefix++
 	}
 
 	suffix := 0
-	for suffix < minLen-prefix && old[len(old)-1-suffix] == new[len(new)-1-suffix] {
+	for suffix < minLen-prefix && old[len(old)-1-suffix] == next[len(next)-1-suffix] {
 		suffix++
 	}
 
 	deleteCount := len(old) - prefix - suffix
-	insertData := append([]uint32(nil), new[prefix:len(new)-suffix]...)
+	insertData := append([]uint32(nil), next[prefix:len(next)-suffix]...)
 
 	if deleteCount == 0 && len(insertData) == 0 {
 		return []protocol.SemanticTokensEdit{}
 	}
 
 	return []protocol.SemanticTokensEdit{{
-		Start:       uint32(prefix),      //nolint:gosec // non-negative
-		DeleteCount: uint32(deleteCount), //nolint:gosec // non-negative
+		Start:       uint32(prefix),
+		DeleteCount: uint32(deleteCount), //nolint:gosec // deleteCount is a non-negative slice length difference
 		Data:        insertData,
 	}}
 }
