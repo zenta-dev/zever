@@ -216,9 +216,10 @@ export function docgoProblems(src, relFile) {
       if (ambientTokens.has(shape.lhs)) continue;
       const svc = shape.head.toLowerCase();
 
-      // Canonical field spelling: this loop's own job (audit-facts does
-      // not read option fields), for bare and valued tokens alike.
-      if (svc in truth && shape.field !== 'ADAPTER') {
+      // Canonical field spelling. audit-facts's envKeyProblems now carries
+      // the same check for `=value` shapes, so this loop only owns the
+      // bare-token case (no `=`) to avoid duplicate findings.
+      if (svc in truth && shape.field !== 'ADAPTER' && shape.value === undefined) {
         const { exact, loose } = canonFields(svc);
         if (!exact.has(shape.field)) {
           const near = loose.get(shape.field.replaceAll('_', ''));

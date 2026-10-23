@@ -153,7 +153,7 @@ DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, 
 - The second service to open a DSN borrows the first pool and never closes it. The shared pool takes the first opener's pool settings, and a differing nonzero `max_conns` logs a warning without DSN content.
 - Set `dedicated_pool: true` to open a private pool. Use it with a separate database for `queue`, `workflow`, and `scheduler` under sustained load.
 - `dedicated_pool` is ignored on `db` itself, which owns the pool.
-- Env: `SEARCH_DEDICATEDPOOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
+- Env: `SEARCH_DEDICATED_POOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
 - Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so drop those keys before a downgrade.
 
 ```sh

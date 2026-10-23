@@ -186,7 +186,7 @@ database).
 ```sh
 SEARCH_ADAPTER=db
 SEARCH_DSN="postgres://app:secret@db:5432/app?sslmode=require"
-SEARCH_DEDICATEDPOOL=false   # default false shares; true opens a private pool
+SEARCH_DEDICATED_POOL=false   # default false shares; true opens a private pool
 ```
 
 `db` is the canonical DB-backed name for `search`, `vectorstore`, and
