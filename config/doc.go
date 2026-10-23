@@ -9,7 +9,7 @@
 //	production must supply real secrets via environment.
 //
 //	Env: variables carry no prefix: DB_ADAPTER selects the db adapter,
-//	DB_MAXCONNS sets a db field. Files (.env, .env.local) feed the same
+//	DB_MAX_CONNS sets a db field. Files (.env, .env.local) feed the same
 //	layer beneath the real process environment; see LoadEnv and FromEnv.
 //
 // A service is one zever package's Adapter plus Options: the adapter

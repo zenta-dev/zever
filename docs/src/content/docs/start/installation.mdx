@@ -123,7 +123,7 @@ Expected output:
 db resolved: true
 ```
 
-If that line prints, fetch, build, and default resolution all work. `container.New(nil)` is valid too and closes cleanly. When you configure services later, see the [configuration guide](../../guides/operate/configuration/): config is env-only, and env vars are `<SERVICE>_<FIELD>` with no prefix (`DB_ADAPTER`, `DB_MAXCONNS`), read from `.env`, `.env.local`, and the process environment.
+If that line prints, fetch, build, and default resolution all work. `container.New(nil)` is valid too and closes cleanly. When you configure services later, see the [configuration guide](../../guides/operate/configuration/): config is env-only, and env vars are `<SERVICE>_<FIELD>` with no prefix (`DB_ADAPTER`, `DB_MAX_CONNS`), read from `.env`, `.env.local`, and the process environment.
 
 ## Upgrade
 
