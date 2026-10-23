@@ -39,7 +39,7 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Sync | `textDocument/didOpen`, `textDocument/didChange` (full), `textDocument/didSave`, `textDocument/didClose`, `workspace/didChangeWatchedFiles` |
 | Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array; each diagnostic carries a stable `zen-###` code — see [Diagnostic codes](#diagnostic-codes) below) |
 | Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback) |
-| Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
+| Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/typeDefinition` (the named type under the cursor: a scalar or unknown type is honestly null), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
 | Hover | `textDocument/hover` |
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
 | Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |

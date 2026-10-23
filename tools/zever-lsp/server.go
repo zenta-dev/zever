@@ -214,6 +214,7 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			WorkspaceSymbolProvider: protocol.Boolean(true),
 			DefinitionProvider:      protocol.Boolean(true),
 			DeclarationProvider:     protocol.Boolean(true),
+			TypeDefinitionProvider:  protocol.Boolean(true),
 			HoverProvider:           protocol.Boolean(true),
 			// Unlike the providers above, this one is a pointer to an
 			// options struct, not a bool: the trigger characters are part
@@ -555,6 +556,19 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
 	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
 
 	return definitionAt(schema, file, params.Position), nil
+}
+
+// TypeDefinition jumps to the declaration of the named type under the cursor:
+// an entity, message, or named enum named by a relation target, an rpc
+// Returns type, a param type, or a field type. A nil result encodes LSP null:
+// the cursor names a scalar (which has no declaration), an unknown type, or
+// nothing jumpable at all.
+func (s *Server) TypeDefinition(ctx context.Context, params *protocol.TypeDefinitionParams) (protocol.DefinitionResult, error) {
+	s.captureClient(ctx)
+
+	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
+
+	return typeDefinitionAt(schema, file, params.Position), nil
 }
 
 // Declaration is an alias for Definition: every .zen declaration is also
