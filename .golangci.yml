@@ -45,6 +45,7 @@ linters:
     - recvcheck
     - revive
     - rowserrcheck
+    - spancheck
     - sqlclosecheck
     - testifylint
     - usetesting
@@ -56,27 +57,36 @@ linters:
     - wastedassign
     - whitespace
     - zerologlint
+  # wrapcheck is intentionally not enabled. Measured with
+  # `golangci-lint run --enable-only wrapcheck ./...` per module (non-test
+  # code, re-measured with --tests=false): config is clean, but container
+  # (17) plus 40+ core/* modules (145) report 162 hits in total, well over
+  # the ~25 that would make a scoped container + core/* enablement cheap. Most are deliberate pass-throughs of
+  # adapter/interface errors (Close/Stop/Shutdown probes, registry
+  # Register, ctx.Err) that callers match with errors.Is/As and that
+  # already carry the adapter's own message prefix; wrapping them all adds
+  # stutter without information. The repo's error conventions (message
+  # prefixes, no double %w, no stray panics) are enforced by
+  # `make err-lint` (tools/errscan) instead; see
+  # docs/src/content/docs/reference/errors.mdx.
   settings:
     depguard:
       rules:
-        # shared/codec can use v2/jsontext
-        codec-facade:
-          files:
-            - "shared/codec/**/*.go"
-          allow:
-            - "encoding/json/v2"
-            - "encoding/json/jsontext"
+        main:
           deny:
             - pkg: "github.com/pkg/errors"
               desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
             - pkg: "io/ioutil"
               desc: "Deprecated since Go 1.16: use io or os instead"
-            - pkg: "encoding/json"
-              desc: "Use shared/codec facade instead of encoding/json directly."
         # The framework has no config-file parser on purpose: v0.8.0 is
         # env-only. A test may parse a generated YAML document (the CLI
         # tests parse the GitHub Actions workflow it scaffolds), but no
         # non-test file may import a YAML, TOML, INI or properties package.
+        # That import would be the first step back to file-based
+        # configuration, so the gate stops it there. The rule covers the
+        # whole tree; the same deny-list lives in tools/tagcheck as the
+        # no_config_parser rule, which fails `make check-tags` with file
+        # and line.
         no-yaml:
           files:
             - "!$test"
@@ -99,13 +109,23 @@ linters:
               desc: "The framework is env-only: no non-test file may parse INI"
             - pkg: "github.com/magiconair/properties"
               desc: "The framework is env-only: no non-test file may parse Java-style properties"
-                # Deny only pkg/errors and io/ioutil for now; encoding/json deny added in final workstream
-        main:
+        # shared/codec is the ONLY package allowed to import encoding/json/v2
+        # and encoding/json/jsontext directly. All other packages must use
+        # the shared/codec facade. This rule will be tightened in the final
+        # workstream (W9) to deny encoding/json everywhere.
+        codec-facade:
+          files:
+            - "shared/codec/**/*.go"
+          allow:
+            - "encoding/json/v2"
+            - "encoding/json/jsontext"
           deny:
             - pkg: "github.com/pkg/errors"
               desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
             - pkg: "io/ioutil"
               desc: "Deprecated since Go 1.16: use io or os instead"
+            - pkg: "encoding/json"
+              desc: "Use shared/codec facade instead of encoding/json directly."
     errorlint:
       errorf: true
     exhaustive:
@@ -114,6 +134,38 @@ linters:
     govet:
       enable:
         - shadow
+    gosec:
+      # Curated security rules: enable only high-confidence, actionable checks.
+      # Excluded false-positive-heavy rules:
+      #  G103: unsafe in generated protobuf code
+      #  G104: unhandled errors (often intentional pass-through)
+      #  G109-G114: strconv unchecked (validated at boundaries)
+      #  G115: integer overflow (bounds-checked at call sites)
+      #  G204: subprocess launch (CLI tools, validated adapters)
+      #  G301/G302/G306: file perms (CLI scaffolds, non-secret files)
+      #  G402: TLS InsecureSkipVerify (explicit opt-in for testing)
+      #  G404: weak random (retry/pruner jitter, non-security)
+      #  G703: taint analysis (high FP rate on validated paths)
+      enable:
+        - G101  # hardcoded credentials
+        - G102  # bind to all interfaces
+        - G106  # ssh.InsecureIgnoreHostKey
+        - G107  # URL taint to HTTP request
+        - G108  # profiling endpoint exposed
+        - G201  # SQL string concatenation
+        - G202  # SQL string concatenation
+        - G203  # unchecked SQL parameter
+        - G303  # predictable tempfile
+        - G305  # zip path traversal
+        - G307  # temp file permissions
+        - G401  # weak crypto
+        - G403  # weak crypto min key size
+        - G501  # import blacklist
+        - G502  # import blacklist
+        - G503  # import blacklist
+        - G504  # import blacklist
+        - G505  # import blacklist
+        - G601  # implicit memory aliasing
   exclusions:
     presets:
       - comments
