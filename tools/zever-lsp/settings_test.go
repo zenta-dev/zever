@@ -60,6 +60,7 @@ func TestParseSettings(t *testing.T) {
 			want: Settings{
 				ImplicitModuleHints: false,
 				ErrorCaseHints:      true,
+				CodeLensReferences:  true,
 				DebounceDelay:       debounceDelay,
 			},
 			wantOK: true,
@@ -70,6 +71,7 @@ func TestParseSettings(t *testing.T) {
 			want: Settings{
 				ImplicitModuleHints: true,
 				ErrorCaseHints:      false,
+				CodeLensReferences:  true,
 				DebounceDelay:       900 * time.Millisecond,
 			},
 			wantOK: true,
@@ -156,7 +158,7 @@ func TestDidChangeConfiguration(t *testing.T) {
 		t.Fatalf("DidChangeConfiguration: %v", err)
 	}
 
-	want := Settings{ImplicitModuleHints: false, ErrorCaseHints: true, DebounceDelay: 40 * time.Millisecond}
+	want := Settings{ImplicitModuleHints: false, ErrorCaseHints: true, CodeLensReferences: true, DebounceDelay: 40 * time.Millisecond}
 	if got := s.currentSettings(); got != want {
 		t.Errorf("settings = %+v, want %+v", got, want)
 	}

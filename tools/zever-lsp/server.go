@@ -242,8 +242,13 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			// PrepareProvider tells the client to ask prepareRename first,
 			// so a cursor on a non-renameable symbol is refused before the
 			// user is ever prompted for a new name.
-			RenameProvider:            &protocol.RenameOptions{PrepareProvider: &enabled},
-			ReferencesProvider:        protocol.Boolean(true),
+			RenameProvider:     &protocol.RenameOptions{PrepareProvider: &enabled},
+			ReferencesProvider: protocol.Boolean(true),
+			// Same options-struct shape as DocumentLinkProvider below: the
+			// resolve round-trip exists so a future command-bearing lens can
+			// fill in lazily. Today's lenses are info-only (a title, no
+			// command to execute), so resolve is a passthrough.
+			CodeLensProvider:          &protocol.CodeLensOptions{ResolveProvider: &enabled},
 			FoldingRangeProvider:      protocol.Boolean(true),
 			DocumentHighlightProvider: protocol.Boolean(true),
 			// Never left to any capability auto-wiring: a legend-less
@@ -778,6 +783,35 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
 	}
 
 	return []protocol.Location(locations), nil
+}
+
+// CodeLens returns one reference-count lens per top-level declaration in the
+// requested document, computed by codeLensesAt over the whole workspace. An
+// unknown document yields nil, not an error, per the "no lenses for this
+// document" reading DocumentLink shares; a switched-off
+// zever.codelens.references setting yields nil too, so the client renders
+// nothing at all.
+func (s *Server) CodeLens(ctx context.Context, params *protocol.CodeLensParams) ([]protocol.CodeLens, error) {
+	s.captureClient(ctx)
+
+	if !s.currentSettings().CodeLensReferences {
+		return nil, nil
+	}
+
+	uriStr := string(params.TextDocument.URI)
+
+	schema, _ := s.schemaAndFile(uriStr)
+
+	return codeLensesAt(schema, s.ws.ParsedFiles(), uriStr), nil
+}
+
+// CodeLensResolve is a passthrough by design: lenses already carry their
+// full titles (there is no command to fill in lazily), so the item
+// round-trips unchanged.
+func (s *Server) CodeLensResolve(ctx context.Context, params *protocol.CodeLens) (*protocol.CodeLens, error) {
+	s.captureClient(ctx)
+
+	return params, nil
 }
 
 // FoldingRanges returns one fold per multi-line brace pair in the document.

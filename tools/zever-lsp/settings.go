@@ -18,6 +18,8 @@ type Settings struct {
 	ImplicitModuleHints bool
 	// ErrorCaseHints gates the errors-case status inlay hint family.
 	ErrorCaseHints bool
+	// CodeLensReferences gates the "N reference(s)" code lens family.
+	CodeLensReferences bool
 	// DebounceDelay is how long an edit burst must settle before recompiling.
 	DebounceDelay time.Duration
 }
@@ -28,6 +30,7 @@ func defaultSettings() Settings {
 	return Settings{
 		ImplicitModuleHints: true,
 		ErrorCaseHints:      true,
+		CodeLensReferences:  true,
 		DebounceDelay:       debounceDelay,
 	}
 }
@@ -37,6 +40,7 @@ func defaultSettings() Settings {
 //	{
 //	  "zever": {
 //	    "inlayHints": { "implicitModule": true, "errorCases": true },
+//	    "codelens": { "references": true },
 //	    "diagnostics": { "debounceMs": 250 }
 //	  }
 //	}
@@ -45,6 +49,8 @@ const (
 	settingsInlayHintsKey = "inlayHints"
 	settingsImplicitKey   = "implicitModule"
 	settingsErrorCasesKey = "errorCases"
+	settingsCodeLensKey   = "codelens"
+	settingsReferencesKey = "references"
 	settingsDiagKey       = "diagnostics"
 	settingsDebounceKey   = "debounceMs"
 )
@@ -94,6 +100,12 @@ func parseSettings(raw protocol.LSPAny) (parsed Settings, ok bool) {
 	if diags, diagsOK := jsonObj(section[settingsDiagKey]); diagsOK {
 		if ms, msOK := jsonFloat(diags[settingsDebounceKey]); msOK && ms > 0 {
 			parsed.DebounceDelay = time.Duration(ms * float64(time.Millisecond))
+		}
+	}
+
+	if lens, lensOK := jsonObj(section[settingsCodeLensKey]); lensOK {
+		if b, bOK := jsonBool(lens[settingsReferencesKey]); bOK {
+			parsed.CodeLensReferences = b
 		}
 	}
 
