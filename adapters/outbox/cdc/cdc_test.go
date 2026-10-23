@@ -2,7 +2,6 @@ package cdc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // fakeTx is a minimal db.Tx whose Exec records the last statement. Record
@@ -99,7 +99,7 @@ func TestEncodeMessageMatchesWireShape(t *testing.T) {
 	}
 
 	var wire map[string]any
-	if err := json.Unmarshal(payload, &wire); err != nil {
+	if err := codec.Unmarshal(payload, &wire); err != nil {
 		t.Fatalf("payload is not JSON: %v", err)
 	}
 

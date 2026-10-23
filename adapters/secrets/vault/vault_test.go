@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/core/secrets"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type stubVault struct {
@@ -48,7 +48,7 @@ func (s *stubVault) handleData(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Data map[string]string `json:"data"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := codec.UnmarshalRead(r.Body, &body); err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
@@ -65,7 +65,7 @@ func (s *stubVault) handleData(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"data": map[string]any{
 				"data":     map[string]string{"value": val},
 				"metadata": map[string]any{},
@@ -90,7 +90,7 @@ func (s *stubVault) handleMetadata(w http.ResponseWriter, r *http.Request) {
 		}
 		s.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"data": map[string]any{"keys": keys},
 		})
 		return
@@ -171,7 +171,7 @@ func TestGet_RawValue_ErrInvalidBase64(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"data": map[string]any{"data": map[string]string{"value": "!!!not-base64!!!"}},
 		})
 	}))

@@ -2,7 +2,6 @@ package remote_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/i18n/remote"
 	"github.com/zenta-dev/zever/core/i18n"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var benchAdapterSeq atomic.Int64
@@ -42,15 +42,15 @@ func benchRemote(b *testing.B) i18n.I18n {
 			Key string `json:"key"`
 		}
 
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		_ = codec.UnmarshalRead(r.Body, &req)
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"translations": map[string]string{req.Key: "v"}})
+		_ = codec.MarshalLine(w, map[string]any{"translations": map[string]string{req.Key: "v"}})
 	})
 
 	mux.HandleFunc("/locales", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"locales": []string{"en", "de"}})
+		_ = codec.MarshalLine(w, map[string]any{"locales": []string{"en", "de"}})
 	})
 
 	srv := httptest.NewServer(mux)

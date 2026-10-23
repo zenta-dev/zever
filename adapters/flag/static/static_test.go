@@ -2,7 +2,6 @@ package static
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/flag"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func openTestdata(t *testing.T, reload bool) flag.Flag {
@@ -248,11 +248,11 @@ func TestReloadPicksUpChange(t *testing.T) {
 	}
 
 	var m map[string]any
-	if err := json.Unmarshal(data, &m); err != nil {
+	if err := codec.Unmarshal(data, &m); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	m["env"] = "staging"
-	changed, _ := json.Marshal(m)
+	changed, _ := codec.Marshal(m)
 	if err := os.WriteFile(p, changed, 0o600); err != nil {
 		t.Fatalf("rewrite: %v", err)
 	}

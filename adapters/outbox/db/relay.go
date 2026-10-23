@@ -2,13 +2,13 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	coredb "github.com/zenta-dev/zever/core/db"
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // claimed is one row claimed for publication.
@@ -564,7 +564,7 @@ func decodeHeaders(s string) map[string]string {
 	}
 
 	var m map[string]string
-	if err := json.Unmarshal([]byte(s), &m); err != nil {
+	if err := codec.Unmarshal([]byte(s), &m); err != nil {
 		return nil
 	}
 

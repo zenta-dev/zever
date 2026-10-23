@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	firebase.google.com/go/v4 v4.22.0
 	github.com/zenta-dev/zever/core/flag v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/firebase v0.8.0
 )
 
@@ -81,3 +82,5 @@ replace github.com/zenta-dev/zever/core/log => ../../../core/log
 replace github.com/zenta-dev/zever/shared/registry => ../../../shared/registry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

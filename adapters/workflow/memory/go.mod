@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/zenta-dev/zever/core/workflow v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 )
 
@@ -22,3 +23,5 @@ replace github.com/zenta-dev/zever/shared/retry => ../../../shared/retry
 replace github.com/zenta-dev/zever/core/db => ../../../core/db
 
 replace github.com/zenta-dev/zever/shared/ref => ../../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../../shared/codec

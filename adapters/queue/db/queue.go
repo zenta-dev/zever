@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/orm/dialect"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/dbconn"
 	"github.com/zenta-dev/zever/shared/msgspan"
 	"github.com/zenta-dev/zever/shared/traceprop"
@@ -358,7 +358,7 @@ func (d *driver) ensureSchema(ctx context.Context) error {
 // fail on map[string]string, so the error is provably infallible and
 // discarded.
 func encodeHeaders(h queue.Headers) string {
-	buf, _ := json.Marshal(map[string]string(h))
+	buf, _ := codec.Marshal(map[string]string(h))
 
 	return string(buf)
 }
@@ -373,7 +373,7 @@ func decodeHeaders(s string) queue.Headers {
 
 	var m map[string]string
 
-	if err := json.Unmarshal([]byte(s), &m); err != nil {
+	if err := codec.Unmarshal([]byte(s), &m); err != nil {
 		return nil
 	}
 

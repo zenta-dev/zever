@@ -3,10 +3,11 @@ package log_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"testing"
 
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/zenta-dev/zever/shared/codec"
 
 	mailerlog "github.com/zenta-dev/zever/adapters/mailer/log"
 	"github.com/zenta-dev/zever/core/mailer"
@@ -53,7 +54,7 @@ func TestSendIncludesTraceID(t *testing.T) {
 	}
 
 	var decoded map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &decoded); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &decoded); err != nil {
 		t.Fatalf("output not JSON: %v", err)
 	}
 	if decoded["trace_id"] != "4bf92f3577b34da6a3ce929d0e0e4736" {
@@ -82,7 +83,7 @@ func TestSendOmitsTraceIDWithoutSpan(t *testing.T) {
 	}
 
 	var decoded map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &decoded); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &decoded); err != nil {
 		t.Fatalf("output not JSON: %v", err)
 	}
 	if _, has := decoded["trace_id"]; has {
