@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/workflow v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/dbconn v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 )
@@ -22,7 +23,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/lrucache v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect

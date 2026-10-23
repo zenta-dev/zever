@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/core/outbox v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
 )
 
@@ -18,7 +19,6 @@ require (
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0 // indirect

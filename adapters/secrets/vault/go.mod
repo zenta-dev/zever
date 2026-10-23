@@ -2,10 +2,12 @@ module github.com/zenta-dev/zever/adapters/secrets/vault
 
 go 1.27.3
 
-require github.com/zenta-dev/zever/core/secrets v0.8.0
+require (
+	github.com/zenta-dev/zever/core/secrets v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
+)
 
 require (
-	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/registry v0.8.0 // indirect
 )
