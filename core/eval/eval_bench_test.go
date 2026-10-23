@@ -88,7 +88,7 @@ func BenchmarkRunSuite_Success(b *testing.B) {
 			Expected: "expected",
 		}
 	}
-	run := func(ctx context.Context, input string) (string, error) {
+	run := func(_ context.Context, _ string) (string, error) {
 		return "expected", nil
 	}
 
@@ -111,7 +111,7 @@ func BenchmarkRunSuite_WithFailures(b *testing.B) {
 			Expected: "expected",
 		}
 	}
-	run := func(ctx context.Context, input string) (string, error) {
+	run := func(_ context.Context, input string) (string, error) {
 		if input == "fail" {
 			return "", context.Canceled
 		}
@@ -136,7 +136,7 @@ func BenchmarkRunSuite_Parallel(b *testing.B) {
 			Expected: "expected",
 		}
 	}
-	run := func(ctx context.Context, input string) (string, error) {
+	run := func(_ context.Context, _ string) (string, error) {
 		return "expected", nil
 	}
 

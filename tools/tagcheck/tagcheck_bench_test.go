@@ -279,7 +279,7 @@ func BenchmarkCheckStruct_PinnedKey(b *testing.B) {
 			want := pinned[field.Name]
 			if field.State() == wire.StateNamed {
 				got, _ := field.Key()
-				if got != want {
+				if got != want { //nolint:revive,staticcheck // empty block is intentional
 					// violation
 				}
 			}
@@ -328,7 +328,7 @@ func BenchmarkCheckGoldenKey(b *testing.B) {
 	for b.Loop() {
 		if field.State() == wire.StateNamed {
 			got, _ := field.Key()
-			if got != want {
+			if got != want { //nolint:revive,staticcheck // empty block is intentional
 				// violation
 			}
 		}
@@ -362,7 +362,7 @@ func BenchmarkCheckPinnedKeys(b *testing.B) {
 					break
 				}
 			}
-			if !found {
+			if !found { //nolint:revive,staticcheck // empty block is intentional
 				// violation - golden-missing
 			}
 		}

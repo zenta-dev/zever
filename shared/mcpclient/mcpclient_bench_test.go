@@ -59,7 +59,7 @@ func BenchmarkDecodeResponse(b *testing.B) {
 func BenchmarkDispatchRequest(b *testing.B) {
 	var buf bytes.Buffer
 	c := New(&buf, &buf)
-	c.onSampling = func(ctx context.Context, req SampleRequest) (SampleResult, error) {
+	c.onSampling = func(_ context.Context, _ SampleRequest) (SampleResult, error) {
 		return SampleResult{Content: map[string]any{"type": "text", "text": "ok"}}, nil
 	}
 

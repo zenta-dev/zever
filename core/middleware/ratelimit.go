@@ -123,20 +123,26 @@ func rightmostUntrusted(header string, trusted []netip.Prefix) (client string, o
 
 	var first string
 
-	for _, entry := range strings.Split(header, ",") {
-		entry = strings.TrimSpace(entry)
+	// Manual scan to avoid strings.Split allocation.
+	// Scan left-to-right, tracking the rightmost untrusted.
+	start := 0
+	for i := 0; i <= len(header); i++ {
+		if i == len(header) || header[i] == ',' {
+			entry := strings.TrimSpace(header[start:i])
+			start = i + 1
 
-		addr, valid := normalizeAddr(entry)
-		if !valid {
-			continue
-		}
+			addr, valid := normalizeAddr(entry)
+			if !valid {
+				continue
+			}
 
-		if first == "" {
-			first = addr.String()
-		}
+			if first == "" {
+				first = addr.String()
+			}
 
-		if !prefixContains(trusted, addr) {
-			client, ok = addr.String(), true
+			if !prefixContains(trusted, addr) {
+				client, ok = addr.String(), true
+			}
 		}
 	}
 

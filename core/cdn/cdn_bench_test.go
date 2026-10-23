@@ -7,7 +7,7 @@ import (
 
 // BenchmarkOpen measures the CDN factory lookup and instantiation.
 func BenchmarkOpen(b *testing.B) {
-	Register(Adapter("bench-noop-"+b.Name()), func(opts Options) (CDN, error) {
+	_ = Register(Adapter("bench-noop-"+b.Name()), func(_ Options) (CDN, error) {
 		return &noopAdapter{}, nil
 	})
 
@@ -85,7 +85,7 @@ func BenchmarkClose_Noop(b *testing.B) {
 
 // BenchmarkRegisteredAdapters measures the sorted adapter list lookup.
 func BenchmarkRegisteredAdapters(b *testing.B) {
-	Register(Adapter("bench-list-"+b.Name()), func(opts Options) (CDN, error) {
+	_ = Register(Adapter("bench-list-"+b.Name()), func(_ Options) (CDN, error) {
 		return &noopAdapter{}, nil
 	})
 

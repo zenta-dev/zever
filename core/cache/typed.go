@@ -25,10 +25,18 @@ func NewTyped[K Key, V any](backend Cache, codec codec.Codec[V]) *Typed[K, V] {
 	return &Typed[K, V]{backend: backend, codec: codec}
 }
 
+// key converts k to its string representation for backend storage.
+// String keys are a fast path with no interface conversion.
+// Non-string integer/float keys use a type switch on the underlying type.
 func (t *Typed[K, V]) key(k K) string {
+	// Fast path for string keys: direct return, no interface conversion.
+	if s, ok := any(k).(string); ok {
+		return s
+	}
+
+	// Non-string keys: use type switch on the concrete type.
+	// This avoids boxing for the string case above.
 	switch v := any(k).(type) {
-	case string:
-		return v
 	case int8:
 		return strconv.FormatInt(int64(v), 10)
 	case int16:

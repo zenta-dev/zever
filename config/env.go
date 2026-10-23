@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
@@ -67,52 +68,56 @@ var durationType = reflect.TypeOf(time.Duration(0))
 // On ANY failure Resolve returns nil plus the error.
 func Resolve(env Env) (*Config, error) {
 	cfg := Default()
-	overlay := stripAdapterKeys(env)
+	norm := buildNormalizedEnv(env)
+	overlay := stripAdapterKeysNormalized(env)
 	for _, svc := range knownServiceNames() {
 		adapter, opts, ok := serviceRefs(cfg, svc)
 		if !ok {
 			continue
 		}
-		if v, ok := lookupEnvKey(env, strings.ToUpper(svc)+"_ADAPTER"); ok {
+		if v, ok := lookupEnvKeyNormalized(norm, strings.ToUpper(svc)+"_ADAPTER"); ok {
 			*adapter = v
 		}
 		if err := ApplyEnv(overlay, svc, "", opts); err != nil {
 			return nil, err
 		}
 	}
-	applyPluginEnv(env, cfg)
+	applyPluginEnvNormalized(norm, cfg)
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-// stripAdapterKeys copies env minus every `SERVICE_ADAPTER` key: adapter
+// stripAdapterKeysNormalized removes every `SERVICE_ADAPTER` key: adapter
 // selection is applied directly by Resolve, so bare-Options ApplyEnv never
 // sees it (an Options struct with its own adapter-shaped field keeps its
 // default, matching the old file+env layering).
-func stripAdapterKeys(env Env) Env {
+func stripAdapterKeysNormalized(env Env) Env {
 	out := make(Env, len(env))
 	adapters := adapterEnvKeys()
 
-outer:
 	for key, value := range env {
 		upper := strings.ToUpper(key)
+		skip := false
 		for _, adapter := range adapters {
 			if upper == adapter {
-				continue outer
+				skip = true
+				break
 			}
 		}
-		out[key] = value
+		if !skip {
+			out[key] = value
+		}
 	}
 	return out
 }
 
 // adapterEnvKeys returns the uppercased SERVICE_ADAPTER key of every known
-// service. The set is built once per call: the ambient environment holds
-// hundreds of unrelated keys, and none of them needs the service list
+// service. The set is built once via sync.OnceValue: the ambient environment
+// holds hundreds of unrelated keys, and none of them needs the service list
 // rebuilt for every key.
-func adapterEnvKeys() []string {
+var adapterEnvKeys = sync.OnceValue(func() []string {
 	names := knownServiceNames()
 	out := make([]string, 0, len(names))
 
@@ -121,31 +126,30 @@ func adapterEnvKeys() []string {
 	}
 
 	return out
-}
+})
 
-// lookupEnvKey finds key (already uppercased) in env case-insensitively,
-// reporting the value. When several cases of the same key exist, the last
-// in sorted order wins, keeping multi-case environments deterministic.
-func lookupEnvKey(env Env, key string) (string, bool) {
-	var (
-		found bool
-		value string
-		best  string
-	)
+// normalizedEnvMap maps uppercased env keys to (originalKey, value) pairs.
+// When multiple cases of the same key exist, the last in sorted order wins.
+type normalizedEnvMap map[string][2]string
 
+// buildNormalizedEnv builds a normalizedEnvMap from env.
+func buildNormalizedEnv(env Env) normalizedEnvMap {
+	m := make(normalizedEnvMap, len(env))
 	for k, v := range env {
-		if strings.ToUpper(k) != key {
-			continue
-		}
-
-		// Sorted order wins: the greatest matching key is the last one
-		// in sorted order.
-		if !found || k > best {
-			best, value, found = k, v, true
+		upper := strings.ToUpper(k)
+		if existing, ok := m[upper]; !ok || k > existing[0] {
+			m[upper] = [2]string{k, v}
 		}
 	}
+	return m
+}
 
-	return value, found
+// lookupEnvKeyNormalized is the fast path using a pre-built normalizedEnvMap.
+func lookupEnvKeyNormalized(norm normalizedEnvMap, key string) (string, bool) {
+	if pair, ok := norm[key]; ok {
+		return pair[1], true
+	}
+	return "", false
 }
 
 // sortedEnvKeys returns env's keys in sorted order so multi-key application
@@ -517,8 +521,13 @@ func DefaultOptions(service, name string) any {
 // are ignored. Only the adapter is overridable; plugin options stay raw
 // because they have no typed fields to coerce into.
 func applyPluginEnv(env Env, cfg *Config) {
+	applyPluginEnvNormalized(buildNormalizedEnv(env), cfg)
+}
+
+// applyPluginEnvNormalized is the fast path using a pre-built normalizedEnvMap.
+func applyPluginEnvNormalized(norm normalizedEnvMap, cfg *Config) {
 	for name, svc := range cfg.Plugins {
-		v, ok := lookupEnvKey(env, strings.ToUpper(name)+"_ADAPTER")
+		v, ok := lookupEnvKeyNormalized(norm, strings.ToUpper(name)+"_ADAPTER")
 		if !ok || v == "" {
 			continue
 		}

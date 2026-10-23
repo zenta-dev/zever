@@ -230,15 +230,15 @@ func BenchmarkVersionFloor(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		_, _ = versionFloorFromBytes(content)
+		_ = versionFloorFromBytes(content)
 	}
 }
 
 // versionFloorFromBytes is a copy for benchmarking without file I/O.
-func versionFloorFromBytes(raw []byte) (string, error) {
+func versionFloorFromBytes(raw []byte) string {
 	s := strings.TrimSpace(string(raw))
 	s = strings.TrimPrefix(s, "v")
-	return s, nil
+	return s
 }
 
 // BenchmarkAppendChangelogFragments measures the fragment appending logic.

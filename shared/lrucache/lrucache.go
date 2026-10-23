@@ -36,13 +36,14 @@ func WithOnEvict[K comparable, V any](fn func(K, V)) Option[K, V] {
 
 // Cache is a fixed-capacity, generic, thread-safe LRU cache backed by
 // container/list (for recency order) and a map (for O(1) lookup). It uses a
-// plain sync.Mutex rather than sync.RWMutex: Get mutates recency order (it
-// moves the accessed entry to the front of the list), so even read-only
-// lookups require exclusive access.
+// sync.RWMutex with an optimistic read path: cache misses take a read lock,
+// cache hits briefly upgrade to a write lock to update recency. This avoids
+// write-lock contention on the common miss path while preserving LRU
+// semantics.
 //
 // The zero value is not usable; construct with New.
 type Cache[K comparable, V any] struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	capacity int
 	ll       *list.List
 	items    map[K]*list.Element
@@ -75,18 +76,28 @@ func New[K comparable, V any](capacity int, opts ...Option[K, V]) *Cache[K, V] {
 // recency list (marking it most-recently-used). The second return value
 // reports whether k was present.
 func (c *Cache[K, V]) Get(k K) (V, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	el, ok := c.items[k]
+	// Fast path: read lock for miss check
+	c.mu.RLock()
+	_, ok := c.items[k]
+	c.mu.RUnlock()
 	if !ok {
 		var zero V
 		return zero, false
 	}
 
+	// Hit: upgrade to write lock to update recency
+	c.mu.Lock()
+	// Re-check under write lock in case entry was evicted
+	el, ok := c.items[k]
+	if !ok {
+		c.mu.Unlock()
+		var zero V
+		return zero, false
+	}
 	c.ll.MoveToFront(el)
-	e := el.Value.(*entry[K, V]) //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
-	return e.val, true
+	v := el.Value.(*entry[K, V]).val //nolint:forcetypeassert // container invariant: ll only ever contains *entry[K, V] pushed by this Cache's own methods
+	c.mu.Unlock()
+	return v, true
 }
 
 // Put inserts or updates the value for k and marks it most-recently-used.
@@ -152,8 +163,8 @@ func (c *Cache[K, V]) Delete(k K) (V, bool) {
 
 // Len returns the number of entries currently in the cache.
 func (c *Cache[K, V]) Len() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	return c.ll.Len()
 }
