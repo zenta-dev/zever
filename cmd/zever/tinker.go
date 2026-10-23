@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,6 +19,8 @@ import (
 
 	"github.com/traefik/yaegi/interp"
 	"github.com/traefik/yaegi/stdlib"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // tinkerBindPkg is the synthetic package the shim-backed values are exported
@@ -33,8 +35,11 @@ const tinkerBindPkg = "zevertinker/zevertinker"
 // body, where a bare `x := y` is not a declaration.
 var tinkerPrelude = []string{
 	// A REPL is unusable without these; yaegi imports nothing by default.
-	`import ("fmt"; "strings"; "strconv"; "time"; "encoding/json")`,
+	// shared/codec is the JSON facade (backed by encoding/json/v2); the
+	// stdlib encoding/json package is deliberately not imported.
+	`import ("fmt"; "strings"; "strconv"; "time")`,
 	`import "zevertinker"`,
+	`import "github.com/zenta-dev/zever/shared/codec"`,
 	`db := zevertinker.DB`,
 	`cache := zevertinker.Cache`,
 	`queue := zevertinker.Queue`,
@@ -245,6 +250,17 @@ func newTinkerInterp(client *tinkerClient) (*interp.Interpreter, error) {
 			"Cache": reflect.ValueOf(&tinkerCache{c: client}),
 			"Queue": reflect.ValueOf(&tinkerQueue{c: client}),
 			"Job":   reflect.ValueOf(&tinkerJob{c: client}),
+		},
+		// The prelude binds shared/codec under its real import path so
+		// REPL input reaches for codec.Marshal/codec.Unmarshal instead
+		// of the stdlib v1 package (which yaegi would otherwise resolve
+		// from its own symbol table).
+		"github.com/zenta-dev/zever/shared/codec/codec": {
+			"Marshal":       reflect.ValueOf(codec.Marshal),
+			"MarshalIndent": reflect.ValueOf(codec.MarshalIndent),
+			"MarshalLine":   reflect.ValueOf(codec.MarshalLine),
+			"Unmarshal":     reflect.ValueOf(codec.Unmarshal),
+			"IsValid":       reflect.ValueOf(codec.IsValid),
 		},
 	}
 
@@ -542,7 +558,7 @@ func (c *tinkerClient) ping(timeout time.Duration) error {
 var callTimeout = 30 * time.Second
 
 // call performs one request/response round trip.
-func (c *tinkerClient) call(verb string, args any) (json.RawMessage, error) {
+func (c *tinkerClient) call(verb string, args any) (jsontext.Value, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -557,7 +573,7 @@ func (c *tinkerClient) call(verb string, args any) (json.RawMessage, error) {
 	req := tinkerRequest{Verb: verb}
 
 	if args != nil {
-		raw, err := json.Marshal(args)
+		raw, err := codec.Marshal(args)
 		if err != nil {
 			return nil, fmt.Errorf("zever tinker: marshal %s args: %w", verb, err)
 		}
@@ -565,7 +581,7 @@ func (c *tinkerClient) call(verb string, args any) (json.RawMessage, error) {
 		req.Args = raw
 	}
 
-	line, err := json.Marshal(req)
+	line, err := codec.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("zever tinker: marshal %s request: %w", verb, err)
 	}
@@ -638,7 +654,7 @@ func (c *tinkerClient) readResponse() (tinkerResponse, error) {
 		}
 
 		var resp tinkerResponse
-		if err := json.Unmarshal([]byte(payload), &resp); err != nil {
+		if err := codec.Unmarshal([]byte(payload), &resp); err != nil {
 			return tinkerResponse{}, fmt.Errorf("zever tinker: decode shim response: %w", err)
 		}
 
@@ -661,7 +677,7 @@ func (c *tinkerClient) callInto(verb string, args, dst any) error {
 		return fmt.Errorf("zever tinker: %s returned no result", verb)
 	}
 
-	if err := json.Unmarshal(raw, dst); err != nil {
+	if err := codec.Unmarshal(raw, dst); err != nil {
 		return fmt.Errorf("zever tinker: decode %s result: %w", verb, err)
 	}
 
@@ -762,7 +778,7 @@ type tinkerJob struct{ c *tinkerClient }
 
 // Dispatch enqueues a registered job. args is JSON-encoded on the way over.
 func (t *tinkerJob) Dispatch(name string, args any) error {
-	raw, err := json.Marshal(args)
+	raw, err := codec.Marshal(args)
 	if err != nil {
 		return fmt.Errorf("zever tinker: marshal job args: %w", err)
 	}

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Machine-readable exit codes. The mapping preserves the existing contract:
@@ -71,7 +72,7 @@ func exitCodeFor(err error) int {
 
 // emitEnvelope writes env as a single JSON line to jsonOut.
 func emitEnvelope(env Envelope) {
-	_ = json.NewEncoder(jsonOut).Encode(env)
+	_ = codec.MarshalLine(jsonOut, env)
 }
 
 // emitSuccess writes a success envelope for command with data.

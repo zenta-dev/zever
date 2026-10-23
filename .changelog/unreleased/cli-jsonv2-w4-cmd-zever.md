@@ -1,0 +1,1 @@
+- refactor(cli): route `cmd/zever` JSON through `shared/codec` (v2 backend); generated tinker shims, worker entrypoints, and the `new` hello service now import `shared/codec`/`encoding/json/jsontext` instead of `encoding/json`, and the tinker REPL prelude binds `codec`.
