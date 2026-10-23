@@ -402,12 +402,24 @@ func TestCompletionItemsCarryNoEagerDetail(t *testing.T) {
 		t.Fatalf("completion items missing %q, got %v", "entity", completionLabels(items))
 	}
 
-	if detail, present := item.Detail.Get(); present {
-		t.Errorf("initial completion item Detail = %q, want absent (deferred to resolve)", detail)
+	if detail, present := item.Detail.Get(); !present || detail != "declare an entity" {
+		t.Errorf("initial completion item Detail = %q (present=%v), want %q", detail, present, "declare an entity")
 	}
 
 	if len(item.Data) == 0 {
 		t.Fatalf("initial completion item Data is empty, want the resolve payload")
+	}
+
+	if st, present := item.SortText.Get(); !present || st == "" {
+		t.Fatalf("initial completion item SortText is empty, want a sort prefix")
+	}
+
+	if ft, present := item.FilterText.Get(); !present || ft != "entity" {
+		t.Errorf("initial completion item FilterText = %q (present=%v), want %q", ft, present, "entity")
+	}
+
+	if item.LabelDetails == nil || item.LabelDetails.Detail == nil || *item.LabelDetails.Detail != "declare an entity" {
+		t.Errorf("initial completion item LabelDetails missing detail, got %+v", item.LabelDetails)
 	}
 }
 
