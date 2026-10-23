@@ -478,8 +478,14 @@ func (s *Server) Rename(ctx context.Context, params *protocol.RenameParams) (*pr
 		return renameServiceEdits(parsedFiles, target.Name, params.NewName)
 	case rpcKind:
 		return renameRPCEdits(parsedFiles, target.Owner, target.Name, params.NewName)
+	case messageKind:
+		return renameMessageEdits(parsedFiles, target.Name, params.NewName)
+	case enumKind:
+		return renameEnumEdits(parsedFiles, target.Name, params.NewName)
+	case sagaKind:
+		return renameSagaEdits(parsedFiles, target.Name, params.NewName)
 	}
-	// Proof: renameTargetAt yields only the five kinds dispatched here and
+	// Proof: renameTargetAt yields only the eight kinds dispatched here and
 	// below; rpcKind is the sole remaining reachable kind, so control reaches
 	// here only for rpc renames (the live rpc subtest in TestRename covers
 	// this return).

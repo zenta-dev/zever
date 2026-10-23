@@ -315,3 +315,150 @@ func TestAllEntityNames_returnsEntitiesInDeclarationOrder(t *testing.T) {
 		t.Errorf("allEntityNames(nil) = %v, want nil", allEntityNames(nil))
 	}
 }
+
+const defVisionSrc = `enum Status { active, dormant }
+
+entity User {
+	id: uuid @primary
+	status: Status
+}
+
+job Cleanup() {
+	queue: default
+}
+
+schedule Nightly {
+	cron: "0 0 * * *"
+	dispatch: Cleanup()
+}
+`
+
+// compileVisionDefFixture compiles the enum/job/schedule fixture and parses it.
+func compileVisionDefFixture(t *testing.T) (*ir.Schema, *ast.File) {
+	t.Helper()
+
+	result, diags := compile.Compile(map[string]string{
+		"main.zen": defVisionSrc,
+	})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	file, fileDiags := parser.New("main.zen", []byte(defVisionSrc)).ParseFile()
+	if fileDiags.HasErrors() {
+		t.Fatalf("unexpected parse diagnostics for main.zen: %v", fileDiags)
+	}
+
+	return result.Schema, file
+}
+
+// TestDefinitionAtNamedEnumFieldType: a field typed with a named enum now
+// jumps to the enum's declaration line instead of coming back nil.
+func TestDefinitionAtNamedEnumFieldType(t *testing.T) {
+	schema, file := compileVisionDefFixture(t)
+
+	cursor := cursorOn(t, defVisionSrc, 4, "status: Status")
+	cursor.Character += uint32(len("status: "))
+
+	locations := definitionLocs(t, definitionAt(schema, file, cursor))
+	if len(locations) != 1 {
+		t.Fatalf("got %d locations, want 1: %+v", len(locations), locations)
+	}
+
+	loc := locations[0]
+
+	if !strings.HasSuffix(string(loc.URI), "/main.zen") {
+		t.Errorf("URI = %q, want it to point at main.zen", loc.URI)
+	}
+
+	// `enum Status` is main.zen line 1 -> 0-based line 0, column 0.
+	if loc.Range.Start.Line != 0 || loc.Range.Start.Character != 0 {
+		t.Errorf("Range.Start = %+v, want 0:0", loc.Range.Start)
+	}
+}
+
+func TestFindEnum(t *testing.T) {
+	schema, _ := compileVisionDefFixture(t)
+
+	got := findEnum(schema, "Status")
+
+	if got == nil || got.Name != "Status" || len(got.Values) != 2 {
+		t.Fatalf("findEnum(Status) = %v, want the two-value Status enum", got)
+	}
+
+	if got.Values[0] != "active" || got.Values[1] != "dormant" {
+		t.Errorf("values = %v, want [active dormant]", got.Values)
+	}
+
+	if findEnum(schema, "Nope") != nil {
+		t.Errorf("findEnum(Nope) = %v, want nil", findEnum(schema, "Nope"))
+	}
+
+	if findEnum(nil, "Status") != nil {
+		t.Errorf("findEnum on a nil schema = %v, want nil", findEnum(nil, "Status"))
+	}
+}
+
+// TestDefinitionAtDispatchTargetJumpsToJob: the cursor on a schedule's
+// dispatch target names a job, which has no type-name slot, so the schedule
+// dispatch arm resolves it against the job declarations directly.
+func TestDefinitionAtDispatchTargetJumpsToJob(t *testing.T) {
+	schema, file := compileVisionDefFixture(t)
+
+	cursor := cursorOn(t, defVisionSrc, 13, "dispatch: Cleanup")
+	cursor.Character += uint32(len("dispatch: "))
+
+	locations := definitionLocs(t, definitionAt(schema, file, cursor))
+	if len(locations) != 1 {
+		t.Fatalf("got %d locations, want 1: %+v", len(locations), locations)
+	}
+
+	loc := locations[0]
+
+	if !strings.HasSuffix(string(loc.URI), "/main.zen") {
+		t.Errorf("URI = %q, want it to point at main.zen", loc.URI)
+	}
+
+	// `job Cleanup()` is the fixture's 8th line -> 0-based line 7.
+	if loc.Range.Start.Line != 7 {
+		t.Errorf("Range.Start.Line = %d, want 7", loc.Range.Start.Line)
+	}
+}
+
+// TestDefinitionAtDispatchUnknownJobReturnsNil: a dispatch to a job the
+// resolver could not match (mid-edit) yields nil, not a bogus jump.
+func TestDefinitionAtDispatchUnknownJobReturnsNil(t *testing.T) {
+	src := "job Keep() {\n" +
+		"\tqueue: default\n" +
+		"}\n\n" +
+		"schedule Nightly {\n" +
+		"\tcron: \"0 0 * * *\"\n" +
+		"\tdispatch: Gone()\n" +
+		"}\n"
+
+	result, _ := compile.Compile(map[string]string{"a.zen": src})
+	file, _ := parser.New("a.zen", []byte(src)).ParseFile()
+
+	cursor := cursorOn(t, src, 6, "Gone")
+	cursor.Character += uint32(len("dispatch: "))
+
+	if got := definitionAt(result.Schema, file, cursor); got != nil {
+		t.Errorf("definitionAt() on an unknown dispatch target = %+v, want nil", got)
+	}
+}
+
+func TestFindJob(t *testing.T) {
+	schema, _ := compileVisionDefFixture(t)
+
+	if got := findJob(schema, "Cleanup"); got == nil || got.Name != "Cleanup" {
+		t.Errorf("findJob(Cleanup) = %v, want the Cleanup job", got)
+	}
+
+	if findJob(schema, "Nope") != nil {
+		t.Errorf("findJob(Nope) = %v, want nil", findJob(schema, "Nope"))
+	}
+
+	if findJob(nil, "Cleanup") != nil {
+		t.Errorf("findJob on a nil schema = %v, want nil", findJob(nil, "Cleanup"))
+	}
+}

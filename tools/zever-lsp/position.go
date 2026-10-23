@@ -364,6 +364,67 @@ func rpcNameAt(file *ast.File, cursor protocol.Position) (*ast.ServiceDecl, *ast
 	return nil, nil
 }
 
+// messageNameAt returns the message whose declared name is under the cursor.
+func messageNameAt(file *ast.File, cursor protocol.Position) *ast.MessageDecl {
+	for _, decl := range flattenDecls(file) {
+		msg, ok := decl.(*ast.MessageDecl)
+		if !ok {
+			continue
+		}
+
+		if coversIdent(msg.NamePos, msg.Name, cursor) {
+			return msg
+		}
+	}
+
+	return nil
+}
+
+// enumNameAt returns the named enum whose declared name is under the cursor.
+func enumNameAt(file *ast.File, cursor protocol.Position) *ast.EnumDecl {
+	for _, decl := range flattenDecls(file) {
+		enum, ok := decl.(*ast.EnumDecl)
+		if !ok {
+			continue
+		}
+
+		if coversIdent(enum.NamePos, enum.Name, cursor) {
+			return enum
+		}
+	}
+
+	return nil
+}
+
+// sagaNameAt returns the saga whose declared name is under the cursor.
+func sagaNameAt(file *ast.File, cursor protocol.Position) *ast.SagaDecl {
+	for _, decl := range flattenDecls(file) {
+		saga, ok := decl.(*ast.SagaDecl)
+		if !ok {
+			continue
+		}
+
+		if coversIdent(saga.NamePos, saga.Name, cursor) {
+			return saga
+		}
+	}
+
+	return nil
+}
+
+// rpcRefPos returns the compiler position of the RPC identifier in a
+// "Service.RPC" reference. ast.RPCRef.Pos points at the service identifier
+// (parseRPCRef records no separate rpc position), but the layout is fixed:
+// the service identifier starts at Pos.Col, the dot the parser accepts via
+// expectSagaDot is exactly one character wide, and the rpc identifier starts
+// immediately after it, so its column is derivable arithmetically.
+func rpcRefPos(ref *ast.RPCRef) diag.Position {
+	pos := ref.Pos
+	pos.Col += len(ref.Service) + 1
+
+	return pos
+}
+
 // dispatchTargetAt returns the schedule whose dispatch call names a job
 // under the cursor.
 func dispatchTargetAt(file *ast.File, cursor protocol.Position) *ast.ScheduleDecl {

@@ -137,6 +137,30 @@ func symbolsFromSchema(schema *ir.Schema, path string) protocol.DocumentSymbolSl
 			symbols = append(symbols, leafSymbol(schedule.Name, protocol.SymbolKindEvent,
 				schedule.Cron, identRange(schedule.Pos, schedule.Name)))
 		}
+
+		for _, message := range module.Messages {
+			if message.Pos.File != path {
+				continue
+			}
+
+			symbols = append(symbols, messageSymbol(message))
+		}
+
+		for _, saga := range module.Sagas {
+			if saga.Pos.File != path {
+				continue
+			}
+
+			symbols = append(symbols, sagaSymbol(saga))
+		}
+
+		for _, enum := range module.Enums {
+			if enum.Pos.File != path {
+				continue
+			}
+
+			symbols = append(symbols, enumSymbol(enum))
+		}
 	}
 
 	return symbols
@@ -183,6 +207,86 @@ func serviceSymbol(service *ir.Service) protocol.DocumentSymbol {
 		identRange(service.Pos, service.Name), children)
 }
 
+// messageSymbol builds the document symbol for one resolved message, with its fields as children.
+func messageSymbol(message *ir.Message) protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(message.Fields))
+
+	for _, field := range message.Fields {
+		children = append(children, leafSymbol(field.Name, protocol.SymbolKindField,
+			fieldTypeName(field.Type), identRange(field.Pos, field.Name)))
+	}
+
+	return containerSymbol(message.Name, protocol.SymbolKindStruct, "message",
+		identRange(message.Pos, message.Name), children)
+}
+
+// sagaSymbol builds the document symbol for one resolved saga, with its
+// steps as children. A step's range anchors on the `step` keyword: the
+// resolved step records no position for its own name, so the keyword is the
+// honest anchor the same way a leaf symbol's range is its safest span.
+func sagaSymbol(saga *ir.Saga) protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(saga.Steps))
+
+	for _, step := range saga.Steps {
+		children = append(children, leafSymbol(step.Name, protocol.SymbolKindFunction,
+			sagaStepDetail(sagaStepExecuteNames(step.Execute),
+				sagaStepRefNames(step.Compensate), step.Pivot),
+			identRange(step.Pos, "step")))
+	}
+
+	return containerSymbol(saga.Name, protocol.SymbolKindEvent, "saga",
+		identRange(saga.Pos, saga.Name), children)
+}
+
+// sagaStepExecuteNames renders a step's forward reference as the
+// "Service.RPC" text its execute option carries, or "" when the resolved
+// pointers are missing (the resolver guarantees them, and a "" falls through
+// to the "?" detail rendering).
+func sagaStepExecuteNames(ref ir.ServiceRPC) string {
+	if ref.Service == nil || ref.RPC == nil {
+		return ""
+	}
+
+	return ref.Service.Name + "." + ref.RPC.Name
+}
+
+// sagaStepRefNames renders a resolved step reference as the "Service.RPC"
+// text a step's option carries, or "" when the step declares none.
+func sagaStepRefNames(ref *ir.ServiceRPC) string {
+	if ref == nil || ref.Service == nil || ref.RPC == nil {
+		return ""
+	}
+
+	return ref.Service.Name + "." + ref.RPC.Name
+}
+
+// sagaStepDetail renders one step's outline detail line: its forward and
+// optional reverse references, plus the pivot marker when set.
+func sagaStepDetail(execute, compensate string, pivot bool) string {
+	detail := "execute " + execute
+	if execute == "" {
+		detail += "?"
+	}
+
+	if compensate != "" {
+		detail += ", compensate " + compensate
+	}
+
+	if pivot {
+		detail += " (pivot)"
+	}
+
+	return detail
+}
+
+// enumSymbol builds the document symbol for one named enum. The resolved IR
+// records no per-value positions, so the enum has no children here -- the
+// AST fallback (astEnumSymbol) is where values surface with their spans.
+func enumSymbol(enum *ir.Enum) protocol.DocumentSymbol {
+	return leafSymbol(enum.Name, protocol.SymbolKindEnum, "enum",
+		identRange(enum.Pos, enum.Name))
+}
+
 // symbolsFromAST is the best-effort fallback used while the workspace does
 // not resolve: it reports whatever the parser managed to recover.
 func symbolsFromAST(file *ast.File) protocol.DocumentSymbolSlice {
@@ -192,6 +296,12 @@ func symbolsFromAST(file *ast.File) protocol.DocumentSymbolSlice {
 		switch d := decl.(type) {
 		case *ast.EntityDecl:
 			symbols = append(symbols, astEntitySymbol(d))
+		case *ast.MessageDecl:
+			symbols = append(symbols, astMessageSymbol(d))
+		case *ast.EnumDecl:
+			symbols = append(symbols, astEnumSymbol(d))
+		case *ast.SagaDecl:
+			symbols = append(symbols, astSagaSymbol(d))
 		case *ast.ServiceDecl:
 			symbols = append(symbols, astServiceSymbol(d))
 		case *ast.JobDecl:
@@ -247,6 +357,70 @@ func astServiceSymbol(service *ast.ServiceDecl) protocol.DocumentSymbol {
 		identRange(service.NamePos, service.Name), children)
 }
 
+// astMessageSymbol builds the document symbol for one parsed message declaration, with its fields as children.
+func astMessageSymbol(message *ast.MessageDecl) protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(message.Fields))
+
+	for _, field := range message.Fields {
+		detail := ""
+		if field.Type != nil {
+			detail = field.Type.Name
+		}
+
+		children = append(children, leafSymbol(field.Name, protocol.SymbolKindField,
+			detail, identRange(field.NamePos, field.Name)))
+	}
+
+	return containerSymbol(message.Name, protocol.SymbolKindStruct, "message",
+		identRange(message.NamePos, message.Name), children)
+}
+
+// astEnumSymbol builds the document symbol for one parsed named enum, with
+// its values as children -- the AST records each value's position, which the
+// resolved IR carries only fruitlessly.
+func astEnumSymbol(enum *ast.EnumDecl) protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(enum.Values))
+
+	for i, val := range enum.Values {
+		var pos diag.Position
+		if i < len(enum.ValuePos) {
+			pos = enum.ValuePos[i]
+		}
+
+		children = append(children, leafSymbol(val, protocol.SymbolKindEnumMember,
+			"", identRange(pos, val)))
+	}
+
+	return containerSymbol(enum.Name, protocol.SymbolKindEnum, "enum",
+		identRange(enum.NamePos, enum.Name), children)
+}
+
+// astSagaSymbol builds the document symbol for one parsed saga, with its
+// steps as children. Like the resolved path, a step's range anchors on its
+// `step` keyword because the parser records no position for the step's own
+// name.
+func astSagaSymbol(saga *ast.SagaDecl) protocol.DocumentSymbol {
+	children := make([]protocol.DocumentSymbol, 0, len(saga.Steps))
+
+	for _, step := range saga.Steps {
+		var execute, compensate string
+		if step.Execute != nil {
+			execute = step.Execute.Service + "." + step.Execute.RPC
+		}
+
+		if step.Compensate != nil {
+			compensate = step.Compensate.Service + "." + step.Compensate.RPC
+		}
+
+		children = append(children, leafSymbol(step.Name, protocol.SymbolKindFunction,
+			sagaStepDetail(execute, compensate, step.Pivot),
+			identRange(step.Pos, "step")))
+	}
+
+	return containerSymbol(saga.Name, protocol.SymbolKindEvent, "saga",
+		identRange(saga.NamePos, saga.Name), children)
+}
+
 // leafSymbol builds a childless document symbol anchored at rng.
 func leafSymbol(name string, kind protocol.SymbolKind, detail string, rng protocol.Range) protocol.DocumentSymbol {
 	symbol := protocol.DocumentSymbol{
@@ -289,10 +463,12 @@ func containerSymbol(
 	return symbol
 }
 
-// workspaceSymbols returns every entity/field/job/schedule/service/RPC across
-// every file the workspace knows about, filtered by a case-insensitive
-// substring match against query (empty query returns everything, per the
-// workspace/symbol spec's convention).
+// workspaceSymbols returns every entity/field/job/schedule/service/RPC plus
+// every message (and its fields), saga (and its steps) and named enum (and,
+// in the AST fallback, its values) across every file the workspace knows
+// about, filtered by a case-insensitive substring match against query
+// (empty query returns everything, per the workspace/symbol spec's
+// convention).
 //
 // The result is a flat SymbolInformation list, the document-symbol response's
 // legacy sibling that workspace/symbol still speaks.
@@ -378,6 +554,26 @@ func flatSymbolsFromSchema(schema *ir.Schema) protocol.SymbolInformationSlice {
 		for _, schedule := range module.Schedules {
 			symbols = append(symbols, flatSymbol(schedule.Name, protocol.SymbolKindEvent, "", schedule.Pos))
 		}
+
+		for _, message := range module.Messages {
+			symbols = append(symbols, flatSymbol(message.Name, protocol.SymbolKindStruct, "", message.Pos))
+
+			for _, field := range message.Fields {
+				symbols = append(symbols, flatSymbol(field.Name, protocol.SymbolKindField, message.Name, field.Pos))
+			}
+		}
+
+		for _, saga := range module.Sagas {
+			symbols = append(symbols, flatSymbol(saga.Name, protocol.SymbolKindEvent, "", saga.Pos))
+
+			for _, step := range saga.Steps {
+				symbols = append(symbols, flatSymbol(step.Name, protocol.SymbolKindFunction, saga.Name, step.Pos))
+			}
+		}
+
+		for _, enum := range module.Enums {
+			symbols = append(symbols, flatSymbol(enum.Name, protocol.SymbolKindEnum, "", enum.Pos))
+		}
 	}
 
 	return symbols
@@ -402,6 +598,31 @@ func flatSymbolsFromAST(path string, file *ast.File) protocol.SymbolInformationS
 			for _, rel := range d.Relations {
 				symbols = append(symbols,
 					flatSymbolAt(rel.FieldName, protocol.SymbolKindField, d.Name, rel.FieldNamePos, path))
+			}
+		case *ast.MessageDecl:
+			symbols = append(symbols, flatSymbolAt(d.Name, protocol.SymbolKindStruct, "", d.NamePos, path))
+
+			for _, field := range d.Fields {
+				symbols = append(symbols,
+					flatSymbolAt(field.Name, protocol.SymbolKindField, d.Name, field.NamePos, path))
+			}
+		case *ast.EnumDecl:
+			symbols = append(symbols, flatSymbolAt(d.Name, protocol.SymbolKindEnum, "", d.NamePos, path))
+
+			for i, val := range d.Values {
+				var pos diag.Position
+				if i < len(d.ValuePos) {
+					pos = d.ValuePos[i]
+				}
+
+				symbols = append(symbols, flatSymbolAt(val, protocol.SymbolKindEnumMember, d.Name, pos, path))
+			}
+		case *ast.SagaDecl:
+			symbols = append(symbols, flatSymbolAt(d.Name, protocol.SymbolKindEvent, "", d.NamePos, path))
+
+			for _, step := range d.Steps {
+				symbols = append(symbols,
+					flatSymbolAt(step.Name, protocol.SymbolKindFunction, d.Name, step.Pos, path))
 			}
 		case *ast.ServiceDecl:
 			symbols = append(symbols, flatSymbolAt(d.Name, protocol.SymbolKindInterface, "", d.NamePos, path))

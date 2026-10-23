@@ -255,7 +255,7 @@ func TestReferencesAtServiceAndRpc(t *testing.T) {
 // TestRefsFnForKind routes every known kind to its walk and rejects unknown
 // kinds, pinning the full dispatch table including the default arm.
 func TestRefsFnForKind(t *testing.T) {
-	for _, kind := range []symbolKind{entityKind, fieldKind, jobKind, serviceKind, rpcKind} {
+	for _, kind := range []symbolKind{entityKind, fieldKind, jobKind, serviceKind, rpcKind, messageKind, enumKind, sagaKind} {
 		t.Run(string(kind), func(t *testing.T) {
 			target := renameTarget{Kind: kind, Name: "X", Owner: "Owner"}
 
@@ -305,5 +305,105 @@ func TestSortLocationsOrdersByURIThenPosition(t *testing.T) {
 
 	if locs[3].URI != uriB {
 		t.Errorf("locs[3] = %+v, want b.zen", locs[3])
+	}
+}
+
+const (
+	refsEnumSrc = "enum Status { active, dormant }\n"
+
+	refsEnumUserSrc = "entity User {\n" +
+		"\tid: uuid @primary\n" +
+		"\tstatus: Status\n" +
+		"}\n"
+
+	refsEnumMsgSrc = "message Draft {\n" +
+		"\tstate: Status\n" +
+		"}\n"
+
+	refsMsgSrc = "message Greeting {\n" +
+		"\ttext: string @validate(min_len: 1)\n" +
+		"}\n"
+
+	refsMsgUseSrc = "service Greeter {\n" +
+		"\trpc Hello(req: Greeting) -> User {\n" +
+		"\t\tauth: none\n" +
+		"\t}\n" +
+		"}\n"
+
+	refsSagaSrc = "saga Checkout {\n" +
+		"\tstep reserve {\n" +
+		"\t\texecute: UserService.Reserve\n" +
+		"\t\tcompensate: UserService.Release\n" +
+		"\t}\n" +
+		"}\n"
+)
+
+// TestReferencesAtEnumReturnsDeclarationAndTypeSpans: refs on the enum
+// declaration include every entity field, message field, and param type
+// spelling the enum by name, across files.
+func TestReferencesAtEnumReturnsDeclarationAndTypeSpans(t *testing.T) {
+	files := map[string]string{
+		"enum.zen":  refsEnumSrc,
+		"user.zen":  refsEnumUserSrc,
+		"draft.zen": refsEnumMsgSrc,
+	}
+
+	parsed := parseRefsFiles(t, files)
+
+	locs := referencesAt(parsed["enum.zen"], cursorOn(t, refsEnumSrc, 0, "Status"), parsed, true)
+
+	if got := len(locationsForURI(locs, string(pathToURI("enum.zen")))); got != 1 {
+		t.Errorf("enum.zen locations = %d, want 1 (the declaration)", got)
+	}
+
+	for path, want := range map[string]int{
+		"user.zen":  1, // `status: Status`
+		"draft.zen": 1, // `state: Status`
+	} {
+		if got := len(locationsForURI(locs, string(pathToURI(path)))); got != want {
+			t.Errorf("%s locations = %d, want %d", path, got, want)
+		}
+	}
+
+	if got := len(locs); got != 3 {
+		t.Errorf("total locations = %d, want 3", got)
+	}
+}
+
+// TestReferencesAtMessageReturnsDeclarationAndTypeSpans: refs on the
+// message declaration cover its rpc param type references too.
+func TestReferencesAtMessageReturnsDeclarationAndTypeSpans(t *testing.T) {
+	files := map[string]string{
+		"msg.zen": refsMsgSrc,
+		"use.zen": refsMsgUseSrc,
+	}
+
+	parsed := parseRefsFiles(t, files)
+
+	locs := referencesAt(parsed["msg.zen"], cursorOn(t, refsMsgSrc, 0, "Greeting"), parsed, false)
+
+	if got := len(locationsForURI(locs, string(pathToURI("msg.zen")))); got != 0 {
+		t.Errorf("msg.zen locations = %d, want 0 (declaration excluded)", got)
+	}
+
+	if got := len(locationsForURI(locs, string(pathToURI("use.zen")))); got != 1 {
+		t.Errorf("use.zen locations = %d, want 1 (the param type)", got)
+	}
+}
+
+// TestReferencesAtSagaReturnsDeclarationOnly pins the saga kind's walk: a
+// step's execute/compensate identifiers name services and rpcs and are
+// deliberately left out of the saga's own reference set.
+func TestReferencesAtSagaReturnsDeclarationOnly(t *testing.T) {
+	parsed := parseRefsFiles(t, map[string]string{"saga.zen": refsSagaSrc})
+
+	locs := referencesAt(parsed["saga.zen"], cursorOn(t, refsSagaSrc, 0, "Checkout"), parsed, true)
+
+	if got := len(locs); got != 1 {
+		t.Fatalf("total locations = %d, want 1: %+v", got, locs)
+	}
+
+	if path := string(pathToURI("saga.zen")); len(locationsForURI(locs, path)) != 1 {
+		t.Errorf("declaration location missing: %+v", locs)
 	}
 }

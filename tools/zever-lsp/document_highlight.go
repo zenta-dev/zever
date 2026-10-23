@@ -36,8 +36,14 @@ func highlightsAt(file *ast.File, cursor protocol.Position) []protocol.DocumentH
 		refs = serviceRefsIn(file)
 	case rpcKind:
 		refs = rpcRefsIn(file, target.Owner)
+	case messageKind:
+		refs = messageRefsIn(file)
+	case enumKind:
+		refs = enumRefsIn(file)
+	case sagaKind:
+		refs = sagaRefsIn(file)
 	}
-	// Proof: renameTargetAt yields only the five kinds dispatched above, so
+	// Proof: renameTargetAt yields only the eight kinds dispatched above, so
 	// refs is always assigned on reachable paths; an (impossible) unknown
 	// kind leaves refs nil and the shared loop below yields nil, exactly as
 	// the old default arm did.

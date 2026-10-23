@@ -826,3 +826,77 @@ func TestStringSpanLengthStopsAtNewline(t *testing.T) {
 		t.Errorf("unterminated literal measured %d, want 3", got)
 	}
 }
+
+func TestClassifyFileTagsNamedEnum(t *testing.T) {
+	//   0: enum Status {
+	//   1: 	active, dormant
+	//   2: }
+	src := "enum Status {\n" +
+		"\tactive, dormant\n" +
+		"}\n"
+
+	tokens := classifySource(t, src)
+
+	want := []decodedToken{
+		{Line: 0, StartChar: 0, Length: 4, TokenType: "keyword"},    // enum (token tier)
+		{Line: 0, StartChar: 5, Length: 6, TokenType: "class"},      // Status
+		{Line: 1, StartChar: 1, Length: 6, TokenType: "enumMember"}, // active
+		{Line: 1, StartChar: 9, Length: 7, TokenType: "enumMember"}, // dormant
+	}
+
+	for _, expect := range want {
+		if !hasToken(tokens, expect) {
+			t.Errorf("missing %s token at %d:%d (len %d); got %+v",
+				expect.TokenType, expect.Line, expect.StartChar, expect.Length, tokens)
+		}
+	}
+}
+
+func TestClassifyFileTagsSagaAndStepReferences(t *testing.T) {
+	//   0: saga Checkout {
+	//   1: 	step reserve {
+	//   2: 		execute: InventoryService.Reserve
+	//   3: 		compensate: InventoryService.Release
+	//   4: 	}
+	//   5: }
+	//
+	// The step's option labels and its own name are deliberately left to the
+	// shipped grammars, matching how every other contextual label is treated
+	// (header comment); only the saga name and the Service.RPC identifiers
+	// get AST-tier categories.
+	src := "saga Checkout {\n" +
+		"\tstep reserve {\n" +
+		"\t\texecute: InventoryService.Reserve\n" +
+		"\t\tcompensate: InventoryService.Release\n" +
+		"\t}\n" +
+		"}\n"
+
+	tokens := classifySource(t, src)
+
+	want := []decodedToken{
+		{Line: 0, StartChar: 5, Length: 8, TokenType: "function"},   // Checkout
+		{Line: 2, StartChar: 11, Length: 16, TokenType: "function"}, // InventoryService
+		{Line: 2, StartChar: 28, Length: 7, TokenType: "method"},    // Reserve
+		{Line: 3, StartChar: 14, Length: 16, TokenType: "function"}, // InventoryService
+		{Line: 3, StartChar: 31, Length: 7, TokenType: "method"},    // Release
+	}
+
+	for _, expect := range want {
+		if !hasToken(tokens, expect) {
+			t.Errorf("missing %s token at %d:%d (len %d); got %+v",
+				expect.TokenType, expect.Line, expect.StartChar, expect.Length, tokens)
+		}
+	}
+}
+
+func TestClassifyNilEnumAndSagaDecls(t *testing.T) {
+	c := &spanCollector{taken: make(map[[2]int]bool)}
+
+	c.enumDecl(nil)
+	c.saga(nil)
+	c.enumDecl(&ast.EnumDecl{Values: []string{"only"}, ValuePos: []diag.Position{}})
+
+	if len(c.spans) != 0 {
+		t.Errorf("nil/positionless decls produced spans: %+v", c.spans)
+	}
+}
