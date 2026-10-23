@@ -2,12 +2,13 @@ package zevertest
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Client drives an http.Handler in-process: no port, no network. Requests run
@@ -75,7 +76,7 @@ func (c *Client) Do(method, path string, body any) *Response {
 	case io.Reader:
 		reader = b
 	default:
-		raw, err := json.Marshal(b)
+		raw, err := codec.Marshal(b)
 		if err != nil {
 			c.tb.Fatalf("zevertest: marshal %s %s body: %v", method, path, err)
 		}
@@ -148,7 +149,7 @@ func (r *Response) Text() string { return string(r.Body) }
 func (r *Response) JSON(v any) {
 	r.tb.Helper()
 
-	if err := json.Unmarshal(r.Body, v); err != nil {
+	if err := codec.Unmarshal(r.Body, v); err != nil {
 		r.tb.Fatalf("zevertest: decode response body %q: %v", r.Body, err)
 	}
 }

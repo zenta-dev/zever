@@ -1,7 +1,7 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"strings"
 	"testing"
 )
@@ -31,8 +31,8 @@ func TestRedactedServicesPluginCorruptOptions(t *testing.T) {
 	t.Parallel()
 
 	cfg := Default()
-	cfg.Plugins = map[string]Service[json.RawMessage]{
-		"plugintest_corrupt": {Adapter: "custom", Options: json.RawMessage(`{not json`)},
+	cfg.Plugins = map[string]Service[jsontext.Value]{
+		"plugintest_corrupt": {Adapter: "custom", Options: jsontext.Value(`{not json`)},
 	}
 
 	got := cfg.RedactedServices()

@@ -7,12 +7,13 @@ package firebase
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 
 	firebase "firebase.google.com/go/v4"
 	"google.golang.org/api/option"
@@ -50,7 +51,7 @@ func (c Credentials) Validate() error {
 		return fmt.Errorf("firebase: service_account path %q cannot be read: %w", c.ServiceAccount, err)
 	}
 	var doc map[string]any
-	if err := json.Unmarshal(raw, &doc); err != nil {
+	if err := codec.Unmarshal(raw, &doc); err != nil {
 		return fmt.Errorf("firebase: service_account path %q is not valid JSON: %w", c.ServiceAccount, err)
 	}
 	return nil

@@ -2,16 +2,19 @@ package mcpclient
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"io"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // fakeIO bundles a scripted server's ends.
 type fakeIO struct {
-	dec *json.Decoder
-	enc *json.Encoder
+	dec *jsontext.Decoder
+	w   io.Writer
 }
 
 func (f fakeIO) read(t *testing.T, wantMethod string) {
@@ -20,7 +23,7 @@ func (f fakeIO) read(t *testing.T, wantMethod string) {
 	var req struct {
 		Method string `json:"method"`
 	}
-	if err := f.dec.Decode(&req); err != nil {
+	if err := codec.UnmarshalDecode(f.dec, &req); err != nil {
 		t.Errorf("read %s: %v", wantMethod, err)
 		return
 	}
@@ -32,7 +35,13 @@ func (f fakeIO) read(t *testing.T, wantMethod string) {
 func (f fakeIO) write(t *testing.T, msg map[string]any) {
 	t.Helper()
 
-	if err := f.enc.Encode(msg); err != nil {
+	raw, err := codec.Marshal(msg)
+	if err != nil {
+		t.Errorf("write: %v", err)
+		return
+	}
+	raw = append(raw, '\n')
+	if _, err := f.w.Write(raw); err != nil {
 		t.Errorf("write: %v", err)
 	}
 }
@@ -53,7 +62,7 @@ func driveConversation(t *testing.T, midRequest map[string]any, verify func(*tes
 	go func() {
 		defer server.Close()
 
-		f := fakeIO{dec: json.NewDecoder(server), enc: json.NewEncoder(server)}
+		f := fakeIO{dec: jsontext.NewDecoder(server), w: server}
 
 		f.read(t, "initialize")
 		f.write(t, resultMsg(1, map[string]any{"protocolVersion": "2024-11-05"}))
@@ -64,7 +73,7 @@ func driveConversation(t *testing.T, midRequest map[string]any, verify func(*tes
 			ID     int64          `json:"id"`
 			Result map[string]any `json:"result"`
 		}
-		if err := f.dec.Decode(&answer); err != nil {
+		if err := codec.UnmarshalDecode(f.dec, &answer); err != nil {
 			t.Errorf("read answer: %v", err)
 			return
 		}

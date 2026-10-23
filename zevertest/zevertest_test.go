@@ -152,7 +152,9 @@ func TestClientAgainstContainerRouter(t *testing.T) {
 
 	res := authed.Post("/echo", map[string]string{"a": "b"}).RequireStatus(http.StatusCreated)
 
-	var out struct{ OK bool }
+	var out struct {
+		OK bool `json:"ok"`
+	}
 
 	res.JSON(&out)
 

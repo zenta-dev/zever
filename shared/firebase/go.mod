@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	firebase.google.com/go/v4 v4.22.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	google.golang.org/api v0.304.0
 )
 
@@ -62,3 +63,5 @@ require (
 	google.golang.org/grpc v1.85.0-dev.0.20260825072537-93e31b48545e // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+replace github.com/zenta-dev/zever/shared/codec => ../codec

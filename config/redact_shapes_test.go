@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -11,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type shapeLeaf struct {
@@ -92,7 +93,7 @@ func TestRedactSecretFields_allShapes(t *testing.T) {
 	redactMap(m)
 	redactSecretFields(opts, m)
 
-	b, err := json.Marshal(m)
+	b, err := codec.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +137,7 @@ func TestRedact_typedValuesInMap(t *testing.T) {
 	}
 	out := Redact(in)
 
-	b, err := json.Marshal(out)
+	b, err := codec.Marshal(out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +174,7 @@ func TestRedactSecretFields_nilAndCycle(t *testing.T) {
 	acyclic := &node{Pass: "p1", Next: &node{Pass: "p2"}}
 	m2 := serviceToMap(acyclic)
 	redactSecretFields(acyclic, m2)
-	b, _ := json.Marshal(m2)
+	b, _ := codec.Marshal(m2)
 	if strings.Contains(string(b), "p1") || strings.Contains(string(b), "p2") {
 		t.Errorf("recursive struct leaks: %s", b)
 	}
@@ -236,7 +237,7 @@ func TestRedactedServices_secretShapesViaConfig(t *testing.T) {
 	cfg.Storage.Options.Secret = "hmac-secret"
 	cfg.Auth.Options.JWT.Keys = nil
 	svc := cfg.RedactedServices()
-	b, err := json.Marshal(svc)
+	b, err := codec.Marshal(svc)
 	if err != nil {
 		t.Fatal(err)
 	}

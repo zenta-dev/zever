@@ -1,13 +1,14 @@
 package grpcclient
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/zenta-dev/zever/shared/codec"
 	"google.golang.org/grpc/codes"
 )
 
@@ -145,8 +146,8 @@ func grpcDuration(d time.Duration) string {
 // the round_robin default, plus a per-method retryPolicy when a retry
 // policy is configured, overlaid by any WithServiceConfigJSON keys.
 func (c *config) serviceConfigJSON() (string, error) {
-	base := map[string]json.RawMessage{}
-	if err := json.Unmarshal([]byte(defaultServiceConfig), &base); err != nil {
+	base := map[string]jsontext.Value{}
+	if err := codec.Unmarshal([]byte(defaultServiceConfig), &base); err != nil {
 		return "", fmt.Errorf("grpcclient: default service config: %w", err)
 	}
 
@@ -155,14 +156,14 @@ func (c *config) serviceConfigJSON() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		methodConfig, err := json.Marshal(map[string]any{
+		methodConfig, err := codec.Marshal(map[string]any{
 			"name":        []map[string]any{{}},
 			"retryPolicy": retryPolicy,
 		})
 		if err != nil {
 			return "", fmt.Errorf("grpcclient: retry policy: %w", err)
 		}
-		methodConfigSlice, err := json.Marshal([]json.RawMessage{methodConfig})
+		methodConfigSlice, err := codec.Marshal([]jsontext.Value{jsontext.Value(methodConfig)})
 		if err != nil {
 			return "", fmt.Errorf("grpcclient: retry policy: %w", err)
 		}
@@ -170,8 +171,8 @@ func (c *config) serviceConfigJSON() (string, error) {
 	}
 
 	if c.serviceConfigSet {
-		overlay := map[string]json.RawMessage{}
-		if err := json.Unmarshal([]byte(c.serviceConfig), &overlay); err != nil {
+		overlay := map[string]jsontext.Value{}
+		if err := codec.Unmarshal([]byte(c.serviceConfig), &overlay); err != nil {
 			return "", fmt.Errorf("grpcclient: service config JSON: %w", err)
 		}
 		for k, v := range overlay {
@@ -179,7 +180,7 @@ func (c *config) serviceConfigJSON() (string, error) {
 		}
 	}
 
-	out, err := json.Marshal(base)
+	out, err := codec.Marshal(base)
 	if err != nil {
 		return "", fmt.Errorf("grpcclient: service config: %w", err)
 	}

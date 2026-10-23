@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/zenta-dev/zever/core/observability v0.8.0
 	github.com/zenta-dev/zever/core/resilience v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/traceprop v0.8.0
 	go.opentelemetry.io/otel/trace v1.47.0
 	google.golang.org/grpc v1.83.2
@@ -44,3 +45,5 @@ replace github.com/zenta-dev/zever/shared/redisopt => ../redisopt
 replace github.com/zenta-dev/zever/shared/retry => ../retry
 
 replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../codec

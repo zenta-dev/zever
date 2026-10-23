@@ -1,8 +1,9 @@
 package config
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // These tests pin the JSON shape of the service-config envelope that
@@ -14,7 +15,7 @@ func TestServiceConfigWireKeys(t *testing.T) {
 	t.Parallel()
 
 	sc := ServiceConfig{Adapter: "sqlite", Options: map[string]any{"dsn": ":memory:"}}
-	out, err := json.Marshal(sc)
+	out, err := codec.Marshal(sc)
 	if err != nil {
 		t.Fatalf("marshal ServiceConfig: %v", err)
 	}
@@ -25,7 +26,7 @@ func TestServiceConfigWireKeys(t *testing.T) {
 	}
 
 	var got ServiceConfig
-	if err := json.Unmarshal(out, &got); err != nil {
+	if err := codec.Unmarshal(out, &got); err != nil {
 		t.Fatalf("unmarshal ServiceConfig: %v", err)
 	}
 	if got.Adapter != sc.Adapter {
@@ -42,7 +43,7 @@ func TestServiceConfigEmptyOptionsWireKeys(t *testing.T) {
 	// Options must serialize as {} (not null) so clients can rely on the
 	// key, and the adapter key must always be present.
 	sc := ServiceConfig{Adapter: "noop", Options: map[string]any{}}
-	out, err := json.Marshal(sc)
+	out, err := codec.Marshal(sc)
 	if err != nil {
 		t.Fatalf("marshal ServiceConfig: %v", err)
 	}

@@ -3,7 +3,6 @@ package serve
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -18,6 +17,8 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/scheduler"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestMainDoctorArgWritesReport proves the `doctor` argument prints the
@@ -60,7 +61,7 @@ func TestMainDoctorArgWritesReport(t *testing.T) {
 		} `json:"batteries"`
 	}
 
-	if err := json.Unmarshal(bytes.TrimSpace(out), &doc); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(out), &doc); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, out)
 	}
 

@@ -3,8 +3,9 @@ package mcpclient
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // BenchmarkNew measures Client construction.
@@ -29,7 +30,7 @@ func BenchmarkEncodeRequest(b *testing.B) {
 
 	for b.Loop() {
 		req := request{JSONRPC: "2.0", ID: 1, Method: "test", Params: map[string]any{"k": "v"}}
-		_ = c.enc.Encode(req)
+		_ = encodeMessage(c.w, req)
 		buf.Reset()
 	}
 }
@@ -50,7 +51,7 @@ func BenchmarkDecodeResponse(b *testing.B) {
 		buf.Reset()
 		buf.WriteString(resp)
 		var msg inbound
-		_ = c.dec.Decode(&msg)
+		_ = codec.UnmarshalDecode(c.dec, &msg)
 	}
 }
 
@@ -72,7 +73,7 @@ func BenchmarkDispatchRequest(b *testing.B) {
 		buf.Reset()
 		buf.Write(reqBytes)
 		var msg inbound
-		_ = c.dec.Decode(&msg)
+		_ = codec.UnmarshalDecode(c.dec, &msg)
 		_ = c.dispatchRequest(b.Context(), msg.ID, msg.Method, msg.Params)
 	}
 }
@@ -126,7 +127,7 @@ func BenchmarkCallTool_EncodeOnly(b *testing.B) {
 
 	for b.Loop() {
 		buf.Reset()
-		_ = c.enc.Encode(request{JSONRPC: "2.0", ID: 1, Method: "tools/call", Params: map[string]any{"name": "test-tool", "arguments": args}})
+		_ = encodeMessage(c.w, request{JSONRPC: "2.0", ID: 1, Method: "tools/call", Params: map[string]any{"name": "test-tool", "arguments": args}})
 	}
 }
 
@@ -141,7 +142,7 @@ func BenchmarkListTools_EncodeOnly(b *testing.B) {
 
 	for b.Loop() {
 		buf.Reset()
-		_ = c.enc.Encode(request{JSONRPC: "2.0", ID: 1, Method: "tools/list", Params: nil})
+		_ = encodeMessage(c.w, request{JSONRPC: "2.0", ID: 1, Method: "tools/list", Params: nil})
 	}
 }
 
@@ -156,7 +157,7 @@ func BenchmarkInitialize_EncodeOnly(b *testing.B) {
 
 	for b.Loop() {
 		buf.Reset()
-		_ = c.enc.Encode(request{JSONRPC: "2.0", ID: 1, Method: "initialize", Params: map[string]any{"protocolVersion": "2024-11-05", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "test", "version": "1.0"}}})
+		_ = encodeMessage(c.w, request{JSONRPC: "2.0", ID: 1, Method: "initialize", Params: map[string]any{"protocolVersion": "2024-11-05", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "test", "version": "1.0"}}})
 	}
 }
 
@@ -168,6 +169,6 @@ func BenchmarkJSONMarshal(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		_, _ = json.Marshal(args)
+		_, _ = codec.Marshal(args)
 	}
 }

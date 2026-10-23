@@ -1,11 +1,12 @@
 package grpcclient
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/zenta-dev/zever/shared/codec"
 	"google.golang.org/grpc/codes"
 )
 
@@ -93,7 +94,7 @@ func TestRetryPolicyValidate(t *testing.T) {
 // serviceConfigMirror mirrors the gRPC service config JSON shape for
 // assertions.
 type serviceConfigMirror struct {
-	LoadBalancingConfig []map[string]json.RawMessage `json:"loadBalancingConfig"`
+	LoadBalancingConfig []map[string]jsontext.Value `json:"loadBalancingConfig"`
 	MethodConfig        []struct {
 		Name        []map[string]any `json:"name"`
 		RetryPolicy *struct {
@@ -110,7 +111,7 @@ func unmarshalServiceConfig(t *testing.T, raw string) serviceConfigMirror {
 	t.Helper()
 
 	var m serviceConfigMirror
-	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+	if err := codec.Unmarshal([]byte(raw), &m); err != nil {
 		t.Fatalf("service config JSON does not unmarshal: %v", err)
 	}
 	return m
