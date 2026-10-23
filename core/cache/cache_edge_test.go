@@ -9,7 +9,6 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/cache/memory"
 	"github.com/zenta-dev/zever/core/cache"
-	coredb "github.com/zenta-dev/zever/core/db"
 )
 
 func TestCacheEdge_TypedKeyConversions(t *testing.T) {
@@ -191,61 +190,3 @@ func TestCacheEdge_OptionsValidateAlwaysNil(t *testing.T) {
 	}
 }
 
-func TestCacheEdge_SharedRegistry(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil factory", func(t *testing.T) {
-		t.Parallel()
-
-		if err := cache.RegisterShared(freshCacheAdapter(), nil); !errors.Is(err, cache.ErrNilFactory) {
-			t.Fatalf("RegisterShared(nil) err = %v, want ErrNilFactory", err)
-		}
-	})
-
-	t.Run("unknown adapter", func(t *testing.T) {
-		t.Parallel()
-
-		if _, err := cache.OpenShared(freshCacheAdapter(), nil, cache.Options{}); !errors.Is(err, cache.ErrUnknownAdapter) {
-			t.Fatalf("OpenShared unknown err = %v, want ErrUnknownAdapter", err)
-		}
-	})
-
-	t.Run("factory error wrapped", func(t *testing.T) {
-		t.Parallel()
-
-		adapter := freshCacheAdapter()
-		sentinel := errors.New("boom")
-
-		if err := cache.RegisterShared(adapter, func(coredb.DB, cache.Options) (cache.Cache, error) {
-			return nil, sentinel
-		}); err != nil {
-			t.Fatalf("RegisterShared err = %v", err)
-		}
-
-		if _, err := cache.OpenShared(adapter, nil, cache.Options{}); !errors.Is(err, sentinel) {
-			t.Fatalf("OpenShared err = %v, want wrapped sentinel", err)
-		}
-	})
-
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-
-		adapter := freshCacheAdapter()
-		want := stubCache{}
-
-		if err := cache.RegisterShared(adapter, func(coredb.DB, cache.Options) (cache.Cache, error) {
-			return want, nil
-		}); err != nil {
-			t.Fatalf("RegisterShared err = %v", err)
-		}
-
-		got, err := cache.OpenShared(adapter, nil, cache.Options{})
-		if err != nil {
-			t.Fatalf("OpenShared err = %v", err)
-		}
-
-		if got != cache.Cache(want) {
-			t.Fatal("OpenShared did not return the factory cache")
-		}
-	})
-}

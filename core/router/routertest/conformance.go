@@ -2,7 +2,6 @@
 package routertest
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +11,7 @@ import (
 )
 
 // Conformance verifies factory-built backends implement the
-// router.Router contract: open/register round-trip, direct route
+// router.Router contract: direct route
 // serving, path params, group prefixes, Use middleware, and 404 for
 // unknown paths. Each subtest takes a fresh instance from factory so
 // cases stay isolated. Tests serve over httptest (no external
@@ -24,36 +23,11 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) router.Router) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("ServeRoute", func(t *testing.T) { conformanceServeRoute(t, factory) })
 	t.Run("PathParam", func(t *testing.T) { conformancePathParam(t, factory) })
 	t.Run("Group", func(t *testing.T) { conformanceGroup(t, factory) })
 	t.Run("Use", func(t *testing.T) { conformanceUse(t, factory) })
 	t.Run("NotFound", func(t *testing.T) { conformanceNotFound(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := router.Open(router.Adapter("conformance-missing-adapter"), router.Options{}); !errors.Is(err, router.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := router.Adapter("conformance-probe-router")
-
-	if err := router.Register(probe, nil); !errors.Is(err, router.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(router.Options) (router.Router, error) {
-		return nil, errors.New("routertest: probe factory must not run")
-	}
-
-	_ = router.Register(probe, stub)
-
-	if err := router.Register(probe, stub); !errors.Is(err, router.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 // serve issues req against r and returns the recorded response.

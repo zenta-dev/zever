@@ -33,11 +33,3 @@ func TestLimitDecode_emptyData_returnsDecodeErrorNotSizeError(t *testing.T) {
 	}
 }
 
-func TestOpen_invalidOptions_checkedBeforeLookup(t *testing.T) {
-	t.Parallel()
-
-	_, err := Open(Adapter("edge-unknown"), Options{MaxWebhookBytes: -1})
-	if !errors.Is(err, ErrInvalidOptions) {
-		t.Fatalf("Open(invalid opts, unknown adapter) err = %v, want ErrInvalidOptions", err)
-	}
-}

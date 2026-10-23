@@ -27,32 +27,6 @@ func TestSentinelMessages(t *testing.T) {
 	}
 }
 
-func TestParseAdapterInvalid(t *testing.T) {
-	t.Parallel()
-	_, err := cache.ParseAdapter("")
-	if err == nil {
-		t.Fatal("ParseAdapter(\"\") = nil, want ErrInvalidAdapter")
-	}
-	if !errors.Is(err, cache.ErrInvalidAdapter) {
-		t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
-	}
-	var invErr cache.InvalidAdapterError
-	if !errors.As(err, &invErr) {
-		t.Errorf("errors.As(err, InvalidAdapterError) = false (err = %T %v)", err, err)
-	}
-}
-
-func TestParseAdapterOpen_acceptsCustom(t *testing.T) {
-	t.Parallel()
-	got, err := cache.ParseAdapter("bogus")
-	if err != nil {
-		t.Fatalf("ParseAdapter(bogus) error = %v, want nil (open adapter)", err)
-	}
-	if got != cache.Adapter("bogus") {
-		t.Errorf("ParseAdapter(bogus) = %v, want %v", got, cache.Adapter("bogus"))
-	}
-}
-
 func TestMemoryNotFound(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -113,78 +87,6 @@ func TestMemoryInvalidInteger(t *testing.T) {
 	}
 }
 
-func TestAdapterString_returnsName(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		in   cache.Adapter
-		want string
-	}{
-		{name: "memory", in: cache.Memory, want: "memory"},
-		{name: "redis", in: cache.Redis, want: "redis"},
-		{name: "unknown formats", in: cache.Adapter(""), want: "unknown"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got := tt.in.String(); got != tt.want {
-				t.Errorf("String() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestParseAdapter_valid_returnsAdapter(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		in   string
-		want cache.Adapter
-	}{
-		{in: "memory", want: cache.Memory},
-		{in: "redis", want: cache.Redis},
-	}
-
-	for _, tt := range tests {
-		got, err := cache.ParseAdapter(tt.in)
-		if err != nil {
-			t.Fatalf("ParseAdapter(%q) error = %v", tt.in, err)
-		}
-
-		if got != tt.want {
-			t.Errorf("ParseAdapter(%q) = %v, want %v", tt.in, got, tt.want)
-		}
-	}
-}
-
-func TestParseAdapter_empty_returnsInvalidAdapterError(t *testing.T) {
-	t.Parallel()
-
-	got, err := cache.ParseAdapter("")
-	if err == nil {
-		t.Fatal("ParseAdapter() = nil, want ErrInvalidAdapter")
-	}
-
-	if got != cache.Adapter("") {
-		t.Errorf("ParseAdapter() = %v, want empty fallback", got)
-	}
-
-	if !errors.Is(err, cache.ErrInvalidAdapter) {
-		t.Errorf("errors.Is(err, ErrInvalidAdapter) = false (err = %v)", err)
-	}
-
-	var invErr cache.InvalidAdapterError
-	if !errors.As(err, &invErr) {
-		t.Fatalf("errors.As(err, InvalidAdapterError) = false (err = %T %v)", err, err)
-	}
-
-	if invErr.Adapter != "" {
-		t.Errorf("InvalidAdapterError.Adapter = %q, want empty", invErr.Adapter)
-	}
-}
 
 func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Parallel()
@@ -245,7 +147,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("duplicate", func(t *testing.T) {
 		t.Parallel()
 
-		err := cache.DuplicateAdapterError{Adapter: cache.Memory}
+		err := cache.DuplicateAdapterError{Adapter: "memory"}
 		if got, want := err.Error(), `cache: duplicate adapter: memory`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}
@@ -258,7 +160,7 @@ func TestTypedErrorMessages_unwrap(t *testing.T) {
 	t.Run("unknown adapter", func(t *testing.T) {
 		t.Parallel()
 
-		err := cache.UnknownAdapterError{Adapter: cache.Adapter("")}
+		err := cache.UnknownAdapterError{Adapter: "unknown"}
 		if got, want := err.Error(), `cache: unknown adapter: unknown (forgotten import?)`; got != want {
 			t.Errorf("Error() = %q, want %q", got, want)
 		}

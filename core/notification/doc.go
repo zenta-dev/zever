@@ -4,16 +4,16 @@
 // log, Twilio, or FCM backends. It does not queue or schedule messages, only
 // direct validated delivery.
 //
-// Type safety: Notifier interface with typed Options plus Adapter enum plus
+// Type safety: Notifier interface with typed Options  plus
 // Factory. Channel and Priority enums plus Notification, NewNotification,
 // Clone, Validate, TwilioOptions, and FCMOptions. Unsupported features fail
 // closed with channel-not-supported errors.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with
 // zero-infra defaults for tests, with the log adapter writing instead of
 // sending. Configuration comes from the environment only: .env, .env.local,
 // and the process environment, with keys named <SERVICE>_<FIELD> (no prefix,
-// e.g. NOTIFICATION_ADAPTER). See config/README.md.
+// ). See config/README.md.
 //
 // Container: container.New(cfg) then c.Notification(). Lazy per-service
 // singleton, retry on error. See container/README.md.
@@ -39,5 +39,5 @@
 // Concurrency: safe for concurrent use unless noted. No globals, no init
 // wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package notification

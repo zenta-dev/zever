@@ -11,42 +11,6 @@ import (
 // before the adapter boundary.
 var nilCtx context.Context
 
-func TestEdgeOpen_emptyAdapterName(t *testing.T) {
-	t.Parallel()
-
-	got, err := Open(Adapter(""), Options{})
-	if !errors.Is(err, ErrUnknownAdapter) {
-		t.Fatalf("Open(\"\") err = %v, want ErrUnknownAdapter", err)
-	}
-	var ue UnknownAdapterError
-	if !errors.As(err, &ue) {
-		t.Fatalf("err %T is not *UnknownAdapterError", err)
-	}
-	if ue.Adapter != Adapter("") {
-		t.Fatalf("Adapter = %v, want empty", ue.Adapter)
-	}
-	if got != nil {
-		t.Fatalf("got = %v, want nil", got)
-	}
-}
-
-func TestEdgeOpen_factoryReturnsNilNil(t *testing.T) {
-	t.Parallel()
-
-	a := freshAdapter()
-	var nilAnalytics Analytics
-	if err := Register(a, func(Options) (Analytics, error) { return nilAnalytics, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
-	}
-	got, err := Open(a, Options{})
-	if err != nil {
-		t.Fatalf("Open err = %v, want nil", err)
-	}
-	if got != nil {
-		t.Fatalf("got = %v, want nil", got)
-	}
-}
-
 func TestEdgeOptionsValidate_endpointQueryAndFragment(t *testing.T) {
 	t.Parallel()
 
@@ -130,29 +94,6 @@ func TestEdgeValidateBounds_nilMap(t *testing.T) {
 	}
 }
 
-func TestEdgeTrack_nilContext(t *testing.T) {
-	t.Parallel()
-
-	a := freshAdapter()
-	stub := &stubAnalytics{}
-	if err := Register(a, func(Options) (Analytics, error) { return stub, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
-	}
-	got, err := Open(a, Options{})
-	if err != nil {
-		t.Fatalf("Open err = %v", err)
-	}
-	if err := got.Track(nilCtx, "evt", nil); err != nil {
-		t.Fatalf("Track(nil ctx) err = %v, want nil", err)
-	}
-	if err := got.Identify(nilCtx, "u1", nil); err != nil {
-		t.Fatalf("Identify(nil ctx) err = %v, want nil", err)
-	}
-	if err := got.Group(nilCtx, "u1", "g1", nil); err != nil {
-		t.Fatalf("Group(nil ctx) err = %v, want nil", err)
-	}
-}
-
 func TestEdgeUserIDWithFallback_emptyFallback(t *testing.T) {
 	t.Parallel()
 
@@ -185,14 +126,3 @@ func TestEdgeSizeLimitError_message(t *testing.T) {
 	}
 }
 
-func TestEdgeParseAdapter_whitespace(t *testing.T) {
-	t.Parallel()
-
-	got, err := ParseAdapter(" ")
-	if err != nil {
-		t.Fatalf("ParseAdapter(\" \") err = %v, want nil", err)
-	}
-	if got != Adapter(" ") {
-		t.Fatalf("ParseAdapter(\" \") = %v, want space", got)
-	}
-}

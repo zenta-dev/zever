@@ -6,36 +6,12 @@ import (
 
 // benchVectorAdapter registers a stub store once and returns its adapter so
 // Open can be measured without the one-shot registration cost.
-func benchVectorAdapter(b *testing.B) Adapter {
-	b.Helper()
-
-	a := freshAdapter()
-	if err := Register(a, func(Options) (VectorStore, error) { return newStubStore(), nil }); err != nil {
-		b.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	return a
-}
-
 func benchEmbedding() []float32 {
 	v := make([]float32, DefaultDimension)
 	for i := range v {
 		v[i] = float32(i%7) * 0.1
 	}
 	return v
-}
-
-func BenchmarkOpen(b *testing.B) {
-	a := benchVectorAdapter(b)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if _, err := Open(a, Options{}); err != nil {
-			b.Fatalf("Open(%v) error = %v", a, err)
-		}
-	}
 }
 
 func BenchmarkCosineSimilarity(b *testing.B) {

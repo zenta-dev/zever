@@ -2,9 +2,6 @@ package billing
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Billing defines the subscription and invoice contract for billing backends.
@@ -38,45 +35,3 @@ type Billing interface {
 
 // Factory creates a Billing from the given Options.
 type Factory func(opts Options) (Billing, error)
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(adapter Adapter) error { return DuplicateAdapterError{Adapter: adapter} },
-	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("billing: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates a Billing for adapter using the registered Factory and opts.
-func Open(adapter Adapter, opts Options) (Billing, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := factory(opts)
-	if err != nil {
-		return nil, fmt.Errorf("billing: open %s: %w", adapter, err)
-	}
-
-	return b, nil
-}

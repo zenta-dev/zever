@@ -20,7 +20,7 @@ const (
 )
 
 // Conformance verifies factory-built lockers implement the lock.Locker
-// contract: open/register round-trip, exclusive TryAcquire, blocking
+// contract: exclusive TryAcquire, blocking
 // Acquire with context cancellation, Extend/Unlock lease semantics
 // (ErrNotHeld, no steal), TTL expiry, and Close. Each subtest takes a
 // fresh instance from factory so cases stay isolated. Expiry waits poll
@@ -40,7 +40,6 @@ const (
 func Conformance(t *testing.T, factory func(t *testing.T) lock.Locker) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("TryAcquireExclusive", func(t *testing.T) { conformanceExclusive(t, factory) })
 	t.Run("Acquire", func(t *testing.T) { conformanceAcquire(t, factory) })
 	t.Run("ExtendUnlock", func(t *testing.T) { conformanceExtendUnlock(t, factory) })
@@ -48,29 +47,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) lock.Locker) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := lock.Open(lock.Adapter("conformance-missing-adapter"), lock.Options{}); !errors.Is(err, lock.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := lock.Adapter("conformance-probe-lock")
-
-	if err := lock.Register(probe, nil); !errors.Is(err, lock.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(lock.Options) (lock.Locker, error) {
-		return nil, errors.New("locktest: probe factory must not run")
-	}
-
-	_ = lock.Register(probe, stub)
-
-	if err := lock.Register(probe, stub); !errors.Is(err, lock.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
-}
 
 func conformanceExclusive(t *testing.T, factory func(t *testing.T) lock.Locker) {
 	t.Helper()

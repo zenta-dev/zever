@@ -4,20 +4,14 @@ package notificationtest
 
 import (
 	"errors"
-	"strconv"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/notification"
 )
 
-// adapterSeq keeps throwaway registry names unique across Conformance runs
-// in one process.
-var adapterSeq atomic.Uint64
-
 // Conformance verifies factory-built notifiers implement the
 // notification.Notifier contract: validated delivery on at least one
-// channel, validation errors, Open/Register registry wiring, and Close.
+// channel, validation errors, and Close.
 // Each subtest takes a fresh instance from factory so cases stay
 // isolated. No test touches the network: push targets are opaque tokens
 // and SMS targets are E.164 fixtures, and adapters under test must stub
@@ -34,7 +28,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) notification.Notifier)
 
 	t.Run("HappyPath", func(t *testing.T) { conformanceHappyPath(t, factory, &working) })
 	t.Run("Validation", func(t *testing.T) { conformanceValidation(t, factory) })
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory, &working) })
 }
 
@@ -116,27 +109,6 @@ func conformanceValidation(t *testing.T, factory func(t *testing.T) notification
 	smsTitle := notification.Notification{Target: "+14155552671", Channel: notification.ChannelSMS, Title: "nope", Body: "hi"}
 	titleErr := n.Notify(ctx, &smsTitle)
 	expectMatch(t, errors.Is(titleErr, notification.ErrInvalidNotification), "Notify(sms title) err = %v, want ErrInvalidNotification", titleErr)
-}
-
-func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) notification.Notifier) {
-	t.Helper()
-
-	name := notification.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
-	probe := factory(t)
-
-	regErr := notification.Register(name, func(notification.Options) (notification.Notifier, error) { return probe, nil })
-	mustMatch(t, regErr == nil, "Register() error = %v", regErr)
-
-	dupErr := notification.Register(name, func(notification.Options) (notification.Notifier, error) { return probe, nil })
-	mustMatch(t, errors.Is(dupErr, notification.ErrDuplicate), "Register(dup) err = %v, want ErrDuplicate", dupErr)
-
-	opened, openErr := notification.Open(name, notification.Options{})
-	mustMatch(t, openErr == nil, "Open() error = %v", openErr)
-
-	expectMatch(t, opened == probe, "Open() did not return the registered notifier")
-
-	_, unknownErr := notification.Open("kit-no-such-adapter", notification.Options{})
-	expectMatch(t, errors.Is(unknownErr, notification.ErrUnknownAdapter), "Open(unknown) err = %v, want ErrUnknownAdapter", unknownErr)
 }
 
 func conformanceClose(t *testing.T, factory func(t *testing.T) notification.Notifier, _ *notification.Notification) {

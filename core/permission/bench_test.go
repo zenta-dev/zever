@@ -6,47 +6,6 @@ import (
 
 // benchAdapter registers a stub checker once and returns its adapter so
 // Open can be measured without paying the (one-shot) registration cost.
-func benchAdapter(b *testing.B) Adapter {
-	b.Helper()
-
-	a := freshAdapter()
-	if err := Register(a, func(Options) (Checker, error) { return stubChecker{}, nil }); err != nil {
-		b.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	return a
-}
-
-func BenchmarkOpen(b *testing.B) {
-	a := benchAdapter(b)
-	opts := Options{Rules: []Rule{{Role: "admin", Action: "read", Effect: Allow}}}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		if _, err := Open(a, opts); err != nil {
-			b.Fatalf("Open(%v) error = %v", a, err)
-		}
-	}
-}
-
-func BenchmarkOpenParallel(b *testing.B) {
-	a := benchAdapter(b)
-	opts := Options{Rules: []Rule{{Role: "admin", Action: "read", Effect: Allow}}}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			if _, err := Open(a, opts); err != nil {
-				b.Errorf("Open(%v) error = %v", a, err)
-				return
-			}
-		}
-	})
-}
-
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{
 		Rules: []Rule{

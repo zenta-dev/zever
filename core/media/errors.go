@@ -56,7 +56,7 @@ var ErrTranscodeFailed = errors.New("media: transcode failed")
 // DuplicateAdapterError reports a duplicate adapter registration.
 type DuplicateAdapterError struct {
 	// Adapter is the already-registered adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // DuplicateError aliases DuplicateAdapterError for compatibility.
@@ -75,7 +75,7 @@ func (e DuplicateAdapterError) Unwrap() error {
 // UnknownAdapterError reports a lookup of an unregistered adapter.
 type UnknownAdapterError struct {
 	// Adapter is the unregistered adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // Error returns a human-readable unknown-adapter message.

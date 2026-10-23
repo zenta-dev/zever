@@ -2,9 +2,6 @@ package webhook
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Webhook defines the core operations for webhook delivery.
@@ -27,48 +24,3 @@ type Webhook interface {
 
 // Factory creates a Webhook from the given Options.
 type Factory func(opts Options) (Webhook, error)
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(adapter Adapter) error { return DuplicateAdapterError{Adapter: adapter} },
-	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("webhook: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates a Webhook for adapter using the registered Factory and opts.
-// Options are validated first, so misconfiguration fails before any factory runs.
-// Open returns a nil Webhook on any error; callers must not use the first
-// result when err is non-nil.
-func Open(adapter Adapter, opts Options) (Webhook, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	w, err := factory(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return w, nil
-}

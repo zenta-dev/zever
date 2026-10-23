@@ -11,7 +11,7 @@ import (
 )
 
 // Conformance verifies factory-built billings implement the
-// billing.Billing contract: open/register round-trip, customer then
+// billing.Billing contract: customer then
 // subscription then invoice lifecycle, cancel semantics, missing-ID
 // and not-found sentinels, and Close. Each subtest takes a fresh
 // instance from factory so cases stay isolated. Tests never call
@@ -26,7 +26,6 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("CustomerSubscriptionInvoice", func(t *testing.T) { conformanceLifecycle(t, factory) })
 	t.Run("Cancel", func(t *testing.T) { conformanceCancel(t, factory) })
 	t.Run("NotFound", func(t *testing.T) { conformanceNotFound(t, factory) })
@@ -34,40 +33,9 @@ func Conformance(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if err := checkOpenRegister(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// checkOpenRegister proves the open/register round-trip against the
+// checkOpenRegister proves the factory-built backends against the
 // shared registry. It returns a descriptive error on the first
 // contract violation so unit tests can drive every branch.
-func checkOpenRegister() error {
-	if _, err := billing.Open(billing.Adapter("conformance-missing-adapter"), billing.Options{}); !errors.Is(err, billing.ErrUnknownAdapter) {
-		return fmt.Errorf("billingtest: Open(missing) err = %w, want ErrUnknownAdapter", err)
-	}
-
-	probe := billing.Adapter("conformance-probe-billing")
-
-	if err := billing.Register(probe, nil); !errors.Is(err, billing.ErrNilFactory) {
-		return fmt.Errorf("billingtest: Register(nil) err = %w, want ErrNilFactory", err)
-	}
-
-	stub := func(billing.Options) (billing.Billing, error) {
-		return nil, errors.New("billingtest: probe factory must not run")
-	}
-
-	_ = billing.Register(probe, stub)
-
-	if err := billing.Register(probe, stub); !errors.Is(err, billing.ErrDuplicate) {
-		return fmt.Errorf("billingtest: Register(duplicate) err = %w, want ErrDuplicate", err)
-	}
-
-	return nil
-}
 
 func conformanceLifecycle(t *testing.T, factory func(t *testing.T) billing.Billing) {
 	t.Helper()

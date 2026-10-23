@@ -2,9 +2,9 @@
 //
 // It registers per-target secrets, unregisters subscriptions, and delivers payloads to event targets. It is not a queue itself though one backend rides on queue.
 //
-// Type safety: Webhook plus typed Options plus Adapter enum plus Factory. Options carry Timeout plus MaxRetries plus QueueAdapter plus QueueOpts plus DeadLetterTopic plus ReplayTolerance; there is no shared APIKey by design. Unsupported features fail closed.
+// Type safety: Webhook plus typed Options plus Factory. Options carry Timeout plus MaxRetries plus QueueAdapter plus QueueOpts plus DeadLetterTopic plus ReplayTolerance; there is no shared APIKey by design. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. WEBHOOK_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Webhook(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package webhook

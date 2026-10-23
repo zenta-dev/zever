@@ -2,7 +2,6 @@ package search
 
 import (
 	"errors"
-	"sync"
 	"testing"
 )
 
@@ -47,44 +46,3 @@ func TestQueryOptions_defaults_not_mutated(t *testing.T) {
 	}
 }
 
-func TestOpen_https_with_port(t *testing.T) {
-	t.Parallel()
-
-	a := freshAdapter()
-	if err := Register(a, func(Options) (Search, error) { return &stubSearch{}, nil }); err != nil {
-		t.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	got, err := Open(a, Options{Host: "https://search.example.com:7700"})
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
-	if got == nil {
-		t.Fatal("Open() returned nil Search")
-	}
-}
-
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshAdapter()
-			if err := Register(a, func(Options) (Search, error) { return &stubSearch{}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}

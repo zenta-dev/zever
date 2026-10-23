@@ -19,7 +19,7 @@ const (
 )
 
 // Conformance verifies factory-built buses implement the
-// eventbus.EventBus contract: open/register round-trip, push
+// eventbus.EventBus contract: push
 // publish/subscribe delivery with payload+header fidelity and
 // unsubscribe, pull SubscribeChan/Unsubscribe, invalid topic and
 // payload sentinels, topic isolation, and Close. Each subtest takes a
@@ -33,7 +33,6 @@ const (
 func Conformance(t *testing.T, factory func(t *testing.T) eventbus.EventBus) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("PushDelivery", func(t *testing.T) { conformancePushDelivery(t, factory) })
 	t.Run("Unsubscribe", func(t *testing.T) { conformanceUnsubscribe(t, factory) })
 	t.Run("PullChannel", func(t *testing.T) { conformancePullChannel(t, factory) })
@@ -42,29 +41,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) eventbus.EventBus) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := eventbus.Open(eventbus.Adapter("conformance-missing-adapter"), eventbus.Options{}); !errors.Is(err, eventbus.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := eventbus.Adapter("conformance-probe-eventbus")
-
-	if err := eventbus.Register(probe, nil); !errors.Is(err, eventbus.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(eventbus.Options) (eventbus.EventBus, error) {
-		return nil, errors.New("eventbustest: probe factory must not run")
-	}
-
-	_ = eventbus.Register(probe, stub)
-
-	if err := eventbus.Register(probe, stub); !errors.Is(err, eventbus.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
-}
 
 func conformancePushDelivery(t *testing.T, factory func(t *testing.T) eventbus.EventBus) {
 	t.Helper()

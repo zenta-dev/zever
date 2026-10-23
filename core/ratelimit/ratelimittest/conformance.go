@@ -13,7 +13,7 @@ import (
 )
 
 // Conformance verifies factory-built limiters implement the
-// ratelimit.Limiter contract: open/register round-trip, burst allow
+// ratelimit.Limiter contract: burst allow
 // then denial with RetryAfter, Reset restoration, invalid key/cost
 // sentinels, Name, and Close. Each subtest takes a fresh instance from
 // factory so cases stay isolated. Proof factories should configure a
@@ -27,47 +27,15 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) ratelimit.Limiter) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("AllowDeny", func(t *testing.T) { conformanceAllowDeny(t, factory) })
 	t.Run("Reset", func(t *testing.T) { conformanceReset(t, factory) })
 	t.Run("InvalidInput", func(t *testing.T) { conformanceInvalidInput(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if err := checkOpenRegister(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// checkOpenRegister proves the open/register round-trip against the
+// checkOpenRegister proves the factory-built backends against the
 // shared registry. It returns a descriptive error on the first
 // contract violation so unit tests can drive every branch.
-func checkOpenRegister() error {
-	if _, err := ratelimit.Open(ratelimit.Adapter("conformance-missing-adapter"), ratelimit.Options{Rate: 1, Burst: 1}); !errors.Is(err, ratelimit.ErrUnknownAdapter) {
-		return fmt.Errorf("ratelimittest: Open(missing) err = %w, want ErrUnknownAdapter", err)
-	}
-
-	probe := ratelimit.Adapter("conformance-probe-ratelimit")
-
-	if err := ratelimit.Register(probe, nil); !errors.Is(err, ratelimit.ErrNilFactory) {
-		return fmt.Errorf("ratelimittest: Register(nil) err = %w, want ErrNilFactory", err)
-	}
-
-	stub := func(ratelimit.Options) (ratelimit.Limiter, error) {
-		return nil, errors.New("ratelimittest: probe factory must not run")
-	}
-
-	_ = ratelimit.Register(probe, stub)
-
-	if err := ratelimit.Register(probe, stub); !errors.Is(err, ratelimit.ErrDuplicate) {
-		return fmt.Errorf("ratelimittest: Register(duplicate) err = %w, want ErrDuplicate", err)
-	}
-
-	return nil
-}
 
 func conformanceAllowDeny(t *testing.T, factory func(t *testing.T) ratelimit.Limiter) {
 	t.Helper()

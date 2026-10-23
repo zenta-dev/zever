@@ -12,7 +12,7 @@ import (
 )
 
 // Conformance verifies factory-built flags implement the flag.Flag
-// contract: open/register round-trip, missing-key fallback with nil
+// contract: missing-key fallback with nil
 // error for Bool/String/Int/JSON, invalid-key sentinels, and Close.
 // Each subtest takes a fresh instance from factory so cases stay
 // isolated. Tests never call time.Sleep and never touch the network.
@@ -38,46 +38,14 @@ func errf(format string, args ...any) error {
 func Conformance(t *testing.T, factory func(t *testing.T) flag.Flag) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Fallback", func(t *testing.T) { conformanceFallback(t, factory) })
 	t.Run("InvalidKey", func(t *testing.T) { conformanceInvalidKey(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if err := checkOpenRegister(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// checkOpenRegister proves the open/register round-trip against the
+// checkOpenRegister proves the factory-built backends against the
 // shared registry. It returns a descriptive error on the first
 // contract violation so unit tests can drive every branch.
-func checkOpenRegister() error {
-	if _, err := flag.Open(flag.Adapter("conformance-missing-adapter"), flag.Options{}); !errors.Is(err, flag.ErrUnknownAdapter) {
-		return fmt.Errorf("flagtest: Open(missing) err = %w, want ErrUnknownAdapter", err)
-	}
-
-	probe := flag.Adapter("conformance-probe-flag")
-
-	if err := flag.Register(probe, nil); !errors.Is(err, flag.ErrNilFactory) {
-		return fmt.Errorf("flagtest: Register(nil) err = %w, want ErrNilFactory", err)
-	}
-
-	stub := func(flag.Options) (flag.Flag, error) {
-		return nil, errors.New("flagtest: probe factory must not run")
-	}
-
-	_ = flag.Register(probe, stub)
-
-	if err := flag.Register(probe, stub); !errors.Is(err, flag.ErrDuplicate) {
-		return fmt.Errorf("flagtest: Register(duplicate) err = %w, want ErrDuplicate", err)
-	}
-
-	return nil
-}
 
 func conformanceFallback(t *testing.T, factory func(t *testing.T) flag.Flag) {
 	t.Helper()

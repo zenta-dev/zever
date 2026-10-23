@@ -2,9 +2,6 @@ package crypto
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Encryptor is the interface for encryption operations.
@@ -37,46 +34,3 @@ type Crypto interface {
 
 // Factory creates a Crypto from the given Options.
 type Factory func(opts Options) (Crypto, error)
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(a Adapter) error { return DuplicateError{Adapter: a} },
-	func(a Adapter) error { return UnknownAdapterError{Adapter: a} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("crypto: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates a Crypto for adapter using the registered Factory and opts.
-// Validate is called before factory lookup so missing/invalid secrets fail-closed.
-func Open(adapter Adapter, opts Options) (Crypto, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := factory(opts)
-	if err != nil {
-		return nil, fmt.Errorf("crypto: open %s: %w", adapter, err)
-	}
-
-	return c, nil
-}

@@ -6,33 +6,6 @@ import (
 )
 
 // BenchmarkRegister measures registry insertion for a fresh adapter key.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if err := Register(geoFreshAdapter(), func(Options) (Geo, error) { return &stubGeo{}, nil }); err != nil {
-			b.Fatalf("Register err = %v", err)
-		}
-	}
-}
-
-// BenchmarkOpen measures validated registry lookup plus the factory call.
-func BenchmarkOpen(b *testing.B) {
-	adapter := geoFreshAdapter()
-	if err := Register(adapter, func(Options) (Geo, error) { return &stubGeo{}, nil }); err != nil {
-		b.Fatalf("Register err = %v", err)
-	}
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if _, err := Open(adapter, Options{Timeout: time.Second}); err != nil {
-			b.Fatalf("Open err = %v", err)
-		}
-	}
-}
-
-// BenchmarkValidCoord measures coordinate range and finiteness validation.
 func BenchmarkValidCoord(b *testing.B) {
 	b.ReportAllocs()
 
@@ -62,28 +35,6 @@ func BenchmarkOptionsValidate(b *testing.B) {
 }
 
 // BenchmarkAdapterString measures canonical adapter naming.
-func BenchmarkAdapterString(b *testing.B) {
-	a := Google
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		_ = a.String()
-	}
-}
-
-// BenchmarkParseAdapter measures adapter name parsing.
-func BenchmarkParseAdapter(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if _, err := ParseAdapter("google"); err != nil {
-			b.Fatalf("ParseAdapter err = %v", err)
-		}
-	}
-}
-
-// BenchmarkGeocode measures the Geo contract dispatch through a stub.
 func BenchmarkGeocode(b *testing.B) {
 	g := &stubGeo{}
 	ctx := b.Context()

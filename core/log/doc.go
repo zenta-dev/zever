@@ -5,15 +5,14 @@
 // traces, it only records structured log events.
 //
 // Type safety: Logger plus Event plus Context interfaces with typed Options
-// plus Adapter enum plus Factory. Level and FieldType enums plus typed Field
+// plus Factory. Level and FieldType enums plus typed Field
 // constructors cover string, int, float, bool, duration, time, error, and any
 // values. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with
 // zero-infra defaults for tests, with Noop discarding all events.
 // Configuration comes from the environment only: .env, .env.local, and the
-// process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g.
-// LOG_ADAPTER). See config/README.md.
+// process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Log(). Lazy per-service singleton,
 // retry on error. See container/README.md.
@@ -38,5 +37,5 @@
 // Concurrency: safe for concurrent use unless noted. No globals, no init
 // wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package log

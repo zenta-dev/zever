@@ -8,13 +8,9 @@ import (
 	"github.com/zenta-dev/zever/core/idempotency"
 )
 
-// ExampleOpen opens the memory store and replays a completed key.
-func ExampleOpen() {
-	if err := idempotency.Register(idempotency.Memory, memory.New); err != nil {
-		return
-	}
-
-	store, err := idempotency.Open(idempotency.Memory, idempotency.Options{})
+// Example opens the memory store and replays a completed key.
+func Example() {
+	store, err := memory.New(idempotency.Options{})
 	if err != nil {
 		return
 	}

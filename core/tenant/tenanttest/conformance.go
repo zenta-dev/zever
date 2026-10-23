@@ -2,14 +2,13 @@
 package tenanttest
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/tenant"
 )
 
 // Conformance verifies factory-built backends implement the
-// tenant.Tenant contract: open/register round-trip, fixture-meta
+// tenant.Tenant contract: fixture-meta
 // resolution to a non-empty ID, Scoped/FromContext round-trip, and
 // Close. Each subtest takes a fresh instance from factory so cases
 // stay isolated. Tests never call time.Sleep and never touch the
@@ -24,34 +23,9 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) tenant.Tenant) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Resolve", func(t *testing.T) { conformanceResolve(t, factory) })
 	t.Run("Scoped", func(t *testing.T) { conformanceScoped(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := tenant.Open(tenant.Adapter("conformance-missing-adapter"), tenant.Options{}); !errors.Is(err, tenant.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := tenant.Adapter("conformance-probe-tenant")
-
-	if err := tenant.Register(probe, nil); !errors.Is(err, tenant.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(tenant.Options) (tenant.Tenant, error) {
-		return nil, errors.New("tenanttest: probe factory must not run")
-	}
-
-	_ = tenant.Register(probe, stub)
-
-	if err := tenant.Register(probe, stub); !errors.Is(err, tenant.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceResolve(t *testing.T, factory func(t *testing.T) tenant.Tenant) {

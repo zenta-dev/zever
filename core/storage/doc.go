@@ -2,9 +2,9 @@
 //
 // It presigns uploads and downloads and supports exists, delete, and move with bucket policy helpers. It is not a CDN and does not serve bytes itself.
 //
-// Type safety: Storage plus typed Options plus Adapter enum plus Factory. Options embed LocalOptions plus S3Options plus R2Options with URLBase and Policy; bucket and key are validated. Unsupported features fail closed.
+// Type safety: Storage plus typed Options plus Factory. Options embed LocalOptions plus S3Options plus R2Options with URLBase and Policy; bucket and key are validated. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. STORAGE_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Storage(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package storage

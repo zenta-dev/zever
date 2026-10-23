@@ -37,57 +37,6 @@ func TestFlagEdge_ValidateKeyBoundary(t *testing.T) {
 	}
 }
 
-func TestFlagEdge_OpenConcurrent(t *testing.T) {
-	t.Parallel()
-
-	adapter := freshAdapter()
-	if err := Register(adapter, func(Options) (Flag, error) { return &stubFlag{}, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
-	}
-
-	var wg sync.WaitGroup
-
-	for range 50 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			if _, err := Open(adapter, Options{}); err != nil {
-				t.Errorf("Open err = %v", err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestFlagEdge_RegisterConcurrentUnique(t *testing.T) {
-	t.Parallel()
-
-	var wg sync.WaitGroup
-
-	errs := make([]error, 20)
-
-	for i := range errs {
-		wg.Add(1)
-
-		go func(i int) {
-			defer wg.Done()
-
-			errs[i] = Register(freshAdapter(), func(Options) (Flag, error) { return &stubFlag{}, nil })
-		}(i)
-	}
-
-	wg.Wait()
-
-	for i, err := range errs {
-		if err != nil {
-			t.Errorf("Register worker %d err = %v", i, err)
-		}
-	}
-}
-
 func TestFlagEdge_GetJSONNilFallback(t *testing.T) {
 	t.Parallel()
 
@@ -108,24 +57,6 @@ func TestFlagEdge_EvalContextMissing(t *testing.T) {
 
 	if _, ok := EvalContextFrom(t.Context()); ok {
 		t.Fatal("EvalContextFrom = true, want false without WithEvalContext")
-	}
-}
-
-func TestFlagEdge_OpenInvalidOptions(t *testing.T) {
-	t.Parallel()
-
-	got, err := Open(freshAdapter(), Options{Firebase: FirebaseOptions{Timeout: -1}})
-	if !errors.Is(err, ErrInvalidOptions) {
-		t.Fatalf("Open(invalid opts) err = %v, want ErrInvalidOptions", err)
-	}
-
-	var ioe InvalidOptionsError
-	if !errors.As(err, &ioe) {
-		t.Fatalf("err %T is not InvalidOptionsError", err)
-	}
-
-	if got != nil {
-		t.Fatalf("got = %v, want nil", got)
 	}
 }
 
