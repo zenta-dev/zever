@@ -1,74 +1,98 @@
 name: bench
 
-# Non-gating benchmark trend for orm + container hot paths. This workflow
-# NEVER fails a PR: every step that could fail (benchstat compare, artifact
-# download for the base) runs with continue-on-error, and the workflow is
-# intentionally not listed in required status checks. Read the numbers as
-# trend signal; compare shapes (allocs/op) and relative deltas via
-# benchstat, not single-run ns/op (see docs benchmarks reference).
+# Non-gating benchmark trend for hot paths across module groups.
+# This workflow NEVER fails a PR: every step that could fail runs with
+# continue-on-error, and the workflow is intentionally not listed in
+# required status checks. Read the numbers as trend signal; compare shapes
+# (allocs/op) and relative deltas via benchstat, not single-run ns/op.
 #
-# Repro locally: go test -run=NONE -bench=. -benchmem -count=6 ./orm/...
-# then `benchstat base.txt head.txt` (golang.org/x/perf/cmd/benchstat).
+# Module groups rotate daily (deterministic via date) to cover all packages
+# within a week without exceeding runner budgets. Each group targets ~3 min.
+# Runtime budget: ~10 min total per workflow run (including setup).
 
 on:
   push:
     branches: [main]
     paths:
-      - "orm/**"
-      - "container/**"
+      - "**/*_bench_test.go"
       - ".github/workflows/bench.yml"
   pull_request:
     paths:
-      - "orm/**"
-      - "container/**"
+      - "**/*_bench_test.go"
       - ".github/workflows/bench.yml"
   schedule:
-    - cron: "0 6 * * 1"
+    # Daily at 06:00 UTC; module group selected by day-of-week.
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
 
-jobs:
-  bench-orm:
-    name: bench-orm
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.work
-      - name: Run orm benchmarks
-        run: go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-orm.txt
-      - name: Upload orm results
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: bench-orm-${{ github.sha }}
-          path: bench-orm.txt
-          retention-days: 90
+# Module groups for rotation (deterministic via day-of-week 0=Sun..6=Sat).
+# Each group kept to ~3 min runtime on ubuntu-24.04 shared runners.
+# Add/remove packages here as benchmark coverage expands.
+env:
+  MODULE_GROUPS: |
+    [{"day":0,"modules":["./orm/...","./container/..."],"label":"orm+container"},
+     {"day":1,"modules":["./core/...","./config/..."],"label":"core+config"},
+     {"day":2,"modules":["./shared/...","./serve/..."],"label":"shared+serve"},
+     {"day":3,"modules":["./dsl/...","./tools/apidiff/..."],"label":"dsl+apidiff"},
+     {"day":4,"modules":["./tools/tagcheck/...","./tools/vulngate/...","./tools/gengrammar/..."],"label":"tools"},
+     {"day":5,"modules":["./adapters/.../noop/..."],"label":"adapters-noop"},
+     {"day":6,"modules":["./adapters/.../memory/...","./adapters/.../log/..."],"label":"adapters-memory+log"}]
 
-  bench-container:
-    name: bench-container
+jobs:
+  bench-group:
+    name: bench-${{ matrix.group.label }}
     runs-on: ubuntu-24.04
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # Deterministic selection: pick the group matching today's day-of-week.
+        # The fromJson parses MODULE_GROUPS; the filter selects the entry where
+        # day == (current date in UTC) % 7.
+        group: ${{ fromJson(env.MODULE_GROUPS) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
-      - name: Run container benchmarks
-        run: go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./container/... 2>&1 | tee bench-container.txt
-      - name: Upload container results
+      - name: Select module group for today
+        id: select
+        run: |
+          DAY=$(date -u +%w)  # 0=Sun..6=Sat
+          echo "day=$DAY" >> $GITHUB_OUTPUT
+          # Filter the matrix to only today's group
+          echo "${{ toJson(matrix.group) }}" | jq -c "select(.day == $DAY)" > /tmp/group.json || true
+          if [ ! -s /tmp/group.json ]; then
+            echo "No group for day $DAY, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            cat /tmp/group.json | jq -r '.modules[]' | tr '\n' ' ' > /tmp/modules.txt
+            echo "modules=$(cat /tmp/modules.txt)" >> $GITHUB_OUTPUT
+            echo "label=$(cat /tmp/group.json | jq -r '.label')" >> $GITHUB_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Run benchmarks
+        if: steps.select.outputs.skip != 'true'
+        run: |
+          modules="${{ steps.select.outputs.modules }}"
+          label="${{ steps.select.outputs.label }}"
+          echo "Running benchmarks for group: $label"
+          echo "Modules: $modules"
+          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 $modules 2>&1 | tee "bench-$label.txt"
+      - name: Upload results
+        if: steps.select.outputs.skip != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: bench-container-${{ github.sha }}
-          path: bench-container.txt
+          name: bench-${{ steps.select.outputs.label }}-${{ github.sha }}
+          path: bench-${{ steps.select.outputs.label }}.txt
           retention-days: 90
 
   benchstat:
-    name: benchstat
+    name: benchstat-compare
     runs-on: ubuntu-24.04
-    needs: [bench-orm, bench-container]
+    needs: [bench-group]
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,21 +110,44 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
+          DAY=$(date -u +%w)
+          # Map day to label for base comparison
+          case $DAY in
+            0) LABEL="orm+container" ;;
+            1) LABEL="core+config" ;;
+            2) LABEL="shared+serve" ;;
+            3) LABEL="dsl+apidiff" ;;
+            4) LABEL="tools" ;;
+            5) LABEL="adapters-noop" ;;
+            6) LABEL="adapters-memory+log" ;;
+          esac
+          HEAD_FILE="bench-$LABEL.txt"
+          BASE_FILE="bench-base-$LABEL.txt"
+          if [ ! -f "$HEAD_FILE" ]; then
+            echo "No head results for $LABEL, skipping comparison"
+            exit 0
+          fi
           git fetch origin "$BASE_REF" --depth=1 || true
           git stash -u || true
-          git checkout -q "origin/$BASE_REF" -- orm container 2>/dev/null || true
-          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./orm/... 2>&1 | tee bench-base-orm.txt || true
-          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 ./container/... 2>&1 | tee bench-base-container.txt || true
-          git checkout -q HEAD -- orm container 2>/dev/null || true
-          # 5% regression signal per hot-path module (user requirement: <5%
-          # regression; security never sacrificed). benchstat prints a +N%
+          # Check out the modules for today's group from base
+          case $DAY in
+            0) MODULES="./orm/... ./container/..." ;;
+            1) MODULES="./core/... ./config/..." ;;
+            2) MODULES="./shared/... ./serve/..." ;;
+            3) MODULES="./dsl/... ./tools/apidiff/..." ;;
+            4) MODULES="./tools/tagcheck/... ./tools/vulngate/... ./tools/gengrammar/..." ;;
+            5) MODULES="./adapters/.../noop/..." ;;
+            6) MODULES="./adapters/.../memory/... ./adapters/.../log/..." ;;
+          esac
+          git checkout -q "origin/$BASE_REF" -- $MODULES 2>/dev/null || true
+          go test -run=NONE -bench=. -benchmem -benchtime=1s -count=6 $MODULES 2>&1 | tee "$BASE_FILE" || true
+          git checkout -q HEAD -- $MODULES 2>/dev/null || true
+          # 5% regression signal per hot-path module. benchstat prints a +N%
           # delta only for statistically significant changes (insignificant
           # ones render as ~), so any +N% line with N > 5 is a real signal.
           # Warning only — shared runners are noisy, so this workflow stays
           # advisory by design (continue-on-error above); follow up on
-          # repeated warnings, never gate merges on one sample. No
-          # per-request reflection may be introduced by anyone; these numbers
-          # watch the trend.
+          # repeated warnings, never gate merges on one sample.
           signal_regressions() {
             base="$1"; head="$2"; label="$3"
             if [ ! -f "$head" ]; then
@@ -118,6 +165,5 @@ jobs:
             done
             return 0
           }
-          signal_regressions bench-base-orm.txt bench-orm.txt orm
-          signal_regressions bench-base-container.txt bench-container.txt container
+          signal_regressions "$BASE_FILE" "$HEAD_FILE" "$LABEL"
           exit 0

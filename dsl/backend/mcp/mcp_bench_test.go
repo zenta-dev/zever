@@ -40,7 +40,7 @@ func BenchmarkRenderOperation(b *testing.B) {
 			{Name: "id", Type: ir.FieldType{Scalar: ir.TUUID}},
 			{Name: "include", Type: ir.FieldType{Scalar: ir.TString}},
 		},
-		Returns: &ir.TypeRef{Entity: &ir.Entity{Name: "User", Fields: []*ir.Field{{Name: "id", Type: ir.FieldType{Scalar: ir.TUUID}}, {Name: "name", Type: ir.FieldType{Scalar: ir.TString}}}}},
+		Returns:   &ir.TypeRef{Entity: &ir.Entity{Name: "User", Fields: []*ir.Field{{Name: "id", Type: ir.FieldType{Scalar: ir.TUUID}}, {Name: "name", Type: ir.FieldType{Scalar: ir.TString}}}}},
 		Paginated: false,
 	}
 	r := &renderer{
