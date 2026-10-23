@@ -3,7 +3,6 @@ package job
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"math/big"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 var (
@@ -157,7 +157,7 @@ func (b *Batch) Dispatch(ctx context.Context) error {
 	queued := make([]queuedJob, 0, len(b.jobs))
 
 	for _, j := range b.jobs {
-		payload, err := json.Marshal(j.args)
+		payload, err := codec.Marshal(j.args)
 		if err != nil {
 			return fmt.Errorf("job: %q marshaling batch args: %w", j.name, err)
 		}

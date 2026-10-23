@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json/v2"
 	"fmt"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/traceprop"
 )
 
@@ -85,7 +85,7 @@ func (d *Dispatcher) Dispatch(
 		fn(&o)
 	}
 
-	payload, err := json.Marshal(args)
+	payload, err := codec.Marshal(args)
 	if err != nil {
 		return fmt.Errorf("job: %q marshal: %w", jobName, err)
 	}

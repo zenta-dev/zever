@@ -2,15 +2,16 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // StepFuncOf is a typed workflow step: input of type In in, output of type
 // Out or error out. In and Out must be JSON-marshalable; the typed-to-untyped
-// bridge (see NewTypedStep) converts across step boundaries with encoding/json
-// so heterogeneous steps can share one saga definition.
+// bridge (see NewTypedStep) converts across step boundaries with the codec
+// facade so heterogeneous steps can share one saga definition.
 type StepFuncOf[In, Out any] func(ctx context.Context, input In) (Out, error)
 
 // TypedStep is one saga step with typed forward and compensating actions.
@@ -27,7 +28,7 @@ type TypedStep struct {
 // NewTypedStep returns the TypedStep for the named step: execute runs the
 // forward action, compensate undoes it, pivot marks the step after which
 // failures roll forward instead of compensating. The typed functions are
-// bridged to the engine's untyped StepFunc with encoding/json conversion;
+// bridged to the engine's untyped StepFunc with codec conversion;
 // see convertStepValue.
 func NewTypedStep[ExecIn, ExecOut, CompIn, CompOut any](
 	name string,
@@ -117,19 +118,19 @@ func wrapStepFunc[In, Out any](fn StepFuncOf[In, Out]) StepFunc {
 	}
 }
 
-// convertStepValue decodes input into out with an encoding/json round-trip.
+// convertStepValue decodes input into out with a codec round-trip.
 // A nil input leaves out at its zero value.
 func convertStepValue(input any, out any) error {
 	if input == nil {
 		return nil
 	}
 
-	raw, err := json.Marshal(input)
+	raw, err := codec.Marshal(input)
 	if err != nil {
 		return errors.Join(ErrTypedStepConvert, fmt.Errorf("workflow: marshal saga step input: %w", err))
 	}
 
-	if err := json.Unmarshal(raw, out); err != nil {
+	if err := codec.Unmarshal(raw, out); err != nil {
 		return errors.Join(ErrTypedStepConvert, fmt.Errorf("workflow: unmarshal saga step input: %w", err))
 	}
 

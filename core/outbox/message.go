@@ -25,7 +25,7 @@ type Message struct {
 	Headers map[string]string `json:"headers,omitempty"`
 	// CreatedAt is the message creation timestamp. Zero means "stamp now"
 	// for adapters that persist it.
-	CreatedAt time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitzero"`
 	// Attempts is the delivery attempt count observed by the publisher.
 	Attempts int `json:"attempts"`
 }

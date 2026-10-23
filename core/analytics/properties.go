@@ -1,7 +1,7 @@
 package analytics
 
 import (
-	"encoding/json"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // ValidatePropertiesSize checks that the JSON-encoded size of m does not exceed limit.
@@ -14,7 +14,7 @@ func ValidatePropertiesSize(m map[string]any, limit int) error {
 		limit = DefaultMaxPropertiesBytes
 	}
 
-	b, err := json.Marshal(m)
+	b, err := codec.Marshal(m)
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func MarshalValidated(m map[string]any, limit int) ([]byte, error) {
 		limit = DefaultMaxPropertiesBytes
 	}
 
-	b, err := json.Marshal(m)
+	b, err := codec.Marshal(m)
 	if err != nil {
 		return nil, err
 	}

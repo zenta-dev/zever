@@ -2,10 +2,10 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // AsTool wraps a sub-agent as a callable tool, enabling agent composition: a
@@ -24,7 +24,7 @@ func AsTool(name, description string, sub Agent, schema map[string]any) Tool {
 				return "", errors.New("agent: nil sub-agent")
 			}
 
-			raw, err := json.Marshal(args)
+			raw, err := codec.Marshal(args)
 			if err != nil {
 				return "", err
 			}
