@@ -86,6 +86,7 @@ func TestParseSettings(t *testing.T) {
 			want: Settings{
 				ImplicitModuleHints: true,
 				ErrorCaseHints:      true,
+				CodeLensReferences:  true,
 				ParamNames:          true,
 				DebounceDelay:       debounceDelay,
 			},

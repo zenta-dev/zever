@@ -947,11 +947,11 @@ tools/vulngate	findingMsg	Finding	finding	v0.7.2
 tools/vulngate	frame	Function	function	v0.7.2
 tools/zever-lsp	callHierarchyData	Service	service	e3b5d9f813a2
 tools/zever-lsp	callHierarchyData	RPC	rpc	e3b5d9f813a2
-tools/zever-lsp	codeActionResolveData	Kind	kind	ca12a4fae806
-tools/zever-lsp	codeActionResolveData	URI	uri	ca12a4fae806
-tools/zever-lsp	codeActionResolveData	Line	line	ca12a4fae806
-tools/zever-lsp	codeActionResolveData	Character	character	ca12a4fae806
-tools/zever-lsp	codeActionResolveData	Message	message	ca12a4fae806
+tools/zever-lsp	codeActionResolveData	Kind	kind	f6519c62bc80
+tools/zever-lsp	codeActionResolveData	URI	uri	f6519c62bc80
+tools/zever-lsp	codeActionResolveData	Line	line	f6519c62bc80
+tools/zever-lsp	codeActionResolveData	Character	character	f6519c62bc80
+tools/zever-lsp	codeActionResolveData	Message	message	f6519c62bc80
 tools/zever-lsp	completionResolveData	Detail	detail	v0.7.2
 tools/zever-mcp	callParams	Name	name	v0.7.2
 tools/zever-mcp	callParams	Arguments	arguments	v0.7.2
