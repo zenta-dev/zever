@@ -3,86 +3,9 @@ package queue
 import (
 	"context"
 	"errors"
-	"strings"
-	"sync"
 	"testing"
 	"time"
-
-	coredb "github.com/zenta-dev/zever/core/db"
 )
-
-func TestOpenShared_success(t *testing.T) {
-	t.Parallel()
-
-	a := freshQueueAdapter()
-	var gotOpts Options
-	if err := RegisterShared(a, func(_ coredb.DB, opts Options) (Queue, error) {
-		gotOpts = opts
-		return stubQueue{}, nil
-	}); err != nil {
-		t.Fatalf("RegisterShared(%v) error = %v", a, err)
-	}
-
-	want := Options{PollTimeout: time.Second}
-	q, err := OpenShared(a, nil, want)
-	if err != nil {
-		t.Fatalf("OpenShared(%v) error = %v", a, err)
-	}
-	if q == nil {
-		t.Fatal("OpenShared returned nil Queue")
-	}
-	if gotOpts != want {
-		t.Fatalf("factory opts = %+v, want %+v", gotOpts, want)
-	}
-}
-
-func TestRegisterShared_nilFactory(t *testing.T) {
-	t.Parallel()
-
-	a := freshQueueAdapter()
-	if err := RegisterShared(a, nil); !errors.Is(err, ErrNilFactory) {
-		t.Fatalf("RegisterShared(nil) err = %v, want ErrNilFactory", err)
-	}
-}
-
-func TestRegisterShared_duplicate(t *testing.T) {
-	t.Parallel()
-
-	a := freshQueueAdapter()
-	stub := func(coredb.DB, Options) (Queue, error) { return stubQueue{}, nil }
-	if err := RegisterShared(a, stub); err != nil {
-		t.Fatalf("first RegisterShared(%v) error = %v", a, err)
-	}
-	if err := RegisterShared(a, stub); !errors.Is(err, ErrDuplicate) {
-		t.Fatalf("second RegisterShared(%v) err = %v, want ErrDuplicate", a, err)
-	}
-}
-
-func TestOpenShared_unknown(t *testing.T) {
-	t.Parallel()
-
-	_, err := OpenShared(Adapter("test-9500"), nil, Options{})
-	if !errors.Is(err, ErrUnknownAdapter) {
-		t.Fatalf("OpenShared(unknown) err = %v, want ErrUnknownAdapter", err)
-	}
-}
-
-func TestOpenShared_factoryError_wrapped(t *testing.T) {
-	t.Parallel()
-
-	a := freshQueueAdapter()
-	sentinel := errors.New("shared boom")
-	if err := RegisterShared(a, func(coredb.DB, Options) (Queue, error) { return nil, sentinel }); err != nil {
-		t.Fatalf("RegisterShared(%v) error = %v", a, err)
-	}
-	_, err := OpenShared(a, nil, Options{})
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("OpenShared err = %v, want wrap of sentinel", err)
-	}
-	if !strings.Contains(err.Error(), "queue: open shared") {
-		t.Fatalf("OpenShared err %q missing %q", err.Error(), "queue: open shared")
-	}
-}
 
 func TestParseMessageID_boundaries(t *testing.T) {
 	t.Parallel()
@@ -186,56 +109,6 @@ func TestOptionsValidate_always_nil(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestRegisterShared_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshQueueAdapter()
-			if err := RegisterShared(a, func(coredb.DB, Options) (Queue, error) { return stubQueue{}, nil }); err != nil {
-				t.Errorf("RegisterShared(%v) error = %v", a, err)
-				return
-			}
-			if _, err := OpenShared(a, nil, Options{}); err != nil {
-				t.Errorf("OpenShared(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestRegisterOpen_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshQueueAdapter()
-			if err := Register(a, func(Options) (Queue, error) { return stubQueue{}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
 }
 
 func TestStubQueue_contract(t *testing.T) {

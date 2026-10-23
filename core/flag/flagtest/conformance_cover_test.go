@@ -103,12 +103,6 @@ func mustPass(t *testing.T, err error) {
 	}
 }
 
-func TestCheckOpenRegisterSuccess(t *testing.T) {
-	t.Parallel()
-
-	mustPass(t, checkOpenRegister())
-}
-
 func TestCheckFallbackSuccess(t *testing.T) {
 	t.Parallel()
 

@@ -2,9 +2,9 @@
 //
 // It seals plaintext at rest through Encrypt and Decrypt plus HMAC and signatures. It is not a key manager, transport layer, or password hasher; load keys from secrets.
 //
-// Type safety: Crypto embeds Encryptor and Signer plus typed Options plus Adapter enum plus Factory. Key and SignKey are base64 32-byte and 64-byte secrets validated before factory lookup. Unsupported features fail closed.
+// Type safety: Crypto embeds Encryptor and Signer plus typed Options plus Factory. Key and SignKey are base64 32-byte and 64-byte secrets validated before factory lookup. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. CRYPTO_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Crypto(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package crypto

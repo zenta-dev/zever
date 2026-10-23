@@ -5,11 +5,9 @@ import (
 	"github.com/zenta-dev/zever/core/tenant"
 )
 
-// ExampleOpen opens the single-tenant backend with a fixed ID.
-func ExampleOpen() {
-	_ = tenant.Register(tenant.Single, tenantsingle.New)
-
-	t, err := tenant.Open(tenant.Single, tenant.Options{ID: "default"})
+// Example opens the single-tenant backend with a fixed ID.
+func Example() {
+	t, err := tenantsingle.New(tenant.Options{ID: "default"})
 	if err != nil {
 		return
 	}

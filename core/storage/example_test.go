@@ -7,11 +7,9 @@ import (
 	"github.com/zenta-dev/zever/core/storage"
 )
 
-// ExampleOpen opens the local-filesystem storage backend with defaults.
-func ExampleOpen() {
-	_ = storage.Register(storage.AdapterLocal, storagelocal.New)
-
-	s, err := storage.Open(storage.AdapterLocal, storage.Options{})
+// Example opens the local-filesystem storage backend with defaults.
+func Example() {
+	s, err := storagelocal.New(storage.Options{})
 	if err != nil {
 		return
 	}

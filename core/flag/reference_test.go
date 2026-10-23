@@ -18,23 +18,6 @@ const referenceDoc = "../../docs/src/content/docs/reference/flag.mdx"
 // TestReferencePageListsAdapters pins the reference adapters table to the
 // Adapter constants: every known adapter has a cell, and the config service
 // key names the battery.
-func TestReferencePageListsAdapters(t *testing.T) {
-	t.Parallel()
-
-	raw := mustReadReference(t)
-	for _, a := range []Adapter{Static, Firebase} {
-		if !strings.Contains(raw, "`"+a.String()+"`") {
-			t.Errorf("adapter %q missing from reference page", a.String())
-		}
-	}
-	if !strings.Contains(raw, "Service key: `flag`") {
-		t.Errorf("config service key `flag` missing from reference page")
-	}
-}
-
-// TestReferencePageListsOptionKeys pins the reference options table to the
-// Options struct: every JSON key (recursing into named blocks, skipping the
-// untagged Logger) must appear on the page.
 func TestReferencePageListsOptionKeys(t *testing.T) {
 	t.Parallel()
 

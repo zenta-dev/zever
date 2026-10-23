@@ -9,8 +9,8 @@ import (
 	"github.com/zenta-dev/zever/core/analytics"
 )
 
-// ExampleOpen opens the log backend against a buffer and tracks one event.
-func ExampleOpen() {
+// Example opens the log backend against a buffer and tracks one event.
+func Example() {
 	var buf bytes.Buffer
 
 	backend, err := analyzelog.NewWithWriter(analytics.Options{}, &buf)

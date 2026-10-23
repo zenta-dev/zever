@@ -11,54 +11,6 @@ func (zeroReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		if err := Register(freshAdapter(), func(Options) (Media, error) { return &stubMedia{}, nil }); err != nil {
-			b.Fatalf("Register err = %v", err)
-		}
-	}
-}
-
-func BenchmarkOpen(b *testing.B) {
-	a := freshAdapter()
-	if err := Register(a, func(Options) (Media, error) { return &stubMedia{}, nil }); err != nil {
-		b.Fatalf("Register err = %v", err)
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		if _, err := Open(a, Options{}); err != nil {
-			b.Fatalf("Open err = %v", err)
-		}
-	}
-}
-
-func BenchmarkOpenParallel(b *testing.B) {
-	a := freshAdapter()
-	if err := Register(a, func(Options) (Media, error) { return &stubMedia{}, nil }); err != nil {
-		b.Fatalf("Register err = %v", err)
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			if _, err := Open(a, Options{}); err != nil {
-				b.Fatalf("Open err = %v", err)
-			}
-		}
-	})
-}
-
-func BenchmarkParseAdapter(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		_, _ = ParseAdapter("s3")
-	}
-}
-
 func BenchmarkValidID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()

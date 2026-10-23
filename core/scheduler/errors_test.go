@@ -25,7 +25,7 @@ func TestSentinels(t *testing.T) {
 func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := DuplicateAdapterError{Adapter: Embedded}
+	err := DuplicateAdapterError{Adapter: "embedded"}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("err=%v want ErrDuplicate", err)
 	}
@@ -38,7 +38,7 @@ func TestDuplicateAdapterErrorUnwrap(t *testing.T) {
 func TestUnknownAdapterErrorUnwrap(t *testing.T) {
 	t.Parallel()
 
-	err := UnknownAdapterError{Adapter: Adapter("")}
+	err := UnknownAdapterError{Adapter: ""}
 	if !errors.Is(err, ErrUnknownAdapter) {
 		t.Fatalf("err=%v want ErrUnknownAdapter", err)
 	}

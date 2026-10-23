@@ -4,20 +4,14 @@ package webhooktest
 
 import (
 	"errors"
-	"strconv"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/webhook"
 )
 
-// adapterSeq keeps throwaway registry names unique across Conformance runs
-// in one process.
-var adapterSeq atomic.Uint64
-
 // Conformance verifies factory-built webhooks implement the webhook.Webhook
 // contract: Register/Unregister lifecycle, Deliver fan-out invocation,
-// ErrNotFound sentinels, Open/Register registry wiring, and Close. Each
+// ErrNotFound sentinels, and Close. Each
 // subtest takes a fresh instance from factory so cases stay isolated. No
 // test delivers to a live server: targets are syntactically valid private
 // URLs that factories must accept with private targets allowed, and live
@@ -27,7 +21,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
 
 	t.Run("Lifecycle", func(t *testing.T) { conformanceLifecycle(t, factory) })
 	t.Run("NotFound", func(t *testing.T) { conformanceNotFound(t, factory) })
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
@@ -110,27 +103,6 @@ func conformanceNotFound(t *testing.T, factory func(t *testing.T) webhook.Webhoo
 
 	emptyTargetErr := w.Register(ctx, "kit.e", "", "s")
 	expectMatch(t, emptyTargetErr != nil, "Register(empty target) = nil, want error")
-}
-
-func conformanceOpenRegister(t *testing.T, factory func(t *testing.T) webhook.Webhook) {
-	t.Helper()
-
-	name := webhook.Adapter("kit-open-test-" + strconv.FormatUint(adapterSeq.Add(1), 10))
-	probe := factory(t)
-
-	regErr := webhook.Register(name, func(webhook.Options) (webhook.Webhook, error) { return probe, nil })
-	mustMatch(t, regErr == nil, "Register() error = %v", regErr)
-
-	dupErr := webhook.Register(name, func(webhook.Options) (webhook.Webhook, error) { return probe, nil })
-	mustMatch(t, errors.Is(dupErr, webhook.ErrDuplicate), "Register(dup) err = %v, want ErrDuplicate", dupErr)
-
-	opened, openErr := webhook.Open(name, webhook.Options{})
-	mustMatch(t, openErr == nil, "Open() error = %v", openErr)
-
-	expectMatch(t, opened == probe, "Open() did not return the registered webhook")
-
-	_, unknownErr := webhook.Open("kit-no-such-adapter", webhook.Options{})
-	expectMatch(t, errors.Is(unknownErr, webhook.ErrUnknownAdapter), "Open(unknown) err = %v, want ErrUnknownAdapter", unknownErr)
 }
 
 func conformanceClose(t *testing.T, factory func(t *testing.T) webhook.Webhook) {

@@ -5,11 +5,9 @@ import (
 	"github.com/zenta-dev/zever/core/webhook"
 )
 
-// ExampleOpen opens the http webhook backend with default options.
-func ExampleOpen() {
-	_ = webhook.Register(webhook.AdapterHTTP, webhookhttp.New)
-
-	w, err := webhook.Open(webhook.AdapterHTTP, webhook.Options{})
+// Example opens the http webhook backend with default options.
+func Example() {
+	w, err := webhookhttp.New(webhook.Options{})
 	if err != nil {
 		return
 	}

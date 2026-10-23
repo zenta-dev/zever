@@ -5,11 +5,9 @@ import (
 	"github.com/zenta-dev/zever/core/workflow"
 )
 
-// ExampleOpen opens the in-memory workflow backend with defaults.
-func ExampleOpen() {
-	_ = workflow.Register(workflow.Memory, workflowmemory.New)
-
-	w, err := workflow.Open(workflow.Memory, workflow.Options{})
+// Example opens the in-memory workflow backend with defaults.
+func Example() {
+	w, err := workflowmemory.New(workflow.Options{})
 	if err != nil {
 		return
 	}

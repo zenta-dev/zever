@@ -11,7 +11,7 @@ import (
 )
 
 // Conformance verifies factory-built stores implement the
-// idempotency.Store contract: open/register round-trip, Begin miss
+// idempotency.Store contract: Begin miss
 // reserves, Complete then replay returns the stored copy,
 // in-flight Begin reports ErrInProgress, fingerprint mismatch reports
 // ErrKeyMismatch even mid-flight, Forget is idempotent, invalid keys
@@ -37,7 +37,6 @@ func errf(format string, args ...any) error {
 func Conformance(t *testing.T, factory func(t *testing.T) idempotency.Store) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("ExecuteReplay", func(t *testing.T) { conformanceExecuteReplay(t, factory) })
 	t.Run("InProgress", func(t *testing.T) { conformanceInProgress(t, factory) })
 	t.Run("FingerprintMismatch", func(t *testing.T) { conformanceFingerprintMismatch(t, factory) })
@@ -46,40 +45,9 @@ func Conformance(t *testing.T, factory func(t *testing.T) idempotency.Store) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if err := checkOpenRegister(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// checkOpenRegister proves the open/register round-trip against the
+// checkOpenRegister proves the factory-built backends against the
 // shared registry. It returns a descriptive error on the first
 // contract violation so unit tests can drive every branch.
-func checkOpenRegister() error {
-	if _, err := idempotency.Open(idempotency.Adapter("conformance-missing-adapter"), idempotency.Options{}); !errors.Is(err, idempotency.ErrUnknownAdapter) {
-		return fmt.Errorf("idempotencytest: Open(missing) err = %w, want ErrUnknownAdapter", err)
-	}
-
-	probe := idempotency.Adapter("conformance-probe-idempotency")
-
-	if err := idempotency.Register(probe, nil); !errors.Is(err, idempotency.ErrNilFactory) {
-		return fmt.Errorf("idempotencytest: Register(nil) err = %w, want ErrNilFactory", err)
-	}
-
-	stub := func(idempotency.Options) (idempotency.Store, error) {
-		return nil, errors.New("idempotencytest: probe factory must not run")
-	}
-
-	_ = idempotency.Register(probe, stub)
-
-	if err := idempotency.Register(probe, stub); !errors.Is(err, idempotency.ErrDuplicate) {
-		return fmt.Errorf("idempotencytest: Register(duplicate) err = %w, want ErrDuplicate", err)
-	}
-
-	return nil
-}
 
 func conformanceExecuteReplay(t *testing.T, factory func(t *testing.T) idempotency.Store) {
 	t.Helper()

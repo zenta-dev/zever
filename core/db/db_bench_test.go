@@ -7,33 +7,6 @@ import (
 )
 
 // BenchmarkRegister measures registry insertion for a fresh adapter key.
-func BenchmarkRegister(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if err := Register(dbFreshAdapter(), func(Options) (DB, error) { return &stubDB{}, nil }); err != nil {
-			b.Fatalf("Register err = %v", err)
-		}
-	}
-}
-
-// BenchmarkOpen measures validated registry lookup plus the factory call.
-func BenchmarkOpen(b *testing.B) {
-	adapter := dbFreshAdapter()
-	if err := Register(adapter, func(Options) (DB, error) { return &stubDB{dialect: "sqlite"}, nil }); err != nil {
-		b.Fatalf("Register err = %v", err)
-	}
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if _, err := Open(adapter, Options{DSN: "postgres://localhost/db"}); err != nil {
-			b.Fatalf("Open err = %v", err)
-		}
-	}
-}
-
-// BenchmarkOptionsValidate measures the adapter-independent range checks.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{MaxConns: 10, MinConns: 2, MaxConnLifetime: time.Hour, MaxConnIdleTime: time.Minute}
 
@@ -47,28 +20,6 @@ func BenchmarkOptionsValidate(b *testing.B) {
 }
 
 // BenchmarkAdapterString measures canonical adapter naming.
-func BenchmarkAdapterString(b *testing.B) {
-	a := Postgres
-
-	b.ReportAllocs()
-
-	for b.Loop() {
-		_ = a.String()
-	}
-}
-
-// BenchmarkParseAdapter measures adapter name parsing.
-func BenchmarkParseAdapter(b *testing.B) {
-	b.ReportAllocs()
-
-	for b.Loop() {
-		if _, err := ParseAdapter("postgres"); err != nil {
-			b.Fatalf("ParseAdapter err = %v", err)
-		}
-	}
-}
-
-// BenchmarkIsolationLevelString measures isolation-level rendering.
 func BenchmarkIsolationLevelString(b *testing.B) {
 	level := Serializable
 

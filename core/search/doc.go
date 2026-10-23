@@ -2,9 +2,9 @@
 //
 // It indexes documents and runs ranked queries with explicit index filters and paged results. It is not a vector store and does not rank by embedding similarity.
 //
-// Type safety: Search plus typed Options plus Adapter enum plus Factory. Document plus QueryOptions plus Result plus Hit are typed; Limit <= 0 selects DefaultLimit 10. Unsupported features fail closed.
+// Type safety: Search plus typed Options plus Factory. Document plus QueryOptions plus Result plus Hit are typed; Limit <= 0 selects DefaultLimit 10. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. SEARCH_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Search(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -18,5 +18,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package search

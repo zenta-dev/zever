@@ -608,12 +608,6 @@ func (e *errQueue) Close() error { return e.q.Close() }
 
 func (e *errQueue) Name() string { return e.q.Name() }
 
-func TestCheckOpenRegisterSuccess(t *testing.T) {
-	t.Parallel()
-
-	mustPass(t, checkOpenRegister(healthyStubScheduler()))
-}
-
 func TestCheckConcurrent(t *testing.T) {
 	t.Parallel()
 

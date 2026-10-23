@@ -39,147 +39,8 @@ func (stubStorage) Name() string {
 	return "stub"
 }
 
-func TestAdapterString(t *testing.T) {
-	t.Parallel()
 
-	cases := []struct {
-		adapter Adapter
-		want    string
-	}{
-		{AdapterLocal, "local"},
-		{AdapterS3, "s3"},
-		{AdapterR2, "r2"},
-		{Adapter(""), "unknown"},
-	}
 
-	for i := range cases {
-		if got := cases[i].adapter.String(); got != cases[i].want {
-			t.Errorf("String() = %q, want %q", got, cases[i].want)
-		}
-	}
-}
-
-func TestParseAdapter(t *testing.T) {
-	t.Parallel()
-
-	wantOK := map[string]Adapter{
-		"local": AdapterLocal,
-		"s3":    AdapterS3,
-		"r2":    AdapterR2,
-	}
-
-	for name, want := range wantOK {
-		got, err := ParseAdapter(name)
-		if err != nil {
-			t.Errorf("ParseAdapter(%q) error: %v", name, err)
-			continue
-		}
-
-		if got != want {
-			t.Errorf("ParseAdapter(%q) = %v, want %v", name, got, want)
-		}
-	}
-
-	got, err := ParseAdapter("bogus")
-	if err != nil {
-		t.Fatalf("ParseAdapter(bogus) error = %v, want nil (open adapter)", err)
-	}
-	if got != Adapter("bogus") {
-		t.Errorf("ParseAdapter(bogus) = %v, want %v", got, Adapter("bogus"))
-	}
-
-	_, err = ParseAdapter("")
-	if err == nil {
-		t.Fatal("ParseAdapter(\"\") expected error")
-	}
-
-	if !errors.Is(err, ErrInvalidAdapter) {
-		t.Errorf("expected ErrInvalidAdapter, got %v", err)
-	}
-
-	var inv InvalidAdapterError
-	if !errors.As(err, &inv) {
-		t.Fatalf("expected *InvalidAdapterError, got %T", err)
-	}
-
-	if inv.Adapter != "" {
-		t.Errorf("Adapter = %q, want %q", inv.Adapter, "")
-	}
-
-	if !strings.Contains(err.Error(), `""`) {
-		t.Errorf("Error() = %q, want it to mention empty", err.Error())
-	}
-}
-
-func TestRegistryRegisterAndOpen(t *testing.T) {
-	if err := Register(Adapter("test-77"), nil); !errors.Is(err, ErrNilFactory) {
-		t.Fatalf("Register nil factory: expected ErrNilFactory, got %v", err)
-	}
-
-	stub := func(_ Options) (Storage, error) { return stubStorage{}, nil }
-	if err := Register(Adapter("test-77"), stub); err != nil {
-		var dup DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("Register: %v", err)
-		}
-	}
-
-	if err := Register(Adapter("test-77"), stub); !errors.Is(err, ErrDuplicate) {
-		t.Fatalf("expected ErrDuplicate, got %v", err)
-	} else {
-		var dup DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("expected *DuplicateError, got %T", err)
-		}
-
-		if dup.Adapter != Adapter("test-77") {
-			t.Errorf("Adapter = %v, want %v", dup.Adapter, Adapter("test-77"))
-		}
-
-		if !strings.Contains(err.Error(), "test-77") {
-			t.Errorf("Error() = %q", err.Error())
-		}
-	}
-
-	if _, err := Open(Adapter("test-79"), Options{}); !errors.Is(err, ErrUnknownAdapter) {
-		t.Fatalf("expected ErrUnknownAdapter, got %v", err)
-	} else {
-		var unk UnknownAdapterError
-		if !errors.As(err, &unk) {
-			t.Fatalf("expected *UnknownAdapterError, got %T", err)
-		}
-
-		if unk.Adapter != Adapter("test-79") {
-			t.Errorf("Adapter = %v, want %v", unk.Adapter, Adapter("test-79"))
-		}
-
-		if !strings.Contains(err.Error(), "forgotten import?") {
-			t.Errorf("Error() = %q", err.Error())
-		}
-	}
-
-	if err := Register(Adapter("test-78"), func(_ Options) (Storage, error) { return nil, ErrExpired }); err != nil {
-		var dup DuplicateError
-		if !errors.As(err, &dup) {
-			t.Fatalf("Register: %v", err)
-		}
-	}
-
-	if _, err := Open(Adapter("test-78"), Options{}); !errors.Is(err, ErrExpired) {
-		t.Fatalf("expected wrapped ErrExpired, got %v", err)
-	} else if !strings.Contains(err.Error(), "storage: open") {
-		t.Errorf("Error() = %q, want storage: open prefix", err.Error())
-	}
-
-	s, err := Open(Adapter("test-77"), Options{})
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-
-	if s.Name() != "stub" {
-		t.Errorf("Name() = %q, want stub", s.Name())
-	}
-}
 
 func TestOptionsValidate(t *testing.T) {
 	t.Parallel()
@@ -936,7 +797,7 @@ func TestErrorTypes(t *testing.T) {
 		t.Errorf("As failed: %T", inv)
 	}
 
-	dup := DuplicateError{Adapter: AdapterLocal}
+	dup := DuplicateError{Adapter: "local"}
 	if dup.Error() != "storage: duplicate adapter: local" {
 		t.Errorf("Error() = %q", dup.Error())
 	}
@@ -954,7 +815,7 @@ func TestErrorTypes(t *testing.T) {
 		t.Errorf("As failed: %T", dup)
 	}
 
-	unk := UnknownAdapterError{Adapter: AdapterS3}
+	unk := UnknownAdapterError{Adapter: "s3"}
 	if unk.Error() != "storage: unknown adapter: s3 (forgotten import?)" {
 		t.Errorf("Error() = %q", unk.Error())
 	}

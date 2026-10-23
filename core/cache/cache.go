@@ -2,10 +2,7 @@ package cache
 
 import (
 	"context"
-	"fmt"
 	"time"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Cache defines the backend contract for byte-slice cache entries with TTL and atomic counters.
@@ -30,44 +27,3 @@ type Cache interface {
 
 // Factory creates a Cache from the given Options.
 type Factory func(opts Options) (Cache, error)
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(adapter Adapter) error { return DuplicateError{Adapter: adapter} },
-	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("cache: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates a Cache for adapter using the registered Factory and opts.
-func Open(adapter Adapter, opts Options) (Cache, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := factory(opts)
-	if err != nil {
-		return nil, fmt.Errorf("cache: open %s: %w", adapter, err)
-	}
-	return c, nil
-}

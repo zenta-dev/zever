@@ -12,7 +12,7 @@ import (
 )
 
 // Conformance verifies factory-built cryptos implement the
-// crypto.Crypto contract: open/register round-trip, Encrypt/Decrypt
+// crypto.Crypto contract: Encrypt/Decrypt
 // round-trip with copy semantics and tamper detection, Sign/Verify,
 // Mac/VerifyMac, and wrong-key failure. Each subtest takes a fresh
 // instance from factory so cases stay isolated. Tests never call
@@ -28,36 +28,12 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) crypto.Crypto) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("EncryptDecrypt", func(t *testing.T) { conformanceEncryptDecrypt(t, factory) })
 	t.Run("Tamper", func(t *testing.T) { conformanceTamper(t, factory) })
 	t.Run("SignVerify", func(t *testing.T) { conformanceSignVerify(t, factory) })
 	t.Run("Mac", func(t *testing.T) { conformanceMac(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := crypto.Open(crypto.Adapter("conformance-missing-adapter"), crypto.Options{Key: "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="}); !errors.Is(err, crypto.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := crypto.Adapter("conformance-probe-crypto")
-
-	if err := crypto.Register(probe, nil); !errors.Is(err, crypto.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(crypto.Options) (crypto.Crypto, error) {
-		return nil, errors.New("cryptotest: probe factory must not run")
-	}
-
-	_ = crypto.Register(probe, stub)
-
-	if err := crypto.Register(probe, stub); !errors.Is(err, crypto.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
-}
 
 func conformanceEncryptDecrypt(t *testing.T, factory func(t *testing.T) crypto.Crypto) {
 	t.Helper()

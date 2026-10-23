@@ -4,11 +4,11 @@
 // Param access and NormalizePattern conversion across backends. It ships no
 // middleware implementations and it runs no listen loop; adapters own that.
 //
-// Type safety: Router plus Group plus typed Options plus Adapter enum plus Factory.
+// Type safety: Router plus Group plus typed Options plus Factory.
 // ValidMethod gates 9 standard methods, and NormalizePattern plus ChiPattern
 // convert brace and colon params with MalformedPatternError detail. Unsupported features fail closed.
 //
-// DX: Open with Open, custom backends with Register. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix, e.g. ROUTER_ADAPTER). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Router(). Lazy per-service singleton, retry on error. See container/README.md.
 //
@@ -22,5 +22,5 @@
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //
-// Example: see ExampleOpen in example_test.go.
+// Example: see Example in example_test.go.
 package router

@@ -3,7 +3,6 @@ package vectorstore
 import (
 	"errors"
 	"math"
-	"sync"
 	"testing"
 )
 
@@ -58,31 +57,6 @@ func TestCosineSimilarity_scaleInvariant(t *testing.T) {
 	if math.Abs(float64(got-1)) > 1e-6 {
 		t.Fatalf("parallel vectors similarity = %v, want 1", got)
 	}
-}
-
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshAdapter()
-			if err := Register(a, func(Options) (VectorStore, error) { return newStubStore(), nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
 }
 
 func TestStubStore_emptyEmbedding(t *testing.T) {

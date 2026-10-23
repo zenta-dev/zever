@@ -6,24 +6,6 @@ import (
 )
 
 // BenchmarkOpen measures the CDN factory lookup and instantiation.
-func BenchmarkOpen(b *testing.B) {
-	_ = Register(Adapter("bench-noop-"+b.Name()), func(_ Options) (CDN, error) {
-		return &noopAdapter{}, nil
-	})
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		_, err := Open(Adapter("bench-noop-"+b.Name()), Options{})
-		if err != nil {
-			b.Fatalf("Open: %v", err)
-		}
-	}
-}
-
-// BenchmarkPurge_Noop measures the no-op purge path (no network, no
-// allocations beyond the request struct).
 func BenchmarkPurge_Noop(b *testing.B) {
 	c := &noopAdapter{}
 	ctx := b.Context()
@@ -84,20 +66,6 @@ func BenchmarkClose_Noop(b *testing.B) {
 }
 
 // BenchmarkRegisteredAdapters measures the sorted adapter list lookup.
-func BenchmarkRegisteredAdapters(b *testing.B) {
-	_ = Register(Adapter("bench-list-"+b.Name()), func(_ Options) (CDN, error) {
-		return &noopAdapter{}, nil
-	})
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for b.Loop() {
-		_ = RegisteredAdapters()
-	}
-}
-
-// noopAdapter implements CDN for benchmarking.
 type noopAdapter struct{}
 
 func (n *noopAdapter) Purge(_ context.Context, _ PurgeRequest) error { return nil }

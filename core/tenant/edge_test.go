@@ -1,8 +1,6 @@
 package tenant
 
 import (
-	"errors"
-	"sync"
 	"testing"
 )
 
@@ -37,41 +35,4 @@ func TestContext_nilParentValue(t *testing.T) {
 	}
 }
 
-func TestOpen_invalidHeader_colon(t *testing.T) {
-	t.Parallel()
 
-	a := freshAdapter()
-	if err := Register(a, func(Options) (Tenant, error) { return &stubTenant{}, nil }); err != nil {
-		t.Fatalf("Register(%v) error = %v", a, err)
-	}
-
-	_, err := Open(a, Options{Header: "X:Bad"})
-	if !errors.Is(err, ErrInvalidOptions) {
-		t.Fatalf("Open(colon header) err = %v, want ErrInvalidOptions", err)
-	}
-}
-
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := freshAdapter()
-			if err := Register(a, func(Options) (Tenant, error) { return &stubTenant{id: "acme"}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}

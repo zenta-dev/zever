@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // Secrets is the interface that secret-management adapters must implement.
@@ -31,48 +29,6 @@ type Secrets interface {
 
 // Factory creates a Secrets from the given Options.
 type Factory func(opts Options) (Secrets, error)
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(adapter Adapter) error { return DuplicateError{Adapter: adapter} },
-	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("secrets: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates a Secrets for adapter using the registered Factory and opts.
-func Open(adapter Adapter, opts Options) (Secrets, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	s, err := factory(opts)
-	if err != nil {
-		return nil, fmt.Errorf("secrets: open %s: %w", adapter, err)
-	}
-
-	return s, nil
-}
 
 var validSecretName = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 

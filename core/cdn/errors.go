@@ -37,7 +37,7 @@ func (e InvalidAdapterError) Unwrap() error {
 // DuplicateError reports a repeated adapter registration.
 type DuplicateError struct {
 	// Adapter is the duplicated adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // Error returns the human-readable error message.
@@ -53,7 +53,7 @@ func (e DuplicateError) Unwrap() error {
 // UnknownAdapterError reports an unregistered adapter lookup.
 type UnknownAdapterError struct {
 	// Adapter is the unknown adapter.
-	Adapter Adapter
+	Adapter string
 }
 
 // Error returns the human-readable error message.

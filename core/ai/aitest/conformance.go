@@ -3,14 +3,13 @@ package aitest
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/ai"
 )
 
 // Conformance verifies factory-built backends implement the ai.AI
-// contract: open/register round-trip, Generate round-trip, Embed
+// contract: Generate round-trip, Embed
 // shape, Stream draining to Done, context cancellation, and Close.
 // Each subtest takes a fresh instance from factory so cases stay
 // isolated. Tests never call time.Sleep and never touch the network.
@@ -22,36 +21,11 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) ai.AI) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("Generate", func(t *testing.T) { conformanceGenerate(t, factory) })
 	t.Run("Embed", func(t *testing.T) { conformanceEmbed(t, factory) })
 	t.Run("Stream", func(t *testing.T) { conformanceStream(t, factory) })
 	t.Run("CanceledContext", func(t *testing.T) { conformanceCanceledContext(t, factory) })
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
-}
-
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if _, err := ai.Open(ai.Adapter("conformance-missing-adapter"), ai.Options{}); !errors.Is(err, ai.ErrUnknownAdapter) {
-		t.Fatalf("Open(missing) err = %v, want ErrUnknownAdapter", err)
-	}
-
-	probe := ai.Adapter("conformance-probe-ai")
-
-	if err := ai.Register(probe, nil); !errors.Is(err, ai.ErrNilFactory) {
-		t.Fatalf("Register(nil) err = %v, want ErrNilFactory", err)
-	}
-
-	stub := func(ai.Options) (ai.AI, error) {
-		return nil, errors.New("aitest: probe factory must not run")
-	}
-
-	_ = ai.Register(probe, stub)
-
-	if err := ai.Register(probe, stub); !errors.Is(err, ai.ErrDuplicate) {
-		t.Fatalf("Register(duplicate) err = %v, want ErrDuplicate", err)
-	}
 }
 
 func conformanceGenerate(t *testing.T, factory func(t *testing.T) ai.AI) {

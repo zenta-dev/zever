@@ -2,7 +2,6 @@ package ai_test
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/zenta-dev/zever/core/ai"
 )
@@ -31,26 +30,3 @@ func (stubAI) Embed(_ context.Context, _ string, inputs []string, _ ai.EmbedOpti
 func (stubAI) Close() error { return nil }
 
 // ExampleOpen opens a registered backend and runs a generation.
-func ExampleOpen() {
-	const exampleAdapter ai.Adapter = "example-test"
-
-	_ = ai.Register(exampleAdapter, func(ai.Options) (ai.AI, error) { return stubAI{}, nil })
-
-	backend, err := ai.Open(exampleAdapter, ai.Options{})
-	if err != nil {
-		fmt.Println("open error")
-		return
-	}
-	defer backend.Close()
-
-	gen, err := backend.Generate(context.Background(), "model-x", []ai.Message{
-		{Role: ai.RoleUser, Content: "hi"},
-	}, ai.GenerateOptions{})
-	if err != nil {
-		fmt.Println("generate error")
-		return
-	}
-
-	fmt.Println(gen.Content)
-	// Output: hello from stub
-}

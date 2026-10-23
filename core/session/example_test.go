@@ -5,11 +5,9 @@ import (
 	"github.com/zenta-dev/zever/core/session"
 )
 
-// ExampleOpen opens the in-memory session store with default TTL.
-func ExampleOpen() {
-	_ = session.Register(session.Memory, sessionmemory.New)
-
-	s, err := session.Open(session.Memory, session.Options{})
+// Example opens the in-memory session store with default TTL.
+func Example() {
+	s, err := sessionmemory.New(session.Options{})
 	if err != nil {
 		return
 	}

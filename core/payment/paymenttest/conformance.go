@@ -11,7 +11,7 @@ import (
 )
 
 // Conformance verifies factory-built payments implement the
-// payment.Payment contract: open/register round-trip, Create/Get
+// payment.Payment contract: Create/Get
 // lifecycle, Refund partial/full with mismatch sentinels,
 // invalid-request sentinels, fail-closed webhooks, and Close. Each
 // subtest takes a fresh instance from factory so cases stay
@@ -26,7 +26,6 @@ import (
 func Conformance(t *testing.T, factory func(t *testing.T) payment.Payment) {
 	t.Helper()
 
-	t.Run("OpenRegister", func(t *testing.T) { conformanceOpenRegister(t) })
 	t.Run("CreateGet", func(t *testing.T) { conformanceCreateGet(t, factory) })
 	t.Run("InvalidRequest", func(t *testing.T) { conformanceInvalidRequest(t, factory) })
 	t.Run("Refund", func(t *testing.T) { conformanceRefund(t, factory) })
@@ -35,40 +34,9 @@ func Conformance(t *testing.T, factory func(t *testing.T) payment.Payment) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-func conformanceOpenRegister(t *testing.T) {
-	t.Helper()
-
-	if err := checkOpenRegister(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// checkOpenRegister proves the open/register round-trip against the
+// checkOpenRegister proves the factory-built backends against the
 // shared registry. It returns a descriptive error on the first
 // contract violation so unit tests can drive every branch.
-func checkOpenRegister() error {
-	if _, err := payment.Open(payment.Adapter("conformance-missing-adapter"), payment.Options{}); !errors.Is(err, payment.ErrUnknownAdapter) {
-		return fmt.Errorf("paymenttest: Open(missing) err = %w, want ErrUnknownAdapter", err)
-	}
-
-	probe := payment.Adapter("conformance-probe-payment")
-
-	if err := payment.Register(probe, nil); !errors.Is(err, payment.ErrNilFactory) {
-		return fmt.Errorf("paymenttest: Register(nil) err = %w, want ErrNilFactory", err)
-	}
-
-	stub := func(payment.Options) (payment.Payment, error) {
-		return nil, errors.New("paymenttest: probe factory must not run")
-	}
-
-	_ = payment.Register(probe, stub)
-
-	if err := payment.Register(probe, stub); !errors.Is(err, payment.ErrDuplicate) {
-		return fmt.Errorf("paymenttest: Register(duplicate) err = %w, want ErrDuplicate", err)
-	}
-
-	return nil
-}
 
 func conformanceCreateGet(t *testing.T, factory func(t *testing.T) payment.Payment) {
 	t.Helper()

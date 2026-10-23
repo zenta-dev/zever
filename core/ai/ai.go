@@ -2,9 +2,6 @@ package ai
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/zenta-dev/zever/shared/registry"
 )
 
 // AI defines the LLM facade contract for generation, streaming and embeddings.
@@ -21,45 +18,3 @@ type AI interface {
 
 // Factory creates an AI from the given Options.
 type Factory func(opts Options) (AI, error)
-
-var factories = registry.New[Adapter, Factory](
-	ErrNilFactory,
-	func(adapter Adapter) error { return DuplicateAdapterError{Adapter: adapter} },
-	func(adapter Adapter) error { return UnknownAdapterError{Adapter: adapter} },
-)
-
-// RegisteredAdapters returns the sorted names of adapters with a factory
-// registered via Register. The registry is the source of truth for adapter
-// validation (see config.ValidateAdapters and container.RegisteredAdapters);
-// ParseAdapter stays permissive for custom adapters and is not consulted.
-func RegisteredAdapters() []string {
-	return registry.SortedNames(factories)
-}
-
-// Register associates an Adapter with a Factory for later use by Open.
-func Register(adapter Adapter, factory Factory) error {
-	if factory == nil {
-		return fmt.Errorf("ai: %w for adapter %s", ErrNilFactory, adapter)
-	}
-
-	return factories.Register(adapter, factory)
-}
-
-// Open creates an AI for adapter using the registered Factory and opts.
-func Open(adapter Adapter, opts Options) (AI, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	factory, err := factories.Lookup(adapter)
-	if err != nil {
-		return nil, err
-	}
-
-	a, err := factory(opts)
-	if err != nil {
-		return nil, fmt.Errorf("ai: open %s: %w", adapter, err)
-	}
-
-	return a, nil
-}

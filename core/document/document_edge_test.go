@@ -1,61 +1,9 @@
 package document
 
 import (
-	"sync"
 	"testing"
 	"time"
 )
-
-func TestDocumentEdge_OpenConcurrent(t *testing.T) {
-	t.Parallel()
-
-	adapter := freshAdapter()
-	if err := Register(adapter, func(Options) (Document, error) { return &stubDocument{}, nil }); err != nil {
-		t.Fatalf("Register err = %v", err)
-	}
-
-	var wg sync.WaitGroup
-
-	for range 50 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			if _, err := Open(adapter, Options{}); err != nil {
-				t.Errorf("Open err = %v", err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestDocumentEdge_RegisterConcurrentUnique(t *testing.T) {
-	t.Parallel()
-
-	var wg sync.WaitGroup
-
-	errs := make([]error, 20)
-
-	for i := range errs {
-		wg.Add(1)
-
-		go func(i int) {
-			defer wg.Done()
-
-			errs[i] = Register(freshAdapter(), func(Options) (Document, error) { return &stubDocument{}, nil })
-		}(i)
-	}
-
-	wg.Wait()
-
-	for i, err := range errs {
-		if err != nil {
-			t.Errorf("Register worker %d err = %v", i, err)
-		}
-	}
-}
 
 func TestDocumentEdge_OptionsValidateBoundary(t *testing.T) {
 	t.Parallel()

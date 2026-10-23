@@ -41,10 +41,10 @@ func TestErrors_sentinels_match(t *testing.T) {
 
 func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 	t.Parallel()
-	if !errors.Is(DuplicateAdapterError{Adapter: Memory}, ErrDuplicate) {
+	if !errors.Is(DuplicateAdapterError{Adapter: "memory"}, ErrDuplicate) {
 		t.Fatal("DuplicateAdapterError does not unwrap to ErrDuplicate")
 	}
-	if !errors.Is(UnknownAdapterError{Adapter: Memory}, ErrUnknownAdapter) {
+	if !errors.Is(UnknownAdapterError{Adapter: "memory"}, ErrUnknownAdapter) {
 		t.Fatal("UnknownAdapterError does not unwrap to ErrUnknownAdapter")
 	}
 	if !errors.Is(InvalidAdapterError{Adapter: "x"}, ErrInvalidAdapter) {
@@ -58,32 +58,3 @@ func TestErrors_unwrap_carries_sentinel(t *testing.T) {
 	}
 }
 
-func TestErrors_carried_fields(t *testing.T) {
-	t.Parallel()
-	de := DuplicateAdapterError{Adapter: Redis}
-	if de.Adapter != Redis {
-		t.Fatalf("DuplicateAdapterError.Adapter = %v", de.Adapter)
-	}
-	ue := UnknownAdapterError{Adapter: Redis}
-	if ue.Adapter != Redis {
-		t.Fatalf("UnknownAdapterError.Adapter = %v", ue.Adapter)
-	}
-	iae := InvalidAdapterError{Adapter: "nope"}
-	if iae.Adapter != "nope" {
-		t.Fatalf("InvalidAdapterError.Adapter = %q", iae.Adapter)
-	}
-	ioe := InvalidOptionsError{Reason: "bad ttl"}
-	if ioe.Reason != "bad ttl" {
-		t.Fatalf("InvalidOptionsError.Reason = %q", ioe.Reason)
-	}
-	if !strings.Contains(ioe.Error(), "bad ttl") {
-		t.Fatalf("InvalidOptionsError.Error() = %q, want reason", ioe.Error())
-	}
-	ike := InvalidKeyError{KeyLen: 300}
-	if ike.KeyLen != 300 {
-		t.Fatalf("InvalidKeyError.KeyLen = %d", ike.KeyLen)
-	}
-	if strings.Contains(ike.Error(), "super-secret") {
-		t.Fatal("InvalidKeyError echoes key")
-	}
-}

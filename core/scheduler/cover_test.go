@@ -5,15 +5,6 @@ import (
 	"testing"
 )
 
-func TestCoverUnknownAdapterErrorString(t *testing.T) {
-	t.Parallel()
-
-	err := UnknownAdapterError{Adapter: Adapter("")}
-	if got, want := err.Error(), "scheduler: unknown adapter: unknown (forgotten import?)"; got != want {
-		t.Fatalf("Error() = %q, want %q", got, want)
-	}
-}
-
 func TestCoverInvalidAdapterErrorString(t *testing.T) {
 	t.Parallel()
 

@@ -86,30 +86,6 @@ func TestDecisionHook_concurrent(t *testing.T) {
 	}
 }
 
-func TestRegister_Open_concurrent(t *testing.T) {
-	t.Parallel()
-
-	const n = 16
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-
-			a := benchStorageAdapter()
-			if err := Register(a, func(Options) (Storage, error) { return stubStorage{}, nil }); err != nil {
-				t.Errorf("Register(%v) error = %v", a, err)
-				return
-			}
-			if _, err := Open(a, Options{}); err != nil {
-				t.Errorf("Open(%v) error = %v", a, err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
 
 func TestValidKeyRejectsControlCharacters(t *testing.T) {
 	t.Parallel()

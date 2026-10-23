@@ -18,23 +18,6 @@ const referenceDoc = "../../docs/src/content/docs/reference/ratelimit.mdx"
 // TestReferencePageListsAdapters pins the reference adapters table to the
 // Adapter constants: every known adapter has a cell, and the config service
 // key names the battery.
-func TestReferencePageListsAdapters(t *testing.T) {
-	t.Parallel()
-
-	raw := mustReadReference(t)
-	for _, a := range []Adapter{Memory, Redis} {
-		if !strings.Contains(raw, "`"+a.String()+"`") {
-			t.Errorf("adapter %q missing from reference page", a.String())
-		}
-	}
-	if !strings.Contains(raw, "Service key: `ratelimit`") {
-		t.Errorf("config service key `ratelimit` missing from reference page")
-	}
-}
-
-// TestReferencePageListsOptionKeys pins the reference options table to the
-// Options struct: every JSON key (recursing into named blocks, skipping the
-// anonymous shared-redis embed) must appear on the page.
 func TestReferencePageListsOptionKeys(t *testing.T) {
 	t.Parallel()
 

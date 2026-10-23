@@ -47,7 +47,7 @@ func TestSentinels_messages_prefixed(t *testing.T) {
 func TestDuplicateAdapterError_message_unwrap(t *testing.T) {
 	t.Parallel()
 
-	err := DuplicateAdapterError{Adapter: Local}
+	err := DuplicateAdapterError{Adapter: "local"}
 	if got := err.Error(); !strings.Contains(got, ErrDuplicateAdapter.Error()) {
 		t.Errorf("Error() = %q, want contain %q", got, ErrDuplicateAdapter.Error())
 	}
@@ -65,7 +65,7 @@ func TestDuplicateAdapterError_message_unwrap(t *testing.T) {
 func TestDuplicateAliases_compat(t *testing.T) {
 	t.Parallel()
 
-	err := DuplicateAdapterError{Adapter: Local}
+	err := DuplicateAdapterError{Adapter: "local"}
 	if !errors.Is(err, ErrDuplicate) {
 		t.Errorf("errors.Is(%v, ErrDuplicate) = false, want true", err)
 	}
@@ -83,7 +83,7 @@ func TestDuplicateAliases_compat(t *testing.T) {
 func TestUnknownAdapterError_message_unwrap(t *testing.T) {
 	t.Parallel()
 
-	err := UnknownAdapterError{Adapter: S3}
+	err := UnknownAdapterError{Adapter: "s3"}
 	if got := err.Error(); !strings.Contains(got, ErrUnknownAdapter.Error()) {
 		t.Errorf("Error() = %q, want contain %q", got, ErrUnknownAdapter.Error())
 	}

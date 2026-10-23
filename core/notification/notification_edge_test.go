@@ -1,7 +1,6 @@
 package notification
 
 import (
-	"errors"
 	"testing"
 	"time"
 )
@@ -40,18 +39,3 @@ func TestNotificationClone_emptyNonNilData_staysNonNil(t *testing.T) {
 	}
 }
 
-func TestOpen_invalidOptions_returnsInvalidOptions(t *testing.T) {
-	t.Parallel()
-
-	n, err := Open(freshAdapter(), Options{Timeout: -time.Second})
-	if !errors.Is(err, ErrInvalidOptions) {
-		t.Fatalf("Open invalid-opts err = %v, want ErrInvalidOptions", err)
-	}
-	if n != nil {
-		t.Fatalf("Open invalid-opts notifier = %v, want nil", n)
-	}
-	var ve InvalidOptionsError
-	if !errors.As(err, &ve) {
-		t.Fatalf("err %T is not InvalidOptionsError", err)
-	}
-}
