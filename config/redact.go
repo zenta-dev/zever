@@ -652,6 +652,12 @@ func scrubValue(key, s string) string {
 // The host, path, query, and fragment stay visible for debugging. Values
 // without a scheme, host, or userinfo are returned unchanged.
 func scrubURLUserinfo(s string) string {
+	// Fast path: only parse if it looks like a URL with userinfo.
+	// Must contain "://" (scheme) and "@" (userinfo delimiter).
+	if !strings.Contains(s, "://") || !strings.Contains(s, "@") {
+		return s
+	}
+
 	u, err := url.Parse(s)
 	if err == nil && u.Scheme != "" && u.Host != "" && u.User != nil {
 		var b strings.Builder

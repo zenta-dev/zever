@@ -229,10 +229,10 @@ func TestPrintUsagesCoverBranches(t *testing.T) {
 	for _, colored := range []bool{false, true} {
 		colorEnabled = colored
 
-		for name, print := range printers {
+		for name, printFn := range printers {
 			fs := flag.NewFlagSet("test-"+name, flag.ContinueOnError)
 			fs.SetOutput(io.Discard)
-			print(fs)
+			printFn(fs)
 		}
 
 		printGenerateUsage()
