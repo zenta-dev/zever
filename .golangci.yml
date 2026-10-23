@@ -109,6 +109,23 @@ linters:
               desc: "The framework is env-only: no non-test file may parse INI"
             - pkg: "github.com/magiconair/properties"
               desc: "The framework is env-only: no non-test file may parse Java-style properties"
+        # shared/codec is the ONLY package allowed to import encoding/json/v2
+        # and encoding/json/jsontext directly. All other packages must use
+        # the shared/codec facade. This rule will be tightened in the final
+        # workstream (W9) to deny encoding/json everywhere.
+        codec-facade:
+          files:
+            - "shared/codec/**/*.go"
+          allow:
+            - "encoding/json/v2"
+            - "encoding/json/jsontext"
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
+            - pkg: "io/ioutil"
+              desc: "Deprecated since Go 1.16: use io or os instead"
+            - pkg: "encoding/json"
+              desc: "Use shared/codec facade instead of encoding/json directly."
     errorlint:
       errorf: true
     exhaustive:
