@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zenta-dev/zever/shared/codec"
 	"google.golang.org/grpc/codes"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // defaultServiceConfig is the base service config applied to every

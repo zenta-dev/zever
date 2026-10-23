@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zenta-dev/zever/shared/codec"
 	"google.golang.org/grpc/codes"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // validRetryPolicy returns a policy that passes validation.
