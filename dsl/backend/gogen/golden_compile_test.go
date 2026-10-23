@@ -202,6 +202,7 @@ func writeTempModule(t *testing.T, dir, root string) {
 		"github.com/zenta-dev/zever/core/router v0.6.1",
 		"github.com/zenta-dev/zever/core/workflow v0.6.1",
 		"github.com/zenta-dev/zever/shared/apperror v0.6.1",
+		"github.com/zenta-dev/zever/shared/codec v0.8.0",
 		"github.com/zenta-dev/zever/gen v0.0.0",
 		"google.golang.org/grpc v1.83.2",
 		"google.golang.org/protobuf v1.36.12",

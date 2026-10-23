@@ -96,7 +96,8 @@ func pbGoParamType(t ir.FieldType) (goType, importPath string) {
 
 const (
 	importTime        = "time"
-	importJSON        = "encoding/json"
+	importCodec       = "github.com/zenta-dev/zever/shared/codec"
+	importJSONText    = "encoding/json/jsontext"
 	importIO          = "io"
 	importContext     = "context"
 	importErrors      = "errors"

@@ -380,9 +380,32 @@ func keysOfAny(m map[string]any) []string {
 	return out
 }
 
+// mcpServerGoMod returns the temp module definition for the generated
+// server build test: the emitted server imports shared/codec alongside the
+// standard library, so the temp module requires it with a replace pointing
+// at the in-repo workspace copy (no network, no go.sum entry needed for a
+// replaced module with no external deps of its own).
+func mcpServerGoMod(t *testing.T) string {
+	t.Helper()
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	root := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
+	if _, err := os.Stat(filepath.Join(root, "go.work")); err != nil {
+		t.Fatalf("go.work not found above %s: %v", wd, err)
+	}
+
+	codecDir := filepath.ToSlash(filepath.Join(root, "shared", "codec"))
+
+	return "module mcpserver\n\ngo 1.27.3\n\nrequire github.com/zenta-dev/zever/shared/codec v0.0.0\n\nreplace github.com/zenta-dev/zever/shared/codec => " + codecDir + "\n"
+}
+
 // TestGeneratedServerBuildsAndServes proves the emitted server is runnable:
-// it compiles with only the standard library, answers initialize and
-// tools/list over stdio, and reports the generated tool names.
+// it compiles against the standard library plus shared/codec, answers
+// initialize and tools/list over stdio, and reports the generated tool names.
 func TestGeneratedServerBuildsAndServes(t *testing.T) {
 	schema := mustResolve(t, map[string]string{"schema/blog/blog.zen": testFixture})
 	out := mustGenerate(t, schema)
@@ -399,7 +422,7 @@ func TestGeneratedServerBuildsAndServes(t *testing.T) {
 
 	dir := t.TempDir()
 
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module mcpserver\n\ngo 1.27.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mcpServerGoMod(t)), 0o600); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 

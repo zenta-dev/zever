@@ -14,7 +14,7 @@ import (
 var errTestMarshal = errors.New("test marshal failure")
 
 // swapMarshal swaps the jsonMarshalIndent seam, restoring it via t.Cleanup.
-func swapMarshal(t *testing.T, fn func(v any, prefix, indent string) ([]byte, error)) {
+func swapMarshal(t *testing.T, fn func(v any, indent string) ([]byte, error)) {
 	t.Helper()
 
 	orig := jsonMarshalIndent
@@ -23,7 +23,7 @@ func swapMarshal(t *testing.T, fn func(v any, prefix, indent string) ([]byte, er
 }
 
 // TestGenerate_moduleMarshalError_propagates covers Generate's per-module
-// json.MarshalIndent error branch (openapi.go): the seam fails on the first
+// codec.MarshalIndent error branch (openapi.go): the seam fails on the first
 // call, so the module-spec marshal reports an error naming the module.
 func TestGenerate_moduleMarshalError_propagates(t *testing.T) {
 	schema := compileSchema(t, `entity Widget {
@@ -37,7 +37,7 @@ func TestGenerate_moduleMarshalError_propagates(t *testing.T) {
 		}
 	}`)
 
-	swapMarshal(t, func(_ any, _, _ string) ([]byte, error) {
+	swapMarshal(t, func(_ any, _ string) ([]byte, error) {
 		return nil, errTestMarshal
 	})
 
@@ -56,7 +56,7 @@ func TestGenerate_moduleMarshalError_propagates(t *testing.T) {
 }
 
 // TestGenerate_mergedMarshalError_propagates covers Generate's merged-spec
-// json.MarshalIndent error branch (openapi.go): the seam succeeds for the
+// codec.MarshalIndent error branch (openapi.go): the seam succeeds for the
 // per-module marshal but fails for the merged marshal. This branch is
 // unreachable via real inputs (any value failing the merged marshal would
 // already fail its own module marshal first), hence the seam.
@@ -74,10 +74,10 @@ func TestGenerate_mergedMarshalError_propagates(t *testing.T) {
 
 	orig := jsonMarshalIndent
 	calls := 0
-	jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
+	jsonMarshalIndent = func(v any, indent string) ([]byte, error) {
 		calls++
 		if calls == 1 {
-			return orig(v, prefix, indent)
+			return orig(v, indent)
 		}
 		return nil, errTestMarshal
 	}

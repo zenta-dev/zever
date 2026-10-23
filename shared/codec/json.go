@@ -61,8 +61,8 @@ var (
 	// defaultUnmarshalOpts applies Duration string/number round-trip.
 	defaultUnmarshalOpts = json.JoinOptions(json.WithUnmarshalers(durationUnmarshalers))
 
-	// indentOpts for MarshalIndent (2-space indent, multiline).
-	indentOpts = json.JoinOptions(jsontext.Multiline(true), jsontext.WithIndent("  "))
+	// indentOpts for MarshalIndent (2-space indent, multiline, deterministic).
+	indentOpts = json.JoinOptions(json.Deterministic(true), jsontext.Multiline(true), jsontext.WithIndent("  "))
 )
 
 // JSONCodec is a Codec[V] implementation that uses JSON encoding.

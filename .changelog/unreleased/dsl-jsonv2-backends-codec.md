@@ -1,0 +1,2 @@
+- **Breaking:** `dsl` gogen/mcp backends: generated `router.go` and MCP stdio servers now import `github.com/zenta-dev/zever/shared/codec` (encoding/json/v2 dialect) instead of `encoding/json`; regenerate committed output with `zever compile`.
+- refactor(dsl): openapi and mcp manifests now marshal through `shared/codec` with deterministic key order; `paginated`, `isError`, `nullable`, `exclusiveMinimum`/`exclusiveMaximum` render via `omitzero` (v2 `omitempty` no longer omits `false`).
