@@ -1,7 +1,6 @@
 package stripe
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,17 +10,18 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/core/billing"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
+	_ = codec.MarshalLine(w, v)
 }
 
 func writeStripeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	_ = codec.MarshalLine(w, map[string]any{
 		"error": map[string]any{
 			"message": msg,
 			"type":    "card_error",

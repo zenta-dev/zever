@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -31,6 +30,7 @@ import (
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/core/tenant"
 	"github.com/zenta-dev/zever/examples/bookings/internal/api"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
@@ -488,7 +488,7 @@ func coverLogin(t *testing.T, h http.Handler, email, pass string) string {
 	var out struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
 		t.Fatalf("login token missing: %v body %s", err, rec.Body.String())
 	}
 	return out.Token
@@ -506,7 +506,7 @@ func coverSpace(t *testing.T, h http.Handler, token string) string {
 	var space struct {
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &space); err != nil || space.ID == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &space); err != nil || space.ID == "" {
 		t.Fatalf("space id missing: %v body %s", err, rec.Body.String())
 	}
 	return space.ID
@@ -526,7 +526,7 @@ func coverBook(t *testing.T, h http.Handler, token, spaceID, start, end string) 
 			ID string `json:"id"`
 		} `json:"booking"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &booked); err != nil || booked.Booking.ID == "" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &booked); err != nil || booked.Booking.ID == "" {
 		t.Fatalf("book decode: %v body %s", err, rec.Body.String())
 	}
 	return booked.Booking.ID
@@ -558,7 +558,7 @@ func TestSpaceUpdateCoversPatch(t *testing.T) {
 		Description string `json:"description"`
 		PriceCents  int64  `json:"price_cents"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &patched); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &patched); err != nil {
 		t.Fatalf("patch decode: %v", err)
 	}
 	if patched.Title != "Renamed loft" || patched.PriceCents != 18000 || patched.Description != "brighter" {
@@ -620,7 +620,7 @@ func TestNearbyVariants(t *testing.T) {
 		t.Fatalf("nearby lat/lng: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var nearby []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &nearby); err != nil || len(nearby) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &nearby); err != nil || len(nearby) != 1 {
 		t.Fatalf("nearby want 1, got %s err %v", rec.Body.String(), err)
 	}
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"math"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 
 	"github.com/zenta-dev/zever/dsl/ast"
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // quickFixKind is shared by every CodeAction this server produces: both
@@ -77,7 +77,7 @@ func diagnosticMessage(d protocol.Diagnostic) string {
 // payload is a static struct, so this never happens, and resolve treats a
 // missing payload as "nothing to fill".
 func attachCodeActionData(action *protocol.CodeAction, data codeActionResolveData) {
-	raw, err := json.Marshal(data)
+	raw, err := codec.Marshal(data)
 	if err != nil {
 		return
 	}
@@ -94,12 +94,12 @@ func attachCodeActionData(action *protocol.CodeAction, data codeActionResolveDat
 func codeActionResolveDataFromAny(data any) (codeActionResolveData, bool) {
 	if raw, ok := data.(protocol.LSPAny); ok {
 		var payload codeActionResolveData
-		if err := json.Unmarshal(raw, &payload); err == nil && payload.Kind != "" {
+		if err := codec.Unmarshal(raw, &payload); err == nil && payload.Kind != "" {
 			return payload, true
 		}
 
 		var m map[string]any
-		if err := json.Unmarshal(raw, &m); err == nil {
+		if err := codec.Unmarshal(raw, &m); err == nil {
 			return codeActionResolveDataFromMap(m)
 		}
 

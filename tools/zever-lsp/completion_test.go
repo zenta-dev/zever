@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/parser"
 	"github.com/zenta-dev/zever/dsl/resolver"
 	"github.com/zenta-dev/zever/dsl/token"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // completionLabels extracts the label of every item, for order-insensitive
@@ -483,14 +483,14 @@ func TestCompletionResolveFillsDetailFromRoundTrippedData(t *testing.T) {
 		}
 	}
 
-	raw, err := json.Marshal(item)
+	raw, err := codec.Marshal(item)
 	if err != nil {
-		t.Fatalf("json.Marshal(item) error = %v", err)
+		t.Fatalf("codec.Marshal(item) error = %v", err)
 	}
 
 	var roundTripped protocol.CompletionItem
-	if unmarshalErr := json.Unmarshal(raw, &roundTripped); unmarshalErr != nil {
-		t.Fatalf("json.Unmarshal(item) error = %v", unmarshalErr)
+	if unmarshalErr := codec.Unmarshal(raw, &roundTripped); unmarshalErr != nil {
+		t.Fatalf("codec.Unmarshal(item) error = %v", unmarshalErr)
 	}
 
 	server := NewServer()
@@ -524,7 +524,7 @@ func TestCompletionResolveFillsDetailFromRoundTrippedData(t *testing.T) {
 // the in-process struct and pointer forms, a JSON-decoded map, and the
 // unknown/empty shapes that must report absent rather than crash.
 func TestCompletionResolveDetailShapes(t *testing.T) {
-	raw, err := json.Marshal(completionResolveData{Detail: "declare an entity"})
+	raw, err := codec.Marshal(completionResolveData{Detail: "declare an entity"})
 	if err != nil {
 		t.Fatalf("json.Marshal error = %v", err)
 	}

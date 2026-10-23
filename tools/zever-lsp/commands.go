@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,6 +10,8 @@ import (
 	"go.lsp.dev/uri"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // CommandValidate is the workspace/executeCommand identifier that forces a
@@ -131,7 +132,7 @@ func (s *Server) executeFixAll(args []protocol.LSPAny) (protocol.LSPAny, error) 
 	// never invents a confirmation the client did not negotiate.
 	edit := buildFixAllEdit(uriStr, merged, s.changeAnnotation.Load())
 
-	raw, err := json.Marshal(edit)
+	raw, err := codec.Marshal(edit)
 	if err != nil {
 		return nil, fmt.Errorf("zever-lsp: %s cannot encode the fix edit: %w", CommandFixAll, err)
 	}
@@ -223,7 +224,7 @@ func buildFixAllEdit(requested string, merged map[uri.URI][]protocol.TextEdit, a
 // emptyWorkspaceEdit encodes an empty WorkspaceEdit as LSPAny: the fixAll
 // answer for a document with nothing to fix.
 func emptyWorkspaceEdit() protocol.LSPAny {
-	raw, err := json.Marshal(&protocol.WorkspaceEdit{})
+	raw, err := codec.Marshal(&protocol.WorkspaceEdit{})
 	if err != nil {
 		return nil
 	}
@@ -245,13 +246,13 @@ func executeCommandURI(args []protocol.LSPAny) (string, bool) {
 
 	var direct string
 
-	if err := json.Unmarshal(raw, &direct); err == nil && direct != "" {
+	if err := codec.Unmarshal(raw, &direct); err == nil && direct != "" {
 		return direct, true
 	}
 
 	var obj map[string]any
 
-	if err := json.Unmarshal(raw, &obj); err != nil {
+	if err := codec.Unmarshal(raw, &obj); err != nil {
 		return "", false
 	}
 

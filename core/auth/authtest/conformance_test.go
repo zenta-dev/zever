@@ -2,7 +2,6 @@ package authtest_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/auth/authtest"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type stubRecord struct {
@@ -39,7 +39,7 @@ func (s *stubAuth) Issue(_ context.Context, subject string, custom map[string]an
 	if ttl <= 0 {
 		return auth.Token{}, fmt.Errorf("stub: issue: %w: non-positive ttl", auth.ErrInvalidToken)
 	}
-	if _, err := json.Marshal(custom); err != nil {
+	if _, err := codec.Marshal(custom); err != nil {
 		return auth.Token{}, fmt.Errorf("stub: issue: signing failed: %w", errors.Join(auth.ErrInvalidToken, err))
 	}
 	s.mu.Lock()

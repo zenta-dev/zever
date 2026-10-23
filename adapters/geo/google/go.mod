@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/zenta-dev/zever/core/geo v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0
 	github.com/zenta-dev/zever/shared/httpclient v0.8.0
 	googlemaps.github.io/maps v1.7.0

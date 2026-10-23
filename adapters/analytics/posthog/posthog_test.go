@@ -2,7 +2,7 @@ package posthog
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"io"
 	"net/http"
@@ -15,6 +15,7 @@ import (
 	posthog "github.com/posthog/posthog-go"
 
 	"github.com/zenta-dev/zever/core/analytics"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // errFakeClient simulates SDK client construction failures.
@@ -822,17 +823,17 @@ func TestOpen_endpoint_deliversTrackPayload(t *testing.T) {
 
 	var (
 		mu        sync.Mutex
-		rawBodies []json.RawMessage
+		rawBodies []jsontext.Value
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 
 		var batch struct {
-			Batch []json.RawMessage `json:"batch"`
+			Batch []jsontext.Value `json:"batch"`
 		}
 
-		_ = json.Unmarshal(body, &batch)
+		_ = codec.Unmarshal(body, &batch)
 
 		mu.Lock()
 		rawBodies = append(rawBodies, batch.Batch...)
@@ -863,7 +864,7 @@ func TestOpen_endpoint_deliversTrackPayload(t *testing.T) {
 	}
 
 	var evt map[string]any
-	if err := json.Unmarshal(rawBodies[0], &evt); err != nil {
+	if err := codec.Unmarshal(rawBodies[0], &evt); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 

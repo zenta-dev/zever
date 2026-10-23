@@ -2,7 +2,6 @@ package editors
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/gengrammar"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // edgeBigWords returns n deterministic synthetic words ("word0".."wordN-1").
@@ -53,7 +53,7 @@ func edgeTmWithExtras(extras map[string]map[string]string) []byte {
 		repo[name] = entry
 	}
 
-	data, _ := json.Marshal(map[string]any{"scopeName": "source.zen", "repository": repo})
+	data, _ := codec.Marshal(map[string]any{"scopeName": "source.zen", "repository": repo})
 
 	return data
 }
@@ -212,13 +212,13 @@ func TestEdgeUnknownKeysIgnored(t *testing.T) {
 	})
 
 	var doc map[string]any
-	if err := json.Unmarshal(canonicalTmGrammar(), &doc); err != nil {
+	if err := codec.Unmarshal(canonicalTmGrammar(), &doc); err != nil {
 		t.Fatal(err)
 	}
 
 	doc["futureFlag"] = true
 
-	tmTop, err := json.Marshal(doc)
+	tmTop, err := codec.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +297,7 @@ func TestEdgeDuplicates(t *testing.T) {
 		}
 	})
 
-	t.Run("json duplicate keys last wins", func(t *testing.T) {
+	t.Run("json duplicate keys rejected", func(t *testing.T) {
 		t.Parallel()
 
 		var grammar struct {
@@ -305,17 +305,11 @@ func TestEdgeDuplicates(t *testing.T) {
 		}
 
 		data := []byte(`{"repository":{"keywords":{"match":"\\b(a|b)\\b"},"keywords":{"match":"\\b(c|d)\\b"}}}`)
-		if err := json.Unmarshal(data, &grammar); err != nil {
-			t.Fatal(err)
-		}
-
-		m, err := tmRuleMatch(grammar.Repository, "keywords")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if want := `\b(c|d)\b`; m != want {
-			t.Fatalf("got %q, want %q (Go JSON last-key-wins)", m, want)
+		// shared/codec (encoding/json/v2) rejects duplicate object member
+		// names instead of the v1 last-wins merge, so a duplicated grammar
+		// key fails closed rather than silently keeping one alternative.
+		if err := codec.Unmarshal(data, &grammar); err == nil {
+			t.Fatal("duplicate keys decoded without error, want rejection")
 		}
 	})
 }
@@ -419,7 +413,7 @@ func TestEdgeBoundarySizes(t *testing.T) {
 		}
 
 		data := tmGrammarJSON(big, expectedBooleans, expectedScalarTypes, canonicalLabels, canonicalVerbs)
-		if err := json.Unmarshal(data, &grammar); err != nil {
+		if err := codec.Unmarshal(data, &grammar); err != nil {
 			t.Fatal(err)
 		}
 

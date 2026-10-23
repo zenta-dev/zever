@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"encoding/json"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/zenta-dev/zever/adapters/auth/oidc"
 	"github.com/zenta-dev/zever/core/auth"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // The tests in this file pin the OIDC wire contract the adapter speaks:
@@ -39,7 +39,7 @@ func newStandardIDP(tb testing.TB) (*httptest.Server, *rsa.PrivateKey) {
 
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"issuer":   srv.URL,
 			"jwks_uri": srv.URL + "/keys",
 		})
@@ -47,7 +47,7 @@ func newStandardIDP(tb testing.TB) (*httptest.Server, *rsa.PrivateKey) {
 
 	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"keys": []map[string]any{{
 				"kty": "RSA",
 				"kid": "test-key-1",
@@ -70,7 +70,7 @@ func newStandardIDP(tb testing.TB) (*httptest.Server, *rsa.PrivateKey) {
 func mintStandardToken(tb testing.TB, key *rsa.PrivateKey, issuer, aud string, exp time.Time, extra map[string]any) string {
 	tb.Helper()
 
-	header, err := json.Marshal(map[string]any{"alg": "RS256", "kid": "test-key-1", "typ": "JWT"})
+	header, err := codec.Marshal(map[string]any{"alg": "RS256", "kid": "test-key-1", "typ": "JWT"})
 	if err != nil {
 		tb.Fatalf("marshal header: %s", err)
 	}
@@ -86,7 +86,7 @@ func mintStandardToken(tb testing.TB, key *rsa.PrivateKey, issuer, aud string, e
 		payload[k] = v
 	}
 
-	payloadBytes, err := json.Marshal(payload)
+	payloadBytes, err := codec.Marshal(payload)
 	if err != nil {
 		tb.Fatalf("marshal payload: %s", err)
 	}

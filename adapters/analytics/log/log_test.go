@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/core/analytics"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // lockedWriter serializes writes into buf.
@@ -58,7 +58,7 @@ func decodeEntry(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
 
 	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+	if err := codec.Unmarshal(buf.Bytes(), &entry); err != nil {
 		t.Fatalf("unmarshal log entry: %v", err)
 	}
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/dsl/parser"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // executeArgs marshals values the way a client encodes executeCommand
@@ -22,9 +22,9 @@ func executeArgs(t *testing.T, values ...any) []protocol.LSPAny {
 	out := make([]protocol.LSPAny, 0, len(values))
 
 	for _, v := range values {
-		raw, err := json.Marshal(v)
+		raw, err := codec.Marshal(v)
 		if err != nil {
-			t.Fatalf("json.Marshal(%v): %v", v, err)
+			t.Fatalf("codec.Marshal(%v): %v", v, err)
 		}
 
 		out = append(out, protocol.LSPAny(raw))
@@ -52,7 +52,7 @@ func executeFixAllEdits(t *testing.T, s *Server, docURI string) protocol.Workspa
 
 	var edit protocol.WorkspaceEdit
 
-	if err := json.Unmarshal([]byte(raw), &edit); err != nil {
+	if err := codec.Unmarshal([]byte(raw), &edit); err != nil {
 		t.Fatalf("fixAll result is not a WorkspaceEdit: %v", err)
 	}
 

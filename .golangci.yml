@@ -78,6 +78,11 @@ linters:
               desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
             - pkg: "io/ioutil"
               desc: "Deprecated since Go 1.16: use io or os instead"
+            # Exact match (trailing $): v1 only. encoding/json/v2 and
+            # encoding/json/jsontext stay allowed: shared/codec is built on
+            # them and migrated tests may reference jsontext.Value directly.
+            - pkg: "encoding/json$"
+              desc: "Use shared/codec facade instead of encoding/json directly."
         # The framework has no config-file parser on purpose: v0.8.0 is
         # env-only. A test may parse a generated YAML document (the CLI
         # tests parse the GitHub Actions workflow it scaffolds), but no

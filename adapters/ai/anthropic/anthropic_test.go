@@ -4,7 +4,6 @@ package anthropic
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -19,6 +18,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestOpen_APIKeyRequired(t *testing.T) {
@@ -64,7 +64,7 @@ func TestOpen_SuccessAndClose(t *testing.T) {
 func TestOpen_WithBaseURL(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = codec.MarshalLine(w, map[string]any{
 			"content":     []any{map[string]any{"type": "text", "text": "hi"}},
 			"usage":       map[string]any{"input_tokens": 1, "output_tokens": 1},
 			"stop_reason": "end_turn",
@@ -205,7 +205,7 @@ func TestGenerate_Roundtrip(t *testing.T) {
 			t.Errorf("x-api-key header = %q want test-key", got)
 		}
 		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := codec.UnmarshalRead(r.Body, &body); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
 		msgs, _ := body["messages"].([]any)
@@ -255,7 +255,7 @@ func TestGenerate_DefaultMaxTokens(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = codec.UnmarshalRead(r.Body, &body)
 		if body["max_tokens"] != float64(1024) {
 			t.Fatalf("max_tokens %v want 1024", body["max_tokens"])
 		}
@@ -275,7 +275,7 @@ func TestGenerate_ToolHandlingAndMapping(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = codec.UnmarshalRead(r.Body, &body)
 		// check tools present
 		tools, _ := body["tools"].([]any)
 		if len(tools) != 1 {
@@ -360,7 +360,7 @@ func TestGenerate_ToolChoiceVariants(t *testing.T) {
 	// ParallelToolCalls alone without ToolChoice
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = codec.UnmarshalRead(r.Body, &body)
 		if _, ok := body["tool_choice"]; !ok {
 			t.Fatalf("want tool_choice auto when disable parallel")
 		}

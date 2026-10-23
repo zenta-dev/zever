@@ -1,13 +1,13 @@
 package outbox_test
 
 import (
-	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/zenta-dev/zever/core/outbox"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestOptionsValidate(t *testing.T) {
@@ -105,7 +105,7 @@ func TestStallReadinessIsOptIn(t *testing.T) {
 	}
 
 	var decoded outbox.Options
-	if err := json.Unmarshal([]byte(`{"stall_readiness":true}`), &decoded); err != nil {
+	if err := codec.Unmarshal([]byte(`{"stall_readiness":true}`), &decoded); err != nil {
 		t.Fatalf("json.Unmarshal: %v", err)
 	}
 

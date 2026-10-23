@@ -2,12 +2,12 @@ package remote
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/document"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // benchPDF is a minimal PDF magic-prefixed body the server returns.
@@ -44,7 +44,7 @@ func BenchmarkRender(b *testing.B) {
 func BenchmarkRenderJSON(b *testing.B) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(renderResponse{Data: benchPDF})
+		_ = codec.MarshalLine(w, renderResponse{Data: benchPDF})
 	}))
 	b.Cleanup(srv.Close)
 

@@ -5,10 +5,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func mustUpgradeSums(t *testing.T, data []byte, asset string) string {
@@ -511,7 +512,7 @@ func TestRunUpgradeJSONCheck(t *testing.T) {
 	}
 
 	var env Envelope
-	if err := json.Unmarshal(bytes.TrimSpace(jbuf.Bytes()), &env); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(jbuf.Bytes()), &env); err != nil {
 		t.Fatalf("envelope is not JSON: %v", err)
 	}
 

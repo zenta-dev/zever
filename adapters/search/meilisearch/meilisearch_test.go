@@ -1,7 +1,6 @@
 package meilisearch
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
@@ -146,7 +146,7 @@ func TestIndex_sendsDocumentStructure(t *testing.T) {
 	}
 
 	var docs []map[string]any
-	if err := json.Unmarshal(capt.body, &docs); err != nil {
+	if err := codec.Unmarshal(capt.body, &docs); err != nil {
 		t.Fatalf("add body unmarshal err = %v", err)
 	}
 
@@ -222,7 +222,7 @@ func TestIndexBatch_sendsSingleRequestPerIndex(t *testing.T) {
 	}
 
 	var idxADocs []map[string]any
-	if err := json.Unmarshal(bodies[0], &idxADocs); err != nil {
+	if err := codec.Unmarshal(bodies[0], &idxADocs); err != nil {
 		t.Fatalf("idx-a body unmarshal err = %v", err)
 	}
 
@@ -573,7 +573,7 @@ func TestSearch_appliesLimitOffsetAndRankingScore(t *testing.T) {
 	}
 
 	var body map[string]any
-	if err := json.Unmarshal(capt.body, &body); err != nil {
+	if err := codec.Unmarshal(capt.body, &body); err != nil {
 		t.Fatalf("search body unmarshal err = %v", err)
 	}
 
@@ -626,7 +626,7 @@ func TestSearch_defaultLimitAndClampedOffset(t *testing.T) {
 	}
 
 	var body map[string]any
-	if err := json.Unmarshal(capt.body, &body); err != nil {
+	if err := codec.Unmarshal(capt.body, &body); err != nil {
 		t.Fatalf("body unmarshal err = %v", err)
 	}
 

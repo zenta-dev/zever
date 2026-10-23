@@ -2,10 +2,10 @@ package log
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/analytics"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // RED: NewWithWriter injects writer seam; Track/Identify/Group emit JSON lines.
@@ -24,7 +24,7 @@ func TestNewWithWriter_track_emitsJSONLine(t *testing.T) {
 	}
 
 	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+	if err := codec.Unmarshal(buf.Bytes(), &entry); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 

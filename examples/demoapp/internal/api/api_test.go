@@ -3,7 +3,6 @@ package api_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,6 +20,7 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/examples/demoapp/internal/api"
 	"github.com/zenta-dev/zever/examples/demoapp/locales"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
 	billingstub "github.com/zenta-dev/zever/adapters/billing/stub"
@@ -262,7 +262,7 @@ func do(t *testing.T, h http.Handler, method, path, token string, body any) *htt
 		buf.WriteString(b)
 	default:
 		contentType = "application/json"
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		if err := codec.MarshalLine(&buf, body); err != nil {
 			t.Fatalf("encode: %v", err)
 		}
 	}
@@ -297,7 +297,7 @@ func login(t *testing.T, h http.Handler, email string) string {
 		t.Fatalf("login %s: status %d: %s", email, rec.Code, rec.Body.String())
 	}
 	var out map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode token: %v", err)
 	}
 	token, _ := out["token"].(string)
@@ -328,7 +328,7 @@ func makeProduct(t *testing.T, h http.Handler, token, category, name string, pri
 		t.Fatalf("create product %s: status %d: %s", name, rec.Code, rec.Body.String())
 	}
 	var out map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode product: %v", err)
 	}
 	id, _ := out["id"].(string)
@@ -345,7 +345,7 @@ func TestHealth(t *testing.T) {
 		t.Fatalf("health: status %d", rec.Code)
 	}
 	var out map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["status"] != "ok" {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["status"] != "ok" {
 		t.Fatalf("health body = %s", rec.Body.String())
 	}
 }
@@ -376,7 +376,7 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("me: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var me map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &me); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &me); err != nil {
 		t.Fatalf("decode me: %v", err)
 	}
 	if me["email"] != "ann@example.com" || me["name"] != "Ann" || me["role"] != "member" {
@@ -414,7 +414,7 @@ func TestProductOrderLifecycle(t *testing.T) {
 		t.Fatalf("list products: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var list map[string][]map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list["products"]) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list["products"]) != 1 {
 		t.Fatalf("list products = %s, want 1 product", rec.Body.String())
 	}
 
@@ -436,7 +436,7 @@ func TestProductOrderLifecycle(t *testing.T) {
 		t.Fatalf("create order: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var order map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &order); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &order); err != nil {
 		t.Fatalf("decode order: %v", err)
 	}
 	if order["total_cents"] != float64(2500) || order["status"] != "pending" {
@@ -449,7 +449,7 @@ func TestProductOrderLifecycle(t *testing.T) {
 		t.Fatalf("list orders: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var orders map[string][]map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &orders); err != nil || len(orders["orders"]) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &orders); err != nil || len(orders["orders"]) != 1 {
 		t.Fatalf("list orders = %s, want 1 order", rec.Body.String())
 	}
 
@@ -474,7 +474,7 @@ func TestOwnerScoping(t *testing.T) {
 		t.Fatalf("alice order: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var order map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &order); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &order); err != nil {
 		t.Fatalf("decode order: %v", err)
 	}
 	orderID, _ := order["id"].(string)
@@ -488,7 +488,7 @@ func TestOwnerScoping(t *testing.T) {
 	// Bob's order list is empty.
 	rec = do(t, s.handler, "GET", "/v1/orders", bob, nil)
 	var orders map[string][]map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &orders); err != nil || len(orders["orders"]) != 0 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &orders); err != nil || len(orders["orders"]) != 0 {
 		t.Fatalf("bob orders = %s, want empty", rec.Body.String())
 	}
 }
@@ -541,7 +541,7 @@ func TestPosts(t *testing.T) {
 		t.Fatalf("list posts: status %d: %s", rec.Code, rec.Body.String())
 	}
 	var out map[string][]map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out["posts"]) != 1 {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out["posts"]) != 1 {
 		t.Fatalf("list posts = %s, want 1 post", rec.Body.String())
 	}
 	if out["posts"][0]["title"] != "Hello" {
@@ -562,7 +562,7 @@ func TestDemoBatteries(t *testing.T) {
 		}
 		rec := do(t, h, "GET", "/demo/cache/hello", "", nil)
 		var out map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["value"] != "world" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["value"] != "world" {
 			t.Fatalf("cache get = %s, want world", rec.Body.String())
 		}
 	})
@@ -570,7 +570,7 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("flag", func(t *testing.T) {
 		rec := do(t, h, "GET", "/demo/flag/new_checkout", "", nil)
 		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["value"] != true {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["value"] != true {
 			t.Fatalf("flag = %s, want true", rec.Body.String())
 		}
 	})
@@ -585,7 +585,7 @@ func TestDemoBatteries(t *testing.T) {
 				t.Fatalf("check: status %d: %s", rec.Code, rec.Body.String())
 			}
 			var out map[string]bool
-			if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 				t.Fatalf("decode: %v", err)
 			}
 			return out["allowed"]
@@ -604,7 +604,7 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("ratelimit", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/ratelimit/test-key", "", nil)
 		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["allowed"] != true {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["allowed"] != true {
 			t.Fatalf("ratelimit = %s, want allowed", rec.Body.String())
 		}
 	})
@@ -612,7 +612,7 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("lock", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/lock/test-key", "", nil)
 		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["acquired"] != true {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["acquired"] != true {
 			t.Fatalf("lock = %s, want acquired", rec.Body.String())
 		}
 	})
@@ -624,7 +624,7 @@ func TestDemoBatteries(t *testing.T) {
 		}
 		rec = do(t, h, "POST", "/demo/idempotency/k1", "", map[string]string{"data": "payload"})
 		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["replay"] != true {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["replay"] != true {
 			t.Fatalf("second = %s, want replay", rec.Body.String())
 		}
 	})
@@ -635,12 +635,12 @@ func TestDemoBatteries(t *testing.T) {
 			t.Fatalf("create: status %d: %s", rec.Code, rec.Body.String())
 		}
 		var created map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil || created["id"] == "" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &created); err != nil || created["id"] == "" {
 			t.Fatalf("create = %s, want id", rec.Body.String())
 		}
 		rec = do(t, h, "GET", "/demo/session/"+created["id"], "", nil)
 		var data map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &data); err != nil || data["user"] != "ann" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &data); err != nil || data["user"] != "ann" {
 			t.Fatalf("get = %s, want user ann", rec.Body.String())
 		}
 		if rec := do(t, h, "GET", "/demo/session/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", nil); rec.Code != http.StatusNotFound {
@@ -676,7 +676,7 @@ func TestDemoBatteries(t *testing.T) {
 		}
 		rec = do(t, h, "GET", "/demo/search?q=zenbook", "", nil)
 		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
 		hits, _ := out["Hits"].([]any)
@@ -693,7 +693,7 @@ func TestDemoBatteries(t *testing.T) {
 		}
 		rec = do(t, h, "POST", "/demo/vector/query", "", map[string]any{"vector": vec, "top_k": 5})
 		var out map[string][]map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out["matches"]) == 0 {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out["matches"]) == 0 {
 			t.Fatalf("query = %s, want matches", rec.Body.String())
 		}
 		if out["matches"][0]["ID"] != "v1" {
@@ -706,7 +706,7 @@ func TestDemoBatteries(t *testing.T) {
 			"bucket": "demo", "key": "a/b.bin",
 		})
 		var out map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["url"] == "" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["url"] == "" {
 			t.Fatalf("presign = %s, want url", rec.Body.String())
 		}
 	})
@@ -714,7 +714,7 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("media", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/media/upload", "", "bytes")
 		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["ID"] == "" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["ID"] == "" {
 			t.Fatalf("upload = %s, want id", rec.Body.String())
 		}
 	})
@@ -722,7 +722,7 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("geo", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/geo/geocode", "", map[string]string{"address": "Springfield"})
 		var out map[string][]map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out["results"]) == 0 {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out["results"]) == 0 {
 			t.Fatalf("geocode = %s, want results", rec.Body.String())
 		}
 		if rec := do(t, h, "POST", "/demo/geo/geocode", "", map[string]string{"address": "Nowhere-xyz"}); rec.Code != http.StatusNotFound {
@@ -733,11 +733,11 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("i18n", func(t *testing.T) {
 		rec := do(t, h, "GET", "/demo/i18n/en/hello", "", nil)
 		var out map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["message"] != "Hello, Demo!" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["message"] != "Hello, Demo!" {
 			t.Fatalf("en = %s, want Hello, Demo!", rec.Body.String())
 		}
 		rec = do(t, h, "GET", "/demo/i18n/fr/hello", "", nil)
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["message"] == "" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["message"] == "" {
 			t.Fatalf("fr = %s, want french message", rec.Body.String())
 		}
 	})
@@ -745,12 +745,12 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("crypto", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/crypto/encrypt", "", map[string]string{"plaintext": "hello"})
 		var enc map[string][]byte
-		if err := json.Unmarshal(rec.Body.Bytes(), &enc); err != nil || len(enc["ciphertext"]) == 0 {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &enc); err != nil || len(enc["ciphertext"]) == 0 {
 			t.Fatalf("encrypt = %s, want ciphertext", rec.Body.String())
 		}
 		rec = do(t, h, "POST", "/demo/crypto/decrypt", "", map[string][]byte{"ciphertext": enc["ciphertext"]})
 		var dec map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &dec); err != nil || dec["plaintext"] != "hello" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &dec); err != nil || dec["plaintext"] != "hello" {
 			t.Fatalf("decrypt = %s, want hello", rec.Body.String())
 		}
 	})
@@ -759,7 +759,7 @@ func TestDemoBatteries(t *testing.T) {
 		t.Setenv("ZEVER_DEMO_NOTE", "hi")
 		rec := do(t, h, "GET", "/demo/secrets/DEMO_NOTE", "", nil)
 		var out map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["value"] != "hi" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["value"] != "hi" {
 			t.Fatalf("secret = %s, want hi", rec.Body.String())
 		}
 		if rec := do(t, h, "GET", "/demo/secrets/MISSING_XYZ", "", nil); rec.Code != http.StatusNotFound {
@@ -788,7 +788,7 @@ func TestDemoBatteries(t *testing.T) {
 	t.Run("workflow", func(t *testing.T) {
 		rec := do(t, h, "POST", "/demo/workflow/start", "", map[string]any{"name": "demo-workflow"})
 		var out map[string]string
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["run_id"] == "" {
+		if err := codec.Unmarshal(rec.Body.Bytes(), &out); err != nil || out["run_id"] == "" {
 			t.Fatalf("start = %s, want run_id", rec.Body.String())
 		}
 	})

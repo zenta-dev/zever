@@ -1,13 +1,13 @@
 package gengrammar
 
 import (
-	"encoding/json"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/resolver"
 	"github.com/zenta-dev/zever/dsl/token"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestKeywords_matchesTokenKeywordsMinusBooleans proves Keywords() is
@@ -133,7 +133,7 @@ func TestTmLanguage_validJSON(t *testing.T) {
 		} `json:"repository"`
 	}
 
-	if err := json.Unmarshal(TmLanguage(), &doc); err != nil {
+	if err := codec.Unmarshal(TmLanguage(), &doc); err != nil {
 		t.Fatalf("TmLanguage() is not valid JSON: %v", err)
 	}
 

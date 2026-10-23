@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestCheckToolOK(t *testing.T) {
@@ -49,7 +50,7 @@ func TestRoutesTool(t *testing.T) {
 	res := callToolReq(t, newServer(), "zever_routes", map[string]any{"files": testFiles()})
 
 	var got routesResult
-	if err := json.Unmarshal([]byte(resultText(t, res)), &got); err != nil {
+	if err := codec.Unmarshal([]byte(resultText(t, res)), &got); err != nil {
 		t.Fatalf("routes output is not JSON: %v\n%s", err, resultText(t, res))
 	}
 
@@ -74,7 +75,7 @@ func TestRoutesToolFromDirAndEmpty(t *testing.T) {
 	res := callToolReq(t, newServer(), "zever_routes", map[string]any{"dir": dir})
 
 	var got routesResult
-	if err := json.Unmarshal([]byte(resultText(t, res)), &got); err != nil {
+	if err := codec.Unmarshal([]byte(resultText(t, res)), &got); err != nil {
 		t.Fatalf("not JSON: %v", err)
 	}
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // mustJSONMode enables jsonMode with jsonOut redirected to buf for the
@@ -33,7 +33,7 @@ func mustDecodeEnvelope(t *testing.T, buf *bytes.Buffer) Envelope {
 	t.Helper()
 
 	var env Envelope
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &env); err != nil {
 		t.Fatalf("envelope is not JSON: %v (raw %q)", err, buf.String())
 	}
 
@@ -44,13 +44,13 @@ func mustDecodeEnvelope(t *testing.T, buf *bytes.Buffer) Envelope {
 func envelopeData(t *testing.T, env Envelope) map[string]any {
 	t.Helper()
 
-	raw, err := json.Marshal(env.Data)
+	raw, err := codec.Marshal(env.Data)
 	if err != nil {
 		t.Fatalf("marshal envelope data: %v", err)
 	}
 
 	var data map[string]any
-	if err := json.Unmarshal(raw, &data); err != nil {
+	if err := codec.Unmarshal(raw, &data); err != nil {
 		t.Fatalf("envelope data is not an object: %v (raw %s)", err, raw)
 	}
 

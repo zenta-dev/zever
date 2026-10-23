@@ -1,8 +1,9 @@
 package ollama
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // The tests in this file pin the Ollama wire format: the exact JSON key
@@ -86,7 +87,7 @@ func TestChatResponseWireKeys(t *testing.T) {
 	}
 
 	// Re-encoding the decoded value must reproduce the golden bytes exactly.
-	out, err := json.Marshal(resp)
+	out, err := codec.Marshal(resp)
 	if err != nil {
 		t.Fatalf("marshal decoded chatResponse: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestChatResponseToolCallsWireKeys(t *testing.T) {
 		t.Errorf("tool call name = %q, want %q", resp.Message.ToolCalls[0].Function.Name, "get_time")
 	}
 
-	out, err := json.Marshal(resp)
+	out, err := codec.Marshal(resp)
 	if err != nil {
 		t.Fatalf("marshal decoded chatResponse: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestStreamResponseWireKeys(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			out, err := json.Marshal(tc.resp)
+			out, err := codec.Marshal(tc.resp)
 			if err != nil {
 				t.Fatalf("marshal streamResponse: %v", err)
 			}
@@ -187,7 +188,7 @@ func TestEmbedWireKeys(t *testing.T) {
 		t.Fatalf("decode golden embedResponse: %v", err)
 	}
 
-	out, err := json.Marshal(resp)
+	out, err := codec.Marshal(resp)
 	if err != nil {
 		t.Fatalf("marshal decoded embedResponse: %v", err)
 	}

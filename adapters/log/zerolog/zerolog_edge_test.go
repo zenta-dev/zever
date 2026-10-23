@@ -2,7 +2,6 @@ package zerolog
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"strings"
 	"sync"
@@ -11,6 +10,7 @@ import (
 	zl "github.com/rs/zerolog"
 
 	"github.com/zenta-dev/zever/core/log"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestEdge_ToZeroLogLevelAll(t *testing.T) {
@@ -89,8 +89,8 @@ func TestEdge_ContextLoggerFields(t *testing.T) {
 	l.With().Str("service", "api").Int("version", 2).Logger().Info().Msg("child")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if got["service"] != "api" || got["version"] != float64(2) {
@@ -107,8 +107,8 @@ func TestEdge_EventNilErrors(t *testing.T) {
 	l.Info().Err(nil).AnErr("cause", nil).Msg("m")
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	for _, key := range []string{"error", "cause"} {
@@ -127,8 +127,8 @@ func TestEdge_SendEmptyMsg(t *testing.T) {
 	l.Info().Str("k", "v").Send()
 
 	var got map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("json.Unmarshal() error = %v (raw = %q)", err, buf.String())
+	if err := codec.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("codec.Unmarshal() error = %v (raw = %q)", err, buf.String())
 	}
 
 	if _, ok := got["k"]; !ok {

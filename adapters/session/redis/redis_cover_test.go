@@ -8,7 +8,6 @@ package redis
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -21,6 +20,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/zenta-dev/zever/core/session"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // coverStore builds a store over a dedicated miniredis server (never the
@@ -284,7 +284,7 @@ func TestCoverSaveZeroExpiryExisting(t *testing.T) {
 
 	createdAt := time.Now().Add(-time.Hour).Truncate(time.Second).UTC()
 
-	raw, err := json.Marshal(wireSession{
+	raw, err := codec.Marshal(wireSession{
 		CreatedAt: createdAt.UnixNano(),
 		UpdatedAt: createdAt.UnixNano(),
 	})

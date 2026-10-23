@@ -1,9 +1,10 @@
 package gengrammar
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestKeywordsExcludeBooleans(t *testing.T) {
@@ -80,7 +81,7 @@ func TestTmLanguageIsValidJSON(t *testing.T) {
 	t.Parallel()
 
 	var doc map[string]any
-	if err := json.Unmarshal(TmLanguage(), &doc); err != nil {
+	if err := codec.Unmarshal(TmLanguage(), &doc); err != nil {
 		t.Fatalf("TmLanguage() is not valid JSON: %v", err)
 	}
 

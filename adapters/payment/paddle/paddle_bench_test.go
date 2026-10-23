@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func benchSign(body []byte, secret string, ts time.Time) string {
@@ -23,7 +23,7 @@ func benchSign(body []byte, secret string, ts time.Time) string {
 
 func benchWriteJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
+	_ = codec.MarshalLine(w, v)
 }
 
 func benchServer(b *testing.B) *httptest.Server {

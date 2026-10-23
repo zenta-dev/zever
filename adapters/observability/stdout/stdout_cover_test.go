@@ -2,12 +2,12 @@ package stdout
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func validCoverOptions() observability.Options {
@@ -18,7 +18,7 @@ func decodeCoverLine(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
 
 	var v map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &v); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &v); err != nil {
 		t.Fatalf("decode line %q: %v", buf.String(), err)
 	}
 	return v

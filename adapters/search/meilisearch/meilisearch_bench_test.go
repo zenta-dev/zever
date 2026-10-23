@@ -1,7 +1,7 @@
 package meilisearch
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -81,16 +81,16 @@ func BenchmarkSearch(b *testing.B) {
 func BenchmarkToHits(b *testing.B) {
 	raw := meilisearch.Hits{
 		{
-			"id":            json.RawMessage(`"doc-1"`),
-			"content":       json.RawMessage(`"hello"`),
-			"metadata":      json.RawMessage(`{"k":"v"}`),
-			"_rankingScore": json.RawMessage(`0.9`),
+			"id":            jsontext.Value(`"doc-1"`),
+			"content":       jsontext.Value(`"hello"`),
+			"metadata":      jsontext.Value(`{"k":"v"}`),
+			"_rankingScore": jsontext.Value(`0.9`),
 		},
 		{
-			"id":            json.RawMessage(`"doc-2"`),
-			"content":       json.RawMessage(`"world"`),
-			"metadata":      json.RawMessage(`{"k":"w"}`),
-			"_rankingScore": json.RawMessage(`0.5`),
+			"id":            jsontext.Value(`"doc-2"`),
+			"content":       jsontext.Value(`"world"`),
+			"metadata":      jsontext.Value(`{"k":"w"}`),
+			"_rankingScore": jsontext.Value(`0.5`),
 		},
 	}
 

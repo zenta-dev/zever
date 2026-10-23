@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +17,7 @@ import (
 	"github.com/PaddleHQ/paddle-go-sdk/v5"
 
 	"github.com/zenta-dev/zever/core/payment"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // signWebhook returns a Paddle-Signature header value for body.
@@ -65,7 +65,7 @@ func writeJSON(t *testing.T, w http.ResponseWriter, v any) {
 	t.Helper()
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
+	if err := codec.MarshalLine(w, v); err != nil {
 		t.Errorf("encode: %v", err)
 	}
 }
@@ -156,7 +156,7 @@ func TestCreatePayment(t *testing.T) {
 			CustomerID   string `json:"customer_id"`
 			CurrencyCode string `json:"currency_code"`
 		}
-		if derr := json.NewDecoder(r.Body).Decode(&body); derr != nil {
+		if derr := codec.UnmarshalRead(r.Body, &body); derr != nil {
 			http.Error(w, derr.Error(), http.StatusBadRequest)
 
 			return
@@ -268,7 +268,7 @@ func TestCreatePaymentErrors(t *testing.T) {
 				PriceID string `json:"price_id"`
 			} `json:"items"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = codec.UnmarshalRead(r.Body, &body)
 
 		switch {
 		case len(body.Items) == 1 && body.Items[0].PriceID == "pri_boom":
@@ -440,7 +440,7 @@ func TestRefund(t *testing.T) {
 				Amount *string `json:"amount"`
 			} `json:"items"`
 		}
-		if derr := json.NewDecoder(r.Body).Decode(&body); derr != nil {
+		if derr := codec.UnmarshalRead(r.Body, &body); derr != nil {
 			http.Error(w, derr.Error(), http.StatusBadRequest)
 
 			return

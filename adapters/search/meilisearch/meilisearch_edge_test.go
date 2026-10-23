@@ -2,7 +2,6 @@ package meilisearch
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"github.com/meilisearch/meilisearch-go"
 
 	"github.com/zenta-dev/zever/core/search"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/lrucache"
 )
 
@@ -147,7 +147,7 @@ func TestEdgeSearch_negativeLimit(t *testing.T) {
 	}
 
 	var body map[string]any
-	if err := json.Unmarshal(capt.body, &body); err != nil {
+	if err := codec.Unmarshal(capt.body, &body); err != nil {
 		t.Fatalf("body unmarshal err = %v", err)
 	}
 
@@ -176,7 +176,7 @@ func TestEdgeSearch_negativeOffset(t *testing.T) {
 	}
 
 	var body map[string]any
-	if err := json.Unmarshal(capt.body, &body); err != nil {
+	if err := codec.Unmarshal(capt.body, &body); err != nil {
 		t.Fatalf("body unmarshal err = %v", err)
 	}
 

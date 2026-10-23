@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"flag"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/zenta-dev/zever/dsl/diag"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const inspectUserSchema = `entity User {
@@ -362,7 +362,7 @@ func TestRunCompileOpenAPIBackend(t *testing.T) {
 		}
 
 		var doc map[string]any
-		if err := json.Unmarshal(content, &doc); err != nil {
+		if err := codec.Unmarshal(content, &doc); err != nil {
 			t.Fatalf("%q is not valid JSON: %v", rel, err)
 		}
 

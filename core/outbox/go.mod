@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/core/observability v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/ref v0.8.0
 	github.com/zenta-dev/zever/shared/registry v0.8.0
 	github.com/zenta-dev/zever/shared/retry v0.8.0
@@ -35,3 +36,5 @@ replace github.com/zenta-dev/zever/shared/traceprop => ../../shared/traceprop
 replace github.com/zenta-dev/zever/adapters/observability/noop => ../../adapters/observability/noop
 
 replace github.com/zenta-dev/zever/shared/ref => ../../shared/ref
+
+replace github.com/zenta-dev/zever/shared/codec => ../../shared/codec

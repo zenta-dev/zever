@@ -2,13 +2,13 @@ package stdout_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
 
 	"github.com/zenta-dev/zever/adapters/observability/stdout"
 	"github.com/zenta-dev/zever/core/observability"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func validOptions() observability.Options {
@@ -36,7 +36,7 @@ func decodeLine(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
 
 	var v map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &v); err != nil {
+	if err := codec.Unmarshal(bytes.TrimSpace(buf.Bytes()), &v); err != nil {
 		t.Fatalf("decode line %q: %v", buf.String(), err)
 	}
 	return v
@@ -155,10 +155,10 @@ func TestSpan_childInheritsTraceID(t *testing.T) {
 	}
 
 	var first, second map[string]any
-	if err := json.Unmarshal(lines[0], &first); err != nil {
+	if err := codec.Unmarshal(lines[0], &first); err != nil {
 		t.Fatalf("decode first: %v", err)
 	}
-	if err := json.Unmarshal(lines[1], &second); err != nil {
+	if err := codec.Unmarshal(lines[1], &second); err != nil {
 		t.Fatalf("decode second: %v", err)
 	}
 	if first["trace_id"] != second["trace_id"] {

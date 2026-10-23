@@ -1,10 +1,11 @@
 package sms_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"testing"
 
 	sms "github.com/example/zever-sms"
+
 	"github.com/zenta-dev/zever/config"
 )
 
@@ -46,8 +47,8 @@ func BenchmarkBuildFromConfig(b *testing.B) {
 	}
 
 	cfg := config.Default()
-	cfg.Plugins = map[string]config.Service[json.RawMessage]{
-		"sms": {Adapter: "stub", Options: json.RawMessage(`{"from":"+15550000"}`)},
+	cfg.Plugins = map[string]config.Service[jsontext.Value]{
+		"sms": {Adapter: "stub", Options: jsontext.Value(`{"from":"+15550000"}`)},
 	}
 
 	b.ReportAllocs()

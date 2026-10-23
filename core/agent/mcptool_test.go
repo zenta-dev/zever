@@ -1,12 +1,13 @@
 package agent
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"net"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/ai"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/mcpclient"
 )
 
@@ -20,16 +21,16 @@ type fakeMCPServer struct {
 func (s *fakeMCPServer) serve() {
 	defer s.conn.Close()
 
-	dec := json.NewDecoder(s.conn)
+	dec := jsontext.NewDecoder(s.conn)
 
 	for {
 		var req struct {
-			ID     int64           `json:"id"`
-			Method string          `json:"method"`
-			Params json.RawMessage `json:"params"`
+			ID     int64          `json:"id"`
+			Method string         `json:"method"`
+			Params jsontext.Value `json:"params"`
 		}
 
-		if err := dec.Decode(&req); err != nil {
+		if err := codec.UnmarshalDecode(dec, &req); err != nil {
 			return
 		}
 
@@ -61,17 +62,17 @@ func (s *fakeMCPServer) serve() {
 		if result == nil {
 			out["error"] = map[string]any{"code": -32603, "message": "boom"}
 		} else {
-			raw, err := json.Marshal(result)
+			raw, err := codec.Marshal(result)
 			if err != nil {
 				s.t.Errorf("marshal: %v", err)
 
 				return
 			}
 
-			out["result"] = json.RawMessage(raw)
+			out["result"] = jsontext.Value(raw)
 		}
 
-		raw, err := json.Marshal(out)
+		raw, err := codec.Marshal(out)
 		if err != nil {
 			s.t.Errorf("marshal: %v", err)
 

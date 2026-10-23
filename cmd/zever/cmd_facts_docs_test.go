@@ -8,7 +8,6 @@ package main
 // were never machine-checked.
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // docsFlagAllowEntry is one allowlisted flag token: a token that looks like a
@@ -391,7 +392,7 @@ func cmdDocsLoadAllow(t *testing.T) docsFlagAllow {
 	}
 
 	var allow docsFlagAllow
-	if err := json.Unmarshal(raw, &allow); err != nil {
+	if err := codec.Unmarshal(raw, &allow); err != nil {
 		t.Fatalf("parse allowlist %s: %v", path, err)
 	}
 

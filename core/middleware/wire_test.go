@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // The tests in this file pin the JSON error envelope shared by Recover,
@@ -62,7 +63,7 @@ func TestErrorBodyOmitsNoKeys(t *testing.T) {
 	}
 
 	var m map[string]any
-	if err := json.Unmarshal(out, &m); err != nil {
+	if err := codec.Unmarshal(out, &m); err != nil {
 		t.Fatalf("unmarshal empty errorBody: %v", err)
 	}
 
