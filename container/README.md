@@ -291,7 +291,7 @@ battery must run with the same CWD); `:memory:` (including
 ```sh
 SEARCH_ADAPTER=db
 SEARCH_DSN="postgres://app:secret@db:5432/app?sslmode=require"
-SEARCH_DEDICATEDPOOL=false   # default false shares; true restores a private pool
+SEARCH_DEDICATED_POOL=false   # default false shares; true restores a private pool
 ```
 
 - Share-by-default: two identical DSNs are unambiguous operator intent, so

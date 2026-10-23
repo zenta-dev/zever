@@ -69,6 +69,22 @@ export function defaultInstanceProblems(code) {
   return out;
 }
 
+const canonCache = new Map();
+function canonFields(svc) {
+  if (canonCache.has(svc)) return canonCache.get(svc);
+  const exact = new Set();
+  const loose = new Map();
+  for (const key of (truth[svc]?.keys ?? [])) {
+    const envKey = key.toUpperCase();
+    if (!exact.has(envKey)) exact.add(envKey);
+    const stripped = envKey.replaceAll('_', '');
+    if (!loose.has(stripped)) loose.set(stripped, envKey);
+  }
+  const out = { exact, loose };
+  canonCache.set(svc, out);
+  return out;
+}
+
 export function envKeyProblems(code) {
   const out = [];
   for (const tok of tokens(code))
@@ -85,6 +101,17 @@ export function envKeyProblems(code) {
         const known = [...(truth[svc]?.adapters ?? [])];
         if (known.length && !known.includes(value))
           out.push(`env ${m[1]}_ADAPTER: "${value}" is not a ${svc} adapter (known: ${known.join(', ')})`);
+      }
+      // Canonical field spelling: the runtime matches case- and
+      // underscore-insensitively, but docs should use the canonical key.
+      if (svc in truth && field.toUpperCase() !== 'ADAPTER') {
+        const cf = canonFields(svc);
+        const fu = field.toUpperCase();
+        if (!cf.exact.has(fu)) {
+          const near = cf.loose.get(fu.replaceAll('_', ''));
+          if (near)
+            out.push(`env ${svc.toUpperCase()}_${near}: "${field}" is not the canonical spelling; the runtime matches it (case- and underscore-insensitive) to field ${near}, but the canonical key is ${svc.toUpperCase()}_${near}`);
+        }
       }
     }
 
@@ -188,6 +215,8 @@ function selfTest() {
     { name: 'SESSION_ADAPTER=db is clean after the fix', ok: envKeyProblems('SESSION_ADAPTER=db\n').length === 0 },
     { name: 'an unknown idempotency adapter value is still rejected', ok: envKeyProblems('IDEMPOTENCY_ADAPTER=nope\n').length === 1 },
     { name: 'an unknown session adapter value is still rejected', ok: envKeyProblems('SESSION_ADAPTER=nope\n').length === 1 },
+    { name: 'a non-canonical field spelling is rejected (DB_MAXCONNS)', ok: envKeyProblems('DB_MAXCONNS=20\n').length === 1 },
+    { name: 'the canonical field spelling passes (DB_MAX_CONNS)', ok: envKeyProblems('DB_MAX_CONNS=20\n').length === 0 },
     {
       name: 'adapterNamesFromRegister parses both spellings',
       ok: adapterNamesFromRegister('package pkg\n\nconst Adapter foo.Adapter = "a"\nconst Adapter bar.Adapter = bar.Adapter("b")\n').join(',') === 'a,b',

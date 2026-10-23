@@ -52,6 +52,19 @@ const commands = new Set();
 for (const f of fs.readdirSync(path.join(repo, 'cmd/zever')).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go')))
   for (const m of read(path.join(repo, 'cmd/zever', f)).matchAll(/Use:\s+"([a-z][a-z:-]*)/g)) commands.add(m[1]);
 
+// CLI flags, from the same source scan audit-facts.mjs uses, so a repo
+// markdown claim like `zever new --bogus` is checked against the real
+// flag set rather than escaping (hole #1 closure). Foreign flags that follow
+// a `zever <cmd>` in prose are rare; the few that slip through are
+// allowlisted below with a why.
+const flags = new Set();
+for (const f of fs.readdirSync(path.join(repo, 'cmd/zever')).filter((f) => f.endsWith('.go') && !f.endsWith('_test.go'))) {
+  const src = read(path.join(repo, 'cmd/zever', f));
+  for (const m of src.matchAll(/"(--?[a-z][a-z0-9-]*)"/g)) flags.add(m[1].replace(/^-+/, ''));
+  for (const m of src.matchAll(/\.(?:String|Bool|Int|Int64|Duration|Float64|StringSlice|StringVar|BoolVar|IntVar|Var)[A-Za-z]*\((?:[^,"()]*,\s*)?"([a-z][a-z0-9-]*)"/g)) flags.add(m[1]);
+}
+flags.add('help'); flags.add('version');
+
 // go.work's `go` directive is the only pinned toolchain claim in the repo.
 const goVersion = /^go (\S+)/m.exec(read(path.join(repo, 'go.work')))?.[1];
 if (!goVersion) throw new Error('go.work: no `go` directive found');
@@ -92,6 +105,22 @@ export function defaultInstanceProblems(code) {
   return out;
 }
 
+const canonCacheRepo = new Map();
+function canonFieldsRepo(svc) {
+  if (canonCacheRepo.has(svc)) return canonCacheRepo.get(svc);
+  const exact = new Set();
+  const loose = new Map();
+  for (const key of (truth[svc]?.keys ?? [])) {
+    const envKey = key.toUpperCase();
+    if (!exact.has(envKey)) exact.add(envKey);
+    const stripped = envKey.replaceAll('_', '');
+    if (!loose.has(stripped)) loose.set(stripped, envKey);
+  }
+  const out = { exact, loose };
+  canonCacheRepo.set(svc, out);
+  return out;
+}
+
 export function envKeyProblems(code) {
   const out = [];
   for (const tok of tokens(code))
@@ -108,6 +137,15 @@ export function envKeyProblems(code) {
         const known = [...(truth[svc]?.adapters ?? [])];
         if (known.length && !known.includes(value))
           out.push(`env ${m[1]}_ADAPTER: "${value}" is not a ${svc} adapter (known: ${known.join(', ')})`);
+      }
+      if (svc in truth && field.toUpperCase() !== 'ADAPTER') {
+        const cf = canonFieldsRepo(svc);
+        const fu = field.toUpperCase();
+        if (!cf.exact.has(fu)) {
+          const near = cf.loose.get(fu.replaceAll('_', ''));
+          if (near)
+            out.push(`env ${svc.toUpperCase()}_${near}: "${field}" is not the canonical spelling; the runtime matches it (case- and underscore-insensitive) to field ${near}, but the canonical key is ${svc.toUpperCase()}_${near}`);
+        }
       }
     }
 
@@ -155,6 +193,9 @@ const ALLOW = [
   { dir: '.github/', re: /^env FLAKE_COUNT: "/, why: 'make test-flake passes it to go test -count (Makefile:267, .github/workflows/flake.yml:37)' },
   // Records of things removed on purpose keep the removed spelling.
   { dir: '.changelog/unreleased/', re: /^env VECTORSTORE_ADAPTER: "pgvector" is not a vectorstore adapter /, why: 'the fragment records the removed non-canonical spelling on purpose (fix-cli-canonical-adapters.md)' },
+  // `zever db rollback --count n` documents the legacy stdlib flagset flag;
+  // --count is not on the cobra help tree (see cmd_facts_allow.json).
+  { dir: 'orm/', re: /^flag --count \(after "zever db"\) not in cmd\/zever$/, why: 'legacy stdlib flagset flag for `zever db rollback --count` (orm/DIALECTS.md)' },
   { dir: '.changelog/unreleased/', re: /^path \.github\/zever\.jpg: /, why: 'the fragment records deleting that asset; it is gone by design (chore-logo-update.md)' },
 ];
 
@@ -264,6 +305,29 @@ export function checkCommands(text) {
   return out;
 }
 
+// checkFlags validates `--flag` tokens that follow a `zever <sub>` mention
+// against the real flag set extracted from cmd/zever (hole #1 closure: repo
+// markdown such as examples/*/README.md now fails on a bogus flag, instead
+// of escaping because cmd_facts_docs_test only reads three files).
+export function checkFlags(text) {
+  const out = [];
+  for (const m of text.matchAll(/(?:^|[\s`$(])zever ([a-z][a-z:-]*)((?:[ \t]+(?:--?[a-z][a-z0-9-]*(?:=\S+)?|[a-z:-]+))*)/gm)) {
+    const sub = m[1];
+    if (sub.endsWith(':')) continue;
+    if (!commands.has(sub)) continue;
+    for (const f of m[2].matchAll(/\s--?([a-z][a-z0-9-]*)/g))
+      if (!flags.has(f[1])) out.push({ line: lineOf(text, m.index), msg: `flag --${f[1]} (after "zever ${sub}") not in cmd/zever` });
+  }
+  for (const b of blocks(text).filter((b) => ['sh', 'bash', 'shell', 'console'].includes(b.lang)))
+    for (const l of blockLines(text, b)) {
+      const m = l.code.match(/^\s*\$?\s*(?:[A-Z_]+=\S+\s+)*zever\s+([a-z][a-z:-]*)(.*)$/);
+      if (!m) continue;
+      for (const f of m[2].matchAll(/\s--?([a-z][a-z0-9-]*)/g))
+        if (!flags.has(f[1])) out.push({ line: l.line, msg: `sh: flag --${f[1]} not found (zever ${m[1]})` });
+    }
+  return out;
+}
+
 // Shapes that look like paths but are not single resolvable files. Named
 // here so the rule stays mechanical: globs (*), copy-templates (<battery>)
 // and alternation lists (a|b) name many files, and .pb.go tokens are
@@ -365,10 +429,14 @@ function selfTest() {
     { name: 'env: a __DEFAULT__ spelling is rejected', run: () => checkEnv('set `DB__DEFAULT__DSN=x`'), expect: 1 },
     { name: 'env: a named instance in prose passes', run: () => checkEnv('set `DB__REPORTING__DSN=...`'), expect: 0 },
     { name: 'env: a valueless key named in prose passes', run: () => checkEnv('set `DB_DSN` yourself'), expect: 0 },
+    { name: 'env: a non-canonical field spelling is rejected', run: () => checkEnv('```sh\nDB_MAXCONNS=20\n```'), expect: 1 },
+    { name: 'env: the canonical field spelling passes', run: () => checkEnv('```sh\nDB_MAX_CONNS=20\n```'), expect: 0 },
     { name: 'accessor: a bogus method is rejected', run: () => checkAccessors('call `c.Nonexistent()` at boot'), expect: 1 },
     { name: 'accessor: a real method passes', run: () => checkAccessors('the handler receives `c.DB()`'), expect: 0 },
     { name: 'command: a bogus subcommand is rejected', run: () => checkCommands('```sh\nzever frobnicate\n```'), expect: 1 },
     { name: 'command: a real subcommand passes', run: () => checkCommands('```sh\n$ zever serve\n```'), expect: 0 },
+    { name: 'flag: a bogus flag after zever is rejected', run: () => checkFlags('run `zever new --nonexistent-xyz`'), expect: 1 },
+    { name: 'flag: a real flag passes', run: () => checkFlags('run `zever compile --backend go`'), expect: 0 },
     { name: 'path: a broken path is rejected', run: () => checkPaths('see `nope/nope.go`', import.meta.filename), expect: 1 },
     { name: 'path: a real repo path passes', run: () => checkPaths('see `config/config.go`', import.meta.filename), expect: 0 },
     { name: 'path: an import-path span without an extension passes', run: () => checkPaths('import `github.com/zenta-dev/zever/orm`', import.meta.filename), expect: 0 },
@@ -415,6 +483,7 @@ for (const rel of files) {
   emit(checkEnv(text));
   emit(checkAccessors(text));
   emit(checkCommands(text));
+  emit(checkFlags(text));
   emit(checkPaths(text, file));
   emit(checkVersions(text));
 }
