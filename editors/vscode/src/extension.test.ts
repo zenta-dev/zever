@@ -6,8 +6,10 @@
 // They cover: the activate error path (missing zever-lsp binary surfaces one
 // install-hint notification, leaking no paths), the happy path (no error),
 // deactivate with/without a live client, the countDecls schema-stats helper,
-// the zen language status item, and the palette commands (validate/fixAll
-// forward the active editor's URI over workspace/executeCommand).
+// the zen language status item, the palette commands (validate/fixAll
+// forward the active editor's URI over workspace/executeCommand), the
+// isCompatibleVersion helper, and the server/extension version check (one
+// warning on major.minor mismatch, silence otherwise).
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
 import * as path from 'node:path';
@@ -25,13 +27,22 @@ interface StatusItemStub {
 interface VscodeStub {
   window: {
     showErrorMessage: (message: string) => Thenable<string | undefined>;
+    showWarningMessage: (message: string) => Thenable<string | undefined>;
     activeTextEditor?: { document: VscodeApi.TextDocument };
+  };
+  extensions: {
+    getExtension: (
+      id: string
+    ) => { packageJSON: { version: string } } | undefined;
+    __requestedIds: string[];
+    __version: string | undefined;
   };
   languages: {
     createLanguageStatusItem: (id: string, selector: unknown) => StatusItemStub;
     getDiagnostics: (uri: VscodeApi.Uri) => VscodeApi.Diagnostic[];
   };
   __messages: string[];
+  __warnings: string[];
   __statusItems: StatusItemStub[];
   __commands: string[];
   __commandHandlers: Record<string, () => Promise<unknown> | unknown>;
@@ -54,6 +65,7 @@ interface LanguageClientStub {
   clientOptions: { documentSelector: unknown };
   stopped: boolean;
   sentRequests: SentRequest[];
+  initializeResult: unknown;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   sendRequest: (method: string, params: unknown) => Promise<unknown>;
@@ -62,6 +74,7 @@ interface LanguageClientStub {
 interface LanguageClientCtor {
   instances: LanguageClientStub[];
   failWith: unknown;
+  initializeResult: unknown;
   new (
     id: string,
     name: string,
@@ -120,7 +133,7 @@ const { LanguageClient } = require(stubTargets['vscode-languageclient/node']) as
 };
 // Imported lazily so the hook above is installed before extension.js loads.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { activate, deactivate, countDecls } = require('./extension') as typeof ExtensionModule;
+const { activate, deactivate, countDecls, isCompatibleVersion } = require('./extension') as typeof ExtensionModule;
 
 const vscodeStub = vscode as unknown as VscodeStub;
 const clientCtor = LanguageClient as unknown as LanguageClientCtor;
@@ -141,8 +154,12 @@ function flushMicrotasks(): Promise<void> {
 describe('activate', () => {
   beforeEach(() => {
     vscodeStub.__messages.length = 0;
+    vscodeStub.__warnings.length = 0;
+    vscodeStub.extensions.__requestedIds.length = 0;
+    vscodeStub.extensions.__version = undefined;
     clientCtor.instances.length = 0;
     clientCtor.failWith = undefined;
+    clientCtor.initializeResult = undefined;
   });
 
   it('starts zever-lsp over stdio with the zen document selector', () => {
@@ -214,8 +231,12 @@ describe('activate', () => {
 describe('deactivate', () => {
   beforeEach(() => {
     vscodeStub.__messages.length = 0;
+    vscodeStub.__warnings.length = 0;
+    vscodeStub.extensions.__requestedIds.length = 0;
+    vscodeStub.extensions.__version = undefined;
     clientCtor.instances.length = 0;
     clientCtor.failWith = undefined;
+    clientCtor.initializeResult = undefined;
   });
 
   it('stops the active client and resolves', async () => {
@@ -292,9 +313,13 @@ describe('status item', () => {
 
   beforeEach(() => {
     vscodeStub.__messages.length = 0;
+    vscodeStub.__warnings.length = 0;
+    vscodeStub.extensions.__requestedIds.length = 0;
+    vscodeStub.extensions.__version = undefined;
     vscodeStub.__statusItems.length = 0;
     clientCtor.instances.length = 0;
     clientCtor.failWith = undefined;
+    clientCtor.initializeResult = undefined;
     setActiveZenEditor(undefined);
     vscodeStub.languages.getDiagnostics = defaultGetDiagnostics;
   });
@@ -362,12 +387,16 @@ describe('status item', () => {
 describe('palette commands', () => {
   beforeEach(() => {
     vscodeStub.__messages.length = 0;
+    vscodeStub.__warnings.length = 0;
+    vscodeStub.extensions.__requestedIds.length = 0;
+    vscodeStub.extensions.__version = undefined;
     vscodeStub.__commands.length = 0;
     for (const key of Object.keys(vscodeStub.__commandHandlers)) {
       delete vscodeStub.__commandHandlers[key];
     }
     clientCtor.instances.length = 0;
     clientCtor.failWith = undefined;
+    clientCtor.initializeResult = undefined;
     vscodeStub.window.activeTextEditor = undefined;
   });
 
@@ -441,5 +470,128 @@ describe('palette commands', () => {
 
     const [instance] = clientCtor.instances;
     assert.equal(instance.sentRequests.length, 0);
+  });
+});
+
+describe('isCompatibleVersion', () => {
+  it('matches identical versions', () => {
+    assert.equal(isCompatibleVersion('0.8.0', '0.8.0'), true);
+  });
+
+  it('ignores patch differences', () => {
+    assert.equal(isCompatibleVersion('0.8.1', '0.8.0'), true);
+  });
+
+  it('flags a minor mismatch', () => {
+    assert.equal(isCompatibleVersion('0.7.0', '0.8.0'), false);
+  });
+
+  it('flags a major mismatch', () => {
+    assert.equal(isCompatibleVersion('1.8.0', '0.8.0'), false);
+  });
+
+  it('treats missing versions as compatible', () => {
+    assert.equal(isCompatibleVersion('', '0.8.0'), true);
+    assert.equal(isCompatibleVersion('0.8.0', ''), true);
+    assert.equal(isCompatibleVersion('', ''), true);
+  });
+
+  it('never warns on unparseable input', () => {
+    assert.equal(isCompatibleVersion('dev', '0.8.0'), true);
+    assert.equal(isCompatibleVersion('0.8.0', 'dev'), true);
+    assert.equal(isCompatibleVersion('nightly', 'local'), true);
+  });
+
+  it('tolerates a leading v and trailing segments', () => {
+    assert.equal(isCompatibleVersion('v0.8.0', '0.8.3'), true);
+    assert.equal(isCompatibleVersion('0.8.0-beta.1', '0.8.0'), true);
+    assert.equal(isCompatibleVersion('v0.7.9', '0.8.0'), false);
+  });
+});
+
+describe('server version check', () => {
+  beforeEach(() => {
+    vscodeStub.__messages.length = 0;
+    vscodeStub.__warnings.length = 0;
+    vscodeStub.extensions.__requestedIds.length = 0;
+    vscodeStub.extensions.__version = undefined;
+    clientCtor.instances.length = 0;
+    clientCtor.failWith = undefined;
+    clientCtor.initializeResult = undefined;
+  });
+
+  function reportServerVersion(version: string): void {
+    clientCtor.initializeResult = {
+      serverInfo: { name: 'zever-lsp', version },
+    };
+  }
+
+  it('warns once when major.minor differ', async () => {
+    reportServerVersion('0.7.0');
+    vscodeStub.extensions.__version = '0.8.0';
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.equal(vscodeStub.__warnings.length, 1);
+    assert.match(
+      vscodeStub.__warnings[0],
+      /Zever: language server version 0\.7\.0 differs from extension version 0\.8\.0;/
+    );
+  });
+
+  it('looks up the extension by its publisher.name id', async () => {
+    reportServerVersion('0.7.0');
+    vscodeStub.extensions.__version = '0.8.0';
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.ok(
+      vscodeStub.extensions.__requestedIds.includes('zenta-dev.zever-dsl')
+    );
+  });
+
+  it('stays silent when major.minor match', async () => {
+    reportServerVersion('0.8.3');
+    vscodeStub.extensions.__version = '0.8.0';
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.equal(vscodeStub.__warnings.length, 0);
+  });
+
+  it('stays silent without a server version', async () => {
+    vscodeStub.extensions.__version = '0.8.0';
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.equal(vscodeStub.__warnings.length, 0);
+  });
+
+  it('stays silent without an extension version', async () => {
+    reportServerVersion('0.7.0');
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.equal(vscodeStub.__warnings.length, 0);
+  });
+
+  it('stays silent on unparseable versions', async () => {
+    reportServerVersion('dev');
+    vscodeStub.extensions.__version = '0.8.0';
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.equal(vscodeStub.__warnings.length, 0);
+  });
+
+  it('warns nothing extra when the server fails to start', async () => {
+    reportServerVersion('0.7.0');
+    vscodeStub.extensions.__version = '0.8.0';
+    clientCtor.failWith = new Error('spawn zever-lsp ENOENT');
+    activate(makeContext());
+    await flushMicrotasks();
+
+    assert.equal(vscodeStub.__messages.length, 1);
+    assert.equal(vscodeStub.__warnings.length, 0);
   });
 });

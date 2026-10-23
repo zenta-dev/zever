@@ -1,0 +1,3 @@
+- feat(lsp): serve `textDocument/rangesFormatting` (advertised via `rangesSupport` on the range-formatting capability) as the union of the per-range `formatDocument` edits.
+- feat(lsp): send Markdown diagnostic messages with a `` [`zen-###`](doc) `` link when the client advertises `textDocument.diagnostic.markupMessageSupport`; plain strings otherwise.
+- feat(lsp): `zever.fixAll` attaches `needsConfirmation` change annotations to foreign-file edits when the client supports `workspace.workspaceEdit.changeAnnotationSupport`, falling back to plain edits otherwise; `codeAction/resolve` still rebuilds plain edits.

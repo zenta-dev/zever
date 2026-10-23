@@ -7,6 +7,9 @@ const TransportKind = { stdio: 0, ipc: 1, pipe: 2, socket: 3 };
 class LanguageClient {
   static instances = [];
   static failWith = undefined;
+  // initializeResult reported by subsequently constructed clients; tests set
+  // this before activate to simulate the server's `serverInfo.version`.
+  static initializeResult = undefined;
 
   constructor(id, name, serverOptions, clientOptions) {
     this.id = id;
@@ -15,6 +18,7 @@ class LanguageClient {
     this.clientOptions = clientOptions;
     this.stopped = false;
     this.sentRequests = [];
+    this.initializeResult = LanguageClient.initializeResult;
     LanguageClient.instances.push(this);
   }
 
