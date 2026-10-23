@@ -11,3 +11,11 @@ var errRenameUnsupported = ErrRenameUnsupported
 // ErrPublishDiagnostics reports a failure to deliver a publishDiagnostics
 // notification for one file.
 var ErrPublishDiagnostics = errors.New("zever-lsp: publish diagnostics failed")
+
+// ErrExecuteUnknownCommand is returned when workspace/executeCommand names a
+// command this server does not serve, or carries arguments the handler
+// cannot use as a document reference.
+var ErrExecuteUnknownCommand = errors.New("zever-lsp: unknown execute command")
+
+// errExecuteUnknownCommand aliases ErrExecuteUnknownCommand for existing same-package callers.
+var errExecuteUnknownCommand = ErrExecuteUnknownCommand

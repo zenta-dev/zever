@@ -292,6 +292,11 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			// capability itself.
 			DocumentLinkProvider:  &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
 			CallHierarchyProvider: protocol.Boolean(true),
+			// ExecuteCommandProvider advertises the workspace/executeCommand
+			// commands this server serves (see commands.go): validate forces
+			// a recompile for one document, fixAll collects its quickfixes
+			// into a single edit.
+			ExecuteCommandProvider: protocol.ExecuteCommandOptions{Commands: []string{CommandValidate, CommandFixAll}},
 			Workspace: &protocol.WorkspaceOptions{
 				WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{
 					Supported:           boolPtr(true),
@@ -871,7 +876,9 @@ func (s *Server) CodeActionResolve(ctx context.Context, params *protocol.CodeAct
 // PrepareRename answers whether the symbol under the cursor can be renamed,
 // and if so which span the client should pre-fill the prompt from. A nil
 // result means "not renameable here", which is how the client learns to
-// refuse before prompting.
+// refuse before prompting. A renameable symbol answers a placeholder: the
+// range plus the identifier text, so the client can pre-fill without
+// re-reading the document.
 func (s *Server) PrepareRename(ctx context.Context, params *protocol.PrepareRenameParams) (protocol.PrepareRenameResult, error) {
 	s.captureClient(ctx)
 
@@ -884,7 +891,7 @@ func (s *Server) PrepareRename(ctx context.Context, params *protocol.PrepareRena
 
 	rng := identRange(target.Pos, target.Name)
 
-	return &rng, nil
+	return &protocol.PrepareRenamePlaceholder{Range: rng, Placeholder: target.Name}, nil
 }
 
 // Rename renames the symbol under the cursor across the whole workspace,

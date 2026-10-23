@@ -1249,13 +1249,17 @@ func TestPrepareRename(t *testing.T) {
 			t.Fatalf("PrepareRename: %v", err)
 		}
 
-		rng, ok := res.(*protocol.Range)
+		rng, ok := res.(*protocol.PrepareRenamePlaceholder)
 		if !ok || rng == nil {
-			t.Fatalf("PrepareRename result = %#v, want *Range", res)
+			t.Fatalf("PrepareRename result = %#v, want *PrepareRenamePlaceholder", res)
 		}
 
-		if rng.Start.Line != 0 || rng.Start.Character != 7 || rng.End.Character != 11 {
-			t.Errorf("PrepareRename range = %+v, want line 0 chars 7-11", rng)
+		if rng.Placeholder != "User" {
+			t.Errorf("PrepareRename placeholder = %q, want %q (the identifier under the cursor)", rng.Placeholder, "User")
+		}
+
+		if rng.Range.Start.Line != 0 || rng.Range.Start.Character != 7 || rng.Range.End.Character != 11 {
+			t.Errorf("PrepareRename range = %+v, want line 0 chars 7-11", rng.Range)
 		}
 	})
 

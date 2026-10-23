@@ -45,8 +45,8 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
 | Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |
 | Formatting | `textDocument/formatting`, `textDocument/rangeFormatting`, `textDocument/onTypeFormatting` |
-| Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets) |
-| Rename | `textDocument/prepareRename`, `textDocument/rename` (entities, fields, jobs, services, RPCs) |
+| Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets), `codeAction/resolve`, `workspace/executeCommand` (`zever.validate` forces a recompile for one document; `zever.fixAll` collects its quickfixes into one edit) |
+| Rename | `textDocument/prepareRename` (answers a placeholder with the identifier text), `textDocument/rename` (entities, fields, jobs, services, RPCs) |
 | Code lens | `textDocument/codeLens`, `codeLens/resolve` (per-declaration `N reference(s)` counts; info-only, gated by `zever.codelens.references`) |
 | Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` (the `definition` modifier marks declaration identifiers) |
 | Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module, `errors:`-case, and `paramNames:` parameter-name annotations, per-hint-family configurable — see [Configuration](#configuration) below) |

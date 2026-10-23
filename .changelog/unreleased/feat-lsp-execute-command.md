@@ -1,0 +1,3 @@
+- feat(lsp): new `workspace/executeCommand` commands `zever.validate` (force a recompile and republish diagnostics for one document) and `zever.fixAll` (collect every quickfix for one document into a single `WorkspaceEdit`).
+- feat(lsp): quickfixes now dispatch on the diagnostic `code` (`zen-001` scalar, `zen-002` relation) first, falling back to message matching when no code is present; `prepareRename` answers a placeholder carrying the identifier text.
+- feat(editors): VS Code palette commands `Zever: Validate Current File` and `Zever: Fix All Issues in Current File` for the active `.zen` file.

@@ -246,13 +246,38 @@ func nearestCandidate(name string, candidates []string) (string, bool) {
 	return best, true
 }
 
+// diagnosticCodeOf returns the stable zen-### code carried by d's Code
+// field, or "" when Code is absent or not a string. The publisher sets Code
+// through diagnosticCode (see diagnostics.go); a codeless diagnostic means
+// the class could not be determined, and dispatch falls back to message
+// matching.
+func diagnosticCodeOf(d protocol.Diagnostic) string {
+	if s, ok := d.Code.(protocol.String); ok {
+		return string(s)
+	}
+
+	return ""
+}
+
+// diagMatchesCodeOrMessage reports whether d belongs to the fix class named
+// by code. A present Code decides on its own: a code-carrying diagnostic
+// needs no message sniffing. A codeless diagnostic falls back to the legacy
+// message-substring match, so older diagnostics keep working.
+func diagMatchesCodeOrMessage(d protocol.Diagnostic, code, pattern string) bool {
+	if c := diagnosticCodeOf(d); c != "" {
+		return c == code
+	}
+
+	return strings.Contains(diagnosticMessage(d), pattern)
+}
+
 // fixUnknownScalarType handles the resolver's "unknown field type %q"
 // diagnostic: it locates the offending field at the diagnostic's position
 // (rather than parsing the type name out of the human-readable message,
 // which is more fragile), finds the nearest valid scalar name, and offers
 // to replace the bad type token with it.
 func fixUnknownScalarType(file *ast.File, id uri.URI, d protocol.Diagnostic) *protocol.CodeAction {
-	if !strings.Contains(diagnosticMessage(d), "unknown field type") {
+	if !diagMatchesCodeOrMessage(d, diagCodeUnknownFieldType, "unknown field type") {
 		return nil
 	}
 
@@ -307,7 +332,7 @@ func fixUnresolvedRelationTarget(
 	id uri.URI,
 	d protocol.Diagnostic,
 ) *protocol.CodeAction {
-	if !strings.Contains(diagnosticMessage(d), "references unknown entity") {
+	if !diagMatchesCodeOrMessage(d, diagCodeUnknownRelationTarget, "references unknown entity") {
 		return nil
 	}
 
@@ -425,11 +450,12 @@ func formatAllAction(id uri.URI, src []byte) *protocol.CodeAction {
 // codeActionsAt returns quick fixes applicable at the diagnostics present
 // in params.Context.Diagnostics, plus the whole-document format action when
 // the request's Only filter admits source actions. Each diagnostic now
-// carries a structured code (diagnosticCode in diagnostics.go), but dispatch
-// still matches the message patterns directly: mirrored diagnostics are
-// built through the same matcher table, so matching messages keeps the two
-// paths coupled to one list of classes -- a deliberately narrow approach,
-// not a general framework.
+// carries a structured code (diagnosticCode in diagnostics.go), which the
+// fixes prefer over message text: a present code decides dispatch on its
+// own, and only codeless diagnostics fall back to message-substring
+// matching. Mirrored diagnostics are built through the same matcher table,
+// so dispatch and publishing stay coupled to one list of classes -- a
+// deliberately narrow approach, not a general framework.
 //
 // src is the document's live buffer, used only for the format action; the
 // quick fixes resolve against the parsed file and schema. A nil or empty
