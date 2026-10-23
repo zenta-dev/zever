@@ -1,9 +1,11 @@
 package main
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"reflect"
 	"testing"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // TestTinkerProtocolRoundTrip marshals and unmarshals every request and
@@ -17,9 +19,9 @@ func TestTinkerProtocolRoundTrip(t *testing.T) {
 		name string
 		val  any
 	}{
-		{"tinkerRequest", tinkerRequest{Verb: verbDBQuery, Args: json.RawMessage(`{"sql":"select 1"}`)}},
+		{"tinkerRequest", tinkerRequest{Verb: verbDBQuery, Args: jsontext.Value(`{"sql":"select 1"}`)}},
 		{"tinkerRequestNoArgs", tinkerRequest{Verb: verbPing}},
-		{"tinkerResponseResult", tinkerResponse{Result: json.RawMessage(`{"value":true}`)}},
+		{"tinkerResponseResult", tinkerResponse{Result: jsontext.Value(`{"value":true}`)}},
 		{"tinkerResponseError", tinkerResponse{Error: "boom"}},
 		{"tinkerResponseEmpty", tinkerResponse{}},
 		{"dbQueryArgs", dbQueryArgs{SQL: "select ?", Args: []any{"x"}}},
@@ -37,7 +39,7 @@ func TestTinkerProtocolRoundTrip(t *testing.T) {
 		{"queuePushArgsNoHeaders", queuePushArgs{Topic: "t", Payload: "p"}},
 		{"queueLengthArgs", queueLengthArgs{Topic: "t"}},
 		{"int64Result", int64Result{Value: 42}},
-		{"jobDispatchArgs", jobDispatchArgs{Name: "send", Args: json.RawMessage(`{"to":"a@b.c"}`)}},
+		{"jobDispatchArgs", jobDispatchArgs{Name: "send", Args: jsontext.Value(`{"to":"a@b.c"}`)}},
 		{"jobDispatchArgsNoArgs", jobDispatchArgs{Name: "send"}},
 	}
 
@@ -45,13 +47,13 @@ func TestTinkerProtocolRoundTrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			data, err := json.Marshal(tc.val)
+			data, err := codec.Marshal(tc.val)
 			if err != nil {
 				t.Fatalf("marshal: %v", err)
 			}
 
 			out := reflect.New(reflect.TypeOf(tc.val))
-			if err := json.Unmarshal(data, out.Interface()); err != nil {
+			if err := codec.Unmarshal(data, out.Interface()); err != nil {
 				t.Fatalf("unmarshal %s: %v", data, err)
 			}
 

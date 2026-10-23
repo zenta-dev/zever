@@ -1,10 +1,12 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"go.lsp.dev/protocol"
 
+	"github.com/zenta-dev/zever/dsl/ast"
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/diag"
 	"github.com/zenta-dev/zever/dsl/ir"
@@ -348,5 +350,245 @@ func TestImplicitModuleHint_condition_expected(t *testing.T) {
 
 	if inlayLabel(t, hint) != " (module: public)" {
 		t.Errorf("hint label = %q, want %q", inlayLabel(t, hint), " (module: public)")
+	}
+}
+
+// paramNameSrc declares a two-parameter job and a schedule dispatching it
+// with two positional arguments -- the exact shape paramNameHints annotates.
+const paramNameSrc = "job Send(to: string, subject: string) {\n" +
+	"\tqueue: default\n" +
+	"}\n" +
+	"\n" +
+	"schedule Nightly {\n" +
+	"\tcron: \"0 0 * * *\"\n" +
+	"\tdispatch: Send(\"a\", \"b\")\n" +
+	"}\n"
+
+// paramNameFixture compiles paramNameSrc and returns the schema plus the
+// parsed schedule file the hints are computed from.
+func paramNameFixture(t *testing.T) (*ir.Schema, *ast.File) {
+	t.Helper()
+
+	result, diags := compile.Compile(map[string]string{"schema/app.zen": paramNameSrc})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	file, _ := parser.New("schema/app.zen", []byte(paramNameSrc)).ParseFile()
+
+	return result.Schema, file
+}
+
+// TestParamNameHintsAppear proves a positional dispatch call is annotated
+// with one `name:` hint per argument, in parameter order, anchored at each
+// argument's start and typed as a parameter hint.
+func TestParamNameHintsAppear(t *testing.T) {
+	schema, file := paramNameFixture(t)
+
+	hints := paramNameHints(schema, file)
+	if len(hints) != 2 {
+		t.Fatalf("got %d param-name hints, want 2: %+v", len(hints), hints)
+	}
+
+	for i, want := range []string{"to:", "subject:"} {
+		if got := inlayLabel(t, hints[i]); got != want {
+			t.Errorf("hint %d label = %q, want %q", i, got, want)
+		}
+
+		if hints[i].Kind != protocol.InlayHintKindParameter {
+			t.Errorf("hint %d kind = %d, want parameter (%d)", i, hints[i].Kind, protocol.InlayHintKindParameter)
+		}
+	}
+
+	// Both hints sit on the dispatch line, at the start of each argument:
+	// \tdispatch: Send("a", "b").
+	lines := strings.Split(paramNameSrc, "\n")
+
+	var dispatchLine int
+
+	for i, line := range lines {
+		if strings.Contains(line, "dispatch: Send(") {
+			dispatchLine = i
+		}
+	}
+
+	for i, arg := range []string{`"a"`, `"b"`} {
+		wantChar := strings.Index(lines[dispatchLine], arg)
+
+		//nolint:gosec // test fixture offsets are non-negative
+		if hints[i].Position.Line != uint32(dispatchLine) ||
+			hints[i].Position.Character != uint32(wantChar) {
+			t.Errorf("hint %d position = %+v, want line %d char %d (start of %s)",
+				i, hints[i].Position, dispatchLine, wantChar, arg)
+		}
+	}
+}
+
+// TestParamNameHintsSkipNamed proves an argument that already carries a
+// `name:` label is never annotated.
+func TestParamNameHintsSkipNamed(t *testing.T) {
+	src := "job Send(to: string, subject: string) {\n" +
+		"\tqueue: default\n" +
+		"}\n" +
+		"\n" +
+		"schedule Nightly {\n" +
+		"\tcron: \"0 0 * * *\"\n" +
+		"\tdispatch: Send(to: \"a\", subject: \"b\")\n" +
+		"}\n"
+
+	result, diags := compile.Compile(map[string]string{"schema/app.zen": src})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	file, _ := parser.New("schema/app.zen", []byte(src)).ParseFile()
+
+	if hints := paramNameHints(result.Schema, file); len(hints) != 0 {
+		t.Errorf("named arguments produced %d hints, want 0: %+v", len(hints), hints)
+	}
+}
+
+// TestParamNameHintsSkipSingleIdentMatch proves the same-name heuristic: a
+// single-argument call whose value identifier already names the parameter --
+// case-insensitively -- gets no hint, since the name is already visible.
+func TestParamNameHintsSkipSingleIdentMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		dispatch string
+	}{
+		{"exact match", "Send(user)"},
+		{"case-insensitive match", "Send(USER)"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := "job Send(user: string) {\n" +
+				"\tqueue: default\n" +
+				"}\n" +
+				"\n" +
+				"schedule Nightly {\n" +
+				"\tcron: \"0 0 * * *\"\n" +
+				"\tdispatch: " + tc.dispatch + "\n" +
+				"}\n"
+
+			result, diags := compile.Compile(map[string]string{"schema/app.zen": src})
+			if diags.HasErrors() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+
+			file, _ := parser.New("schema/app.zen", []byte(src)).ParseFile()
+
+			if hints := paramNameHints(result.Schema, file); len(hints) != 0 {
+				t.Errorf("same-name call produced %d hints, want 0: %+v", len(hints), hints)
+			}
+		})
+	}
+}
+
+// TestParamNameHintsSingleIdentMismatch proves the heuristic only fires on
+// a match: a differently-named identifier still gets its hint.
+func TestParamNameHintsSingleIdentMismatch(t *testing.T) {
+	src := "job Send(user: string) {\n" +
+		"\tqueue: default\n" +
+		"}\n" +
+		"\n" +
+		"schedule Nightly {\n" +
+		"\tcron: \"0 0 * * *\"\n" +
+		"\tdispatch: Send(admin)\n" +
+		"}\n"
+
+	result, diags := compile.Compile(map[string]string{"schema/app.zen": src})
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	file, _ := parser.New("schema/app.zen", []byte(src)).ParseFile()
+
+	hints := paramNameHints(result.Schema, file)
+	if len(hints) != 1 {
+		t.Fatalf("got %d hints, want 1: %+v", len(hints), hints)
+	}
+
+	if got := inlayLabel(t, hints[0]); got != "user:" {
+		t.Errorf("hint label = %q, want %q", got, "user:")
+	}
+}
+
+// TestParamNameHintsSettingOff proves the family is gated: default settings
+// (paramNames off) yield no param-name hints on a call that would otherwise
+// get them, while an explicit opt-in does.
+func TestParamNameHintsSettingOff(t *testing.T) {
+	schema, file := paramNameFixture(t)
+
+	if hints := inlayHintsFor(schema, file, defaultSettings()); len(hints) != 0 {
+		t.Errorf("default settings produced %d hints, want 0 (paramNames off): %+v", len(hints), hints)
+	}
+
+	on := defaultSettings()
+	on.ParamNames = true
+
+	hints := inlayHintsFor(schema, file, on)
+	if len(hints) != 2 {
+		t.Errorf("paramNames on produced %d hints, want 2: %+v", len(hints), hints)
+	}
+}
+
+// TestParamNameHintsNilSchemaOrFile proves a missing schema (unresolved
+// workspace) or file yields no hints rather than guesses.
+func TestParamNameHintsNilSchemaOrFile(t *testing.T) {
+	_, file := paramNameFixture(t)
+
+	if hints := paramNameHints(nil, file); hints != nil {
+		t.Errorf("nil schema produced %+v, want nil", hints)
+	}
+
+	schema, _ := paramNameFixture(t)
+
+	if hints := paramNameHints(schema, nil); hints != nil {
+		t.Errorf("nil file produced %+v, want nil", hints)
+	}
+}
+
+// TestParamNameHintsUnknownJob proves a dispatch naming no declared job is
+// skipped: there are no resolved parameter names to show.
+func TestParamNameHintsUnknownJob(t *testing.T) {
+	schema, _ := paramNameFixture(t)
+
+	file, _ := parser.New("schema/app.zen", []byte(
+		"schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: Missing(\"a\")\n}\n")).ParseFile()
+
+	if hints := paramNameHints(schema, file); len(hints) != 0 {
+		t.Errorf("unknown job produced %d hints, want 0: %+v", len(hints), hints)
+	}
+}
+
+// TestWalkDispatchCallsSkipsNonCall proves a dispatch that is not a call
+// (mid-edit) contributes no call to annotate.
+func TestWalkDispatchCallsSkipsNonCall(t *testing.T) {
+	file, _ := parser.New("schema/app.zen", []byte(
+		"schedule Nightly {\n\tcron: \"0 0 * * *\"\n\tdispatch: Missing\n}\n")).ParseFile()
+
+	calls := 0
+
+	walkDispatchCalls(file, func(_ *ast.CallValue) { calls++ })
+
+	if calls != 0 {
+		t.Errorf("non-call dispatch produced %d calls, want 0", calls)
+	}
+
+	calls = 0
+
+	walkDispatchCalls(nil, func(_ *ast.CallValue) { calls++ })
+
+	if calls != 0 {
+		t.Errorf("nil file produced %d calls, want 0", calls)
+	}
+}
+
+// TestParamNameHintsDefaultOff pins the default: parameter-name hints are
+// noise unless explicitly asked for.
+func TestParamNameHintsDefaultOff(t *testing.T) {
+	if defaultSettings().ParamNames {
+		t.Errorf("defaultSettings().ParamNames = true, want false")
 	}
 }

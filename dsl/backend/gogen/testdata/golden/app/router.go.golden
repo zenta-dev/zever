@@ -4,7 +4,6 @@
 package app
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -21,6 +20,7 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/router"
 	"github.com/zenta-dev/zever/shared/apperror"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const maxRequestBodyBytes = document.DefaultMaxSourceBytes
@@ -191,7 +191,7 @@ func RegisterTaskServiceRoutes(r router.Router, svc TaskService, a auth.Auth, p 
 // header is sent no error body can still follow it, and the client must
 // not see the requested status for a response that could not be encoded.
 func writeGogenJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
-	body, err := json.Marshal(v)
+	body, err := codec.Marshal(v)
 	if err != nil {
 		log.FromContext(r.Context(), noop.New()).Error().Err(err).Msg("encode json response")
 		w.Header().Set("Content-Type", "application/json")

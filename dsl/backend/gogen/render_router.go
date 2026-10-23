@@ -28,7 +28,7 @@ import (
 // custom protojson.MarshalOptions field-name overrides.
 func renderRouter(pkg string, data moduleModel) string {
 	imports := map[string]bool{
-		importHTTP: true, importJSON: true, importErrors: true, importIO: true,
+		importHTTP: true, importCodec: true, importErrors: true, importIO: true,
 		pkgProtoJSON: true, pkgProto: true, pkgLog: true, pkgNoop: true, pkgDocument: true,
 		pkgApperror: true, pkgRouter: true,
 	}
@@ -479,7 +479,7 @@ const routerHelpers = `// writeGogenJSON writes v as a plain (non-protobuf) JSON
 // header is sent no error body can still follow it, and the client must
 // not see the requested status for a response that could not be encoded.
 func writeGogenJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
-	body, err := json.Marshal(v)
+	body, err := codec.Marshal(v)
 	if err != nil {
 		log.FromContext(r.Context(), noop.New()).Error().Err(err).Msg("encode json response")
 		w.Header().Set("Content-Type", "application/json")

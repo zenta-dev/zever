@@ -436,7 +436,7 @@ type buildData struct {
 	// Adapters lists included battery/adapter pairs, sorted.
 	Adapters []string `json:"adapters"`
 	// DryRun reports a plan-only run.
-	DryRun bool `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun,omitempty,omitzero"`
 }
 
 // buildOptions carries every input runBuildWith needs. Stdout defaults to

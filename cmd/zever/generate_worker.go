@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/ir"
 	"github.com/zenta-dev/zever/dsl/naming"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const workerUsageBody = `Scaffolds the background worker entrypoint at <worker_entry>/main.go (default
@@ -58,7 +58,7 @@ type workerJob struct {
 	Handler   string // "Handle" + PascalCase(Name), the stub package's exported function name.
 	Fields    []workerField
 	Imports   []string
-	NeedsJSON bool // this job's own Args struct needs "encoding/json" (a json.RawMessage field).
+	NeedsJSON bool // this job's own Args struct needs "encoding/json/jsontext" (a jsontext.Value field).
 	NeedsTime bool // this job's own Args struct needs "time" (a time.Time field).
 }
 
@@ -375,7 +375,7 @@ func dispatchArgsJSON(sched *ir.Schedule) string {
 		payload[param.Name] = sched.DispatchArgs[i]
 	}
 
-	encoded, err := json.Marshal(payload)
+	encoded, err := codec.Marshal(payload)
 	if err != nil {
 		return "{}"
 	}
@@ -392,8 +392,8 @@ func dispatchArgsJSON(sched *ir.Schedule) string {
 
 // goScalarType maps a DSL scalar to the Go type a job payload field uses,
 // mirroring the zenorm backend's own scalar mapping. "time" is always
-// imported by the worker template (shutdownGrace), so only the encoding/json
-// import is conditional.
+// imported by the worker template (shutdownGrace), so only the
+// encoding/json/jsontext import is conditional.
 func goScalarType(t ir.ScalarType) (goType string, needsJSON bool) {
 	switch t {
 	case ir.TUUID, ir.TString, ir.TEnum:
@@ -413,7 +413,7 @@ func goScalarType(t ir.ScalarType) (goType string, needsJSON bool) {
 	case ir.TBytes:
 		return "[]byte", false
 	case ir.TJSON:
-		return "json.RawMessage", true
+		return "jsontext.Value", true
 	}
 
 	return "any", false
@@ -494,7 +494,7 @@ package jobs
 import (
 	"context"
 {{- if .NeedsJSON}}
-	"encoding/json"
+	"encoding/json/jsontext"
 {{- end}}
 {{- if .NeedsTime}}
 	"time"
@@ -533,7 +533,7 @@ package main
 import (
 	"context"
 {{- if .NeedsJSON}}
-	"encoding/json"
+	"encoding/json/jsontext"
 {{- end}}
 	"os"
 	"os/signal"
@@ -619,7 +619,7 @@ func run() error {
 {{- range .Schedules}}
 
 	// schedule {{.Name}}
-	if _, err := sched.Schedule(ctx, {{printf "%q" .Cron}}, {{printf "%q" .Job}}, json.RawMessage(` + "`{{.Args}}`" + `)); err != nil {
+	if _, err := sched.Schedule(ctx, {{printf "%q" .Cron}}, {{printf "%q" .Job}}, jsontext.Value(` + "`{{.Args}}`" + `)); err != nil {
 		return err
 	}
 {{- end}}

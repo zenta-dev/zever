@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -15,33 +14,34 @@ import (
 	"github.com/zenta-dev/zever/core/permission"
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/core/router"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Booking is the JSON shape for bookings.
 type Booking struct {
-	ID        string `json:"id"`
-	SpaceID   string `json:"space_id"`
-	GuestID   string `json:"guest_id"`
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
+	ID        string `json:"id,omitzero"`
+	SpaceID   string `json:"space_id,omitzero"`
+	GuestID   string `json:"guest_id,omitzero"`
+	StartDate string `json:"start_date,omitzero"`
+	EndDate   string `json:"end_date,omitzero"`
+	Status    string `json:"status,omitzero"`
+	CreatedAt string `json:"created_at,omitzero"`
 }
 
 type createBookingRequest struct {
-	SpaceID        string `json:"space_id"`
-	StartDate      string `json:"start_date"`
-	EndDate        string `json:"end_date"`
-	GuestPhone     string `json:"guest_phone"`
-	IdempotencyKey string `json:"idempotency_key"`
+	SpaceID        string `json:"space_id,omitzero"`
+	StartDate      string `json:"start_date,omitzero"`
+	EndDate        string `json:"end_date,omitzero"`
+	GuestPhone     string `json:"guest_phone,omitzero"`
+	IdempotencyKey string `json:"idempotency_key,omitzero"`
 }
 
 type bookingResponse struct {
 	Booking         Booking `json:"booking"`
-	Message         string  `json:"message"`
-	CheckoutVersion string  `json:"checkout_version"`
+	Message         string  `json:"message,omitzero"`
+	CheckoutVersion string  `json:"checkout_version,omitzero"`
 	Tenant          string  `json:"tenant"`
-	PaymentID       string  `json:"payment_id"`
+	PaymentID       string  `json:"payment_id,omitzero"`
 }
 
 // bookingKey resolves the idempotency key for a booking attempt.
@@ -246,7 +246,7 @@ func (a *API) handleCreateBooking(w http.ResponseWriter, req *http.Request) {
 
 	// Queue confirmation dispatch.
 	if a.Queue != nil {
-		body, _ := json.Marshal(map[string]string{"booking_id": id, "space_id": in.SpaceID, "guest_id": guest})
+		body, _ := codec.Marshal(map[string]string{"booking_id": id, "space_id": in.SpaceID, "guest_id": guest})
 		if err := a.Queue.Push(ctx, "bookings.confirm", queue.NewPayload(body), queue.NewHeaders(map[string]string{"tenant": tenant})); err != nil {
 			writeError(w, http.StatusInternalServerError, "confirmation dispatch failed")
 			return
@@ -260,7 +260,7 @@ func (a *API) handleCreateBooking(w http.ResponseWriter, req *http.Request) {
 		Tenant:          tenant,
 		PaymentID:       payResult.ID,
 	}
-	raw, _ := json.Marshal(resp)
+	raw, _ := codec.Marshal(resp)
 	completeIdem(raw)
 	writeJSON(w, http.StatusCreated, resp)
 }
@@ -362,7 +362,7 @@ func (a *API) handleCancelBooking(w http.ResponseWriter, req *http.Request) {
 	b.Status = "cancelled"
 
 	if a.Queue != nil {
-		body, _ := json.Marshal(map[string]string{"booking_id": id, "status": "cancelled"})
+		body, _ := codec.Marshal(map[string]string{"booking_id": id, "status": "cancelled"})
 		_ = a.Queue.Push(ctx, "bookings.cancel", queue.NewPayload(body), queue.NewHeaders(nil))
 	}
 

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // resourceDef describes one static MCP resource.
@@ -111,7 +112,7 @@ type resourceReadParams struct {
 // readResource serves one static resource by URI.
 func readResource(req rpcRequest) rpcResponse {
 	var p resourceReadParams
-	if err := json.Unmarshal(req.Params, &p); err != nil {
+	if err := codec.Unmarshal(req.Params, &p); err != nil {
 		return errorResponse(req.ID, codeInvalidParams, "zever-mcp: invalid resources/read params")
 	}
 

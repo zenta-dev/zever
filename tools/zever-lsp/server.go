@@ -56,6 +56,11 @@ type Server struct {
 	// documentLink/resolve knows whether to fill Tooltip. Guarded by mu.
 	docLinkTooltip bool
 
+	// completionCaps records the completion capabilities the client
+	// advertised at Initialize: whether items may carry snippets and which
+	// resolve properties the client handles lazily. Guarded by mu.
+	completionCaps clientCaps
+
 	// settings is the current editing configuration, swapped whole by
 	// workspace/didChangeConfiguration and read by every handler. Atomic
 	// (rather than mu-guarded) so the diagnostics publisher's delay hook can
@@ -178,6 +183,14 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.mu.Unlock()
 	}
 
+	// The completion capabilities decide whether completion items may
+	// carry snippets: recorded the same way, under mu, alongside the
+	// tooltip flag above. clientCapsFor tolerates a nil params, so this is
+	// unconditional.
+	s.mu.Lock()
+	s.completionCaps = clientCapsFor(params)
+	s.mu.Unlock()
+
 	syncKind := protocol.TextDocumentSyncKindIncremental
 	enabled := true
 
@@ -201,6 +214,7 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			WorkspaceSymbolProvider: protocol.Boolean(true),
 			DefinitionProvider:      protocol.Boolean(true),
 			DeclarationProvider:     protocol.Boolean(true),
+			TypeDefinitionProvider:  protocol.Boolean(true),
 			HoverProvider:           protocol.Boolean(true),
 			// Unlike the providers above, this one is a pointer to an
 			// options struct, not a bool: the trigger characters are part
@@ -225,12 +239,22 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 				FirstTriggerCharacter: "\n",
 				MoreTriggerCharacter:  []string{"}", " "},
 			},
-			CodeActionProvider: protocol.Boolean(true),
+			// Like CompletionProvider above, this is a pointer to an options
+			// struct rather than a bare bool: ResolveProvider advertises that
+			// codeAction/resolve fills an action's edit lazily. Actions still
+			// carry their edits eagerly, so clients without resolve support
+			// keep working; resolve only fills edits that are absent.
+			CodeActionProvider: &protocol.CodeActionOptions{ResolveProvider: &enabled},
 			// PrepareProvider tells the client to ask prepareRename first,
 			// so a cursor on a non-renameable symbol is refused before the
 			// user is ever prompted for a new name.
-			RenameProvider:            &protocol.RenameOptions{PrepareProvider: &enabled},
-			ReferencesProvider:        protocol.Boolean(true),
+			RenameProvider:     &protocol.RenameOptions{PrepareProvider: &enabled},
+			ReferencesProvider: protocol.Boolean(true),
+			// Same options-struct shape as DocumentLinkProvider below: the
+			// resolve round-trip exists so a future command-bearing lens can
+			// fill in lazily. Today's lenses are info-only (a title, no
+			// command to execute), so resolve is a passthrough.
+			CodeLensProvider:          &protocol.CodeLensOptions{ResolveProvider: &enabled},
 			FoldingRangeProvider:      protocol.Boolean(true),
 			DocumentHighlightProvider: protocol.Boolean(true),
 			// Never left to any capability auto-wiring: a legend-less
@@ -282,6 +306,45 @@ func negotiatePositionEncoding(params *protocol.InitializeParams) protocol.Posit
 	}
 
 	return ""
+}
+
+// clientCaps records the completion capabilities a client advertised at
+// Initialize: whether completion items may carry snippet insert text,
+// whether the client understands insert/replace edits, and which item
+// properties it can resolve lazily. The zero value -- a client that
+// advertised nothing -- renders every item as a plain-text label.
+type clientCaps struct {
+	snippetSupport       bool
+	insertReplaceSupport bool
+	resolveProps         []string
+}
+
+// clientCapsFor reads the completion capabilities out of an Initialize
+// request's params. Every pointer in the chain may be nil -- a client that
+// advertises no completion block negotiates nothing -- so each level is
+// guarded the same way Initialize guards the tooltip flag.
+func clientCapsFor(params *protocol.InitializeParams) clientCaps {
+	if params == nil || params.Capabilities.TextDocument == nil ||
+		params.Capabilities.TextDocument.Completion == nil ||
+		params.Capabilities.TextDocument.Completion.CompletionItem == nil {
+		return clientCaps{}
+	}
+
+	item := params.Capabilities.TextDocument.Completion.CompletionItem
+
+	var caps clientCaps
+
+	if item.SnippetSupport != nil {
+		caps.snippetSupport = *item.SnippetSupport
+	}
+
+	if item.InsertReplaceSupport != nil {
+		caps.insertReplaceSupport = *item.InsertReplaceSupport
+	}
+
+	caps.resolveProps = append([]string(nil), item.ResolveSupport.Properties...)
+
+	return caps
 }
 
 // Initialized handles the initialized notification by publishing the first
@@ -500,6 +563,19 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
 	return definitionAt(schema, file, params.Position), nil
 }
 
+// TypeDefinition jumps to the declaration of the named type under the cursor:
+// an entity, message, or named enum named by a relation target, an rpc
+// Returns type, a param type, or a field type. A nil result encodes LSP null:
+// the cursor names a scalar (which has no declaration), an unknown type, or
+// nothing jumpable at all.
+func (s *Server) TypeDefinition(ctx context.Context, params *protocol.TypeDefinitionParams) (protocol.DefinitionResult, error) {
+	s.captureClient(ctx)
+
+	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
+
+	return typeDefinitionAt(schema, file, params.Position), nil
+}
+
 // Declaration is an alias for Definition: every .zen declaration is also
 // its own declaration site (there is no separate header/implementation
 // split), so the declaration of the type named under the cursor is exactly
@@ -540,7 +616,11 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 
 	schema, file := s.schemaAndFile(uriStr)
 
-	items := completionAt(schema, file, content, params.Position)
+	s.mu.Lock()
+	caps := s.completionCaps
+	s.mu.Unlock()
+
+	items := completionAtWithCaps(schema, file, content, params.Position, caps)
 	if len(items) == 0 {
 		return nil, nil //nolint:nilnil // LSP encodes "no completions" as a null result
 	}
@@ -629,21 +709,41 @@ func (s *Server) TextDocumentOnTypeFormatting(ctx context.Context, params *proto
 }
 
 // CodeAction returns quick fixes for the diagnostics the client reports as
-// present in params.Context.Diagnostics. Like Completion and Hover it
-// resolves against the latest whole-workspace schema, falling back to a
-// standalone parse of the document when resolution fails. A nil result
-// encodes LSP null: no fix applies.
+// present in params.Context.Diagnostics, plus the whole-document format
+// action when the request's Only filter admits source actions. Like
+// Completion and Hover it resolves against the latest whole-workspace
+// schema, falling back to a standalone parse of the document when
+// resolution fails. A nil result encodes LSP null: no fix applies.
 func (s *Server) CodeAction(ctx context.Context, params *protocol.CodeActionParams) ([]protocol.CommandOrCodeAction, error) {
 	s.captureClient(ctx)
 
 	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
 
-	actions := codeActionsAt(schema, file, params.TextDocument.URI, params)
+	var src []byte
+
+	if content, ok := s.ws.DocContent(string(params.TextDocument.URI)); ok {
+		src = []byte(content)
+	}
+
+	actions := codeActionsAt(schema, file, params.TextDocument.URI, src, params)
 	if len(actions) == 0 {
 		return nil, nil // LSP encodes "no code actions" as a null result
 	}
 
 	return actions, nil
+}
+
+// CodeActionResolve fills in a single code action's edit when the action
+// arrived without one. It delegates to the lowercase implementation that
+// code_action.go owns.
+func (s *Server) CodeActionResolve(ctx context.Context, params *protocol.CodeAction) (*protocol.CodeAction, error) {
+	s.captureClient(ctx)
+
+	if params == nil {
+		return nil, nil //nolint:nilnil // LSP encodes "nothing to resolve" as a null result
+	}
+
+	return s.codeActionResolve(params), nil
 }
 
 // PrepareRename answers whether the symbol under the cursor can be renamed,
@@ -722,6 +822,35 @@ func (s *Server) References(ctx context.Context, params *protocol.ReferenceParam
 	}
 
 	return []protocol.Location(locations), nil
+}
+
+// CodeLens returns one reference-count lens per top-level declaration in the
+// requested document, computed by codeLensesAt over the whole workspace. An
+// unknown document yields nil, not an error, per the "no lenses for this
+// document" reading DocumentLink shares; a switched-off
+// zever.codelens.references setting yields nil too, so the client renders
+// nothing at all.
+func (s *Server) CodeLens(ctx context.Context, params *protocol.CodeLensParams) ([]protocol.CodeLens, error) {
+	s.captureClient(ctx)
+
+	if !s.currentSettings().CodeLensReferences {
+		return nil, nil
+	}
+
+	uriStr := string(params.TextDocument.URI)
+
+	schema, _ := s.schemaAndFile(uriStr)
+
+	return codeLensesAt(schema, s.ws.ParsedFiles(), uriStr), nil
+}
+
+// CodeLensResolve is a passthrough by design: lenses already carry their
+// full titles (there is no command to fill in lazily), so the item
+// round-trips unchanged.
+func (s *Server) CodeLensResolve(ctx context.Context, params *protocol.CodeLens) (*protocol.CodeLens, error) {
+	s.captureClient(ctx)
+
+	return params, nil
 }
 
 // FoldingRanges returns one fold per multi-line brace pair in the document.

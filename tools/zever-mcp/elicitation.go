@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // DefaultElicitTimeout bounds how long the server waits for the client to
@@ -61,7 +63,7 @@ func (s *Server) elicit(ctx context.Context, message string, schema map[string]a
 		s.mu.Unlock()
 	}()
 
-	rawID, err := json.Marshal(id)
+	rawID, err := codec.Marshal(id)
 	if err != nil {
 		return zero, fmt.Errorf("zever-mcp: marshal elicitation id: %w", err)
 	}
@@ -73,7 +75,7 @@ func (s *Server) elicit(ctx context.Context, message string, schema map[string]a
 
 	if err := send(map[string]any{
 		"jsonrpc": "2.0",
-		"id":      json.RawMessage(rawID),
+		"id":      jsontext.Value(rawID),
 		"method":  "elicitation/create",
 		"params":  params,
 	}); err != nil {
@@ -100,15 +102,15 @@ func (s *Server) elicit(ctx context.Context, message string, schema map[string]a
 
 // deliverResponse routes an incoming client message to a pending elicitation
 // when its ID matches. It reports whether the message was consumed.
-func (s *Server) deliverResponse(raw json.RawMessage) bool {
+func (s *Server) deliverResponse(raw jsontext.Value) bool {
 	var probe struct {
-		ID     *int64          `json:"id"`
-		Method string          `json:"method,omitempty"`
-		Result json.RawMessage `json:"result,omitempty"`
-		Error  *rpcError       `json:"error,omitempty"`
+		ID     *int64         `json:"id"`
+		Method string         `json:"method,omitempty"`
+		Result jsontext.Value `json:"result,omitempty"`
+		Error  *rpcError      `json:"error,omitempty"`
 	}
 
-	if err := json.Unmarshal(raw, &probe); err != nil {
+	if err := codec.Unmarshal(raw, &probe); err != nil {
 		return false
 	}
 
@@ -133,7 +135,7 @@ func (s *Server) deliverResponse(raw json.RawMessage) bool {
 	// Malformed answers fail closed as cancellation.
 	var res elicitResult
 	if probe.Error == nil {
-		if err := json.Unmarshal(probe.Result, &res); err != nil {
+		if err := codec.Unmarshal(probe.Result, &res); err != nil {
 			res = elicitResult{}
 		}
 	}

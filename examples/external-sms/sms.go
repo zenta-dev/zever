@@ -8,7 +8,6 @@ package sms
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/container"
+	"github.com/zenta-dev/zever/shared/codec"
 	"github.com/zenta-dev/zever/shared/registry"
 )
 
@@ -56,7 +56,7 @@ func ParseAdapter(s string) (Adapter, error) {
 // Options configures SMS backend construction.
 type Options struct {
 	// From is the sender identity (phone number or short code).
-	From string `json:"from"`
+	From string `json:"from,omitzero"`
 }
 
 // Validate checks options for consistency.
@@ -234,12 +234,12 @@ func RegisterStub() error {
 
 // validatePluginOptions implements config.RegisterPluginValidator: it decodes
 // the plugin's raw options and runs Options.Validate. Unknown fields pass
-// through encoding/json untouched until here. Adapter selection is code
+// through shared/codec untouched until here. Adapter selection is code
 // (RegisterStub wires the stub backend), never config.
 func validatePluginOptions(opts jsontext.Value) error {
 	var o Options
 	if len(opts) > 0 {
-		if err := json.Unmarshal(opts, &o); err != nil {
+		if err := codec.Unmarshal(opts, &o); err != nil {
 			return err
 		}
 	}
@@ -259,7 +259,7 @@ func BuildFromConfig(cfg *config.Config) (SMS, error) {
 	}
 	var opts Options
 	if len(entry.Options) > 0 {
-		if err := json.Unmarshal(entry.Options, &opts); err != nil {
+		if err := codec.Unmarshal(entry.Options, &opts); err != nil {
 			return nil, fmt.Errorf("sms: decode options: %w", err)
 		}
 	}

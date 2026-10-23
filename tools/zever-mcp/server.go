@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const (
@@ -80,10 +82,23 @@ func (s *Server) register(t toolDef) {
 // answers to server-initiated elicitations route to the pending waiter.
 // Tools/call handlers each run in their own goroutine so an eliciting
 // handler never stalls the read loop. Diagnostics go to errw.
+// writeFrame emits one newline-delimited JSON message in a single Write.
+// The bytes match codec.MarshalLine exactly (compact JSON plus '\n'), but
+// the single write preserves v1 Encoder.Encode framing over synchronous
+// transports: net.Pipe pairs each Write with a Read, so a split body/newline
+// pair strands the trailing newline once the peer stops reading its value.
+func writeFrame(out io.Writer, v any) error {
+	b, err := codec.Marshal(v)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(append(b, '\n'))
+	return err
+}
+
 func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 	s := newServer()
-	dec := json.NewDecoder(in)
-	enc := json.NewEncoder(out)
+	dec := jsontext.NewDecoder(in)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -93,7 +108,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 		s.encMu.Lock()
 		defer s.encMu.Unlock()
 
-		return enc.Encode(v)
+		return writeFrame(out, v)
 	}
 	s.mu.Unlock()
 
@@ -104,19 +119,19 @@ func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 		s.encMu.Lock()
 		defer s.encMu.Unlock()
 
-		if err := enc.Encode(resp); err != nil {
+		if err := writeFrame(out, resp); err != nil {
 			fmt.Fprintln(errw, "zever-mcp: encode:", err)
 			failed = true
 		}
 	}
 
 	for {
-		var raw json.RawMessage
-		if err := dec.Decode(&raw); err != nil {
+		var raw jsontext.Value
+		if err := codec.UnmarshalDecode(dec, &raw); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			respond(errorResponse(json.RawMessage("null"), codeParseError, "zever-mcp: parse error"))
+			respond(errorResponse(jsontext.Value("null"), codeParseError, "zever-mcp: parse error"))
 			fmt.Fprintln(errw, "zever-mcp: decode:", err)
 			cancel()
 			wg.Wait()
@@ -129,8 +144,8 @@ func run(ctx context.Context, in io.Reader, out io.Writer, errw io.Writer) int {
 		}
 
 		var req rpcRequest
-		if err := json.Unmarshal(raw, &req); err != nil {
-			respond(errorResponse(json.RawMessage("null"), codeInvalidRequest, "zever-mcp: malformed request"))
+		if err := codec.Unmarshal(raw, &req); err != nil {
+			respond(errorResponse(jsontext.Value("null"), codeInvalidRequest, "zever-mcp: malformed request"))
 			continue
 		}
 
@@ -207,7 +222,7 @@ var supportedProtocolVersions = map[string]bool{
 func (s *Server) initializeResponse(req rpcRequest) rpcResponse {
 	var p initializeParams
 	if len(req.Params) > 0 {
-		if err := json.Unmarshal(req.Params, &p); err != nil {
+		if err := codec.Unmarshal(req.Params, &p); err != nil {
 			return errorResponse(req.ID, codeInvalidParams, "zever-mcp: invalid initialize params")
 		}
 	}
@@ -252,7 +267,7 @@ type callParams struct {
 // execution errors so the model can self-correct.
 func (s *Server) callTool(ctx context.Context, req rpcRequest) rpcResponse {
 	var p callParams
-	if err := json.Unmarshal(req.Params, &p); err != nil {
+	if err := codec.Unmarshal(req.Params, &p); err != nil {
 		return errorResponse(req.ID, codeInvalidParams, "zever-mcp: invalid tools/call params")
 	}
 
@@ -275,6 +290,6 @@ func (s *Server) callTool(ctx context.Context, req rpcRequest) rpcResponse {
 }
 
 // errorResponse builds a JSON-RPC error response.
-func errorResponse(id json.RawMessage, code int, msg string) rpcResponse {
+func errorResponse(id jsontext.Value, code int, msg string) rpcResponse {
 	return rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: code, Message: msg}}
 }

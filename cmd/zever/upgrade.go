@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +19,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // ErrUpgradeNeedsConfirm is returned when upgrade runs without a TTY and
@@ -473,7 +474,7 @@ func parseUpgradeRelease(body []byte) (upgradeReleaseInfo, error) {
 		} `json:"assets"`
 	}
 
-	if err := json.Unmarshal(body, &raw); err != nil {
+	if err := codec.Unmarshal(body, &raw); err != nil {
 		return upgradeReleaseInfo{}, fmt.Errorf("zever upgrade: parse release metadata: %w", err)
 	}
 

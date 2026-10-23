@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // schemaSourceProps is the shared dir/files input every schema tool accepts.
@@ -125,7 +126,7 @@ func routesTool() toolDef {
 
 			routes := collectRoutes(res.Schema)
 
-			b, err := json.MarshalIndent(routesResult{Routes: routes, Count: len(routes)}, "", "  ")
+			b, err := codec.MarshalIndent(routesResult{Routes: routes, Count: len(routes)}, "  ")
 			if err != nil {
 				return "", err
 			}

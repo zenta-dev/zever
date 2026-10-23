@@ -1,10 +1,10 @@
 package mcp
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // Backend renders a resolved schema to MCP tool manifests.
@@ -50,7 +50,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 			merged.Services = append(merged.Services, sm)
 		}
 
-		content, err := json.MarshalIndent(mod, "", "  ")
+		content, err := codec.MarshalIndent(mod, "  ")
 		if err != nil {
 			return nil, fmt.Errorf("mcp: marshal %s manifest: %w", moduleLabel(m), err)
 		}
@@ -67,7 +67,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 		}
 	}
 
-	mergedContent, err := json.MarshalIndent(merged, "", "  ")
+	mergedContent, err := codec.MarshalIndent(merged, "  ")
 	if err != nil {
 		return nil, fmt.Errorf("mcp: marshal merged manifest: %w", err)
 	}

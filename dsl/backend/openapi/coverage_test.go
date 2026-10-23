@@ -2,7 +2,7 @@
 // and helper branches that the main tests do not exercise.
 //
 // Reachability notes:
-//   - Generate's two json.MarshalIndent error branches (openapi.go) are
+//   - Generate's two codec.MarshalIndent error branches (openapi.go) are
 //     unreachable via the public API with real inputs: openAPIDoc is a plain
 //     struct of strings, maps, slices, and pointers with no MarshalJSON
 //     methods and no interface fields that could hold an unmarshalable
