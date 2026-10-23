@@ -2,11 +2,8 @@ package mailer
 
 import (
 	"context"
-	"sync/atomic"
 	"testing"
 )
-
-var freshSeq atomic.Int64
 
 type stubMailer struct {
 	sent *Mail

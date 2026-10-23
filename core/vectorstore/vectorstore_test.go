@@ -2,10 +2,7 @@ package vectorstore
 
 import (
 	"context"
-	"sync/atomic"
 )
-
-var testSeq atomic.Int64
 
 type stubStore struct {
 	vecs map[string]Vector

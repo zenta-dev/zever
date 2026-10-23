@@ -9,8 +9,6 @@ import (
 	"github.com/zenta-dev/zever/core/crypto"
 )
 
-var cryptoTestSeq int32 = 2000
-
 func validOpts() crypto.Options {
 	k := make([]byte, 32)
 	for i := range k {

@@ -2,11 +2,8 @@ package log
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 )
-
-var adapterSeq atomic.Int64
 
 type stubEvent struct{}
 

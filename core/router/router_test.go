@@ -1,23 +1,8 @@
 package router
 
 import (
-	"net/http"
 	"testing"
 )
-
-var routerTestSeq int32 = 2000
-
-type mockRouter struct{}
-
-func (m *mockRouter) Handle(_ string, _ string, _ http.HandlerFunc) {}
-
-func (m *mockRouter) Group(_ string, _ ...func(http.Handler) http.Handler) Group {
-	return m
-}
-
-func (m *mockRouter) Use(_ ...func(http.Handler) http.Handler) {}
-
-func (m *mockRouter) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {}
 
 func TestValidMethod(t *testing.T) {
 	t.Parallel()

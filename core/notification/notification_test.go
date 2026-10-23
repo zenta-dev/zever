@@ -3,12 +3,9 @@ package notification
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 )
-
-var freshSeq atomic.Int64
 
 type stubNotifier struct {
 	notified *Notification

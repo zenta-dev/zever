@@ -1,27 +1,11 @@
 package ratelimit
 
 import (
-	"context"
 	"errors"
 	"math"
-	"sync/atomic"
 	"testing"
 	"time"
 )
-
-var freshSeq atomic.Int64
-
-type stubLimiter struct{}
-
-func (stubLimiter) Allow(_ context.Context, _ string, _ float64) (Decision, error) {
-	return Decision{Allowed: true}, nil
-}
-
-func (stubLimiter) Reset(_ context.Context, _ string) error { return nil }
-
-func (stubLimiter) Close() error { return nil }
-
-func (stubLimiter) Name() string { return "stub" }
 
 func TestValidateCost_table(t *testing.T) {
 	t.Parallel()

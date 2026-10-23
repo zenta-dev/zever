@@ -2,10 +2,6 @@ package mailer
 
 import "testing"
 
-func benchOptions() Options {
-	return Options{Host: "smtp.example.com", Port: 587}
-}
-
 func BenchmarkAddressValidate(b *testing.B) {
 	a := Address{Name: "Alice", Address: "alice@example.com"}
 	b.ReportAllocs()

@@ -1,11 +1,8 @@
 package observability
 
 import (
-	"sync/atomic"
 	"testing"
 )
-
-var benchAdapterSeq atomic.Int64
 
 func BenchmarkOptionsValidate(b *testing.B) {
 	o := Options{ServiceName: "svc", Endpoint: "localhost:4317", Insecure: true, SampleRatio: 0.5}

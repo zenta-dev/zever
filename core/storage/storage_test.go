@@ -9,36 +9,6 @@ import (
 	"time"
 )
 
-type stubStorage struct{}
-
-func (stubStorage) PresignUpload(_ context.Context, _, _, _ string, _ time.Duration) (PresignedURL, error) {
-	return PresignedURL{}, nil
-}
-
-func (stubStorage) PresignDownload(_ context.Context, _, _ string, _ time.Duration) (PresignedURL, error) {
-	return PresignedURL{}, nil
-}
-
-func (stubStorage) Exists(_ context.Context, _, _ string) (bool, error) {
-	return false, nil
-}
-
-func (stubStorage) Delete(_ context.Context, _, _ string) error {
-	return nil
-}
-
-func (stubStorage) Move(_ context.Context, _, _, _, _ string) error {
-	return nil
-}
-
-func (stubStorage) Close(_ context.Context) error {
-	return nil
-}
-
-func (stubStorage) Name() string {
-	return "stub"
-}
-
 func TestOptionsValidate(t *testing.T) {
 	t.Parallel()
 

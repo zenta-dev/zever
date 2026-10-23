@@ -55,8 +55,8 @@ func TestRegRemovalTypedErrors(t *testing.T) {
 				t.Fatalf("%T has no Unwrap", tc.err)
 			}
 
-			if got := u.Unwrap(); got != tc.sentinel {
-				t.Errorf("Unwrap() = %v, want sentinel", got)
+			if !errors.Is(u.Unwrap(), tc.sentinel) {
+				t.Errorf("Unwrap() = %v, want sentinel", u.Unwrap())
 			}
 		})
 	}

@@ -42,8 +42,8 @@ func TestRegRemovalTypedErrors(t *testing.T) {
 		t.Errorf("Adapter = %q, want %q", target.Adapter, "openai")
 	}
 
-	if got := target.Unwrap(); got != ErrDuplicateAdapter {
-		t.Errorf("Unwrap() = %v, want ErrDuplicateAdapter", got)
+	if !errors.Is(target, ErrDuplicateAdapter) {
+		t.Errorf("Unwrap() = %v, want ErrDuplicateAdapter", target.Unwrap())
 	}
 
 	var aliasTarget DuplicateError

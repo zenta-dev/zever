@@ -2,13 +2,10 @@ package cache_test
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"github.com/zenta-dev/zever/core/cache"
 )
-
-var cacheAdapterSeq atomic.Int64
 
 type stubCache struct{}
 

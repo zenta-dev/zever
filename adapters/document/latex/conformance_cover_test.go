@@ -2,7 +2,6 @@ package latex
 
 import (
 	"os/exec"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/document"
@@ -18,10 +17,6 @@ func requirePDFLatex(t *testing.T) {
 		t.Skip("no pdflatex binary found, skipping live latex conformance")
 	}
 }
-
-// kitAdapterSeq suffixes TestOpenRegister's adapter name so every
-// invocation registers a name no earlier -count iteration has claimed.
-var kitAdapterSeq atomic.Int64
 
 // TestOpenRegister proves Register wiring plus Open round-trip. It uses a
 // test-only adapter name so it cannot collide with other registrations in

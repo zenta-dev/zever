@@ -385,7 +385,6 @@ func TestEdgeMacVerifyMac_WithoutKey_Fails(t *testing.T) {
 }
 
 func TestEdgeRegister_WiresFactoryFailClosed(t *testing.T) {
-
 	// The registry factory uses New without DevStub, so Open must fail
 	// closed rather than silently use the deterministic stub client.
 	_, err := New(Options{KeyID: "reg-key"})

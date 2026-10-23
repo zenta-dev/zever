@@ -1,15 +1,10 @@
 package billing
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
 )
-
-// nilCtx is a nil context used to prove the battery never dereferences ctx
-// before the adapter boundary.
-var nilCtx context.Context
 
 func TestEdgeParseMinorUnits_zero(t *testing.T) {
 	t.Parallel()

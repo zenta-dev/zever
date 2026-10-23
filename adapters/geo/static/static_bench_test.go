@@ -1,21 +1,10 @@
 package static
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/geo"
 )
-
-// stubGeo is a no-op geo.Geo used to isolate registry benchmarks.
-type stubGeo struct{}
-
-func (stubGeo) Geocode(context.Context, string) ([]geo.Location, error) { return nil, nil }
-func (stubGeo) ReverseGeocode(context.Context, float64, float64) ([]geo.Address, error) {
-	return nil, nil
-}
-func (stubGeo) Distance(context.Context, geo.Point, geo.Point) (float64, error) { return 0, nil }
-func (stubGeo) Close() error                                                    { return nil }
 
 // benchStatic opens the checked-in cities fixture for benchmarks.
 func benchStatic(b *testing.B) geo.Geo {
@@ -122,7 +111,6 @@ func BenchmarkHaversine(b *testing.B) {
 
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-
 	b.ReportAllocs()
 	b.ResetTimer()
 

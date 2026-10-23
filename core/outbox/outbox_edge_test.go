@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/outbox"
 )
-
-var edgeSeq atomic.Int64
 
 func TestMessage_Validate_emptyTopic(t *testing.T) {
 	t.Parallel()

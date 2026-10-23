@@ -3,13 +3,10 @@ package resilience_test
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/resilience"
 )
-
-var freshSeq atomic.Int64
 
 type stubGuard struct {
 	name string
@@ -29,20 +26,6 @@ func (s *stubGuard) State() resilience.State { return resilience.StateClosed }
 func (s *stubGuard) Name() string { return s.name }
 
 func (s *stubGuard) Close() error { return nil }
-
-type stubManager struct {
-	g resilience.Guard
-}
-
-func (m stubManager) Guard(name string) (resilience.Guard, error) {
-	if m.g != nil {
-		return m.g, nil
-	}
-
-	return &stubGuard{name: name}, nil
-}
-
-func (m stubManager) Close() error { return nil }
 
 func TestDo_returnsValue(t *testing.T) {
 	t.Parallel()

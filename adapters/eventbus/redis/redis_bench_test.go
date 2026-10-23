@@ -9,22 +9,6 @@ import (
 	"github.com/zenta-dev/zever/core/eventbus"
 )
 
-// benchPusher is a no-op Pusher used to isolate registry benchmarks from a
-// live Redis broker.
-type benchPusher struct{}
-
-func (benchPusher) Publish(context.Context, string, eventbus.Payload, eventbus.Headers) error {
-	return nil
-}
-
-func (benchPusher) Subscribe(context.Context, string, eventbus.Handler) (func(), error) {
-	return func() {}, nil
-}
-
-func (benchPusher) Close() error { return nil }
-
-func (benchPusher) Name() string { return "bench" }
-
 // benchRedisAdapter builds a Redis bus over a per-benchmark miniredis.
 func benchRedisAdapter(b *testing.B) eventbus.EventBus {
 	b.Helper()
@@ -63,7 +47,6 @@ func BenchmarkNew(b *testing.B) {
 
 // BenchmarkOpen measures a registry lookup plus wrapped construction via Open.
 func BenchmarkOpen(b *testing.B) {
-
 	b.ReportAllocs()
 	b.ResetTimer()
 

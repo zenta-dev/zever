@@ -1,23 +1,10 @@
 package password_test
 
 import (
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/password"
 )
-
-var benchSeq atomic.Int64
-
-func benchOptions() password.Options {
-	return password.Options{
-		Time:    password.DefaultTime,
-		Memory:  password.DefaultMemory,
-		Threads: password.DefaultThreads,
-		SaltLen: password.DefaultSaltLen,
-		KeyLen:  password.DefaultKeyLen,
-	}
-}
 
 func BenchmarkOptionsValidate(b *testing.B) {
 	o := password.Options{

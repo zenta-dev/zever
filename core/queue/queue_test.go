@@ -2,11 +2,8 @@ package queue
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 )
-
-var queueAdapterSeq atomic.Int64
 
 type stubQueue struct{}
 

@@ -3,11 +3,8 @@ package flag
 import (
 	"context"
 	"encoding/json"
-	"sync/atomic"
 	"testing"
 )
-
-var freshSeq atomic.Int64
 
 type stubFlag struct{}
 

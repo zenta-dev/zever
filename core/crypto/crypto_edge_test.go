@@ -1,17 +1,12 @@
 package crypto_test
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/crypto"
 )
-
-// nilCtx is a nil context used to prove the battery never dereferences ctx
-// before the adapter boundary.
-var nilCtx context.Context
 
 func TestEdgeOptionsValidate_devKey(t *testing.T) {
 	t.Parallel()

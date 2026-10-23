@@ -3,12 +3,9 @@ package mailer
 import (
 	"errors"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
-
-var stubAdapterSeq atomic.Int64
 
 func TestCoverNewMailFields(t *testing.T) {
 	t.Parallel()

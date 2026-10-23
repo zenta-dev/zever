@@ -2,7 +2,6 @@ package geo
 
 import (
 	"context"
-	"sync/atomic"
 )
 
 // stubGeo is a minimal Geo implementation for facade tests.
@@ -25,5 +24,3 @@ func (s *stubGeo) Close() error {
 }
 
 // NOTE: no t.Parallel anywhere in this file: registry is a global map.
-
-var geoAdapterSeq atomic.Int64

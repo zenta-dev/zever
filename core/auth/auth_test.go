@@ -1,27 +1,10 @@
 package auth
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
 )
-
-var testAdapterSeq int32 = 1000
-
-type stubAuth struct{}
-
-func (stubAuth) Issue(context.Context, string, map[string]any, time.Duration) (Token, error) {
-	return Token{}, nil
-}
-
-func (stubAuth) Verify(context.Context, string) (Claims, error) {
-	return Claims{}, nil
-}
-
-func (stubAuth) Revoke(context.Context, string) error { return nil }
-
-func (stubAuth) Close() error { return nil }
 
 func TestClaims_Clone_independent(t *testing.T) {
 	t.Parallel()

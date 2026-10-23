@@ -1,20 +1,10 @@
 package embed
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/i18n"
 )
-
-// stubI18n is a no-op i18n.I18n used to isolate registry benchmarks.
-type stubI18n struct{}
-
-func (stubI18n) Translate(context.Context, string, string, map[string]string) (string, error) {
-	return "", nil
-}
-func (stubI18n) Locales(context.Context) ([]string, error) { return nil, nil }
-func (stubI18n) Close() error                              { return nil }
 
 // benchEmbed builds an embedded-catalog backend over the test catalogs.
 func benchEmbed(b *testing.B) i18n.I18n {
@@ -106,7 +96,6 @@ func BenchmarkValidLocaleName(b *testing.B) {
 
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-
 	b.ReportAllocs()
 	b.ResetTimer()
 

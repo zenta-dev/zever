@@ -1,22 +1,12 @@
 package permission
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-// coverStubChecker is a distinct stub for cover tests.
-// It avoids clashing with stubChecker in permission_test.go.
-type coverStubChecker struct{}
-
-// Can always allows with reason allow.
-func (coverStubChecker) Can(_ context.Context, _ Subject, _ string, _ Resource) (Decision, error) {
-	return Decision{Allowed: true, Reason: "allow"}, nil
-}
 
 func TestCover_Options_Validate_Gaps(t *testing.T) {
 	t.Parallel()
@@ -71,7 +61,3 @@ func TestCover_Options_Validate_PolicyMissing(t *testing.T) {
 		t.Fatalf("reason = %q want %q", ioe.Reason, "policy_path does not exist")
 	}
 }
-
-// errCoverOpenFactory is process-shared so repeat runs (-count=2)
-// rewire the same sentinel instance; Register tolerates the duplicate.
-var errCoverOpenFactory = errors.New("cover boom 9202")

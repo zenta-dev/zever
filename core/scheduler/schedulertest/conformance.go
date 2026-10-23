@@ -29,8 +29,7 @@ const (
 // in one process. jobSeq keeps globally registered job names unique so
 // parallel adapter suites never collide on the process-wide job registry.
 var (
-	adapterSeq atomic.Uint64
-	jobSeq     atomic.Uint64
+	jobSeq atomic.Uint64
 )
 
 // Conformance verifies factory-built schedulers implement the

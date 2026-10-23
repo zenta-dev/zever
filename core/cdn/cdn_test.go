@@ -2,13 +2,10 @@ package cdn_test
 
 import (
 	"context"
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/cdn"
 )
-
-var cdnAdapterSeq atomic.Int64
 
 type stubCDN struct{}
 

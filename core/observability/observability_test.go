@@ -1,15 +1,8 @@
 package observability
 
 import (
-	"context"
 	"testing"
 )
-
-type stubProvider struct{}
-
-func (stubProvider) Tracer(string) Tracer           { return nil }
-func (stubProvider) Meter(string) Metrics           { return nil }
-func (stubProvider) Shutdown(context.Context) error { return nil }
 
 func TestOptionsValidateMutualExclusion(t *testing.T) {
 	t.Parallel()

@@ -2,10 +2,7 @@ package payment
 
 import (
 	"context"
-	"sync/atomic"
 )
-
-var testSeq atomic.Int64
 
 type stubPayment struct {
 	result Result

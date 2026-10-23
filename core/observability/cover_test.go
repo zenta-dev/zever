@@ -37,10 +37,6 @@ func TestNormalizeAttrs_keyTruncation_cutsLongKeys(t *testing.T) {
 	}
 }
 
-var coverOpenSuccessStub = stubProvider{}
-
-var errCoverOpenFactory = errors.New("boom")
-
 func TestOptionsValidate_unreadableCAFile(t *testing.T) {
 	t.Parallel()
 

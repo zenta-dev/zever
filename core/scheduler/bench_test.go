@@ -1,13 +1,10 @@
 package scheduler
 
 import (
-	"sync/atomic"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/job"
 )
-
-var benchSeq atomic.Int64
 
 func benchOptions() Options {
 	return Options{Dispatcher: &job.Dispatcher{Q: &stubQueue{}}}

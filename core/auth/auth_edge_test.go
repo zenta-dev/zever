@@ -1,16 +1,11 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 )
-
-// nilCtx is a nil context used to prove the battery never dereferences ctx
-// before the adapter boundary.
-var nilCtx context.Context
 
 func TestEdgeOptionsValidate_negativeLeeway(t *testing.T) {
 	t.Parallel()

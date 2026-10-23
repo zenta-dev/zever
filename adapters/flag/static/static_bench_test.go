@@ -1,20 +1,10 @@
 package static
 
 import (
-	"context"
 	"testing"
 
 	"github.com/zenta-dev/zever/core/flag"
 )
-
-// stubFlag is a no-op flag.Flag used to isolate registry benchmarks.
-type stubFlag struct{}
-
-func (stubFlag) Bool(context.Context, string, bool) (bool, error)       { return false, nil }
-func (stubFlag) String(context.Context, string, string) (string, error) { return "", nil }
-func (stubFlag) Int(context.Context, string, int) (int, error)          { return 0, nil }
-func (stubFlag) JSON(context.Context, string, any, any) error           { return nil }
-func (stubFlag) Close() error                                           { return nil }
 
 // benchFlag opens the checked-in flags fixture for benchmarks.
 func benchFlag(b *testing.B) flag.Flag {
@@ -133,7 +123,6 @@ func BenchmarkFloatToInt(b *testing.B) {
 
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-
 	b.ReportAllocs()
 	b.ResetTimer()
 

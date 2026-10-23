@@ -250,7 +250,6 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-
 	s, err := New(Options{})
 	if err != nil {
 		t.Fatalf("Open = %v", err)

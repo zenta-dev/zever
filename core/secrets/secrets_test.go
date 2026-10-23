@@ -3,14 +3,10 @@ package secrets_test
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 
-	"github.com/zenta-dev/zever/adapters/secrets/env"
 	"github.com/zenta-dev/zever/core/secrets"
 )
-
-var secretsAdapterSeq atomic.Int64
 
 type stubSecrets struct{}
 
@@ -21,10 +17,6 @@ func (stubSecrets) List(context.Context) ([]string, error)      { return []strin
 func (stubSecrets) Close(context.Context) error                 { return nil }
 
 var _ secrets.Secrets = stubSecrets{}
-
-func envFactory(opts secrets.Options) (secrets.Secrets, error) {
-	return env.New(env.Options{Prefix: opts.Prefix})
-}
 
 func TestValidateName_table(t *testing.T) {
 	t.Parallel()

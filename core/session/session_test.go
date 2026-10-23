@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-var freshAdapterCounter int64
-
 func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
 	t.Helper()
 

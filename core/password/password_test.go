@@ -2,10 +2,7 @@ package password_test
 
 import (
 	"context"
-	"errors"
 	"testing"
-
-	"github.com/zenta-dev/zever/core/password"
 )
 
 type stubHasher struct{}
@@ -21,14 +18,6 @@ func (stubHasher) Verify(_ context.Context, _, p string) (bool, error) {
 func (stubHasher) NeedsRehash(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
-
-func stubFactory(_ password.Options) (password.Hasher, error) {
-	return stubHasher{}, nil
-}
-
-// errOpenFactory is process-shared so repeat runs (-count=2) rewire
-// the same sentinel instance; Register tolerates the resulting duplicate.
-var errOpenFactory = errors.New("boom")
 
 func TestStubHasherEmptyInputs(t *testing.T) {
 	t.Parallel()

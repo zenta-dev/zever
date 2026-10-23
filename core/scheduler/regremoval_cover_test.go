@@ -38,7 +38,7 @@ func TestRegRemovalUnknownAdapterError(t *testing.T) {
 		t.Errorf("Adapter = %q, want %q", target.Adapter, "cron")
 	}
 
-	if got := target.Unwrap(); got != ErrUnknownAdapter {
-		t.Errorf("Unwrap() = %v, want ErrUnknownAdapter", got)
+	if !errors.Is(target, ErrUnknownAdapter) {
+		t.Errorf("Unwrap() = %v, want ErrUnknownAdapter", target.Unwrap())
 	}
 }

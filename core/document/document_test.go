@@ -2,10 +2,7 @@ package document
 
 import (
 	"context"
-	"sync/atomic"
 )
-
-var testSeq atomic.Int64
 
 type stubDocument struct {
 	out []byte

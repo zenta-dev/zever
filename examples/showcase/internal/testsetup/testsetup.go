@@ -91,7 +91,7 @@ func Providers(cfg *config.Config) []container.Provider {
 			container.WithOptions(func(o *analytics.Options) { *o = cfg.Analytics.Options })),
 		container.Provide(auth.DefaultRef(), authjwt.New,
 			container.WithOptions(func(o *auth.Options) { *o = cfg.Auth.Options })),
-		container.Provide(billing.DefaultRef(), func(o billing.Options) (billing.Billing, error) {
+		container.Provide(billing.DefaultRef(), func(_ billing.Options) (billing.Billing, error) {
 			return billingstub.New(), nil
 		}),
 		container.Provide(cache.DefaultRef(), cachememory.New,

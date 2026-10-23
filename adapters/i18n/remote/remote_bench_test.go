@@ -1,7 +1,6 @@
 package remote_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,15 +11,6 @@ import (
 	"github.com/zenta-dev/zever/core/i18n"
 	"github.com/zenta-dev/zever/shared/codec"
 )
-
-// stubI18n is a no-op i18n.I18n used to isolate registry benchmarks.
-type stubI18n struct{}
-
-func (stubI18n) Translate(context.Context, string, string, map[string]string) (string, error) {
-	return "", nil
-}
-func (stubI18n) Locales(context.Context) ([]string, error) { return nil, nil }
-func (stubI18n) Close() error                              { return nil }
 
 // benchRemote builds a remote adapter over a stub HTTP server (loopback, no
 // real network) that echoes the requested key.
@@ -117,7 +107,6 @@ func BenchmarkLocalesCached(b *testing.B) {
 
 // BenchmarkOpen measures a registry lookup plus construction via Open.
 func BenchmarkOpen(b *testing.B) {
-
 	b.ReportAllocs()
 	b.ResetTimer()
 

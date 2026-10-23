@@ -68,8 +68,8 @@ func TestRegRemovalTypedErrors(t *testing.T) {
 			t.Errorf("errors.Is(EmptyError{}, ErrEmpty) = false")
 		}
 
-		if got := err.Unwrap(); got != ErrEmpty {
-			t.Errorf("Unwrap() = %v, want ErrEmpty", got)
+		if !errors.Is(err, ErrEmpty) {
+			t.Errorf("Unwrap() = %v, want ErrEmpty", err.Unwrap())
 		}
 	})
 
@@ -91,8 +91,8 @@ func TestRegRemovalTypedErrors(t *testing.T) {
 			t.Errorf("errors.Is(err, ErrInvalidMessageID) = false")
 		}
 
-		if got := err.Unwrap(); got != ErrInvalidMessageID {
-			t.Errorf("Unwrap() = %v, want ErrInvalidMessageID", got)
+		if !errors.Is(err, ErrInvalidMessageID) {
+			t.Errorf("Unwrap() = %v, want ErrInvalidMessageID", err.Unwrap())
 		}
 
 		var target InvalidMessageIDError

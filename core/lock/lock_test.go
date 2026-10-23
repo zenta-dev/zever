@@ -2,13 +2,10 @@ package lock_test
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
 	"github.com/zenta-dev/zever/core/lock"
 )
-
-var lockAdapterSeq atomic.Int64
 
 type stubLock struct{ key string }
 
