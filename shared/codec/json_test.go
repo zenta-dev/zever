@@ -823,3 +823,47 @@ func TestJSONCodec_concurrent_safe(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestUnmarshalStrict_rejectsUnknownMembers(t *testing.T) {
+	t.Parallel()
+
+	var v jsonTestValue
+	if err := Unmarshal([]byte(`{"Name":"zever","Bogus":1}`), &v); err != nil {
+		t.Fatalf("Unmarshal() with unknown member error = %v", err)
+	}
+
+	var strict jsonTestValue
+	if err := UnmarshalStrict([]byte(`{"Name":"zever","Bogus":1}`), &strict); err == nil {
+		t.Error("UnmarshalStrict() with unknown member = nil, want error")
+	}
+
+	var ok jsonTestValue
+	if err := UnmarshalStrict([]byte(`{"Name":"zever","Count":42}`), &ok); err != nil {
+		t.Fatalf("UnmarshalStrict() known members error = %v", err)
+	}
+	if ok.Name != "zever" || ok.Count != 42 {
+		t.Errorf("UnmarshalStrict() = %+v, want Name=zever Count=42", ok)
+	}
+}
+
+func TestMarshalIndentCompat_escapesHTML(t *testing.T) {
+	t.Parallel()
+
+	in := map[string]string{"url": "<https://x.example/?a=1&b=2>"}
+
+	compat, err := MarshalIndentCompat(in)
+	if err != nil {
+		t.Fatalf("MarshalIndentCompat() error = %v", err)
+	}
+	if !jsontext.Value(compat).IsValid() {
+		t.Fatalf("MarshalIndentCompat() produced invalid JSON: %s", compat)
+	}
+
+	pretty, err := MarshalIndent(in, "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent() error = %v", err)
+	}
+	if string(compat) == string(pretty) {
+		t.Error("MarshalIndentCompat() == MarshalIndent(), want HTML-escaped bytes to differ")
+	}
+}
