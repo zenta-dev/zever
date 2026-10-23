@@ -303,22 +303,23 @@ func loadGolden(dir string) (goldenStructs, error) {
 	return g, nil
 }
 
-// loadGoldenFields parses golden_wire_fields.txt in dir: tab-separated
-// package dir, struct name, Go field name, pinned wire key, and the base
-// revision the key was taken from. Blank lines and # comments are ignored.
-func loadGoldenFields(dir string) (goldenFields, error) {
-	f, closeFile, err := openContained(dir, "golden_wire_fields.txt")
+// loadNested4 parses a tab-separated data file in dir whose rows carry at
+// least four columns (package dir, struct name, field name, value) into a
+// three-level map, ignoring blank lines and # comments. file names the data
+// file for error messages; noun names the row kind (e.g. "golden field").
+func loadNested4(dir, file, noun string) (map[string]map[string]map[string]string, error) {
+	f, closeFile, err := openContained(dir, file)
 	if err != nil {
-		return nil, fmt.Errorf("tagcheck: open golden field list: %w", err)
+		return nil, fmt.Errorf("tagcheck: open %s list: %w", noun, err)
 	}
 	defer closeFile()
 
-	g := goldenFields{}
+	g := map[string]map[string]map[string]string{}
 
-	parseErr := eachDataLine(f, "golden_wire_fields.txt", func(line string) error {
+	parseErr := eachDataLine(f, file, func(line string) error {
 		parts := strings.Split(line, "\t")
 		if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
-			return fmt.Errorf("tagcheck: malformed golden field line %q", line)
+			return fmt.Errorf("tagcheck: malformed %s line %q", noun, line)
 		}
 
 		names := g[parts[0]]
@@ -342,6 +343,18 @@ func loadGoldenFields(dir string) (goldenFields, error) {
 	}
 
 	return g, nil
+}
+
+// loadGoldenFields parses golden_wire_fields.txt in dir: tab-separated
+// package dir, struct name, Go field name, pinned wire key, and the base
+// revision the key was taken from. Blank lines and # comments are ignored.
+func loadGoldenFields(dir string) (goldenFields, error) {
+	g, err := loadNested4(dir, "golden_wire_fields.txt", "golden field")
+	if err != nil {
+		return nil, err
+	}
+
+	return goldenFields(g), nil
 }
 
 // loadExceptions parses golden_wire_exceptions.txt in dir: tab-separated
@@ -383,41 +396,12 @@ func loadExceptions(dir string) (exceptions, error) {
 // dir, struct name, Go field name, and the justification for the removal.
 // Blank lines and # comments are ignored.
 func loadRemoved(dir string) (removedKeys, error) {
-	f, closeFile, err := openContained(dir, "golden_wire_removed.txt")
+	r, err := loadNested4(dir, "golden_wire_removed.txt", "golden removed-key")
 	if err != nil {
-		return nil, fmt.Errorf("tagcheck: open golden removed-key list: %w", err)
-	}
-	defer closeFile()
-
-	r := removedKeys{}
-
-	parseErr := eachDataLine(f, "golden_wire_removed.txt", func(line string) error {
-		parts := strings.Split(line, "\t")
-		if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
-			return fmt.Errorf("tagcheck: malformed golden removed-key line %q", line)
-		}
-
-		names := r[parts[0]]
-		if names == nil {
-			names = map[string]map[string]string{}
-			r[parts[0]] = names
-		}
-
-		fields := names[parts[1]]
-		if fields == nil {
-			fields = map[string]string{}
-			names[parts[1]] = fields
-		}
-
-		fields[parts[2]] = parts[3]
-
-		return nil
-	})
-	if parseErr != nil {
-		return nil, parseErr
+		return nil, err
 	}
 
-	return r, nil
+	return removedKeys(r), nil
 }
 
 // loadAllowlist parses tag_allowlist.txt in dir: one entry per line,
