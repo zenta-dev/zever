@@ -5,7 +5,6 @@ package shop
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/zenta-dev/zever/core/queue"
 	"github.com/zenta-dev/zever/orm"
 	"github.com/zenta-dev/zever/shared/apperror"
+	"github.com/zenta-dev/zever/shared/codec"
 
 	genshop "github.com/zenta-dev/zever/examples/showcase/generated/gogen/shop"
 	pb "github.com/zenta-dev/zever/examples/showcase/generated/protogogen/shop"
@@ -268,7 +268,7 @@ func (s *ShopServiceImpl) Checkout(ctx context.Context, req *genshop.CheckoutReq
 	}
 
 	if s.queue != nil {
-		body, _ := json.Marshal(map[string]string{"order_id": orderID})
+		body, _ := codec.Marshal(map[string]string{"order_id": orderID})
 		_ = s.queue.Push(ctx, confirmTopic, queue.NewPayload(body), queue.NewHeaders(nil))
 	}
 

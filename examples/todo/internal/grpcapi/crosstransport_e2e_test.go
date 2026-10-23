@@ -2,7 +2,6 @@ package grpcapi_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	pb "github.com/zenta-dev/zever/examples/todo/generated/protogogen"
 	"github.com/zenta-dev/zever/examples/todo/internal/grpcapi"
 	"github.com/zenta-dev/zever/examples/todo/internal/testsetup"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 const testJWTSecret = "test-secret-for-todo-grpc-32-bytes-min!"
@@ -113,7 +113,7 @@ func TestCreateIdenticalAcrossTransports(t *testing.T) {
 		t.Fatalf("http create: got %d body %s", rec.Code, rec.Body.String())
 	}
 	var httpTask taskJSON
-	if err := json.Unmarshal(rec.Body.Bytes(), &httpTask); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &httpTask); err != nil {
 		t.Fatalf("http decode: %v", err)
 	}
 
@@ -182,7 +182,7 @@ func TestUnauthorizedRejectedIdentically(t *testing.T) {
 		t.Fatalf("http create: got %d", rec.Code)
 	}
 	var created taskJSON
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+	if err := codec.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
@@ -231,7 +231,7 @@ func TestUnauthorizedRejectedIdentically(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("http create: got %d", rec.Code)
 	}
-	if err = json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+	if err = codec.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 

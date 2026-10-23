@@ -8,6 +8,7 @@ require (
 	github.com/zenta-dev/zever/container v0.8.0
 	github.com/zenta-dev/zever/core/db v0.8.0
 	github.com/zenta-dev/zever/orm v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/registry v0.8.0
 )
 
@@ -229,7 +230,6 @@ require (
 	github.com/zenta-dev/zever/core/vectorstore v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/webhook v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/workflow v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/grpcclient v0.8.0 // indirect

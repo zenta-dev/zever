@@ -16,7 +16,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 	"os/signal"
@@ -205,7 +205,7 @@ func run() error {
 	}
 
 	// Schedule Reminder: every day at 09:00, dispatch SendReminder.
-	if _, err := sched.Schedule(ctx, "0 9 * * *", "SendReminder", json.RawMessage(`{}`)); err != nil {
+	if _, err := sched.Schedule(ctx, "0 9 * * *", "SendReminder", jsontext.Value(`{}`)); err != nil {
 		return err
 	}
 

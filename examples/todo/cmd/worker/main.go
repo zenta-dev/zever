@@ -10,7 +10,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"os"
 	"os/signal"
 	"syscall"
@@ -84,7 +84,7 @@ func run() error {
 	}
 
 	// Schedule OverdueDigest: every minute, dispatch SendOverdueDigest.
-	if _, err := sched.Schedule(ctx, "* * * * *", "SendOverdueDigest", json.RawMessage(`{}`)); err != nil {
+	if _, err := sched.Schedule(ctx, "* * * * *", "SendOverdueDigest", jsontext.Value(`{}`)); err != nil {
 		return err
 	}
 

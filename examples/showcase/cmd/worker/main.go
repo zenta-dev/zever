@@ -13,7 +13,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"os"
 	"os/signal"
 	"syscall"
@@ -108,12 +108,12 @@ func run() error {
 	}
 
 	// schedule DailyReport
-	if _, err := sched.Schedule(ctx, "0 9 * * *", "GenerateDailyReport", json.RawMessage(`{}`)); err != nil {
+	if _, err := sched.Schedule(ctx, "0 9 * * *", "GenerateDailyReport", jsontext.Value(`{}`)); err != nil {
 		return err
 	}
 
 	// schedule HourlyReindex
-	if _, err := sched.Schedule(ctx, "0 * * * *", "ReindexSearch", json.RawMessage(`{}`)); err != nil {
+	if _, err := sched.Schedule(ctx, "0 * * * *", "ReindexSearch", jsontext.Value(`{}`)); err != nil {
 		return err
 	}
 

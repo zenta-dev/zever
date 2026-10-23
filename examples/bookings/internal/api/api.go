@@ -3,9 +3,10 @@ package api
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 
 	"github.com/zenta-dev/zever/core/auth"
 	"github.com/zenta-dev/zever/core/billing"
@@ -202,7 +203,7 @@ func (a *API) checkoutVersion(ctx context.Context) string {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_ = codec.MarshalLine(w, v)
 }
 
 // writeError encodes a message as a JSON error.
@@ -220,5 +221,5 @@ const maxRequestBodyBytes = 1 << 20 // 1 MiB
 func decodeJSON(req *http.Request, v any) error {
 	defer func() { _ = req.Body.Close() }()
 	body := http.MaxBytesReader(nil, req.Body, maxRequestBodyBytes)
-	return json.NewDecoder(body).Decode(v)
+	return codec.UnmarshalRead(body, v)
 }
