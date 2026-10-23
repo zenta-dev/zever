@@ -38,6 +38,7 @@ at the generator, never in the output; and the `.git`, `.worktrees`,
 | `golden_wire_structs.txt` | `dir<TAB>struct<TAB>source file` | the wire-struct registry: every struct that is (or was) a JSON wire type |
 | `golden_wire_fields.txt` | `dir<TAB>struct<TAB>field<TAB>key<TAB>base revision` | the pinned wire key of every field of every registered struct |
 | `golden_wire_exceptions.txt` | `dir<TAB>struct<TAB>reason` | structs that expose json keys but are deliberately not pinned |
+| `golden_wire_removed.txt` | `dir<TAB>struct<TAB>field<TAB>reason` | wire keys deliberately deleted at a breaking release; suppresses `golden-missing`, omitted when the pins regenerate |
 | `tag_allowlist.txt` | `path` or `path:line` | the permitted `yaml:`/`toml:` tag locations |
 | `no_config_file_allowlist.txt` | `path` or `path:line` | the permitted mentions of a retired config file name |
 | `no_config_parser_allowlist.txt` | `path` or `path:line` | the permitted imports of a YAML or TOML parser in a non-test file |
@@ -298,6 +299,38 @@ field of a registered struct, and an untagged field has no wire key to
 pin. Such a struct goes into `golden_wire_exceptions.txt` with a
 justification. The guard rejects an exception that names a struct which
 does not exist, that is registered already, or that is fully json-tagged.
+
+## Removing a wire key
+
+Deleting a field (or renaming it together with its key) is a wire break:
+`golden-missing` fails the gate. The default answer is don't — the
+contracts quoted above (buf's `FIELD_NO_DELETE_UNLESS_NAME_RESERVED`,
+protobuf's "removing fields is a breaking change", Kubernetes' "cannot be
+removed") all pin the same stance.
+
+When a breaking release deletes a key anyway, bless it in
+`golden_wire_removed.txt` instead of hand-editing the generated file:
+
+```sh
+# 1. add one line per removed key, with the breaking-change justification
+# 2. regenerate the pins; the generator omits blessed keys from history
+make tag-golden
+```
+
+`tagcheck` suppresses `golden-missing` for a listed key, and `taggolden`
+omits it when regenerating `golden_wire_fields.txt` from the immutable
+history, so the regenerated file stays byte-stable and both gates pass.
+
+Breaking-change PRs only, with explicit maintainer review. The guard
+rejects a stale entry instead of letting it rot:
+
+* `tagcheck` fails an entry that names a struct which is not registered in
+  `golden_wire_structs.txt`, or a Go field that still exists in the tree
+  (rule `golden-removed`);
+* `taggolden` fails an entry that names a struct which is not registered,
+  or a key that matches no field of the struct at its base revision —
+  there is nothing to bless. The committed golden file omits blessed keys
+  by design, so only the history can judge that case.
 
 ## Why "exposes a json key" is the registration signal
 

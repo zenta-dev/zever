@@ -1,0 +1,20 @@
+# golden_wire_removed.txt — wire keys deliberately deleted from the golden
+# contract at a breaking release (tagcheck rule golden-removed).
+#
+# Format: <repo-relative package dir><TAB><struct name><TAB><Go field name><TAB><justification>
+# Blank lines and # comments are ignored.
+#
+# A listed key suppresses the golden-missing violation its deletion would
+# otherwise produce, and the generator (tools/tagcheck/cmd/taggolden) omits
+# it when regenerating golden_wire_fields.txt from the immutable history,
+# so the regenerated file stays byte-stable.
+#
+# Breaking-change PRs only, with explicit maintainer review. The guard
+# rejects a stale entry instead of letting it rot: tagcheck fails an entry
+# that names a struct which is not registered in golden_wire_structs.txt
+# or a Go field that still exists in the tree, and the generator fails an
+# entry that matches no field of the struct at its base revision (nothing
+# to bless).
+#
+config	Service	Adapter	feat!: adapter selection moved to container.Provide; *_ADAPTER env removed, Adapter field deleted from options-only Service envelope
+config	ServiceConfig	Adapter	feat!: adapter selection moved to container.Provide; *_ADAPTER env removed, Adapter field deleted from options-only Service envelope
