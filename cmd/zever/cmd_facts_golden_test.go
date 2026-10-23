@@ -92,23 +92,20 @@ func harvestFlag(f *pflag.Flag) cmdFactsFlag {
 	}
 }
 
-// harvestFlags walks one command's flag sets via VisitAll (so hidden and
-// deprecated flags are never skipped) and returns them fully sorted for a
-// deterministic golden regardless of SortFlags.
-func harvestFlags(cmd *cobra.Command) (local, inherited []cmdFactsFlag) {
-	collect := func(set *pflag.FlagSet, into *[]cmdFactsFlag) {
-		set.VisitAll(func(f *pflag.Flag) {
-			*into = append(*into, harvestFlag(f))
-		})
-	}
+// harvestFlags walks one command's flag set via VisitAll (so hidden and
+// deprecated flags are never skipped) and returns it fully sorted for a
+// deterministic golden regardless of SortFlags. Inherited persistent flags
+// are pinned once as globals by the caller; they are not repeated here.
+func harvestFlags(cmd *cobra.Command) []cmdFactsFlag {
+	var flags []cmdFactsFlag
 
-	collect(cmd.LocalFlags(), &local)
-	collect(cmd.InheritedFlags(), &inherited)
+	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		flags = append(flags, harvestFlag(f))
+	})
 
-	sortFlagsFacts(local)
-	sortFlagsFacts(inherited)
+	sortFlagsFacts(flags)
 
-	return local, inherited
+	return flags
 }
 
 // harvestCmdFacts builds the fact sheet from a fresh root command. It walks
@@ -124,7 +121,7 @@ func harvestCmdFacts(root *cobra.Command) cmdFacts {
 	// The bare root's flags are the globals: persistent (interactive,
 	// quiet, no-color, json, V) plus the cobra-injected help and version
 	// local flags, which `zever --help [--version]` really accepts.
-	globalsLocal, _ := harvestFlags(root)
+	globalsLocal := harvestFlags(root)
 	facts.Globals = globalsLocal
 
 	var walk func(cmd *cobra.Command, path string)
@@ -137,7 +134,7 @@ func harvestCmdFacts(root *cobra.Command) cmdFacts {
 				aliases = []string{}
 			}
 
-			local, _ := harvestFlags(cmd)
+			local := harvestFlags(cmd)
 			facts.Commands = append(facts.Commands, cmdFactsCommand{
 				Path:       path,
 				Aliases:    aliases,
@@ -202,6 +199,10 @@ func (f cmdFacts) factsFlagsByName() (paths map[string]bool, local map[string]ma
 
 	for _, g := range f.Globals {
 		globals[g.Name] = true
+
+		if g.Shorthand != "" {
+			globals[g.Shorthand] = true
+		}
 	}
 
 	for _, c := range f.Commands {
@@ -288,19 +289,12 @@ func TestCmdFactsGolden(t *testing.T) {
 	golden := filepath.Join("testdata", "cmd_facts.json")
 
 	if updateCmdFactsRequested() {
-		if err := os.WriteFile(golden, got, 0o600); err != nil {
-			t.Fatalf("write golden: %v", err)
-		}
-
-		t.Logf("rewrote %s (%d bytes, %d commands, %d globals)", golden, len(got), len(facts.Commands), len(facts.Globals))
+		mustWriteCmdFactsGolden(t, golden, got)
 
 		return
 	}
 
-	want, err := os.ReadFile(golden)
-	if err != nil {
-		t.Fatalf("read golden %s (run with -update to create it): %v", golden, err)
-	}
+	want := mustReadCmdFactsGolden(t, golden)
 
 	if string(got) != string(want) {
 		t.Errorf("cmd facts golden drifted against %s: run with -update and review the diff", golden)
@@ -309,6 +303,29 @@ func TestCmdFactsGolden(t *testing.T) {
 			t.Errorf("%s", diff)
 		}
 	}
+}
+
+// mustWriteCmdFactsGolden rewrites the committed golden in -update mode.
+func mustWriteCmdFactsGolden(t *testing.T, path string, got []byte) {
+	t.Helper()
+
+	if err := os.WriteFile(path, got, 0o600); err != nil {
+		t.Fatalf("write golden: %v", err)
+	}
+
+	t.Logf("rewrote %s (%d bytes)", path, len(got))
+}
+
+// mustReadCmdFactsGolden loads the committed golden; missing file aborts.
+func mustReadCmdFactsGolden(t *testing.T, path string) []byte {
+	t.Helper()
+
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read golden %s (run with -update to create it): %v", path, err)
+	}
+
+	return want
 }
 
 // hasFlagName reports whether the flag list carries the named flag.

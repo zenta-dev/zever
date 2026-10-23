@@ -194,20 +194,27 @@ func docsWordNamePrefix(f string) string {
 	}
 
 	// A digit-led token ("8080") or bare "." is prose, not a command name.
-	first := rune(f[0])
-	if !(first >= 'a' && first <= 'z' || first >= 'A' && first <= 'Z') {
+	if !docsWordIsLetter(rune(f[0])) {
 		return ""
 	}
 
 	return f[:end]
 }
 
+// docsWordIsLetter reports whether r is an ASCII letter (command names start
+// with one).
+func docsWordIsLetter(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
+}
+
 // cmdDocsScanFile returns, for one file, the per-line mentions and flag
-// tokens, in line order.
-func cmdDocsScanFile(src cmdDocsSource) (mentions map[int][]docsMention, tokens map[int][]string, lines []cmdDocsLine) {
+// tokens, in line order; read errors fail the test (must-helper).
+func mustCmdDocsScanFile(t *testing.T, src cmdDocsSource) (mentions map[int][]docsMention, tokens map[int][]string, lines []cmdDocsLine) {
+	t.Helper()
+
 	raw, err := os.ReadFile(src.Path)
 	if err != nil {
-		return nil, nil, nil
+		t.Fatalf("read docs source %s: %v", src.Rel, err)
 	}
 
 	text := strings.ReplaceAll(string(raw), "\r\n", "\n")
@@ -489,12 +496,7 @@ func TestCmdFactsDocsGate(t *testing.T) {
 	docsDirs := docsSourcesAtInventory(t, docsRepoRoot(t))
 
 	for _, src := range docsDirs {
-		mentions, tokens, lines := cmdDocsScanFile(src)
-		if mentions == nil {
-			t.Fatalf("scan %s failed (read error)", src.Rel)
-
-			continue
-		}
+		mentions, tokens, lines := mustCmdDocsScanFile(t, src)
 
 		for i, toks := range tokens {
 			for col, tok := range toks {
