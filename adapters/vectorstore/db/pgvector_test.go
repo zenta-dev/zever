@@ -368,7 +368,6 @@ func TestEmbeddingCodec_roundTrip(t *testing.T) {
 // TestOpenRegister_canonicalName proves the canonical "db" name resolves
 // through the registry to a working store.
 func TestOpenRegister_canonicalName(t *testing.T) {
-
 	for _, adapter := range []string{"db"} {
 		s, err := New(vectorstore.Options{})
 		if err != nil {

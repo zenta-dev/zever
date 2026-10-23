@@ -100,12 +100,12 @@ func fakeProviders() []Provider {
 	}
 }
 
-// newTestContainer builds a container with every service faked, plus any
-// extra providers, and closes it on cleanup.
-func newTestContainer(t *testing.T, extra ...Provider) *Container {
+// newTestContainer builds a container with every service faked
+// and closes it on cleanup.
+func newTestContainer(t *testing.T) *Container {
 	t.Helper()
 
-	c := New(nil, append(fakeProviders(), extra...)...)
+	c := New(nil, fakeProviders()...)
 	closeContainer(t, c)
 
 	return c
@@ -1000,7 +1000,7 @@ func TestAccessors_failedBuildRetries(t *testing.T) {
 	t.Parallel()
 
 	calls := 0
-	c := New(nil, Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) {
+	c := New(nil, Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) {
 		calls++
 		if calls == 1 {
 			return nil, errors.New("container: db: boom")
@@ -1287,7 +1287,7 @@ type stubDB struct {
 func TestTransactor_unsupported(t *testing.T) {
 	t.Parallel()
 
-	c := New(nil, Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) {
+	c := New(nil, Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) {
 		return stubDB{}, nil
 	}))
 	closeContainer(t, c)

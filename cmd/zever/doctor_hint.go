@@ -12,8 +12,7 @@ import (
 // field that the battery's own Options struct actually declares, so the
 // hint always points at a key the project's .env.example already lists.
 func doctorFixHint(battery, errText string) string {
-	switch battery {
-	case "config":
+	if battery == "config" {
 		// The config row is the whole config's validation, not one
 		// battery: the error names the service whose options are wrong.
 		return "fix the service env the error names, then re-run 'zever doctor'"

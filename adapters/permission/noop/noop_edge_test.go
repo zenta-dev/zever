@@ -45,7 +45,6 @@ func TestCan_concurrentSafe(t *testing.T) {
 }
 
 func TestRegister_wiresNoopFactory(t *testing.T) {
-
 	c, err := noop.New(permission.Options{})
 	if err != nil {
 		t.Fatalf("Open(noop) = %v, want nil", err)

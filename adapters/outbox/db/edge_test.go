@@ -55,7 +55,6 @@ func TestNewInvalidOptions(t *testing.T) {
 }
 
 func TestRegisterSharedOpens(t *testing.T) {
-
 	conn, err := openSQLite(t)
 	if err != nil {
 		t.Fatalf("openSQLite() error = %v", err)

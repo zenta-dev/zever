@@ -46,10 +46,10 @@ func seedReadyContainer(t *testing.T, dbErr error, relay outbox.Status, gate boo
 	cfg.Outbox.Options.StallReadiness = gate
 
 	c := New(cfg,
-		Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) {
+		Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) {
 			return &pingDB{err: dbErr}, nil
 		}),
-		Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+		Provide(outbox.DefaultRef(), func(_ outbox.Options) (outbox.Store, error) {
 			return &stalledOutbox{status: relay}, nil
 		}),
 	)
@@ -141,8 +141,8 @@ func TestReady_outboxResolutionFailureIsIgnored(t *testing.T) {
 	cfg := config.Default()
 	cfg.Outbox.Options.StallReadiness = true
 	c := New(cfg,
-		Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) { return &pingDB{}, nil }),
-		Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+		Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) { return &pingDB{}, nil }),
+		Provide(outbox.DefaultRef(), func(_ outbox.Options) (outbox.Store, error) {
 			return nil, errors.New("container: outbox: unwired in test")
 		}),
 	)

@@ -101,7 +101,6 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
-
 	s, err := memory.New(memory.Options{})
 	if err != nil {
 		t.Fatalf("Open(memory) error = %v", err)

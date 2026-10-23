@@ -193,7 +193,6 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-
 	s, err := New(Options{Options: coredb.Options{Path: filepath.Join(t.TempDir(), "session.db")}})
 	if err != nil {
 		t.Fatalf("New = %v", err)

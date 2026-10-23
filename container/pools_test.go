@@ -12,7 +12,6 @@ import (
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/db"
-	"github.com/zenta-dev/zever/core/search"
 )
 
 // stubPool is a fake db.DB recording closes. It is safe for concurrent use.
@@ -325,22 +324,6 @@ func TestContainer_DedicatedPoolIsolation(t *testing.T) {
 	t.Skip("container no longer shares pools: providers own their backends")
 }
 
-// stubSearch is a no-op search.Search proving the borrower path without
-// importing a search adapter.
-type stubSearch struct{}
-
-func (s *stubSearch) Index(_ context.Context, _ search.Document) error { return nil }
-
-func (s *stubSearch) IndexBatch(_ context.Context, _ []search.Document) error { return nil }
-
-func (s *stubSearch) Delete(_ context.Context, _ string) error { return nil }
-
-func (s *stubSearch) Search(_ context.Context, _ string, _ search.QueryOptions) (search.Result, error) {
-	return search.Result{}, nil
-}
-
-func (s *stubSearch) Close() error { return nil }
-
 func TestContainer_SharedPool_SQLiteFile(t *testing.T) {
 	t.Skip("container no longer shares pools: providers own their backends")
 }
@@ -387,7 +370,7 @@ func TestContainer_PoolStatusAndMismatches(t *testing.T) {
 	c := New(nil)
 	var warns warnSink
 	c.pools.warn = warns.warn
-	c.pools.open = func(_ string, opts db.Options) (db.DB, error) {
+	c.pools.open = func(_ string, _ db.Options) (db.DB, error) {
 		return &stubPool{}, nil
 	}
 	t.Cleanup(func() {

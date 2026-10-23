@@ -223,7 +223,6 @@ func TestEdgeNew_negativeTTL(t *testing.T) {
 // TestEdgeNewFromDB_borrowsPool proves NewFromDB opens over a borrowed pool:
 // closing the cache leaves the caller's conn usable.
 func TestEdgeNewFromDB_borrowsPool(t *testing.T) {
-
 	conn, err := dbsqlite.New(coredb.Options{Path: filepath.Join(t.TempDir(), "cache.db")})
 	if err != nil {
 		t.Fatalf("sqlite New failed: %v", err)

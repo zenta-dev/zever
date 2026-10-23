@@ -274,7 +274,6 @@ func TestOpenFromDBNilConn(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-
 	s, err := New(Options{Options: coredb.Options{Path: filepath.Join(t.TempDir(), "reg.db")}})
 	if err != nil {
 		t.Fatalf("Open(db) error = %v", err)

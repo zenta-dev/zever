@@ -42,7 +42,6 @@ func migrate(t *testing.T, database interface {
 // TestRunSeedsAndIsIdempotent seeds twice and asserts the fixed demo rows
 // exist exactly once.
 func TestRunSeedsAndIsIdempotent(t *testing.T) {
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "seed.db")
 	c := container.New(cfg, testsetup.Providers(cfg)...)
