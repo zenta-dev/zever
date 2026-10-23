@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/diag"
 	"github.com/zenta-dev/zever/dsl/parser"
+	"github.com/zenta-dev/zever/dsl/resolver"
 	"github.com/zenta-dev/zever/dsl/token"
 )
 
@@ -32,6 +35,37 @@ func containsLabel(labels []string, want string) bool {
 	}
 
 	return false
+}
+
+// candidateLabels extracts the label of every candidate, the same shape
+// completionLabels produces for protocol items.
+func candidateLabels(cands []candidate) []string {
+	labels := make([]string, 0, len(cands))
+	for _, cand := range cands {
+		labels = append(labels, cand.label)
+	}
+
+	return labels
+}
+
+// findCandidate returns the first candidate with the given label.
+func findCandidate(cands []candidate, label string) (candidate, bool) {
+	for _, cand := range cands {
+		if cand.label == label {
+			return cand, true
+		}
+	}
+
+	return candidate{}, false
+}
+
+// atLineEnd returns the cursor position at the end of a 0-indexed source
+// line, the usual hand-built cursor for lexical-tier completion fixtures.
+func atLineEnd(src string, line int) protocol.Position {
+	return protocol.Position{
+		Line:      uint32(line),                                //nolint:gosec // test fixture line index
+		Character: uint32(len(strings.Split(src, "\n")[line])), //nolint:gosec // len never negative
+	}
 }
 
 func TestCompletionTopLevelKeywordsOnEmptyFile(t *testing.T) {
@@ -939,7 +973,7 @@ func TestColonContext_condition_expected(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := colonContext(tc.toks); got != tc.want {
+			if got := colonContext(tc.toks, tc.toks); got != tc.want {
 				t.Errorf("colonContext() = %v, want %v", got, tc.want)
 			}
 		})
@@ -1057,6 +1091,454 @@ func TestBraceDepth_condition_expected(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := braceDepth(tc.toks); got != tc.want {
 				t.Errorf("braceDepth() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestScalarTypeCandidatesDeriveFromResolver pins that the field-type
+// candidates are derived from resolver.ScalarTypeNames plus the separate
+// `enum` candidate, keep their human descriptions, and stay sorted by
+// label -- so neither completion nor the resolver's scalar table can drift
+// without failing here (every resolver name, including the datetime alias
+// of timestamp, must appear exactly once).
+func TestScalarTypeCandidatesDeriveFromResolver(t *testing.T) {
+	want := append([]string{}, resolver.ScalarTypeNames()...)
+	want = append(want, "enum")
+	sort.Strings(want)
+
+	labels := candidateLabels(scalarTypeCandidates)
+
+	if len(labels) != len(want) {
+		t.Fatalf("scalarTypeCandidates has %d entries (%v), want %d: %v", len(labels), labels, len(want), want)
+	}
+
+	for i, name := range want {
+		if labels[i] != name {
+			t.Fatalf("scalarTypeCandidates[%d] = %q, want %q (full list: %v)", i, labels[i], name, labels)
+		}
+	}
+
+	if !sort.StringsAreSorted(labels) {
+		t.Errorf("scalarTypeCandidates is not sorted by label: %v", labels)
+	}
+}
+
+// TestScalarTypeCandidateDetails pins the human descriptions of the scalar
+// candidates, including that `datetime` (the resolver's alias of timestamp)
+// phrases like timestamp, and that `enum` keeps its separate inline-enum
+// phrasing.
+func TestScalarTypeCandidateDetails(t *testing.T) {
+	tests := []struct {
+		label string
+		want  string
+	}{
+		{"datetime", "timestamp scalar"},
+		{"timestamp", "timestamp scalar"},
+		{"uuid", "UUID scalar"},
+		{"bool", "boolean scalar"},
+		{"json", "JSON document scalar"},
+		{"enum", "enum(value, ...) inline enumeration"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			cand, ok := findCandidate(scalarTypeCandidates, tc.label)
+			if !ok {
+				t.Fatalf("scalarTypeCandidates missing %q entirely", tc.label)
+			}
+
+			if cand.detail != tc.want {
+				t.Errorf("candidate %q detail = %q, want %q", tc.label, cand.detail, tc.want)
+			}
+		})
+	}
+}
+
+// TestCompletionFieldTypePinFullCandidateList pins the exact candidate list
+// a `field: <empty>` slot offers -- resolver.ScalarTypeNames plus enum,
+// sorted by label -- so adding, dropping or renaming a scalar (e.g. losing
+// the datetime alias) fails here at the completion level too.
+func TestCompletionFieldTypePinFullCandidateList(t *testing.T) {
+	src := "entity User {\n\tid: \n}\n"
+
+	file, _ := parser.New("u.zen", []byte(src)).ParseFile()
+
+	want := []string{"bool", "bytes", "date", "datetime", "enum", "float32", "float64", "int32", "int64", "json", "string", "timestamp", "uuid"}
+
+	items := completionAt(nil, file, src, atLineEnd(src, 1))
+	labels := completionLabels(items)
+
+	if len(labels) != len(want) {
+		t.Fatalf("field-type completion returned %d items (%v), want exactly %v", len(labels), labels, want)
+	}
+
+	for i, name := range want {
+		if labels[i] != name {
+			t.Errorf("field-type completion label %d = %q, want %q", i, labels[i], name)
+		}
+	}
+}
+
+// TestCompletionDispatchValueOffersJobs proves the schedule dispatch slot
+// offers the jobs (from the schema when resolvable, else the file's own job
+// declarations) and stays silent once the call argument list has content.
+func TestCompletionDispatchValueOffersJobs(t *testing.T) {
+	jobName := "CleanupAbandonedCarts"
+
+	tests := []struct {
+		name    string
+		value   string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "empty value lists the jobs",
+			value:   "",
+			want:    []string{jobName},
+			notWant: []string{"uuid", "int32", "GET"},
+		},
+		{
+			name:    "typed prefix filters the jobs",
+			value:   "clea",
+			want:    []string{jobName},
+			notWant: []string{"uuid"},
+		},
+		{
+			name:    "unclosed call paren still lists the jobs",
+			value:   jobName + "(",
+			want:    []string{jobName},
+			notWant: []string{"uuid"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := fmt.Sprintf("job %s() {\n}\n\nschedule Nightly {\n\tdispatch: %s\n}\n", jobName, tc.value)
+
+			file, _ := parser.New("s.zen", []byte(src)).ParseFile()
+
+			cursor := atLineEnd(src, 4)
+			cursor.Character -= uint32(len(tc.value)) //nolint:gosec // test fixture arithmetic
+
+			items := completionAt(nil, file, src, cursor)
+			labels := completionLabels(items)
+
+			for _, want := range tc.want {
+				if !containsLabel(labels, want) {
+					t.Errorf("dispatch completion missing %q, got %v", want, labels)
+				}
+			}
+
+			for _, notWant := range tc.notWant {
+				if containsLabel(labels, notWant) {
+					t.Errorf("dispatch completion should not offer %q, got %v", notWant, labels)
+				}
+			}
+
+			item, ok := findCompletionItem(items, jobName)
+			if !ok {
+				t.Fatalf("missing %q item entirely, got %v", jobName, labels)
+			}
+
+			if item.Kind != protocol.CompletionItemKindFunction {
+				t.Errorf("dispatch target kind = %v, want Function", item.Kind)
+			}
+		})
+	}
+}
+
+// TestCompletionDispatchValueScopedToSchedule proves a field legitimately
+// named `dispatch` outside a schedule block still completes as a field type
+// slot rather than a job target.
+func TestCompletionDispatchValueScopedToSchedule(t *testing.T) {
+	src := "job CleanupAbandonedCarts() {\n}\n\nentity Order {\n\tdispatch: \n}\n"
+
+	file, _ := parser.New("o.zen", []byte(src)).ParseFile()
+
+	items := completionAt(nil, file, src, atLineEnd(src, 4))
+	labels := completionLabels(items)
+
+	if containsLabel(labels, "CleanupAbandonedCarts") {
+		t.Errorf("entity field named dispatch should not offer jobs, got %v", labels)
+	}
+
+	if !containsLabel(labels, "uuid") {
+		t.Errorf("entity field named dispatch should still offer scalar types, got %v", labels)
+	}
+}
+
+// TestCompletionHTTPVerbSlot proves the rpc http: option's verb slot offers
+// the fixed v1 verb vocabulary in a deterministic order, prefix-filters,
+// and stays scoped to rpc blocks.
+func TestCompletionHTTPVerbSlot(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "empty value offers every verb in order",
+			value:   "",
+			want:    []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			notWant: []string{"uuid"},
+		},
+		{
+			name:    "typed prefix filters the verbs",
+			value:   "PO",
+			want:    []string{"POST"},
+			notWant: []string{"GET", "PUT", "PATCH", "DELETE"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := fmt.Sprintf("service S {\n\trpc M() -> T {\n\t\thttp: %s\n\t}\n}\n", tc.value)
+
+			file, _ := parser.New("s.zen", []byte(src)).ParseFile()
+
+			cursor := atLineEnd(src, 2)
+
+			items := completionAt(nil, file, src, cursor)
+			labels := completionLabels(items)
+
+			if len(labels) != len(tc.want) {
+				t.Fatalf("http verb completion returned %v, want exactly %v", labels, tc.want)
+			}
+
+			for i, name := range tc.want {
+				if labels[i] != name {
+					t.Errorf("http verb completion label %d = %q, want %q", i, labels[i], name)
+				}
+			}
+
+			for _, notWant := range tc.notWant {
+				if containsLabel(labels, notWant) {
+					t.Errorf("http verb completion should not offer %q, got %v", notWant, labels)
+				}
+			}
+		})
+	}
+}
+
+// TestCompletionHTTPVerbScopedToRPC proves a field legitimately named `http`
+// outside an rpc block still completes as a field type slot rather than a
+// verb slot.
+func TestCompletionHTTPVerbScopedToRPC(t *testing.T) {
+	src := "entity Order {\n\thttp: \n}\n"
+
+	file, _ := parser.New("o.zen", []byte(src)).ParseFile()
+
+	items := completionAt(nil, file, src, atLineEnd(src, 1))
+	labels := completionLabels(items)
+
+	if containsLabel(labels, "GET") {
+		t.Errorf("entity field named http should not offer HTTP verbs, got %v", labels)
+	}
+
+	if !containsLabel(labels, "uuid") {
+		t.Errorf("entity field named http should still offer scalar types, got %v", labels)
+	}
+}
+
+// TestCompletionDefaultEnumValueOffersEnumValues proves @default( on a
+// field whose declared type names an enum in this file enumerates exactly
+// that enum's values, prefix-filters, and offers nothing it cannot resolve
+// (a scalar field, or a type name missing from both the schema and the
+// file) rather than guessing.
+func TestCompletionDefaultEnumValueOffersEnumValues(t *testing.T) {
+	tests := []struct {
+		name    string
+		typ     string
+		value   string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "named enum values offered",
+			typ:     "Status",
+			value:   "",
+			want:    []string{"pending", "paid"},
+			notWant: []string{"pending,", "Mystery"},
+		},
+		{
+			name:    "typed prefix filters the values",
+			typ:     "Status",
+			value:   "pe",
+			want:    []string{"pending"},
+			notWant: []string{"paid"},
+		},
+		{
+			name: "unresolvable type name offers nothing",
+			typ:  "Mystery",
+		},
+		{
+			name: "scalar type name offers nothing",
+			typ:  "uuid",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := fmt.Sprintf("enum Status {\n\tpending, paid\n}\n\nentity Order {\n\tstatus: %s @default(%s\n}\n", tc.typ, tc.value)
+
+			file, _ := parser.New("o.zen", []byte(src)).ParseFile()
+
+			cursor := atLineEnd(src, 5)
+
+			items := completionAt(nil, file, src, cursor)
+			labels := completionLabels(items)
+
+			for _, want := range tc.want {
+				if !containsLabel(labels, want) {
+					t.Errorf("default completion missing %q, got %v", want, labels)
+				}
+			}
+
+			for _, notWant := range tc.notWant {
+				if containsLabel(labels, notWant) {
+					t.Errorf("default completion should not offer %q, got %v", notWant, labels)
+				}
+			}
+
+			if tc.want == nil && len(labels) != 0 {
+				t.Errorf("default completion returned %d items, want none: %v", len(labels), labels)
+			}
+
+			if len(tc.want) > 0 {
+				item, ok := findCompletionItem(items, tc.want[0])
+				if !ok {
+					t.Fatalf("missing %q item entirely, got %v", tc.want[0], labels)
+				}
+
+				if item.Kind != protocol.CompletionItemKindEnumMember {
+					t.Errorf("default value kind = %v, want EnumMember", item.Kind)
+				}
+
+				if detail, present := item.Detail.Get(); !present || detail != fmt.Sprintf("enum %s value", tc.typ) {
+					t.Errorf("default value detail = %q (present=%v), want %q", detail, present, fmt.Sprintf("enum %s value", tc.typ))
+				}
+			}
+		})
+	}
+}
+
+// TestCompletionDefaultEnumValueNeedsSchemaAcrossFiles proves the default
+// slot enumerates a named enum declared in a different file of the same
+// workspace schema, and that without the schema (or with the enum absent
+// from both sources) it offers nothing instead of guessing.
+func TestCompletionDefaultEnumValueNeedsSchemaAcrossFiles(t *testing.T) {
+	enumSrc := "enum Status {\n\tpending\n}\n"
+	orderSrc := "entity Order {\n\tstatus: Status @default(\n}\n"
+
+	result, _ := compile.Compile(map[string]string{
+		"e.zen": enumSrc, // the enum lives in another file of the workspace
+		"o.zen": orderSrc,
+	})
+
+	file, _ := parser.New("o.zen", []byte(orderSrc)).ParseFile()
+	cursor := atLineEnd(orderSrc, 1)
+
+	labels := completionLabels(completionAt(result.Schema, file, orderSrc, cursor))
+	if !containsLabel(labels, "pending") {
+		t.Errorf("schema-backed default completion missing %q, got %v", "pending", labels)
+	}
+
+	if containsLabel(labels, "paid") {
+		t.Errorf("schema-backed default completion offered a value of a different enum, got %v", labels)
+	}
+
+	// Fall back to the file only: the enum is not declared here, so the slot
+	// must stay silent rather than guess.
+	labels = completionLabels(completionAt(nil, file, orderSrc, cursor))
+	if len(labels) != 0 {
+		t.Errorf("schema-less default completion offered %v, want none", labels)
+	}
+}
+
+// TestCompletionTypeSlotsOfferEntitiesAndMessages proves the type slots
+// that take bare type references -- a message field's type, an rpc's return
+// type, an rpc/job param's type -- offer entities and messages merged (plus
+// the scalar names they also accept), while the relation-target slot stays
+// entity-only.
+func TestCompletionTypeSlotsOfferEntitiesAndMessages(t *testing.T) {
+	src := "entity User {\n\tid: uuid @primary\n}\n\nmessage UserCreated {\n\tactor: User\n}\n\nmessage SyncReport {\n\tnote: \n}\n\nservice S {\n\trpc Get(u: User) -> UserCreated {\n\t}\n}\n\njob Sync(u: User) {\n}\n"
+
+	result, _ := compile.Compile(map[string]string{"t.zen": src})
+	if result == nil {
+		t.Fatal("compile.Compile() = nil schema")
+	}
+
+	file, _ := parser.New("t.zen", []byte(src)).ParseFile()
+
+	// Lines: 0 entity User, 1 id, 2 }, 3 "", 4 message UserCreated,
+	// 5 actor, 6 }, 7 "", 8 message SyncReport, 9 note, 10 }, 11 "",
+	// 12 service, 13 rpc Get(u: User) -> UserCreated, 14 }, 15 }, 16 "",
+	// 17 job Sync(u: User), 18 }, 19 "".
+	tests := []struct {
+		name    string
+		line    int
+		needle  string
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "message field type",
+			line:    5,
+			needle:  "User",
+			want:    []string{"User", "UserCreated"},
+			notWant: []string{"has_many"},
+		},
+		{
+			name:    "message field type (empty slot)",
+			line:    9,
+			needle:  "",
+			want:    []string{"User", "UserCreated", "uuid", "bool", "string"},
+			notWant: []string{"has_many"},
+		},
+		{
+			name:   "rpc param type",
+			line:   13,
+			needle: "User)",
+			want:   []string{"User", "UserCreated"},
+		},
+		{
+			name:   "rpc return type",
+			line:   13,
+			needle: "UserCreated",
+			want:   []string{"UserCreated"},
+		},
+		{
+			name:   "job param type",
+			line:   17,
+			needle: "User)",
+			want:   []string{"User", "UserCreated"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var cursor protocol.Position
+			if tc.needle == "" {
+				cursor = atLineEnd(src, tc.line)
+			} else {
+				cursor = cursorOn(t, src, tc.line, tc.needle)
+			}
+
+			items := completionAt(result.Schema, file, src, cursor)
+			labels := completionLabels(items)
+
+			for _, want := range tc.want {
+				if !containsLabel(labels, want) {
+					t.Errorf("%s completion missing %q, got %v", tc.name, want, labels)
+				}
+			}
+
+			for _, notWant := range tc.notWant {
+				if containsLabel(labels, notWant) {
+					t.Errorf("%s completion should not offer %q, got %v", tc.name, notWant, labels)
+				}
 			}
 		})
 	}

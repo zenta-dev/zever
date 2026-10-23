@@ -40,6 +40,10 @@ const (
 	ctxRPCOptionName
 	ctxJobOptionName
 	ctxScheduleOptionName
+	ctxDispatchJob
+	ctxHTTPVerb
+	ctxDefaultEnumValue
+	ctxMessageType
 )
 
 // candidate is one completion suggestion before it becomes a protocol item:
@@ -49,21 +53,60 @@ type candidate struct {
 	detail string
 }
 
-// scalarTypeCandidates mirrors resolver.scalarTypes, plus `enum`, which the
-// resolver handles separately because it takes an argument list.
-var scalarTypeCandidates = []candidate{
-	{"uuid", "UUID scalar"},
-	{"string", "string scalar"},
-	{"int32", "32-bit signed integer"},
-	{"int64", "64-bit signed integer"},
-	{"float32", "32-bit float"},
-	{"float64", "64-bit float"},
-	{"bool", "boolean scalar"},
-	{"timestamp", "timestamp scalar"},
-	{"date", "date scalar"},
-	{"bytes", "byte string scalar"},
-	{"json", "JSON document scalar"},
-	{"enum", "enum(value, ...) inline enumeration"},
+// scalarTypeDescriptions carries the completion detail for each scalar type
+// name resolver.scalarTypes can yield. `datetime` is the resolver's alias
+// of `timestamp` (both resolve to the same ir type), so the two descriptions
+// deliberately match.
+var scalarTypeDescriptions = map[string]string{
+	"uuid":      "UUID scalar",
+	"string":    "string scalar",
+	"int32":     "32-bit signed integer",
+	"int64":     "64-bit signed integer",
+	"float32":   "32-bit float",
+	"float64":   "64-bit float",
+	"bool":      "boolean scalar",
+	"timestamp": "timestamp scalar",
+	"datetime":  "timestamp scalar",
+	"date":      "date scalar",
+	"bytes":     "byte string scalar",
+	"json":      "JSON document scalar",
+}
+
+// scalarTypeCandidates is derived from resolver.ScalarTypeNames() -- the
+// same table resolveFieldType resolves field types from -- so the candidate
+// list can never advertise a scalar the resolver rejects or omit one it
+// accepts (including the `datetime` alias, which a hand-maintained list
+// would drift away from). Built once from that source of truth, with
+// "enum" appended on top of it -- the resolver handles enum through a
+// separate arg-list path rather than the scalarTypes table -- and sorted
+// by label, since map iteration order is random and this feeds directly
+// into completion output.
+var scalarTypeCandidates = buildScalarTypeCandidates()
+
+// buildScalarTypeCandidates builds the field-type completion candidates
+// from resolver.ScalarTypeNames plus the separate `enum` candidate, sorted
+// by label.
+func buildScalarTypeCandidates() []candidate {
+	names := resolver.ScalarTypeNames()
+
+	cands := make([]candidate, 0, len(names)+1)
+
+	for _, name := range names {
+		detail, ok := scalarTypeDescriptions[name]
+		if !ok {
+			// A scalar resolver learns about without a description here
+			// still completes, phrased like the built-in ones.
+			detail = name + " scalar"
+		}
+
+		cands = append(cands, candidate{name, detail})
+	}
+
+	cands = append(cands, candidate{"enum", "enum(value, ...) inline enumeration"})
+
+	sort.Slice(cands, func(i, j int) bool { return cands[i].label < cands[j].label })
+
+	return cands
 }
 
 // topLevelKeywordCandidates mirrors token.Keywords minus true/false: the
@@ -204,6 +247,157 @@ func buildErrorCandidates() []candidate {
 	return cands
 }
 
+// httpVerbCandidates mirrors resolver_service.go's validHTTPMethods -- the
+// fixed v1 set of HTTP verbs an rpc's `http:` option accepts, in a fixed
+// conventional order. The resolver's set is private (and map-ordered), so
+// the vocabulary is pinned by test rather than derived; a verb the resolver
+// gains but this list omits fails the pin instead of drifting.
+var httpVerbCandidates = []candidate{
+	{"GET", "HTTP verb for the route binding"},
+	{"POST", "HTTP verb for the route binding"},
+	{"PUT", "HTTP verb for the route binding"},
+	{"PATCH", "HTTP verb for the route binding"},
+	{"DELETE", "HTTP verb for the route binding"},
+}
+
+// jobCandidates enumerates the jobs a schedule's dispatch slot can target:
+// every resolved job in the workspace schema, plus any job declared in the
+// current file the schema has not recovered (e.g. while the schedule above
+// it is mid-edit). Merged, deduped by name and sorted by label, since the
+// two sources can name the same job and schema module order is meaningless
+// to a user picking a target.
+func jobCandidates(schema *ir.Schema, file *ast.File) []candidate {
+	seen := make(map[string]bool)
+
+	out := make([]candidate, 0)
+
+	add := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+
+		seen[name] = true
+		out = append(out, candidate{name, "job"})
+	}
+
+	if schema != nil {
+		for _, module := range schema.Modules {
+			for _, job := range module.Jobs {
+				add(job.Name)
+			}
+		}
+	}
+
+	for _, decl := range flattenDecls(file) {
+		job, ok := decl.(*ast.JobDecl)
+		if ok {
+			add(job.Name)
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool { return out[i].label < out[j].label })
+
+	return out
+}
+
+// typeCandidates is the candidate vocabulary of the type slots that accept
+// entities and messages (a message field's type, an rpc's return type or a
+// param's type): the scalar and inline-enum names an entity field's slot
+// also takes, plus every entity and message in the workspace schema --
+// these slots can reference either. Merged, deduped by label and sorted,
+// since the entity and message vocabularies share one naming space.
+func typeCandidates(schema *ir.Schema) []candidate {
+	out := append([]candidate{}, scalarTypeCandidates...)
+
+	for _, module := range allModules(schema) {
+		for _, entity := range module.Entities {
+			out = append(out, candidate{entity.Name, fmt.Sprintf("entity, %d field(s)", len(entity.Fields))})
+		}
+
+		for _, msg := range module.Messages {
+			out = append(out, candidate{msg.Name, fmt.Sprintf("message, %d field(s)", len(msg.Fields))})
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].label == out[j].label {
+			return out[i].detail < out[j].detail
+		}
+
+		return out[i].label < out[j].label
+	})
+
+	return dedupeCandidates(out)
+}
+
+// allModules returns the schema's modules, tolerating a nil schema (completion
+// runs off whatever the workspace could recover).
+func allModules(schema *ir.Schema) []*ir.Module {
+	if schema == nil {
+		return nil
+	}
+
+	return schema.Modules
+}
+
+// dedupeCandidates drops adjacent duplicate labels. Callers sort first, so
+// equal labels end up neighboring.
+func dedupeCandidates(cands []candidate) []candidate {
+	out := cands[:0]
+
+	for i, cand := range cands {
+		if i > 0 && cands[i-1].label == cand.label {
+			continue
+		}
+
+		out = append(out, cand)
+	}
+
+	return out
+}
+
+// fileEnumAt returns the named enum declaration in file, or nil.
+func fileEnumAt(file *ast.File, name string) *ast.EnumDecl {
+	for _, decl := range flattenDecls(file) {
+		enum, ok := decl.(*ast.EnumDecl)
+		if ok && enum.Name == name {
+			return enum
+		}
+	}
+
+	return nil
+}
+
+// enumValueCandidatesFor enumerates the values @default( accepts when the
+// enclosing field's declared type names a resolvable enum: the values of
+// the named enum -- from the workspace schema when it resolves, else from
+// any enum declaration in the current file. When the field's type is not a
+// resolvable named enum it returns nothing: a free-form default is a guess
+// completion must not make.
+func enumValueCandidatesFor(schema *ir.Schema, file *ast.File, src string, cursor protocol.Position) []candidate {
+	name := declaredFieldTypeAt(src, cursor)
+	if name == "" {
+		return nil
+	}
+
+	var values []string
+
+	if enum := findEnum(schema, name); enum != nil {
+		values = enum.Values
+	} else if decl := fileEnumAt(file, name); decl != nil {
+		values = decl.Values
+	} else {
+		return nil
+	}
+
+	out := make([]candidate, 0, len(values))
+	for _, value := range values {
+		out = append(out, candidate{value, fmt.Sprintf("enum %s value", name)})
+	}
+
+	return out
+}
+
 // completionAt returns the completion items for a cursor in one document.
 // It never returns nil items for a known context; an unknown context yields
 // an empty slice so callers can treat "no completions" uniformly.
@@ -252,10 +446,18 @@ func completionAt(
 		return items(jobOptionCandidates, protocol.CompletionItemKindProperty, prefix)
 	case ctxScheduleOptionName:
 		return items(scheduleOptionCandidates, protocol.CompletionItemKindProperty, prefix)
+	case ctxDispatchJob:
+		return items(jobCandidates(schema, file), protocol.CompletionItemKindFunction, prefix)
+	case ctxHTTPVerb:
+		return items(httpVerbCandidates, protocol.CompletionItemKindEnumMember, prefix)
+	case ctxDefaultEnumValue:
+		return items(enumValueCandidatesFor(schema, file, src, cursor), protocol.CompletionItemKindEnumMember, prefix)
+	case ctxMessageType:
+		return items(typeCandidates(schema), protocol.CompletionItemKindClass, prefix)
 	case ctxNone:
 		return nil
 	}
-	// Proof: completionContextAt yields only the sixteen contexts dispatched
+	// Proof: completionContextAt yields only the twenty contexts dispatched
 	// above plus ctxNone, and both ctxNone and any (impossible) unknown
 	// context mean "nothing to enumerate", so they share this single nil
 	// return, which the existing ctxNone tests cover.
@@ -284,15 +486,36 @@ func validateArgCandidatesFor(scalar string) []candidate {
 // param whose @validate(...) the cursor sits inside, or "" when it cannot be
 // determined. The parser drops a field whose attribute is left unclosed, so
 // this reads the re-lexed tokens (which still hold the `name: type @validate(`
-// prefix) rather than the AST. It scans back for the nearest colon outside any
-// preceding attribute's parentheses -- the field's own `name: type` colon --
-// and returns the token after it, so `@default(0) @validate(` and an earlier
-// param's colon do not confuse it.
+// prefix) rather than the AST; attrTargetTypeAfter does the token back-track.
+// Attributes of other names (e.g. a `@default(0) @validate(` predecessor) are
+// rejected up front so the caller cannot attribute another attribute's paren
+// to validate.
 func validateScalarAt(src string, cursor protocol.Position) string {
+	return attrScalarAt(src, cursor, "validate")
+}
+
+// declaredFieldTypeAt returns the declared type name of the field whose
+// `@default(` the cursor sits inside, the same way validateScalarAt reads
+// it back for @validate. The name may be a scalar ("uuid") or a named type
+// ("Status"): only a name that resolves to a named enum makes the default
+// slot enumerable, which enumValueCandidatesFor decides.
+func declaredFieldTypeAt(src string, cursor protocol.Position) string {
+	return attrScalarAt(src, cursor, "default")
+}
+
+// attrScalarAt reads the declared field type name governing the unclosed
+// argument list of `@name(` at the cursor, or "" when it cannot be
+// determined. The parser drops a field whose attribute is left unclosed, so
+// this reads the re-lexed tokens (which still hold the `name: type @name(`
+// prefix) rather than the AST. It scans back for the nearest colon outside
+// any preceding attribute's parentheses -- the field's own `name: type`
+// colon -- and returns the token after it, so `@default(0) @validate(` and
+// an earlier param's colon do not confuse it.
+func attrScalarAt(src string, cursor protocol.Position, attr string) string {
 	toks := lexPrefix(sourceBefore(src, cursor))
 
 	open := openParenIndex(toks)
-	if open < 2 || toks[open-2].Kind != token.AT || toks[open-1].Lit != "validate" {
+	if open < 2 || toks[open-2].Kind != token.AT || toks[open-1].Lit != attr {
 		return ""
 	}
 
@@ -519,6 +742,22 @@ func astContextAt(file *ast.File, cursor protocol.Position) (completionContext, 
 		return ctxFieldType, field.Type.Name, true
 	}
 
+	// Message fields, rpc returns and param types take bare type names that
+	// can reference an entity or a message (not an entity the way relation
+	// targets must), so their one slot offers the merged vocabulary.
+	if _, field := messageFieldAt(file, cursor); field != nil && field.Type != nil &&
+		coversIdent(field.Type.NamePos, field.Type.Name, cursor) {
+		return ctxMessageType, field.Type.Name, true
+	}
+
+	if rpc := rpcReturnsAt(file, cursor); rpc != nil {
+		return ctxMessageType, rpc.Returns, true
+	}
+
+	if param := paramTypeAt(file, cursor); param != nil {
+		return ctxMessageType, param.Type.Name, true
+	}
+
 	return ctxNone, "", false
 }
 
@@ -533,6 +772,14 @@ func lexicalContextAt(src string, cursor protocol.Position) (completionContext, 
 	if n := len(toks); n > 0 && isWordToken(toks[n-1]) && tokenEndsAt(toks[n-1], cursor) {
 		prefix = toks[n-1].Lit
 		toks = toks[:n-1]
+	}
+
+	if ctx, ok := dispatchValueContext(toks); ok {
+		return ctx, prefix
+	}
+
+	if ctx, ok := httpVerbContext(toks); ok {
+		return ctx, prefix
 	}
 
 	if ctx, ok := attrArgContext(toks); ok {
@@ -609,6 +856,82 @@ func tokenEndsAt(tok token.Token, cursor protocol.Position) bool {
 	return tok.Pos.Col+utf8.RuneCountInString(tok.Lit) == int(cursor.Character)+1
 }
 
+// dispatchValueContext handles a cursor in the value slot of a schedule's
+// `dispatch: JobName()` option: before the job name is typed, or inside its
+// still-empty argument list. The slot needs its own tier because a dispatch
+// value is a plain call value, not an @attr argument -- without it the
+// unclosed `(` is dismissed as non-enumerable by attrArgContext and the
+// bare `dispatch:` colon is misclassified as a field type slot by
+// colonContext. It only fires inside a schedule's block, so a field
+// legitimately named `dispatch` elsewhere still completes as a field. A
+// call whose argument list already has tokens is past the job-name slot
+// and reports ctxNone with ok=true, the same "stop trying other tiers"
+// answer attrArgContext gives for a paren it recognizes.
+func dispatchValueContext(toks []token.Token) (completionContext, bool) {
+	if n := len(toks); n >= 2 &&
+		toks[n-1].Kind == token.COLON &&
+		toks[n-2].Kind == token.IDENT && toks[n-2].Lit == "dispatch" &&
+		toks[n-1].Pos.Line == toks[n-2].Pos.Line &&
+		enclosingBlockKind(toks) == token.SCHEDULE {
+		return ctxDispatchJob, true
+	}
+
+	open := openParenIndex(toks)
+	if open < 3 {
+		return ctxNone, false
+	}
+
+	if toks[open-1].Kind != token.IDENT ||
+		toks[open-2].Kind != token.COLON ||
+		toks[open-3].Kind != token.IDENT || toks[open-3].Lit != "dispatch" ||
+		enclosingBlockKind(toks) != token.SCHEDULE {
+		return ctxNone, false
+	}
+
+	if len(toks) > open+1 {
+		// Something already typed inside the call: not the job-name slot.
+		return ctxNone, true
+	}
+
+	return ctxDispatchJob, true
+}
+
+// httpVerbContext handles a cursor in the value slot of an rpc's
+// `http: METHOD "path"` option before the verb is typed. It fires only
+// inside an rpc's block, so a field legitimately named `http` elsewhere
+// still completes as a field. The value itself is a bare verb followed by
+// a string path, so no unclosed-paren shape arises: anything after a
+// completed verb belongs to the path, which has nothing to enumerate.
+func httpVerbContext(toks []token.Token) (completionContext, bool) {
+	n := len(toks)
+	if n < 2 {
+		return ctxNone, false
+	}
+
+	if toks[n-1].Kind != token.COLON ||
+		toks[n-2].Kind != token.IDENT || toks[n-2].Lit != "http" ||
+		toks[n-1].Pos.Line != toks[n-2].Pos.Line ||
+		enclosingBlockKind(toks) != token.RPC {
+		return ctxNone, false
+	}
+
+	return ctxHTTPVerb, true
+}
+
+// enclosingBlockKind reports the declaration keyword whose block is still
+// open at the end of toks -- the owner of the innermost unclosed brace --
+// or token.ILLEGAL when no block is open. blockContext and the value-slot
+// contexts share it so they all answer "what declaration am I inside?" the
+// same way.
+func enclosingBlockKind(toks []token.Token) token.Kind {
+	open := openBraceIndex(toks)
+	if open < 0 {
+		return token.ILLEGAL
+	}
+
+	return enclosingDeclKind(toks, open)
+}
+
 // attrArgContext handles a cursor inside an unclosed `(`. Only attribute
 // argument lists have an enumerable vocabulary; every other paren (enum
 // values, index columns, rpc signatures) reports ctxNone so the caller stops
@@ -634,8 +957,18 @@ func attrArgContext(toks []token.Token) (completionContext, bool) {
 		}
 
 		return ctxNone, true
+	case "default":
+		if len(inner) == 0 {
+			// ctxDefaultEnumValue: the slot may be a named enum's value
+			// list; completionAt decides from the field's declared type
+			// whether anything is enumerable, so a scalar field's
+			// free-form default still offers nothing.
+			return ctxDefaultEnumValue, true
+		}
+
+		return ctxNone, true
 	default:
-		// foreign_key, schema and default take free-form values: there is
+		// foreign_key and schema take free-form values: there is
 		// nothing to enumerate, which is an answer, not a gap.
 		return ctxNone, true
 	}
@@ -735,7 +1068,7 @@ func lineContext(toks []token.Token, line int) (completionContext, bool) {
 	case token.AT:
 		return attrNameContext(lineToks[:len(lineToks)-1], braceDepth(toks)), true
 	case token.COLON:
-		return colonContext(lineToks), true
+		return colonContext(toks, lineToks), true
 	default:
 		return ctxNone, true
 	}
@@ -767,7 +1100,7 @@ func attrNameContext(before []token.Token, depth int) completionContext {
 }
 
 // colonContext distinguishes `field: <type>` from `belongs_to name: <Entity>`.
-func colonContext(lineToks []token.Token) completionContext {
+func colonContext(toks, lineToks []token.Token) completionContext {
 	if len(lineToks) < 2 {
 		return ctxNone
 	}
@@ -777,6 +1110,14 @@ func colonContext(lineToks []token.Token) completionContext {
 	}
 
 	if len(lineToks) == 2 && lineToks[0].Kind == token.IDENT {
+		// Message fields, rpc params and job params (as well as the
+		// entities they can reference) take the merged entity+message+
+		// scalar vocabulary; entity fields stay scalar-only.
+		switch enclosingBlockKind(toks) { //nolint:exhaustive // only decl kinds that host type slots matter
+		case token.MESSAGE, token.SERVICE, token.RPC, token.JOB:
+			return ctxMessageType
+		}
+
 		return ctxFieldType
 	}
 
@@ -882,7 +1223,7 @@ func enclosingDeclKind(toks []token.Token, open int) token.Kind {
 		switch toks[i].Kind { //nolint:exhaustive // scanning for declaration keywords and brace boundaries
 		case token.LBRACE, token.RBRACE:
 			return token.ILLEGAL
-		case token.ENTITY, token.SERVICE, token.JOB, token.SCHEDULE, token.RPC:
+		case token.ENTITY, token.SERVICE, token.JOB, token.SCHEDULE, token.RPC, token.MESSAGE:
 			return toks[i].Kind
 		default:
 		}
