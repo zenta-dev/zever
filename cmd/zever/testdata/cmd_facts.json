@@ -1,0 +1,868 @@
+{
+  "globals": [
+    {
+      "name": "V",
+      "shorthand": "",
+      "hidden": false,
+      "deprecated": ""
+    },
+    {
+      "name": "help",
+      "shorthand": "h",
+      "hidden": false,
+      "deprecated": ""
+    },
+    {
+      "name": "interactive",
+      "shorthand": "i",
+      "hidden": false,
+      "deprecated": ""
+    },
+    {
+      "name": "json",
+      "shorthand": "",
+      "hidden": false,
+      "deprecated": ""
+    },
+    {
+      "name": "no-color",
+      "shorthand": "",
+      "hidden": false,
+      "deprecated": ""
+    },
+    {
+      "name": "quiet",
+      "shorthand": "q",
+      "hidden": false,
+      "deprecated": ""
+    },
+    {
+      "name": "version",
+      "shorthand": "v",
+      "hidden": false,
+      "deprecated": ""
+    }
+  ],
+  "commands": [
+    {
+      "path": "add",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "adapter",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "diff",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "dry-run",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "force",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "module",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "name",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "uses",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "yes",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "breaking",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "build",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "adapters",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "dry-run",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "out",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "check",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "check-boundaries",
+      "aliases": [
+        "check:boundaries"
+      ],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "compile",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "backend",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "check",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "no-tidy",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "out",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "strict",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "completion",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "completion bash",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "completion fish",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "completion powershell",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "completion zsh",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "config",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "config show",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "db",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "db migrate",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "db rollback",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "db seed",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "dev",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "docs",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "dir",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "skill",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "doctor",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "strict",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "explain",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "extract",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "fmt",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "list",
+          "shorthand": "l",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "write",
+          "shorthand": "w",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "generate",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "graph",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "new",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "adapters",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "batteries",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "dir",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "dry-run",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "force",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "framework-version",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "list-batteries",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "module",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "no-tidy",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "profile",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "with",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "yes",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "outbox",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "outbox dlq",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "outbox purge",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "outbox status",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "queue:work",
+      "aliases": [],
+      "hidden": true,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "routes",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "schedule",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "schedule run",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "schedule:run",
+      "aliases": [],
+      "hidden": true,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "serve",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "tinker",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "uninstall",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "dry-run",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "force",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "keep-lsp",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "yes",
+          "shorthand": "y",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "upgrade",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "check",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "dry-run",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "force",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "project",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "version",
+          "shorthand": "",
+          "hidden": false,
+          "deprecated": ""
+        },
+        {
+          "name": "yes",
+          "shorthand": "y",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    },
+    {
+      "path": "worker",
+      "aliases": [],
+      "hidden": false,
+      "deprecated": "",
+      "flags": [
+        {
+          "name": "help",
+          "shorthand": "h",
+          "hidden": false,
+          "deprecated": ""
+        }
+      ]
+    }
+  ]
+}
