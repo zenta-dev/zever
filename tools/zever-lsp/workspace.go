@@ -21,6 +21,12 @@ import (
 // zenExt is the file extension of zen DSL schema files.
 const zenExt = ".zen"
 
+// schemaDirName is the schema subtree name handed to compile.WithSchemaDir:
+// each workspace root owns its own schema/ subtree, so dir-derived module
+// assignment stays correct per root while duplicate-declaration detection
+// never leaks across roots.
+const schemaDirName = "schema"
+
 // compileFunc matches compile.Compile's signature (with zero backends) so
 // tests can substitute a spy and count how often a real compile happened.
 type compileFunc func(files map[string]string) (*compile.Result, diag.List)
@@ -40,9 +46,12 @@ type Workspace struct {
 	compile      compileFunc
 	compileCount int
 
-	lastHash   string
-	lastResult *compile.Result
-	lastDiags  diag.List
+	// cached holds the last compile per workspace root, each tagged with
+	// the content hash of that root's file set. Editing a file in one
+	// root invalidates only that root's entry, so the other roots are
+	// never recompiled; a single-root workspace holds exactly one entry
+	// and behaves exactly like the old whole-workspace hash cache.
+	cached map[string]cachedEntry
 
 	// parsedCache holds the last parsed *ast.File per path, each tagged with
 	// the content hash it was parsed from. references and rename consult
@@ -51,6 +60,15 @@ type Workspace struct {
 	// file's entry, not the whole workspace's.
 	parsedCache map[string]parsedEntry
 	parseCount  int
+}
+
+// cachedEntry pairs a root's last compile output with the content hash it
+// was compiled from, so RecompileAll can tell a cache hit from a stale
+// entry with one comparison.
+type cachedEntry struct {
+	hash   string
+	result *compile.Result
+	diags  diag.List
 }
 
 // parsedEntry pairs a parsed file with the content hash it was parsed from,
@@ -65,9 +83,10 @@ func NewWorkspace() *Workspace {
 	return &Workspace{
 		docs:        make(map[string]string),
 		diskCache:   make(map[string]string),
+		cached:      make(map[string]cachedEntry),
 		parsedCache: make(map[string]parsedEntry),
 		compile: func(files map[string]string) (*compile.Result, diag.List) {
-			return compile.Compile(files)
+			return compile.WithSchemaDir(files, schemaDirName)
 		},
 	}
 }
@@ -80,8 +99,8 @@ func (w *Workspace) SetRoot(rootURI string) {
 	}
 
 	w.mu.Lock()
-	w.rootPath = root
-	w.roots = []string{root}
+	w.rootPath = filepath.Clean(root)
+	w.roots = []string{filepath.Clean(root)}
 	w.mu.Unlock()
 
 	w.Rescan()
@@ -98,14 +117,14 @@ func (w *Workspace) AddRoot(rootURI string) {
 
 	found := false
 	for _, r := range w.roots {
-		if r == root {
+		if r == filepath.Clean(root) {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		w.roots = append(w.roots, root)
+		w.roots = append(w.roots, filepath.Clean(root))
 	}
 
 	if w.rootPath == "" && len(w.roots) > 0 {
@@ -128,7 +147,7 @@ func (w *Workspace) RemoveRoot(rootURI string) {
 
 	filtered := make([]string, 0, len(w.roots))
 	for _, r := range w.roots {
-		if r != root {
+		if r != filepath.Clean(root) {
 			filtered = append(filtered, r)
 		}
 	}
@@ -291,33 +310,191 @@ func (w *Workspace) collectLocked() map[string]string {
 	return files
 }
 
-// Recompile runs the lex->parse->resolve pipeline over every known file,
-// reusing the previous result when nothing has changed since the last call.
-func (w *Workspace) Recompile() (*compile.Result, diag.List) {
+// RecompileAll compiles each workspace root's file set separately and
+// returns the primary root's result, the diagnostics of every root merged
+// in root order, and the per-root diagnostics keyed by root path. Roots are
+// independent projects that merely share a window, so merging their files
+// into one compile would leak module derivation and duplicate-declaration
+// detection across them; compiling per root keeps each root isolated while
+// every root's diagnostics still reach the client through the merged list.
+// A root whose file set is unchanged since the last call is served from the
+// per-root cache instead of recompiling.
+//
+// The primary root is rootPath (roots[0]); when no root is set every known
+// file forms a single group, preserving single-workspace behavior exactly.
+func (w *Workspace) RecompileAll() (*compile.Result, diag.List, map[string]diag.List) {
 	w.mu.Lock()
 	files := w.collectLocked()
-	hash := hashFiles(files)
-
-	if w.lastResult != nil && hash == w.lastHash {
-		result, diags := w.lastResult, w.lastDiags
-		w.mu.Unlock()
-
-		return result, diags
+	roots := w.orderedRootsLocked()
+	primary := w.primaryRootLocked()
+	snapshot := make(map[string]cachedEntry, len(w.cached))
+	for root, entry := range w.cached {
+		snapshot[root] = entry
 	}
-
 	fn := w.compile
 	w.mu.Unlock()
 
-	result, diags := fn(files)
+	partitions := partitionFilesByRoot(files, roots, primary)
+
+	ordered := make([]string, 0, len(partitions))
+	for root := range partitions {
+		ordered = append(ordered, root)
+	}
+
+	sort.Strings(ordered)
+
+	fresh := make(map[string]cachedEntry, len(partitions))
+	dirty := 0
+
+	for _, root := range ordered {
+		subset := partitions[root]
+		hash := hashFiles(subset)
+
+		if prev, ok := snapshot[root]; ok && prev.result != nil && hash == prev.hash {
+			fresh[root] = prev
+
+			continue
+		}
+
+		result, diags := fn(subset)
+		fresh[root] = cachedEntry{hash: hash, result: result, diags: diags}
+		dirty++
+	}
 
 	w.mu.Lock()
-	w.compileCount++
-	w.lastHash = hash
-	w.lastResult = result
-	w.lastDiags = diags
+	for root, entry := range fresh {
+		w.cached[root] = entry
+	}
+	for root := range w.cached {
+		if _, ok := fresh[root]; !ok {
+			delete(w.cached, root)
+		}
+	}
+	w.compileCount += dirty
 	w.mu.Unlock()
 
+	primaryEntry, ok := fresh[primary]
+	if !ok && len(ordered) > 0 {
+		primaryEntry = fresh[ordered[0]]
+	}
+
+	perRoot := make(map[string]diag.List, len(fresh))
+	var all diag.List
+
+	for _, root := range ordered {
+		perRoot[root] = fresh[root].diags
+		all = append(all, fresh[root].diags...)
+	}
+
+	return primaryEntry.result, all, perRoot
+}
+
+// Recompile runs the lex->parse->resolve pipeline over every known file,
+// reusing the previous result when nothing has changed since the last call.
+// It compiles each workspace root separately (see RecompileAll) and reports
+// the primary root's result with every root's diagnostics merged, so every
+// existing caller keeps working while non-primary diagnostics still publish.
+func (w *Workspace) Recompile() (*compile.Result, diag.List) {
+	result, diags, _ := w.RecompileAll()
+
 	return result, diags
+}
+
+// primaryRootLocked reports the root Recompile serves its result for: the
+// configured rootPath, falling back to the first tracked root. Callers must
+// hold w.mu.
+func (w *Workspace) primaryRootLocked() string {
+	if w.rootPath != "" {
+		return w.rootPath
+	}
+
+	if len(w.roots) > 0 {
+		return w.roots[0]
+	}
+
+	return ""
+}
+
+// orderedRootsLocked returns the tracked roots in registration order,
+// falling back to the lone rootPath when the list is empty. Callers must
+// hold w.mu.
+func (w *Workspace) orderedRootsLocked() []string {
+	if len(w.roots) > 0 {
+		return append([]string(nil), w.roots...)
+	}
+
+	if w.rootPath != "" {
+		return []string{w.rootPath}
+	}
+
+	return nil
+}
+
+// partitionFilesByRoot groups files by the longest (most specific) root
+// prefix containing them, so nested roots win over their parents. A file
+// outside every root (an unsaved buffer with no on-disk counterpart yet)
+// falls back to the primary root so it still resolves. Paths and roots are
+// compared absolute with filepath separators, so a root /a/b never claims a
+// sibling like /a/bc. With no roots every file forms the primary group,
+// which keeps single-workspace behavior identical to one merged compile.
+func partitionFilesByRoot(files map[string]string, roots []string, primary string) map[string]map[string]string {
+	cleanRoots := make([]string, 0, len(roots))
+
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+
+		cleanRoots = append(cleanRoots, filepath.Clean(root))
+	}
+
+	if len(cleanRoots) == 0 {
+		dup := make(map[string]string, len(files))
+		for path, content := range files {
+			dup[path] = content
+		}
+
+		return map[string]map[string]string{primary: dup}
+	}
+
+	out := make(map[string]map[string]string, len(cleanRoots)+1)
+
+	for _, root := range cleanRoots {
+		out[root] = make(map[string]string)
+	}
+
+	if _, ok := out[primary]; !ok && primary != "" {
+		out[filepath.Clean(primary)] = make(map[string]string)
+		primary = filepath.Clean(primary)
+	}
+
+	for path, content := range files {
+		out[ownerRootOf(path, cleanRoots, primary)][path] = content
+	}
+
+	return out
+}
+
+// ownerRootOf assigns path to the longest root prefix containing it, or to
+// primary when the path sits outside every root. roots must already be
+// filepath.Clean-ed (see partitionFilesByRoot).
+func ownerRootOf(path string, roots []string, primary string) string {
+	clean := filepath.Clean(path)
+	best := ""
+
+	for _, root := range roots {
+		if clean == root || strings.HasPrefix(clean, root+string(filepath.Separator)) {
+			if len(root) > len(best) {
+				best = root
+			}
+		}
+	}
+
+	if best != "" {
+		return best
+	}
+
+	return primary
 }
 
 // CompileCount reports how many real compiles have run; used by tests to
