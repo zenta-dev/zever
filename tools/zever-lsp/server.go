@@ -56,6 +56,11 @@ type Server struct {
 	// documentLink/resolve knows whether to fill Tooltip. Guarded by mu.
 	docLinkTooltip bool
 
+	// completionCaps records the completion capabilities the client
+	// advertised at Initialize: whether items may carry snippets and which
+	// resolve properties the client handles lazily. Guarded by mu.
+	completionCaps clientCaps
+
 	// settings is the current editing configuration, swapped whole by
 	// workspace/didChangeConfiguration and read by every handler. Atomic
 	// (rather than mu-guarded) so the diagnostics publisher's delay hook can
@@ -178,6 +183,14 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.mu.Unlock()
 	}
 
+	// The completion capabilities decide whether completion items may
+	// carry snippets: recorded the same way, under mu, alongside the
+	// tooltip flag above. clientCapsFor tolerates a nil params, so this is
+	// unconditional.
+	s.mu.Lock()
+	s.completionCaps = clientCapsFor(params)
+	s.mu.Unlock()
+
 	syncKind := protocol.TextDocumentSyncKindIncremental
 	enabled := true
 
@@ -282,6 +295,45 @@ func negotiatePositionEncoding(params *protocol.InitializeParams) protocol.Posit
 	}
 
 	return ""
+}
+
+// clientCaps records the completion capabilities a client advertised at
+// Initialize: whether completion items may carry snippet insert text,
+// whether the client understands insert/replace edits, and which item
+// properties it can resolve lazily. The zero value -- a client that
+// advertised nothing -- renders every item as a plain-text label.
+type clientCaps struct {
+	snippetSupport       bool
+	insertReplaceSupport bool
+	resolveProps         []string
+}
+
+// clientCapsFor reads the completion capabilities out of an Initialize
+// request's params. Every pointer in the chain may be nil -- a client that
+// advertises no completion block negotiates nothing -- so each level is
+// guarded the same way Initialize guards the tooltip flag.
+func clientCapsFor(params *protocol.InitializeParams) clientCaps {
+	if params == nil || params.Capabilities.TextDocument == nil ||
+		params.Capabilities.TextDocument.Completion == nil ||
+		params.Capabilities.TextDocument.Completion.CompletionItem == nil {
+		return clientCaps{}
+	}
+
+	item := params.Capabilities.TextDocument.Completion.CompletionItem
+
+	var caps clientCaps
+
+	if item.SnippetSupport != nil {
+		caps.snippetSupport = *item.SnippetSupport
+	}
+
+	if item.InsertReplaceSupport != nil {
+		caps.insertReplaceSupport = *item.InsertReplaceSupport
+	}
+
+	caps.resolveProps = append([]string(nil), item.ResolveSupport.Properties...)
+
+	return caps
 }
 
 // Initialized handles the initialized notification by publishing the first
@@ -540,7 +592,11 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 
 	schema, file := s.schemaAndFile(uriStr)
 
-	items := completionAt(schema, file, content, params.Position)
+	s.mu.Lock()
+	caps := s.completionCaps
+	s.mu.Unlock()
+
+	items := completionAtWithCaps(schema, file, content, params.Position, caps)
 	if len(items) == 0 {
 		return nil, nil //nolint:nilnil // LSP encodes "no completions" as a null result
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -266,6 +267,140 @@ func TestInitialize_positionEncoding(t *testing.T) {
 				t.Errorf("stored encoding = %q, want %q", stored, tc.wantStored)
 			}
 		})
+	}
+}
+
+// TestClientCapsFor pins the Initialize completion-capability negotiation:
+// a nil params or any nil link in the capability chain yields zero caps,
+// while advertised snippet, insert/replace and resolve support is recorded.
+func TestClientCapsFor(t *testing.T) {
+	t.Parallel()
+
+	yes := true
+	no := false
+
+	withItem := func(item *protocol.ClientCompletionItemOptions) *protocol.InitializeParams {
+		return &protocol.InitializeParams{
+			Capabilities: protocol.ClientCapabilities{
+				TextDocument: &protocol.TextDocumentClientCapabilities{
+					Completion: &protocol.CompletionClientCapabilities{
+						CompletionItem: item,
+					},
+				},
+			},
+		}
+	}
+
+	itemWith := func(snippet, insertReplace *bool, props []string) *protocol.ClientCompletionItemOptions {
+		return &protocol.ClientCompletionItemOptions{
+			SnippetSupport:       snippet,
+			InsertReplaceSupport: insertReplace,
+			ResolveSupport:       protocol.ClientCompletionItemResolveOptions{Properties: props},
+		}
+	}
+
+	tests := []struct {
+		name   string
+		params *protocol.InitializeParams
+		want   clientCaps
+	}{
+		{"nil params", nil, clientCaps{}},
+		{"empty params", &protocol.InitializeParams{}, clientCaps{}},
+		{
+			"textDocument without completion",
+			&protocol.InitializeParams{
+				Capabilities: protocol.ClientCapabilities{
+					TextDocument: &protocol.TextDocumentClientCapabilities{},
+				},
+			},
+			clientCaps{},
+		},
+		{
+			"completion block without item",
+			withItem(nil),
+			clientCaps{},
+		},
+		{
+			"snippet support advertised",
+			withItem(itemWith(&yes, nil, nil)),
+			clientCaps{snippetSupport: true},
+		},
+		{
+			"snippet support explicitly denied",
+			withItem(itemWith(&no, nil, nil)),
+			clientCaps{},
+		},
+		{
+			"insertReplace support advertised",
+			withItem(itemWith(nil, &yes, nil)),
+			clientCaps{insertReplaceSupport: true},
+		},
+		{
+			"resolve properties recorded",
+			withItem(itemWith(nil, nil, []string{"detail", "documentation"})),
+			clientCaps{resolveProps: []string{"detail", "documentation"}},
+		},
+		{
+			"everything advertised",
+			withItem(itemWith(&yes, &yes, []string{"detail"})),
+			clientCaps{snippetSupport: true, insertReplaceSupport: true, resolveProps: []string{"detail"}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := clientCapsFor(tc.params); !equalClientCaps(got, tc.want) {
+				t.Errorf("clientCapsFor() = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// equalClientCaps reports whether two capability sets agree on every field,
+// comparing resolveProps by value since clientCapsFor copies the slice.
+func equalClientCaps(got, want clientCaps) bool {
+	return got.snippetSupport == want.snippetSupport &&
+		got.insertReplaceSupport == want.insertReplaceSupport &&
+		slices.Equal(got.resolveProps, want.resolveProps)
+}
+
+// TestInitializeStoresCompletionCaps proves Initialize records the negotiated
+// completion capabilities on the server for the Completion handler to
+// consult, rather than just answering the position encoding.
+func TestInitializeStoresCompletionCaps(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+
+	yes := true
+
+	params := &protocol.InitializeParams{
+		Capabilities: protocol.ClientCapabilities{
+			TextDocument: &protocol.TextDocumentClientCapabilities{
+				Completion: &protocol.CompletionClientCapabilities{
+					CompletionItem: &protocol.ClientCompletionItemOptions{
+						SnippetSupport:       &yes,
+						InsertReplaceSupport: &yes,
+						ResolveSupport:       protocol.ClientCompletionItemResolveOptions{Properties: []string{"detail"}},
+					},
+				},
+			},
+		},
+	}
+
+	if _, err := s.Initialize(t.Context(), params); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	s.mu.Lock()
+	got := s.completionCaps
+	s.mu.Unlock()
+
+	want := clientCaps{snippetSupport: true, insertReplaceSupport: true, resolveProps: []string{"detail"}}
+	if !equalClientCaps(got, want) {
+		t.Errorf("stored completionCaps = %+v, want %+v", got, want)
 	}
 }
 

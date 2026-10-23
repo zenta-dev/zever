@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/diag"
@@ -1542,4 +1543,394 @@ func TestCompletionTypeSlotsOfferEntitiesAndMessages(t *testing.T) {
 			}
 		})
 	}
+}
+
+// snippetCaps is the negotiated capability set of a client that accepts
+// snippet insert text, used by the snippet completion tests.
+func snippetCaps() clientCaps {
+	return clientCaps{snippetSupport: true}
+}
+
+// TestCompletionSnippetTopLevelSkeletons proves a snippet-capable client is
+// offered skeleton snippets for every block-opening top-level keyword,
+// while keywords without a skeleton still insert their label as plain text.
+func TestCompletionSnippetTopLevelSkeletons(t *testing.T) {
+	src := ""
+
+	file, _ := parser.New("empty.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 0, Character: 0}
+
+	items := completionAtWithCaps(nil, file, src, cursor, snippetCaps())
+
+	tests := []struct {
+		label   string
+		snippet string
+	}{
+		{"entity", "entity ${1:Name} {\n\t$0\n}"},
+		{"message", "message ${1:Name} {\n\t$0\n}"},
+		{"service", "service ${1:Name} {\n\t$0\n}"},
+		{"job", "job ${1:Name}(${2}) {\n\t$0\n}"},
+		{"schedule", "schedule ${1:Name} {\n\t$0\n}"},
+		{"enum", "enum ${1:Name} {\n\t$0\n}"},
+		{"saga", "saga ${1:Name} {\n\t$0\n}"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			item, ok := findCompletionItem(items, tc.label)
+			if !ok {
+				t.Fatalf("completion items missing %q, got %v", tc.label, completionLabels(items))
+			}
+
+			if got, _ := item.InsertText.Get(); got != tc.snippet {
+				t.Errorf("%s InsertText = %q, want snippet %q", tc.label, got, tc.snippet)
+			}
+
+			if item.InsertTextFormat != protocol.InsertTextFormatSnippet {
+				t.Errorf("%s InsertTextFormat = %v, want Snippet", tc.label, item.InsertTextFormat)
+			}
+
+			if item.TextEdit != nil {
+				t.Errorf("%s TextEdit is present with no prefix typed, want nil", tc.label)
+			}
+		})
+	}
+
+	for _, label := range []string{"rpc", "index", "has_many"} {
+		item, ok := findCompletionItem(items, label)
+		if !ok {
+			t.Fatalf("completion items missing %q, got %v", label, completionLabels(items))
+		}
+
+		if got, _ := item.InsertText.Get(); got != label {
+			t.Errorf("%s InsertText = %q, want plain label", label, got)
+		}
+
+		if item.InsertTextFormat != protocol.InsertTextFormatPlainText {
+			t.Errorf("%s InsertTextFormat = %v, want PlainText", label, item.InsertTextFormat)
+		}
+	}
+}
+
+// TestCompletionSnippetFallbackWithoutCaps proves a client that negotiated
+// no snippet support gets plain-text labels everywhere -- the pre-snippet
+// behavior -- even for candidates that carry a snippet skeleton.
+func TestCompletionSnippetFallbackWithoutCaps(t *testing.T) {
+	src := ""
+
+	file, _ := parser.New("empty.zen", []byte(src)).ParseFile()
+	cursor := protocol.Position{Line: 0, Character: 0}
+
+	items := completionAtWithCaps(nil, file, src, cursor, clientCaps{})
+
+	if len(items) == 0 {
+		t.Fatal("completion returned no items")
+	}
+
+	for _, item := range items {
+		if item.InsertTextFormat != protocol.InsertTextFormatPlainText {
+			t.Errorf("%s InsertTextFormat = %v, want PlainText", item.Label, item.InsertTextFormat)
+		}
+
+		if got, _ := item.InsertText.Get(); got != item.Label {
+			t.Errorf("%s InsertText = %q, want the plain label", item.Label, got)
+		}
+	}
+}
+
+// TestCompletionSnippetBraceMagic proves the brace-context keywords -- the
+// service-body rpc and the entity-body index -- complete to snippets for
+// snippet-capable clients and to the plain label otherwise.
+func TestCompletionSnippetBraceMagic(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     string
+		line    int
+		char    int
+		label   string
+		snippet string
+	}{
+		{
+			name:    "service-body rpc signature",
+			src:     "service S {\n\t\n}\n",
+			line:    1,
+			char:    1,
+			label:   "rpc",
+			snippet: "rpc ${1:name}($2) -> ${3:Type} {\n\t$0\n}",
+		},
+		{
+			name:    "entity-body index columns",
+			src:     "entity User {\n\tid: uuid @primary\n\n}\n",
+			line:    2,
+			char:    0,
+			label:   "index",
+			snippet: "index ${1:cols}",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			file, _ := parser.New("m.zen", []byte(tc.src)).ParseFile()
+			cursor := protocol.Position{Line: uint32(tc.line), Character: uint32(tc.char)} //nolint:gosec // test fixture indices
+
+			item, ok := findCompletionItem(completionAtWithCaps(nil, file, tc.src, cursor, snippetCaps()), tc.label)
+			if !ok {
+				t.Fatalf("%s completion missing %q", tc.name, tc.label)
+			}
+
+			if got, _ := item.InsertText.Get(); got != tc.snippet {
+				t.Errorf("%s InsertText = %q, want snippet %q", tc.label, got, tc.snippet)
+			}
+
+			if item.InsertTextFormat != protocol.InsertTextFormatSnippet {
+				t.Errorf("%s InsertTextFormat = %v, want Snippet", tc.label, item.InsertTextFormat)
+			}
+
+			item, ok = findCompletionItem(completionAt(nil, file, tc.src, cursor), tc.label)
+			if !ok {
+				t.Fatalf("%s completion missing %q", tc.name, tc.label)
+			}
+
+			if got, _ := item.InsertText.Get(); got != tc.label {
+				t.Errorf("%s InsertText without caps = %q, want the plain label", tc.label, got)
+			}
+
+			if item.InsertTextFormat != protocol.InsertTextFormatPlainText {
+				t.Errorf("%s InsertTextFormat without caps = %v, want PlainText", tc.label, item.InsertTextFormat)
+			}
+		})
+	}
+}
+
+// TestCompletionTextEditReplacesPrefix proves an item offered while a prefix
+// is typed carries a TextEdit covering exactly that prefix on the cursor
+// line, with the edit text matching the effective insert text -- the plain
+// label here, the snippet for a snippet candidate.
+func TestCompletionTextEditReplacesPrefix(t *testing.T) {
+	src := "service S {\n\trpc M() -> T {\n\t\terrors: { not_ \n\t}\n}\n"
+
+	file, _ := parser.New("s.zen", []byte(src)).ParseFile()
+	cursor := cursorOn(t, src, 2, "not_")
+	cursor.Character += 4 // land just after "not_"
+
+	item, ok := findCompletionItem(completionAt(nil, file, src, cursor), "not_found")
+	if !ok {
+		t.Fatal("errors-set completion missing not_found")
+	}
+
+	edit, ok := item.TextEdit.(*protocol.TextEdit)
+	if !ok {
+		t.Fatalf("not_found TextEdit = %T, want *protocol.TextEdit", item.TextEdit)
+	}
+
+	wantRange := protocol.Range{
+		Start: protocol.Position{Line: 2, Character: cursor.Character - 4},
+		End:   cursor,
+	}
+
+	if edit.Range != wantRange {
+		t.Errorf("not_found TextEdit range = %+v, want %+v", edit.Range, wantRange)
+	}
+
+	if edit.NewText != "not_found" {
+		t.Errorf("not_found TextEdit NewText = %q, want the plain label", edit.NewText)
+	}
+
+	topSrc := "ent"
+
+	topFile, _ := parser.New("t.zen", []byte(topSrc)).ParseFile()
+	topCursor := protocol.Position{Line: 0, Character: 3}
+
+	item, ok = findCompletionItem(completionAtWithCaps(nil, topFile, topSrc, topCursor, snippetCaps()), "entity")
+	if !ok {
+		t.Fatal("top-level completion missing entity")
+	}
+
+	edit, ok = item.TextEdit.(*protocol.TextEdit)
+	if !ok {
+		t.Fatalf("entity TextEdit = %T, want *protocol.TextEdit", item.TextEdit)
+	}
+
+	wantTopRange := protocol.Range{
+		Start: protocol.Position{Line: 0, Character: 0},
+		End:   topCursor,
+	}
+
+	if edit.Range != wantTopRange {
+		t.Errorf("entity TextEdit range = %+v, want %+v", edit.Range, wantTopRange)
+	}
+
+	const snippet = "entity ${1:Name} {\n\t$0\n}"
+
+	if edit.NewText != snippet {
+		t.Errorf("entity TextEdit NewText = %q, want the snippet %q", edit.NewText, snippet)
+	}
+}
+
+// TestCompletionNoTextEditWithoutPrefix proves items offered with nothing
+// typed carry no TextEdit: there is no partial word to replace.
+func TestCompletionNoTextEditWithoutPrefix(t *testing.T) {
+	src := ""
+
+	file, _ := parser.New("empty.zen", []byte(src)).ParseFile()
+
+	for _, caps := range []clientCaps{{}, snippetCaps()} {
+		for _, item := range completionAtWithCaps(nil, file, src, protocol.Position{Line: 0, Character: 0}, caps) {
+			if item.TextEdit != nil {
+				t.Errorf("%s TextEdit is present with no prefix typed, want nil (caps %+v)", item.Label, caps)
+			}
+		}
+	}
+}
+
+// TestPrefixRange pins the prefix-covering range computation, including the
+// clamp when the prefix outruns the cursor column.
+func TestPrefixRange(t *testing.T) {
+	tests := []struct {
+		name   string
+		cursor protocol.Position
+		prefix string
+		want   protocol.Range
+	}{
+		{
+			name:   "covers the typed word",
+			cursor: protocol.Position{Line: 2, Character: 16},
+			prefix: "not_",
+			want: protocol.Range{
+				Start: protocol.Position{Line: 2, Character: 12},
+				End:   protocol.Position{Line: 2, Character: 16},
+			},
+		},
+		{
+			name:   "empty prefix is a caret range",
+			cursor: protocol.Position{Line: 0, Character: 0},
+			prefix: "",
+			want: protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 0, Character: 0},
+			},
+		},
+		{
+			name:   "overlong prefix clamps to the line start",
+			cursor: protocol.Position{Line: 1, Character: 1},
+			prefix: "toolong",
+			want: protocol.Range{
+				Start: protocol.Position{Line: 1, Character: 0},
+				End:   protocol.Position{Line: 1, Character: 1},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := prefixRange(tc.cursor, tc.prefix); got != tc.want {
+				t.Errorf("prefixRange(%+v, %q) = %+v, want %+v", tc.cursor, tc.prefix, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCompletionHonorsNegotiatedSnippetSupport is the end-to-end contract:
+// a client that negotiates snippetSupport at Initialize gets snippet items
+// (with prefix-replacing edits) out of textDocument/completion, while a
+// client that negotiates nothing gets plain-text labels.
+func TestCompletionHonorsNegotiatedSnippetSupport(t *testing.T) {
+	const docURI = "file:///tmp/zever-lsp-snippet.zen"
+
+	newServerWithSnippet := func(t *testing.T, snippet *bool) *Server {
+		t.Helper()
+
+		s := NewServer()
+
+		var item *protocol.ClientCompletionItemOptions
+		if snippet != nil {
+			item = &protocol.ClientCompletionItemOptions{SnippetSupport: snippet}
+		}
+
+		params := &protocol.InitializeParams{
+			Capabilities: protocol.ClientCapabilities{
+				TextDocument: &protocol.TextDocumentClientCapabilities{
+					Completion: &protocol.CompletionClientCapabilities{
+						CompletionItem: item,
+					},
+				},
+			},
+		}
+
+		if _, err := s.Initialize(t.Context(), params); err != nil {
+			t.Fatalf("Initialize: %v", err)
+		}
+
+		return s
+	}
+
+	completeEntity := func(t *testing.T, s *Server) protocol.CompletionItem {
+		t.Helper()
+
+		openDoc(t, s, docURI, "ent")
+
+		res, err := s.Completion(t.Context(), &protocol.CompletionParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(docURI)},
+				Position:     protocol.Position{Line: 0, Character: 3},
+			},
+		})
+		if err != nil {
+			t.Fatalf("Completion: %v", err)
+		}
+
+		slice, ok := res.(protocol.CompletionItemSlice)
+		if !ok {
+			t.Fatalf("Completion result = %T, want CompletionItemSlice", res)
+		}
+
+		item, ok := findCompletionItem(slice, "entity")
+		if !ok {
+			t.Fatalf("completion missing entity, got %v", completionLabels(slice))
+		}
+
+		return item
+	}
+
+	t.Run("snippet client gets the skeleton", func(t *testing.T) {
+		snippet := true
+
+		item := completeEntity(t, newServerWithSnippet(t, &snippet))
+
+		const want = "entity ${1:Name} {\n\t$0\n}"
+
+		if got, _ := item.InsertText.Get(); got != want {
+			t.Errorf("entity InsertText = %q, want snippet %q", got, want)
+		}
+
+		if item.InsertTextFormat != protocol.InsertTextFormatSnippet {
+			t.Errorf("entity InsertTextFormat = %v, want Snippet", item.InsertTextFormat)
+		}
+
+		edit, ok := item.TextEdit.(*protocol.TextEdit)
+		if !ok {
+			t.Fatalf("entity TextEdit = %T, want *protocol.TextEdit", item.TextEdit)
+		}
+
+		wantRange := protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: 0, Character: 3},
+		}
+
+		if edit.Range != wantRange {
+			t.Errorf("entity TextEdit range = %+v, want %+v", edit.Range, wantRange)
+		}
+	})
+
+	t.Run("plain client gets the label", func(t *testing.T) {
+		item := completeEntity(t, newServerWithSnippet(t, nil))
+
+		if got, _ := item.InsertText.Get(); got != "entity" {
+			t.Errorf("entity InsertText = %q, want the plain label", got)
+		}
+
+		if item.InsertTextFormat != protocol.InsertTextFormatPlainText {
+			t.Errorf("entity InsertTextFormat = %v, want PlainText", item.InsertTextFormat)
+		}
+	})
 }

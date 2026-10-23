@@ -48,10 +48,14 @@ const (
 )
 
 // candidate is one completion suggestion before it becomes a protocol item:
-// a label plus an optional one-line explanation.
+// a label, an optional one-line explanation, and an optional snippet body.
+// An empty snippet means the item inserts its label verbatim; a non-empty
+// snippet is offered as a snippet-format insert only to clients that
+// negotiated snippetSupport, and degrades to the plain label otherwise.
 type candidate struct {
-	label  string
-	detail string
+	label   string
+	detail  string
+	snippet string
 }
 
 // scalarTypeDescriptions carries the completion detail for each scalar type
@@ -100,83 +104,90 @@ func buildScalarTypeCandidates() []candidate {
 			detail = name + " scalar"
 		}
 
-		cands = append(cands, candidate{name, detail})
+		cands = append(cands, candidate{name, detail, ""})
 	}
 
-	cands = append(cands, candidate{"enum", "enum(value, ...) inline enumeration"})
+	cands = append(cands, candidate{"enum", "enum(value, ...) inline enumeration", ""})
 
 	sort.Slice(cands, func(i, j int) bool { return cands[i].label < cands[j].label })
 
 	return cands
 }
 
-// topLevelKeywordCandidates mirrors token.Keywords minus true/false: the
-// words that unambiguously start a production.
+// topLevelKeywordCandidates mirrors token.Keywords minus true/false -- the
+// words that unambiguously start a production -- plus the contextual "saga"
+// keyword, which the parser accepts as a top-level declaration despite not
+// reserving it. Keywords that open a block carry a snippet skeleton,
+// offered as a snippet only to clients that negotiated snippetSupport;
+// every other keyword inserts its label verbatim.
 var topLevelKeywordCandidates = []candidate{
-	{"entity", "declare an entity"},
-	{"message", "declare a non-persisted request/response message"},
-	{"service", "declare a service"},
-	{"job", "declare a background job"},
-	{"schedule", "declare a scheduled task"},
-	{"rpc", "declare an rpc method"},
-	{"index", "declare an index"},
-	{"enum", "inline enumeration type"},
-	{"has_many", "one-to-many relation"},
-	{"has_one", "one-to-one relation"},
-	{"belongs_to", "inverse relation holding the foreign key"},
-	{"many_to_many", "many-to-many relation via a join table"},
+	{"entity", "declare an entity", "entity ${1:Name} {\n\t$0\n}"},
+	{"message", "declare a non-persisted request/response message", "message ${1:Name} {\n\t$0\n}"},
+	{"service", "declare a service", "service ${1:Name} {\n\t$0\n}"},
+	{"job", "declare a background job", "job ${1:Name}(${2}) {\n\t$0\n}"},
+	{"schedule", "declare a scheduled task", "schedule ${1:Name} {\n\t$0\n}"},
+	{"rpc", "declare an rpc method", ""},
+	{"index", "declare an index", ""},
+	{"enum", "inline enumeration type", "enum ${1:Name} {\n\t$0\n}"},
+	{"saga", "declare a saga", "saga ${1:Name} {\n\t$0\n}"},
+	{"has_many", "one-to-many relation", ""},
+	{"has_one", "one-to-one relation", ""},
+	{"belongs_to", "inverse relation holding the foreign key", ""},
+	{"many_to_many", "many-to-many relation via a join table", ""},
 }
 
 // entityMemberCandidates are the reserved words that can start an entity
-// body member; a plain field starts with a bare identifier instead.
+// body member; a plain field starts with a bare identifier instead. The
+// index keyword carries a snippet for its column list, offered only to
+// clients that negotiated snippetSupport.
 var entityMemberCandidates = []candidate{
-	{"has_many", "one-to-many relation"},
-	{"has_one", "one-to-one relation"},
-	{"belongs_to", "inverse relation holding the foreign key"},
-	{"many_to_many", "many-to-many relation via a join table"},
-	{"index", "index(column, ...) declaration"},
+	{"has_many", "one-to-many relation", ""},
+	{"has_one", "one-to-one relation", ""},
+	{"belongs_to", "inverse relation holding the foreign key", ""},
+	{"many_to_many", "many-to-many relation via a join table", ""},
+	{"index", "index(column, ...) declaration", "index ${1:cols}"},
 }
 
 // fieldAttrCandidates mirrors resolver.resolveFieldAttribute.
 var fieldAttrCandidates = []candidate{
-	{"primary", "mark the field as the primary key"},
-	{"unique", "add a unique constraint"},
-	{"validate", "validate(kind: value, ...) constraints"},
-	{"default", "default(value) for new rows"},
-	{"renamed_from", "renamed_from(\"old_name\") — record a column rename for zever db migrate"},
+	{"primary", "mark the field as the primary key", ""},
+	{"unique", "add a unique constraint", ""},
+	{"validate", "validate(kind: value, ...) constraints", ""},
+	{"default", "default(value) for new rows", ""},
+	{"renamed_from", "renamed_from(\"old_name\") — record a column rename for zever db migrate", ""},
 }
 
 // relationAttrCandidates mirrors resolver.resolveRelationAttributes.
 var relationAttrCandidates = []candidate{
-	{"foreign_key", "foreign_key(column) backing this relation"},
-	{"on_delete", "on_delete(restrict | cascade | set_null)"},
+	{"foreign_key", "foreign_key(column) backing this relation", ""},
+	{"on_delete", "on_delete(restrict | cascade | set_null)", ""},
 }
 
 // entityAttrCandidates mirrors resolver.resolveEntitySchema.
 var entityAttrCandidates = []candidate{
-	{"schema", "schema(name) overriding the module schema"},
+	{"schema", "schema(name) overriding the module schema", ""},
 }
 
 // indexAttrCandidates mirrors resolver.resolveIndex.
 var indexAttrCandidates = []candidate{
-	{"unique", "make the index unique"},
+	{"unique", "make the index unique", ""},
 }
 
 // stringValidateArgCandidates are the @validate kinds that apply only to
 // string fields, mirroring resolver.resolveValidateRules.
 var stringValidateArgCandidates = []candidate{
-	{"format", "string format: email, url or uuid"},
-	{"min_len", "minimum string length"},
-	{"max_len", "maximum string length"},
+	{"format", "string format: email, url or uuid", ""},
+	{"min_len", "minimum string length", ""},
+	{"max_len", "maximum string length", ""},
 }
 
 // numericValidateArgCandidates are the @validate kinds that apply only to
 // numeric fields, mirroring resolver.resolveValidateRules.
 var numericValidateArgCandidates = []candidate{
-	{"gt", "numeric greater-than bound"},
-	{"gte", "numeric greater-or-equal bound"},
-	{"lt", "numeric less-than bound"},
-	{"lte", "numeric less-or-equal bound"},
+	{"gt", "numeric greater-than bound", ""},
+	{"gte", "numeric greater-or-equal bound", ""},
+	{"lt", "numeric less-than bound", ""},
+	{"lte", "numeric less-or-equal bound", ""},
 }
 
 // validateArgCandidates is the union of both kinds, offered when the field's
@@ -188,44 +199,45 @@ var validateArgCandidates = append(
 )
 
 // serviceMemberCandidates mirrors parser.serviceMemberStart: only "rpc"
-// starts a service-body member.
+// starts a service-body member. The rpc keyword carries a snippet for its
+// signature, offered only to clients that negotiated snippetSupport.
 var serviceMemberCandidates = []candidate{
-	{"rpc", "declare an rpc method"},
+	{"rpc", "declare an rpc method", "rpc ${1:name}($2) -> ${3:Type} {\n\t$0\n}"},
 }
 
 // rpcOptionCandidates mirrors parser.rpcOptionStart.
 var rpcOptionCandidates = []candidate{
-	{"http", "http: METHOD \"path\" route binding"},
-	{"auth", "auth: none | required | required(roles: {...})"},
-	{"permission", "permission: check(resource: ...)"},
-	{"errors", "errors: { code, ... } response error set"},
-	{"paginated", "paginated: true | false"},
+	{"http", "http: METHOD \"path\" route binding", ""},
+	{"auth", "auth: none | required | required(roles: {...})", ""},
+	{"permission", "permission: check(resource: ...)", ""},
+	{"errors", "errors: { code, ... } response error set", ""},
+	{"paginated", "paginated: true | false", ""},
 }
 
 // jobOptionCandidates mirrors parser.jobOptionStart.
 var jobOptionCandidates = []candidate{
-	{"queue", "queue: name of the queue this job drains"},
-	{"retry", "retry: max_attempts(n), backoff(...)"},
+	{"queue", "queue: name of the queue this job drains", ""},
+	{"retry", "retry: max_attempts(n), backoff(...)", ""},
 }
 
 // scheduleOptionCandidates mirrors parser.scheduleOptionStart.
 var scheduleOptionCandidates = []candidate{
-	{"cron", "cron: \"0 0 * * *\" schedule spec"},
-	{"dispatch", "dispatch: JobName() to run"},
+	{"cron", "cron: \"0 0 * * *\" schedule spec", ""},
+	{"dispatch", "dispatch: JobName() to run", ""},
 }
 
 // onDeleteCandidates mirrors resolver.resolveOnDeleteAttribute.
 var onDeleteCandidates = []candidate{
-	{"restrict", "refuse to delete while children exist"},
-	{"cascade", "delete children along with the parent"},
-	{"set_null", "null the foreign key on delete"},
+	{"restrict", "refuse to delete while children exist", ""},
+	{"cascade", "delete children along with the parent", ""},
+	{"set_null", "null the foreign key on delete", ""},
 }
 
 // validateFormatCandidates mirrors resolver.decodeValidateValue.
 var validateFormatCandidates = []candidate{
-	{"email", "an email address"},
-	{"url", "an absolute URL"},
-	{"uuid", "a UUID string"},
+	{"email", "an email address", ""},
+	{"url", "an absolute URL", ""},
+	{"uuid", "a UUID string", ""},
 }
 
 // errorCandidates mirrors resolver.ValidErrorCodes -- the fixed, gRPC-
@@ -240,7 +252,7 @@ func buildErrorCandidates() []candidate {
 	cands := make([]candidate, 0, len(resolver.ValidErrorCodes))
 
 	for name, code := range resolver.ValidErrorCodes {
-		cands = append(cands, candidate{name, fmt.Sprintf("%d %s", code.HTTPStatus(), code.GRPCName())})
+		cands = append(cands, candidate{name, fmt.Sprintf("%d %s", code.HTTPStatus(), code.GRPCName()), ""})
 	}
 
 	sort.Slice(cands, func(i, j int) bool { return cands[i].label < cands[j].label })
@@ -254,11 +266,11 @@ func buildErrorCandidates() []candidate {
 // the vocabulary is pinned by test rather than derived; a verb the resolver
 // gains but this list omits fails the pin instead of drifting.
 var httpVerbCandidates = []candidate{
-	{"GET", "HTTP verb for the route binding"},
-	{"POST", "HTTP verb for the route binding"},
-	{"PUT", "HTTP verb for the route binding"},
-	{"PATCH", "HTTP verb for the route binding"},
-	{"DELETE", "HTTP verb for the route binding"},
+	{"GET", "HTTP verb for the route binding", ""},
+	{"POST", "HTTP verb for the route binding", ""},
+	{"PUT", "HTTP verb for the route binding", ""},
+	{"PATCH", "HTTP verb for the route binding", ""},
+	{"DELETE", "HTTP verb for the route binding", ""},
 }
 
 // jobCandidates enumerates the jobs a schedule's dispatch slot can target:
@@ -278,7 +290,7 @@ func jobCandidates(schema *ir.Schema, file *ast.File) []candidate {
 		}
 
 		seen[name] = true
-		out = append(out, candidate{name, "job"})
+		out = append(out, candidate{name, "job", ""})
 	}
 
 	if schema != nil {
@@ -312,11 +324,11 @@ func typeCandidates(schema *ir.Schema) []candidate {
 
 	for _, module := range allModules(schema) {
 		for _, entity := range module.Entities {
-			out = append(out, candidate{entity.Name, fmt.Sprintf("entity, %d field(s)", len(entity.Fields))})
+			out = append(out, candidate{entity.Name, fmt.Sprintf("entity, %d field(s)", len(entity.Fields)), ""})
 		}
 
 		for _, msg := range module.Messages {
-			out = append(out, candidate{msg.Name, fmt.Sprintf("message, %d field(s)", len(msg.Fields))})
+			out = append(out, candidate{msg.Name, fmt.Sprintf("message, %d field(s)", len(msg.Fields)), ""})
 		}
 	}
 
@@ -393,7 +405,7 @@ func enumValueCandidatesFor(schema *ir.Schema, file *ast.File, src string, curso
 
 	out := make([]candidate, 0, len(values))
 	for _, value := range values {
-		out = append(out, candidate{value, fmt.Sprintf("enum %s value", name)})
+		out = append(out, candidate{value, fmt.Sprintf("enum %s value", name), ""})
 	}
 
 	return out
@@ -401,7 +413,10 @@ func enumValueCandidatesFor(schema *ir.Schema, file *ast.File, src string, curso
 
 // completionAt returns the completion items for a cursor in one document.
 // It never returns nil items for a known context; an unknown context yields
-// an empty slice so callers can treat "no completions" uniformly.
+// an empty slice so callers can treat "no completions" uniformly. It
+// assumes a client with no negotiated capabilities, so every item inserts
+// its label as plain text; completionAtWithCaps is the capability-aware
+// entry point.
 //
 // The textDocument/completion handler wraps a non-empty result in
 // protocol.CompletionItemSlice (the CompletionResult union arm) and returns
@@ -412,49 +427,63 @@ func completionAt(
 	src string,
 	cursor protocol.Position,
 ) []protocol.CompletionItem {
+	return completionAtWithCaps(schema, file, src, cursor, clientCaps{})
+}
+
+// completionAtWithCaps is completionAt for a client whose capabilities were
+// negotiated at Initialize: when caps reports snippetSupport, candidates
+// carrying a snippet skeleton insert it as a snippet; otherwise every item
+// inserts its label as plain text, exactly like completionAt.
+func completionAtWithCaps(
+	schema *ir.Schema,
+	file *ast.File,
+	src string,
+	cursor protocol.Position,
+	caps clientCaps,
+) []protocol.CompletionItem {
 	ctx, prefix := completionContextAt(file, src, cursor)
 
 	switch ctx {
 	case ctxTopLevelKeyword:
-		return items(topLevelKeywordCandidates, protocol.CompletionItemKindKeyword, prefix)
+		return items(topLevelKeywordCandidates, protocol.CompletionItemKindKeyword, prefix, cursor, caps)
 	case ctxEntityMember:
-		return items(entityMemberCandidates, protocol.CompletionItemKindKeyword, prefix)
+		return items(entityMemberCandidates, protocol.CompletionItemKindKeyword, prefix, cursor, caps)
 	case ctxFieldType:
-		return items(scalarTypeCandidates, protocol.CompletionItemKindClass, prefix)
+		return items(scalarTypeCandidates, protocol.CompletionItemKindClass, prefix, cursor, caps)
 	case ctxRelationTarget:
-		return items(entityCandidates(schema), protocol.CompletionItemKindClass, prefix)
+		return items(entityCandidates(schema), protocol.CompletionItemKindClass, prefix, cursor, caps)
 	case ctxFieldAttrName:
-		return items(fieldAttrCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(fieldAttrCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxRelationAttrName:
-		return items(relationAttrCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(relationAttrCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxEntityAttrName:
-		return items(entityAttrCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(entityAttrCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxIndexAttrName:
-		return items(indexAttrCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(indexAttrCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxValidateArgName:
-		return items(validateArgCandidatesFor(validateScalarAt(src, cursor)), protocol.CompletionItemKindProperty, prefix)
+		return items(validateArgCandidatesFor(validateScalarAt(src, cursor)), protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxOnDeleteValue:
-		return items(onDeleteCandidates, protocol.CompletionItemKindEnumMember, prefix)
+		return items(onDeleteCandidates, protocol.CompletionItemKindEnumMember, prefix, cursor, caps)
 	case ctxValidateFormatValue:
-		return items(validateFormatCandidates, protocol.CompletionItemKindEnumMember, prefix)
+		return items(validateFormatCandidates, protocol.CompletionItemKindEnumMember, prefix, cursor, caps)
 	case ctxErrorsValue:
-		return items(errorCandidates, protocol.CompletionItemKindEnumMember, prefix)
+		return items(errorCandidates, protocol.CompletionItemKindEnumMember, prefix, cursor, caps)
 	case ctxServiceMember:
-		return items(serviceMemberCandidates, protocol.CompletionItemKindKeyword, prefix)
+		return items(serviceMemberCandidates, protocol.CompletionItemKindKeyword, prefix, cursor, caps)
 	case ctxRPCOptionName:
-		return items(rpcOptionCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(rpcOptionCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxJobOptionName:
-		return items(jobOptionCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(jobOptionCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxScheduleOptionName:
-		return items(scheduleOptionCandidates, protocol.CompletionItemKindProperty, prefix)
+		return items(scheduleOptionCandidates, protocol.CompletionItemKindProperty, prefix, cursor, caps)
 	case ctxDispatchJob:
-		return items(jobCandidates(schema, file), protocol.CompletionItemKindFunction, prefix)
+		return items(jobCandidates(schema, file), protocol.CompletionItemKindFunction, prefix, cursor, caps)
 	case ctxHTTPVerb:
-		return items(httpVerbCandidates, protocol.CompletionItemKindEnumMember, prefix)
+		return items(httpVerbCandidates, protocol.CompletionItemKindEnumMember, prefix, cursor, caps)
 	case ctxDefaultEnumValue:
-		return items(enumValueCandidatesFor(schema, file, src, cursor), protocol.CompletionItemKindEnumMember, prefix)
+		return items(enumValueCandidatesFor(schema, file, src, cursor), protocol.CompletionItemKindEnumMember, prefix, cursor, caps)
 	case ctxMessageType:
-		return items(typeCandidates(schema), protocol.CompletionItemKindClass, prefix)
+		return items(typeCandidates(schema), protocol.CompletionItemKindClass, prefix, cursor, caps)
 	case ctxNone:
 		return nil
 	}
@@ -555,7 +584,7 @@ func entityCandidates(schema *ir.Schema) []candidate {
 
 	out := make([]candidate, 0, len(entities))
 	for _, entity := range entities {
-		out = append(out, candidate{entity.Name, fmt.Sprintf("entity, %d field(s)", len(entity.Fields))})
+		out = append(out, candidate{entity.Name, fmt.Sprintf("entity, %d field(s)", len(entity.Fields)), ""})
 	}
 
 	return out
@@ -565,6 +594,14 @@ func entityCandidates(schema *ir.Schema) []candidate {
 // items of one kind. It is the single item constructor: every context goes
 // through it so the shapes stay identical.
 //
+// A candidate carrying a snippet inserts it as a snippet when the client
+// negotiated snippetSupport, and degrades to its plain label otherwise
+// (including when caps is the zero value, which is exactly the
+// pre-snippet behavior). When the user already typed a prefix, each item
+// also carries a TextEdit covering that prefix on the cursor line, so
+// accepting the item replaces the partial word instead of duplicating it;
+// the edit's text is the same effective insert text the item carries.
+//
 // Detail is deliberately not attached here: the LSP spec's intended pattern
 // for rich completion is a fast, lightweight initial list followed by a
 // lazy completionItem/resolve for whichever single item the user highlights.
@@ -572,7 +609,7 @@ func entityCandidates(schema *ir.Schema) []candidate {
 // detail (and any richer documentation) on resolve -- see
 // completionResolveData and completionResolve. Data is LSPAny (raw JSON),
 // so the payload is marshaled; an item with no detail keeps Data zero.
-func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) []protocol.CompletionItem {
+func items(cands []candidate, kind protocol.CompletionItemKind, prefix string, cursor protocol.Position, caps clientCaps) []protocol.CompletionItem {
 	out := make([]protocol.CompletionItem, 0, len(cands))
 
 	for _, cand := range cands {
@@ -583,13 +620,28 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) [
 		group := completionGroup(kind, cand)
 		sortPrefix := fmt.Sprintf("%d_", group)
 
+		insert := cand.label
+		format := protocol.InsertTextFormatPlainText
+
+		if cand.snippet != "" && caps.snippetSupport {
+			insert = cand.snippet
+			format = protocol.InsertTextFormatSnippet
+		}
+
 		item := protocol.CompletionItem{
 			Label:            cand.label,
 			Kind:             kind,
 			SortText:         protocol.NewOptional(sortPrefix + cand.label),
 			FilterText:       protocol.NewOptional(cand.label),
-			InsertText:       protocol.NewOptional(cand.label),
-			InsertTextFormat: protocol.InsertTextFormatPlainText,
+			InsertText:       protocol.NewOptional(insert),
+			InsertTextFormat: format,
+		}
+
+		if prefix != "" {
+			item.TextEdit = &protocol.TextEdit{
+				Range:   prefixRange(cursor, prefix),
+				NewText: insert,
+			}
 		}
 
 		if cand.detail != "" {
@@ -606,6 +658,22 @@ func items(cands []candidate, kind protocol.CompletionItemKind, prefix string) [
 	}
 
 	return out
+}
+
+// prefixRange returns the single-line range covering the already-typed
+// prefix ending at the cursor, so a completion TextEdit replaces the
+// partial word instead of duplicating it. The start clamps to the line
+// start, since a prefix longer than the cursor column can never match.
+func prefixRange(cursor protocol.Position, prefix string) protocol.Range {
+	start := int(cursor.Character) - len(prefix)
+	if start < 0 {
+		start = 0
+	}
+
+	return protocol.Range{
+		Start: protocol.Position{Line: cursor.Line, Character: uint32(start)},
+		End:   cursor,
+	}
 }
 
 // completionGroup assigns a context-priority bucket used to build SortText:
