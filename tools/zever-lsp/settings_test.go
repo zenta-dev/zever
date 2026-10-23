@@ -220,6 +220,186 @@ func TestDidChangeConfigurationDefaultsOnFullReplacement(t *testing.T) {
 	}
 }
 
+// refreshTestParams builds Initialize params advertising the given workspace
+// refresh support: a nil arm means the client advertised nothing for that
+// family, matching a client with no refresh support at all.
+func refreshTestParams(t *testing.T, codeLens, inlayHint *bool) *protocol.InitializeParams {
+	t.Helper()
+
+	return &protocol.InitializeParams{
+		Capabilities: protocol.ClientCapabilities{
+			Workspace: &protocol.WorkspaceClientCapabilities{
+				CodeLens:  &protocol.CodeLensWorkspaceClientCapabilities{RefreshSupport: codeLens},
+				InlayHint: &protocol.InlayHintWorkspaceClientCapabilities{RefreshSupport: inlayHint},
+			},
+		},
+	}
+}
+
+// TestRefreshCapsFor pins the Initialize refresh-capability negotiation: a
+// nil params or any nil link in the capability chain negotiates no refresh,
+// while advertised (and only advertised-true) support is recorded per family.
+func TestRefreshCapsFor(t *testing.T) {
+	t.Parallel()
+
+	yes := boolPtr(true)
+	no := boolPtr(false)
+
+	tests := []struct {
+		name   string
+		params *protocol.InitializeParams
+		wantCL bool
+		wantIH bool
+	}{
+		{"nil params", nil, false, false},
+		{"empty params", &protocol.InitializeParams{}, false, false},
+		{"workspace without families", &protocol.InitializeParams{
+			Capabilities: protocol.ClientCapabilities{Workspace: &protocol.WorkspaceClientCapabilities{}},
+		}, false, false},
+		{"both advertised", refreshTestParams(t, yes, yes), true, true},
+		{"only codelens advertised", refreshTestParams(t, yes, nil), true, false},
+		{"only inlay advertised", refreshTestParams(t, nil, yes), false, true},
+		{"explicitly denied", refreshTestParams(t, no, no), false, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if gotCL, gotIH := refreshCapsFor(tc.params); gotCL != tc.wantCL || gotIH != tc.wantIH {
+				t.Errorf("refreshCapsFor() = (%v, %v), want (%v, %v)", gotCL, gotIH, tc.wantCL, tc.wantIH)
+			}
+		})
+	}
+}
+
+// TestDidChangeConfigurationSendsRefreshes proves a settings replacement
+// refreshes exactly the families it flips, and only when the client
+// advertised that family's refresh support at Initialize: a flipped
+// codelens.references pushes workspace/codeLens/refresh, a flipped
+// inlay-hint gate pushes workspace/inlayHint/refresh, and anything else --
+// an unchanged family, an unsupported family, a debounce-only change --
+// stays silent. Semantic tokens are never refreshed: no settings payload
+// here touches token behavior, so no case expects one.
+func TestDidChangeConfigurationSendsRefreshes(t *testing.T) {
+	t.Parallel()
+
+	yes := boolPtr(true)
+	no := boolPtr(false)
+
+	tests := []struct {
+		name          string
+		codeLensCap   *bool
+		inlayHintCap  *bool
+		payload       string
+		wantCodeLens  int
+		wantInlayHint int
+	}{
+		{
+			name:         "codelens flip with support refreshes",
+			codeLensCap:  yes,
+			payload:      `{"zever":{"codelens":{"references":false}}}`,
+			wantCodeLens: 1,
+		},
+		{
+			name:    "codelens flip without support stays silent",
+			payload: `{"zever":{"codelens":{"references":false}}}`,
+		},
+		{
+			name:        "codelens flip with explicitly denied support stays silent",
+			codeLensCap: no,
+			payload:     `{"zever":{"codelens":{"references":false}}}`,
+		},
+		{
+			name:          "implicitModule flip with support refreshes",
+			inlayHintCap:  yes,
+			payload:       `{"zever":{"inlayHints":{"implicitModule":false}}}`,
+			wantInlayHint: 1,
+		},
+		{
+			name:          "errorCases flip refreshes",
+			inlayHintCap:  yes,
+			payload:       `{"zever":{"inlayHints":{"errorCases":false}}}`,
+			wantInlayHint: 1,
+		},
+		{
+			name:          "paramNames flip refreshes",
+			inlayHintCap:  yes,
+			payload:       `{"zever":{"inlayHints":{"paramNames":true}}}`,
+			wantInlayHint: 1,
+		},
+		{
+			name:        "inlay flip with only codelens support stays silent",
+			codeLensCap: yes,
+			payload:     `{"zever":{"inlayHints":{"implicitModule":false}}}`,
+		},
+		{
+			name:         "identical replacement sends nothing",
+			codeLensCap:  yes,
+			inlayHintCap: yes,
+			payload:      `{}`,
+		},
+		{
+			name:         "debounce-only change sends nothing",
+			codeLensCap:  yes,
+			inlayHintCap: yes,
+			payload:      `{"zever":{"diagnostics":{"debounceMs":900}}}`,
+		},
+		{
+			name:          "both families flip with both caps",
+			codeLensCap:   yes,
+			inlayHintCap:  yes,
+			payload:       `{"zever":{"codelens":{"references":false},"inlayHints":{"paramNames":true}}}`,
+			wantCodeLens:  1,
+			wantInlayHint: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := NewServer()
+
+			if _, err := s.Initialize(t.Context(), refreshTestParams(t, tc.codeLensCap, tc.inlayHintCap)); err != nil {
+				t.Fatalf("Initialize: %v", err)
+			}
+
+			fake := &fakeClient{}
+			ctx := protocol.WithClient(t.Context(), fake)
+
+			if err := s.DidChangeConfiguration(ctx, &protocol.DidChangeConfigurationParams{
+				Settings: protocol.LSPAny(tc.payload),
+			}); err != nil {
+				t.Fatalf("DidChangeConfiguration: %v", err)
+			}
+
+			if gotCL, gotIH := fake.refreshCounts(); gotCL != tc.wantCodeLens || gotIH != tc.wantInlayHint {
+				t.Errorf("refreshes = (codelens %d, inlay %d), want (%d, %d)",
+					gotCL, gotIH, tc.wantCodeLens, tc.wantInlayHint)
+			}
+		})
+	}
+}
+
+// TestDidChangeConfigurationWithoutClientSendsNothing proves a settings
+// flip with no captured client yet is a silent no-op, not a nil dereference.
+func TestDidChangeConfigurationWithoutClientSendsNothing(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+
+	if err := s.DidChangeConfiguration(t.Context(), &protocol.DidChangeConfigurationParams{
+		Settings: protocol.LSPAny(`{"zever":{"codelens":{"references":false}}}`),
+	}); err != nil {
+		t.Fatalf("DidChangeConfiguration: %v", err)
+	}
+
+	if got := s.currentSettings(); got.CodeLensReferences {
+		t.Errorf("settings = %+v, want the codelens flip stored despite no client", got)
+	}
+}
+
 // ServerInlayGateSrc declares an entity (which receives the implicit-public
 // module hint in a two-module schema) next to an rpc with a recognized
 // error code, so both hint families fire on one file.

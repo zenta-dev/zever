@@ -587,6 +587,106 @@ func TestDidChangeWatchedFiles(t *testing.T) {
 	}
 }
 
+// TestDidCreateDeleteFiles proves the file-operation handlers update the
+// snapshot surgically: a created file joins CollectAllFiles with its disk
+// content while a sibling written to disk but never announced stays unknown
+// (no full Rescan ran), a deleted file leaves, and non-.zen, unreadable, and
+// non-file URIs are ignored. Nil params are tolerated.
+func TestDidCreateDeleteFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	writeFile(t, dir, "seed.zen", "entity Seed {\n\tid: uuid @primary\n}\n")
+
+	s := NewServer()
+	s.ws.SetRoot(string(pathToURI(dir)))
+
+	// Siblings that land on disk after the scan: announced files must join
+	// the snapshot while these stay unknown, proving no Rescan ran.
+	stray := writeFile(t, dir, "stray.zen", "entity Stray {\n\tid: uuid @primary\n}\n")
+	strayAbs, err := filepath.Abs(stray)
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+
+	const freshContent = "entity Fresh {\n\tid: uuid @primary\n}\n"
+
+	fresh := writeFile(t, dir, "fresh.zen", freshContent)
+	freshAbs, err := filepath.Abs(fresh)
+	if err != nil {
+		t.Fatalf("Abs: %v", err)
+	}
+
+	if err := s.DidCreateFiles(t.Context(), &protocol.CreateFilesParams{
+		Files: []protocol.FileCreate{{URI: string(pathToURI(fresh))}},
+	}); err != nil {
+		t.Fatalf("DidCreateFiles: %v", err)
+	}
+
+	files := s.ws.CollectAllFiles()
+
+	if got, ok := files[freshAbs]; !ok || got != freshContent {
+		t.Errorf("created file = (%q, %v), want the disk bytes announced", got, ok)
+	}
+
+	if _, ok := files[strayAbs]; ok {
+		t.Errorf("unannounced sibling %q joined the snapshot, want no full Rescan", strayAbs)
+	}
+
+	// Non-.zen, unreadable, and non-file URIs are ignored without touching
+	// the snapshot.
+	notes := writeFile(t, dir, "notes.txt", "not a schema")
+
+	if err := s.DidCreateFiles(t.Context(), &protocol.CreateFilesParams{
+		Files: []protocol.FileCreate{
+			{URI: string(pathToURI(notes))},
+			{URI: string(pathToURI(filepath.Join(dir, "missing.zen")))},
+			{URI: "untitled:Untitled-1"},
+		},
+	}); err != nil {
+		t.Fatalf("DidCreateFiles (ignored kinds): %v", err)
+	}
+
+	if files = s.ws.CollectAllFiles(); len(files) != 2 {
+		t.Fatalf("after ignored creates got %d files, want 2 (seed + fresh): %v", len(files), keysOf(files))
+	}
+
+	// Deleting the announced file drops it while the stray stays unknown.
+	if err := s.DidDeleteFiles(t.Context(), &protocol.DeleteFilesParams{
+		Files: []protocol.FileDelete{{URI: string(pathToURI(fresh))}},
+	}); err != nil {
+		t.Fatalf("DidDeleteFiles: %v", err)
+	}
+
+	if files = s.ws.CollectAllFiles(); len(files) != 1 {
+		t.Fatalf("after delete got %d files, want 1 (seed): %v", len(files), keysOf(files))
+	}
+
+	if _, ok := files[strayAbs]; ok {
+		t.Errorf("unannounced sibling %q joined the snapshot on delete, want no full Rescan", strayAbs)
+	}
+
+	// Unknown deletes and nil params are tolerated.
+	if err := s.DidDeleteFiles(t.Context(), &protocol.DeleteFilesParams{
+		Files: []protocol.FileDelete{{URI: string(pathToURI(fresh))}},
+	}); err != nil {
+		t.Fatalf("DidDeleteFiles (unknown): %v", err)
+	}
+
+	if err := s.DidCreateFiles(t.Context(), nil); err != nil {
+		t.Fatalf("DidCreateFiles(nil): %v", err)
+	}
+
+	if err := s.DidDeleteFiles(t.Context(), nil); err != nil {
+		t.Fatalf("DidDeleteFiles(nil): %v", err)
+	}
+
+	if files = s.ws.CollectAllFiles(); len(files) != 1 {
+		t.Errorf("after tolerated calls got %d files, want 1 (seed): %v", len(files), keysOf(files))
+	}
+}
+
 func TestDocumentSymbol(t *testing.T) {
 	t.Run("schema path", func(t *testing.T) {
 		s := NewServer()

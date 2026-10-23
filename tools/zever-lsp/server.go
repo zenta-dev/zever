@@ -61,6 +61,14 @@ type Server struct {
 	// resolve properties the client handles lazily. Guarded by mu.
 	completionCaps clientCaps
 
+	// codeLensRefresh records whether the client advertised
+	// Workspace.CodeLens.RefreshSupport at Initialize, so a flipped
+	// zever.codelens.references setting can push workspace/codeLens/refresh.
+	// inlayHintRefresh is the same gate for Workspace.InlayHint.RefreshSupport
+	// and the inlay-hint families. Guarded by mu.
+	codeLensRefresh  bool
+	inlayHintRefresh bool
+
 	// settings is the current editing configuration, swapped whole by
 	// workspace/didChangeConfiguration and read by every handler. Atomic
 	// (rather than mu-guarded) so the diagnostics publisher's delay hook can
@@ -189,6 +197,15 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 	// unconditional.
 	s.mu.Lock()
 	s.completionCaps = clientCapsFor(params)
+	s.mu.Unlock()
+
+	// The workspace refresh capabilities decide whether a settings change
+	// may push workspace/codeLens/refresh and workspace/inlayHint/refresh:
+	// recorded the same way, tolerating a nil params.
+	codeLens, inlayHint := refreshCapsFor(params)
+	s.mu.Lock()
+	s.codeLensRefresh = codeLens
+	s.inlayHintRefresh = inlayHint
 	s.mu.Unlock()
 
 	syncKind := protocol.TextDocumentSyncKindIncremental
@@ -347,6 +364,28 @@ func clientCapsFor(params *protocol.InitializeParams) clientCaps {
 	return caps
 }
 
+// refreshCapsFor reads the workspace refresh capabilities out of an
+// Initialize request's params: whether the client accepts a
+// workspace/codeLens/refresh and a workspace/inlayHint/refresh pushed by the
+// server. Every pointer in the chain may be nil -- a client that advertises
+// no workspace block negotiates no refresh -- so each level is guarded the
+// same way Initialize guards the tooltip flag.
+func refreshCapsFor(params *protocol.InitializeParams) (codeLens, inlayHint bool) {
+	if params == nil || params.Capabilities.Workspace == nil {
+		return false, false
+	}
+
+	if cl := params.Capabilities.Workspace.CodeLens; cl != nil && cl.RefreshSupport != nil {
+		codeLens = *cl.RefreshSupport
+	}
+
+	if ih := params.Capabilities.Workspace.InlayHint; ih != nil && ih.RefreshSupport != nil {
+		inlayHint = *ih.RefreshSupport
+	}
+
+	return codeLens, inlayHint
+}
+
 // Initialized handles the initialized notification by publishing the first
 // round of diagnostics.
 func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams) error {
@@ -359,7 +398,10 @@ func (s *Server) Initialized(ctx context.Context, _ *protocol.InitializedParams)
 // DidChangeConfiguration stores the settings the client pushes over
 // workspace/didChangeConfiguration, under the sole `zever` section (see
 // settings.go for the shape). An empty or non-object payload leaves the
-// current settings untouched; everything else is a whole replacement.
+// current settings untouched; everything else is a whole replacement. When
+// the replacement flips a code-lens or inlay-hint family, the client is
+// asked to refresh that family -- but only when it advertised refresh
+// support at Initialize (see sendRefreshes).
 func (s *Server) DidChangeConfiguration(ctx context.Context, params *protocol.DidChangeConfigurationParams) error {
 	s.captureClient(ctx)
 
@@ -368,10 +410,52 @@ func (s *Server) DidChangeConfiguration(ctx context.Context, params *protocol.Di
 	}
 
 	if parsed, ok := parseSettings(params.Settings); ok {
+		old := s.currentSettings()
 		s.settings.Store(&parsed)
+		// Refreshes publish over a background context off the stored
+		// client, exactly like refreshDiagnostics below, so the helper
+		// takes no request context by design.
+		s.sendRefreshes(old, parsed) //nolint:contextcheck // refresh is intentionally background: the stored client serves contexts that carry none
 	}
 
 	return nil
+}
+
+// sendRefreshes asks the client to re-request the families whose settings
+// changed: a flipped CodeLensReferences pushes workspace/codeLens/refresh,
+// and a flipped ImplicitModuleHints, ErrorCaseHints, or ParamNames pushes
+// workspace/inlayHint/refresh. Each refresh goes out only when the client
+// advertised that family's refresh support at Initialize; with no client
+// captured yet, or without support, it is skipped silently. Semantic tokens
+// carry no settings-dependent behavior, so they are never refreshed here.
+// Delivery is best-effort over a background context (the stored client
+// serves no request context here): failures are logged, never returned.
+func (s *Server) sendRefreshes(old, next Settings) {
+	client := s.currentClient()
+	if client == nil {
+		return
+	}
+
+	s.mu.Lock()
+	codeLensOK := s.codeLensRefresh
+	inlayHintOK := s.inlayHintRefresh
+	s.mu.Unlock()
+
+	ctx := context.Background()
+
+	if next.CodeLensReferences != old.CodeLensReferences && codeLensOK {
+		if err := client.CodeLensRefresh(ctx); err != nil {
+			log.Printf("zever-lsp: code lens refresh: %v", err)
+		}
+	}
+
+	if (next.ImplicitModuleHints != old.ImplicitModuleHints ||
+		next.ErrorCaseHints != old.ErrorCaseHints ||
+		next.ParamNames != old.ParamNames) && inlayHintOK {
+		if err := client.InlayHintRefresh(ctx); err != nil {
+			log.Printf("zever-lsp: inlay hint refresh: %v", err)
+		}
+	}
 }
 
 // currentSettings returns the settings snapshot in effect. NewServer always
@@ -482,6 +566,44 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 func (s *Server) DidChangeWatchedFiles(ctx context.Context, _ *protocol.DidChangeWatchedFilesParams) error {
 	s.captureClient(ctx)
 	s.ws.Rescan()
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
+
+	return nil
+}
+
+// DidCreateFiles folds user-created files into the snapshot surgically --
+// each file is read from disk on its own -- and republishes, without the
+// full Rescan DidChangeWatchedFiles performs. Non-.zen and unreadable files
+// are ignored.
+func (s *Server) DidCreateFiles(ctx context.Context, params *protocol.CreateFilesParams) error {
+	s.captureClient(ctx)
+
+	if params != nil {
+		for _, f := range params.Files {
+			if path, ok := uriToPath(f.URI); ok {
+				s.ws.AddDiskFile(path)
+			}
+		}
+	}
+
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
+
+	return nil
+}
+
+// DidDeleteFiles drops user-deleted files from the snapshot without a full
+// Rescan and republishes. Paths the snapshot does not know stay a no-op.
+func (s *Server) DidDeleteFiles(ctx context.Context, params *protocol.DeleteFilesParams) error {
+	s.captureClient(ctx)
+
+	if params != nil {
+		for _, f := range params.Files {
+			if path, ok := uriToPath(f.URI); ok {
+				s.ws.RemoveDiskFile(path)
+			}
+		}
+	}
+
 	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
 	return nil

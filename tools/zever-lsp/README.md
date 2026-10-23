@@ -37,6 +37,7 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Area | Methods |
 | --- | --- |
 | Sync | `textDocument/didOpen`, `textDocument/didChange` (full), `textDocument/didSave`, `textDocument/didClose`, `workspace/didChangeWatchedFiles` |
+| File operations | `workspace/didCreateFiles`, `workspace/didDeleteFiles` (surgical `diskCache` updates with no full rescan; `didChangeWatchedFiles` stays the coarse fallback) |
 | Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array; each diagnostic carries a stable `zen-###` code — see [Diagnostic codes](#diagnostic-codes) below) |
 | Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback) |
 | Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/typeDefinition` (the named type under the cursor: a scalar or unknown type is honestly null), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
@@ -50,6 +51,7 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` (the `definition` modifier marks declaration identifiers) |
 | Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module, `errors:`-case, and `paramNames:` parameter-name annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
 | Configuration | `workspace/didChangeConfiguration` (`zever.*` settings, see [Configuration](#configuration) below) |
+| Refresh | `workspace/codeLens/refresh`, `workspace/inlayHint/refresh` (pushed when `didChangeConfiguration` flips that family, only when the client advertised `refreshSupport`; semantic tokens never refresh) |
 | Lifecycle | `initialize`, `initialized`, `shutdown`, `exit`, `$/setTrace` |
 
 ## Non-goals
