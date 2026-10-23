@@ -125,6 +125,21 @@ function startClient(): void {
   });
 }
 
+// executeCommandForActiveEditor sends a workspace/executeCommand request for
+// the active zen document's URI. It no-ops when no zen editor is active or
+// the client is not running, so palette invocations from other languages
+// never surface an error.
+async function executeCommandForActiveEditor(command: string): Promise<void> {
+  const doc = vscode.window.activeTextEditor?.document;
+  if (doc === undefined || doc.languageId !== 'zen' || client === undefined) {
+    return;
+  }
+  await client.sendRequest('workspace/executeCommand', {
+    command,
+    arguments: [doc.uri.toString()],
+  });
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   startClient();
 
@@ -144,6 +159,14 @@ export function activate(context: vscode.ExtensionContext): void {
       startClient();
       vscode.window.showInformationMessage('Zever: Language server restarted.');
     }
+  );
+
+  const validateDisposable = vscode.commands.registerCommand('zever.validate', () =>
+    executeCommandForActiveEditor('zever.validate')
+  );
+
+  const fixAllDisposable = vscode.commands.registerCommand('zever.fixAll', () =>
+    executeCommandForActiveEditor('zever.fixAll')
   );
 
   context.subscriptions.push(
@@ -166,6 +189,8 @@ export function activate(context: vscode.ExtensionContext): void {
     dispose: () => {
       client?.stop();
       restartDisposable.dispose();
+      validateDisposable.dispose();
+      fixAllDisposable.dispose();
     },
   });
 }

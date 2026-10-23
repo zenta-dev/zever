@@ -80,12 +80,28 @@
       {
         "command": "zever.restartServer",
         "title": "Zever: Restart Language Server"
+      },
+      {
+        "command": "zever.validate",
+        "title": "Zever: Validate Current File"
+      },
+      {
+        "command": "zever.fixAll",
+        "title": "Zever: Fix All Issues in Current File"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "zever.restartServer"
+        },
+        {
+          "command": "zever.validate",
+          "when": "editorLangId == zen"
+        },
+        {
+          "command": "zever.fixAll",
+          "when": "editorLangId == zen"
         }
       ]
     }

@@ -1,6 +1,8 @@
 // Minimal `vscode` API stub for headless `npm test` runs.
 const messages = [];
 const statusItems = [];
+const registeredCommands = [];
+const commandHandlers = {};
 
 const window = {
   showErrorMessage: (message) => {
@@ -23,7 +25,11 @@ const workspace = {
 };
 
 const commands = {
-  registerCommand: (_command, _callback) => ({ dispose: () => {} }),
+  registerCommand: (command, callback) => {
+    registeredCommands.push(command);
+    commandHandlers[command] = callback;
+    return { dispose: () => {} };
+  },
 };
 
 const languages = {
@@ -56,4 +62,6 @@ module.exports = {
   LanguageStatusSeverity,
   __messages: messages,
   __statusItems: statusItems,
+  __commands: registeredCommands,
+  __commandHandlers: commandHandlers,
 };

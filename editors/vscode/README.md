@@ -66,6 +66,8 @@ The extension contributes the following settings (under `zever.*`):
 ## Commands
 
 - `Zever: Restart Language Server` (`zever.restartServer`): stops and restarts the language server client. Available from the command palette.
+- `Zever: Validate Current File` (`zever.validate`): re-runs the server's diagnostics for the active `.zen` file via `workspace/executeCommand`. Available from the command palette while a `.zen` file is active.
+- `Zever: Fix All Issues in Current File` (`zever.fixAll`): applies every quickfix the server offers for the active `.zen` file in one edit, via `workspace/executeCommand`. Available from the command palette while a `.zen` file is active.
 
 ## Schema status item
 
