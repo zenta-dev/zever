@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	// jsonv2 stays: these assertions pin the engine's *SemanticError for cyclic payloads.
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"strings"

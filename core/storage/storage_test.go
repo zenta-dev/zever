@@ -2,11 +2,12 @@ package storage
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type stubStorage struct{}
@@ -687,7 +688,7 @@ func TestPolicyConfigMarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	empty := PolicyConfig{}
-	dataEmpty, errEmpty := json.Marshal(empty)
+	dataEmpty, errEmpty := codec.Marshal(empty)
 	if errEmpty != nil {
 		t.Fatalf("marshal empty: %v", errEmpty)
 	}
@@ -701,7 +702,7 @@ func TestPolicyConfigMarshalJSON(t *testing.T) {
 		Default: &Policy{Version: "0"},
 	}
 
-	data, err := json.Marshal(cfg)
+	data, err := codec.Marshal(cfg)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
@@ -711,7 +712,7 @@ func TestPolicyConfigMarshalJSON(t *testing.T) {
 	}
 
 	var back PolicyConfig
-	if errBack := json.Unmarshal(data, &back); errBack != nil {
+	if errBack := codec.Unmarshal(data, &back); errBack != nil {
 		t.Fatalf("round-trip: %v", errBack)
 	}
 
@@ -724,7 +725,7 @@ func TestPolicyConfigMarshalJSON(t *testing.T) {
 	}
 
 	noDef := PolicyConfig{Buckets: map[BucketName]Policy{"a": {Version: "1"}}}
-	dataNoDef, errNoDef := json.Marshal(noDef)
+	dataNoDef, errNoDef := codec.Marshal(noDef)
 	if errNoDef != nil {
 		t.Fatalf("marshal no default: %v", errNoDef)
 	}

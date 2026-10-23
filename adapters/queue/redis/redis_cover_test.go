@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	// encoding/json/v2 stays: the marshal/unmarshal stubs below must name the engine's json.Options type.
 	"encoding/json/v2"
 	"errors"
 	"io"

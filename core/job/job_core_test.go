@@ -2,11 +2,12 @@ package job
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 func TestJobCoreResetClearsState(t *testing.T) {
@@ -220,7 +221,7 @@ func TestJobCoreRegisterHandlerDecodeError(t *testing.T) {
 	if !strings.Contains(err.Error(), `"decode-err"`) {
 		t.Fatalf("decode error %q does not contain job name", err.Error())
 	}
-	inner := json.Unmarshal([]byte(`{invalid`), &args{})
+	inner := codec.Unmarshal([]byte(`{invalid`), &args{})
 	if inner == nil {
 		t.Fatal("json.Unmarshal of bad payload unexpectedly succeeded")
 	}
@@ -248,7 +249,7 @@ func TestJobCoreRegisterHandlerSuccess(t *testing.T) {
 	if !ok {
 		t.Fatal("Lookup success-job: miss")
 	}
-	payload, err := json.Marshal(args{X: "hello"})
+	payload, err := codec.Marshal(args{X: "hello"})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -276,7 +277,7 @@ func TestJobCoreRegisterHandlerPropagatesError(t *testing.T) {
 	if !ok {
 		t.Fatal("Lookup prop-err: miss")
 	}
-	payload, err := json.Marshal(args{X: "v"})
+	payload, err := codec.Marshal(args{X: "v"})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
