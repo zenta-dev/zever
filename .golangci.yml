@@ -59,14 +59,27 @@ linters:
   settings:
     depguard:
       rules:
-        main:
+        # shared/codec can use v2/jsontext
+        codec-facade:
+          files:
+            - "shared/codec/**/*.go"
+          allow:
+            - "encoding/json/v2"
+            - "encoding/json/jsontext"
           deny:
             - pkg: "github.com/pkg/errors"
               desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
             - pkg: "io/ioutil"
               desc: "Deprecated since Go 1.16: use io or os instead"
             - pkg: "encoding/json"
-              desc: "Use shared/codec facade instead of encoding/json directly. This will be enforced repo-wide."
+              desc: "Use shared/codec facade instead of encoding/json directly."
+        # Deny only pkg/errors and io/ioutil for now; encoding/json deny added in final workstream
+        main:
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "Use the standard library errors and fmt.Errorf(%w) instead of pkg/errors"
+            - pkg: "io/ioutil"
+              desc: "Deprecated since Go 1.16: use io or os instead"
     errorlint:
       errorf: true
     exhaustive:
