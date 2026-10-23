@@ -20,7 +20,7 @@ import (
 // Process configuration is restart-only, except the three batteries below:
 // on SIGHUP a server re-reads its environment (.env at the project root and
 // the process environment) and atomically swaps the log level, the flag
-// client, and the rate limiter. Everything else (adapters,
+// client, and the rate limiter. Everything else (backends,
 // DSNs, credentials, TLS material, listen addresses) needs a process
 // restart. The swap is all-or-nothing per battery and never blocks request
 // handling: readers always see a complete instance, either the old or the

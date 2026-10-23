@@ -20,7 +20,7 @@ import (
 // check is best-effort by design: a store that fails to resolve is skipped
 // rather than failing readiness, so turning the flag on cannot make a process
 // that never wired the outbox permanently unready. Store.Status carries no
-// ctx, so its own adapter-level operation timeout bounds the check.
+// ctx, so its own backend-level operation timeout bounds the check.
 func (c *Container) Ready(ctx context.Context) error {
 	var errs []error
 

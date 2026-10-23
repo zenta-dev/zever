@@ -49,29 +49,6 @@ import (
 	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
-// openService parses a service's adapter name, then opens it with typed
-// opts. Adapters register caller-side via each battery's Register; resolving
-// an unregistered adapter fails with UnknownAdapterError. The adapter string
-// before any construction. Wrapping adds only the service name, so
-// secret-bearing option values never leak into error text.
-func openService[T any, A any, O any](service string, name string, parse func(string) (A, error), open func(A, O) (T, error), opts O) (T, error) {
-	a, err := parse(name)
-	if err != nil {
-		var zero T
-
-		return zero, fmt.Errorf("container: %s: %w", service, err)
-	}
-
-	v, err := open(a, opts)
-	if err != nil {
-		var zero T
-
-		return zero, fmt.Errorf("container: %s: %w", service, err)
-	}
-
-	return v, nil
-}
-
 // Agent builds a tool-calling *agent.Loop over the resolved AI backend. It has
 // no adapter registry and no config entry; the model name comes from the AI
 // options. Like Job, it shares the process-wide backend instance. Options
@@ -101,108 +78,92 @@ func (c *Container) Agent(opts ...AgentOption) (*agent.Loop, error) {
 	})
 }
 
-// AI resolves and returns the AI service instance.
+// AI resolves the wired ai service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) AI() (ai.AI, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(ai.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.ai.get(func() (ai.AI, error) {
-		return openService("ai", c.cfg.AI.Adapter, ai.ParseAdapter, ai.Open, c.cfg.AI.Options)
-	})
+	return Get(c, ai.DefaultRef())
 }
 
-// Analytics resolves and returns the analytics service instance.
+// Analytics resolves the wired analytics service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Analytics() (analytics.Analytics, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(analytics.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.analytics.get(func() (analytics.Analytics, error) {
-		return openService("analytics", c.cfg.Analytics.Adapter, analytics.ParseAdapter, analytics.Open, c.cfg.Analytics.Options)
-	})
+	return Get(c, analytics.DefaultRef())
 }
 
-// Auth resolves and returns the auth service instance.
+// Auth resolves the wired auth service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Auth() (auth.Auth, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(auth.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.auth.get(func() (auth.Auth, error) {
-		return openService("auth", c.cfg.Auth.Adapter, auth.ParseAdapter, auth.Open, c.cfg.Auth.Options)
-	})
+	return Get(c, auth.DefaultRef())
 }
 
-// Billing resolves and returns the billing service instance.
+// Billing resolves the wired billing service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Billing() (billing.Billing, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(billing.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.billing.get(func() (billing.Billing, error) {
-		return openService("billing", c.cfg.Billing.Adapter, billing.ParseAdapter, billing.Open, c.cfg.Billing.Options)
-	})
+	return Get(c, billing.DefaultRef())
 }
 
-// Cache resolves and returns the cache service instance. A db-backed cache
-// pointing at an already-pooled DSN borrows the shared pool (owns=false);
-// DedicatedPool or a non-shareable DSN opens a private pool as before.
+// Cache resolves the wired cache service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Cache() (cache.Cache, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(cache.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.cache.get(func() (cache.Cache, error) {
-		if v, shared, err := c.openSharedCache(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("cache", c.cfg.Cache.Adapter, cache.ParseAdapter, cache.Open, c.cfg.Cache.Options)
-	})
+	return Get(c, cache.DefaultRef())
 }
 
-// CDN resolves and returns the CDN service instance.
+// CDN resolves the wired cdn service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) CDN() (cdn.CDN, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(cdn.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.cdn.get(func() (cdn.CDN, error) {
-		return openService("cdn", c.cfg.CDN.Adapter, cdn.ParseAdapter, cdn.Open, c.cfg.CDN.Options)
-	})
+	return Get(c, cdn.DefaultRef())
 }
 
-// Crypto resolves and returns the crypto service instance.
+// Crypto resolves the wired crypto service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Crypto() (crypto.Crypto, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(crypto.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.crypto.get(func() (crypto.Crypto, error) {
-		return openService("crypto", c.cfg.Crypto.Adapter, crypto.ParseAdapter, crypto.Open, c.cfg.Crypto.Options)
-	})
+	return Get(c, crypto.DefaultRef())
 }
 
-// DB resolves and returns the db service instance. Shareable pools register
-// in the DSN registry for borrowers; DedicatedPool is meaningless on db
-// itself and is ignored.
+// DB resolves the wired db service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) DB() (db.DB, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(db.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.db.get(func() (db.DB, error) {
-		return c.openDB()
-	})
+	return Get(c, db.DefaultRef())
 }
 
 // Transactor resolves the db service and asserts it implements
@@ -222,28 +183,26 @@ func (c *Container) Transactor() (db.Transactor, error) {
 	return tr, nil
 }
 
-// Document resolves and returns the document service instance.
+// Document resolves the wired document service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Document() (document.Document, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(document.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.document.get(func() (document.Document, error) {
-		return openService("document", c.cfg.Document.Adapter, document.ParseAdapter, document.Open, c.cfg.Document.Options)
-	})
+	return Get(c, document.DefaultRef())
 }
 
-// EventBus resolves and returns the eventbus service instance.
+// EventBus resolves the wired eventbus service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) EventBus() (eventbus.EventBus, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(eventbus.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.eventbus.get(func() (eventbus.EventBus, error) {
-		return openService("eventbus", c.cfg.EventBus.Adapter, eventbus.ParseAdapter, eventbus.Open, c.cfg.EventBus.Options)
-	})
+	return Get(c, eventbus.DefaultRef())
 }
 
 // Eventbus aliases EventBus for compatibility.
@@ -251,28 +210,26 @@ func (c *Container) Eventbus() (eventbus.EventBus, error) {
 	return c.EventBus()
 }
 
-// Flag resolves and returns the flag service instance.
+// Flag resolves the wired flag service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Flag() (flag.Flag, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(flag.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.flag.get(func() (flag.Flag, error) {
-		return openService("flag", c.cfg.Flag.Adapter, flag.ParseAdapter, flag.Open, c.cfg.Flag.Options)
-	})
+	return Get(c, flag.DefaultRef())
 }
 
-// Geo resolves and returns the geo service instance.
+// Geo resolves the wired geo service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Geo() (geo.Geo, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(geo.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.geo.get(func() (geo.Geo, error) {
-		return openService("geo", c.cfg.Geo.Adapter, geo.ParseAdapter, geo.Open, c.cfg.Geo.Options)
-	})
+	return Get(c, geo.DefaultRef())
 }
 
 // GRPC resolves and returns the process-wide *grpc.Server as a lazy
@@ -333,35 +290,26 @@ func (c *Container) GRPCClient(target string, opts ...grpcclient.Option) (*grpc.
 	})
 }
 
-// I18n resolves and returns the i18n service instance.
+// I18n resolves the wired i18n service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) I18n() (i18n.I18n, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(i18n.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.i18n.get(func() (i18n.I18n, error) {
-		return openService("i18n", c.cfg.I18n.Adapter, i18n.ParseAdapter, i18n.Open, c.cfg.I18n.Options)
-	})
+	return Get(c, i18n.DefaultRef())
 }
 
-// Idempotency resolves and returns the idempotency service instance. A
-// db-backed store pointing at an already-pooled DSN borrows the shared
-// pool (owns=false); DedicatedPool or a non-shareable DSN opens a private
-// pool as before.
+// Idempotency resolves the wired idempotency service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Idempotency() (idempotency.Store, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(idempotency.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.idempotency.get(func() (idempotency.Store, error) {
-		if v, shared, err := c.openSharedIdempotency(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("idempotency", c.cfg.Idempotency.Adapter, idempotency.ParseAdapter, idempotency.Open, c.cfg.Idempotency.Options)
-	})
+	return Get(c, idempotency.DefaultRef())
 }
 
 // Job builds a job.Dispatcher over the resolved queue service. Job has no
@@ -386,168 +334,125 @@ func (c *Container) Job() (*job.Dispatcher, error) {
 	})
 }
 
-// Lock resolves and returns the lock service instance.
+// Lock resolves the wired lock service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Lock() (lock.Locker, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(lock.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.lock.get(func() (lock.Locker, error) {
-		return openService("lock", c.cfg.Lock.Adapter, lock.ParseAdapter, lock.Open, c.cfg.Lock.Options)
-	})
+	return Get(c, lock.DefaultRef())
 }
 
-// Log resolves and returns the log service instance.
+// Log resolves the wired log service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Log() (log.Logger, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(log.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.log.get(func() (log.Logger, error) {
-		return openService("log", c.cfg.Log.Adapter, log.ParseAdapter, log.Open, c.cfg.Log.Options)
-	})
+	return Get(c, log.DefaultRef())
 }
 
-// Mailer resolves and returns the mailer service instance.
+// Mailer resolves the wired mailer service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Mailer() (mailer.Mailer, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(mailer.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.mailer.get(func() (mailer.Mailer, error) {
-		return openService("mailer", c.cfg.Mailer.Adapter, mailer.ParseAdapter, mailer.Open, c.cfg.Mailer.Options)
-	})
+	return Get(c, mailer.DefaultRef())
 }
 
-// Media resolves and returns the media service instance.
+// Media resolves the wired media service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Media() (media.Media, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(media.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.media.get(func() (media.Media, error) {
-		return openService("media", c.cfg.Media.Adapter, media.ParseAdapter, media.Open, c.cfg.Media.Options)
-	})
+	return Get(c, media.DefaultRef())
 }
 
-// Notification resolves and returns the notification service instance.
+// Notification resolves the wired notification service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Notification() (notification.Notifier, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(notification.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.notification.get(func() (notification.Notifier, error) {
-		return openService("notification", c.cfg.Notification.Adapter, notification.ParseAdapter, notification.Open, c.cfg.Notification.Options)
-	})
+	return Get(c, notification.DefaultRef())
 }
 
-// Observability resolves and returns the observability service instance.
+// Observability resolves the wired observability service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Observability() (observability.Provider, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(observability.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.observability.get(func() (observability.Provider, error) {
-		return openService("observability", c.cfg.Observability.Adapter, observability.ParseAdapter, observability.Open, c.cfg.Observability.Options)
-	})
+	return Get(c, observability.DefaultRef())
 }
 
-// Outbox resolves and returns the outbox service instance. The db adapter
-// opens its own pool from Options.DSN (empty selects a private in-memory
-// database); container-level pool sharing is not wired for outbox.
-//
-// The relay is not started here: the transport it publishes through is resolved
-// separately, so use OutboxRelay(ctx) to attach it and start draining. This
-// accessor keeps working for Record after the relay is running.
+// Outbox resolves the wired outbox service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Outbox() (outbox.Store, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(outbox.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.outbox.get(func() (outbox.Store, error) {
-		opts := c.cfg.Outbox.Options
-		// Best-effort: inject the resolved observability provider so the relay
-		// emits metrics/spans. A failed or unconfigured observability service
-		// never blocks the outbox.
-		if obs, err := c.Observability(); err == nil {
-			opts.Provider = obs
-		}
-
-		return openService("outbox", c.cfg.Outbox.Adapter, outbox.ParseAdapter, outbox.Open, opts)
-	})
+	return Get(c, outbox.DefaultRef())
 }
 
-// Password resolves and returns the password service instance.
+// Password resolves the wired password service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Password() (password.Hasher, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(password.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.password.get(func() (password.Hasher, error) {
-		return openService("password", c.cfg.Password.Adapter, password.ParseAdapter, password.Open, c.cfg.Password.Options)
-	})
+	return Get(c, password.DefaultRef())
 }
 
-// Payment resolves and returns the payment service instance. When no
-// explicit idempotency store is configured on the payment options, the
-// resolved idempotency service is reused for webhook replay dedupe; an
-// unresolvable idempotency service never blocks payment resolution.
+// Payment resolves the wired payment service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Payment() (payment.Payment, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(payment.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.payment.get(func() (payment.Payment, error) {
-		opts := c.cfg.Payment.Options
-		if opts.Idempotency == nil {
-			if store, err := c.Idempotency(); err == nil {
-				opts.Idempotency = store
-			}
-		}
-
-		return openService("payment", c.cfg.Payment.Adapter, payment.ParseAdapter, payment.Open, opts)
-	})
+	return Get(c, payment.DefaultRef())
 }
 
-// Permission resolves and returns the permission service instance.
+// Permission resolves the wired permission service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Permission() (permission.Checker, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(permission.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.permission.get(func() (permission.Checker, error) {
-		return openService("permission", c.cfg.Permission.Adapter, permission.ParseAdapter, permission.Open, c.cfg.Permission.Options)
-	})
+	return Get(c, permission.DefaultRef())
 }
 
-// Queue resolves and returns the queue service instance. A db-backed queue
-// pointing at an already-pooled DSN borrows the shared pool (owns=false);
-// DedicatedPool or a non-shareable DSN opens a private pool as before.
-// Under sustained load prefer a separate queue database with
-// DedicatedPool (Solid Queue guidance).
+// Queue resolves the wired queue service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Queue() (queue.Queue, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(queue.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.queue.get(func() (queue.Queue, error) {
-		if v, shared, err := c.openSharedQueue(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("queue", c.cfg.Queue.Adapter, queue.ParseAdapter, queue.Open, c.cfg.Queue.Options)
-	})
+	return Get(c, queue.DefaultRef())
 }
 
 // RAG builds a *rag.Engine over the resolved AI and VectorStore backends. It
@@ -600,16 +505,15 @@ func (c *Container) RAG(opts ...RAGOption) (*rag.Engine, error) {
 	})
 }
 
-// RateLimit resolves and returns the ratelimit service instance.
+// RateLimit resolves the wired ratelimit service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) RateLimit() (ratelimit.Limiter, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(ratelimit.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.ratelimit.get(func() (ratelimit.Limiter, error) {
-		return openService("ratelimit", c.cfg.RateLimit.Adapter, ratelimit.ParseAdapter, ratelimit.Open, c.cfg.RateLimit.Options)
-	})
+	return Get(c, ratelimit.DefaultRef())
 }
 
 // Ratelimit aliases RateLimit for compatibility.
@@ -617,182 +521,123 @@ func (c *Container) Ratelimit() (ratelimit.Limiter, error) {
 	return c.RateLimit()
 }
 
-// Resilience resolves and returns the resilience service instance.
+// Resilience resolves the wired resilience service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Resilience() (resilience.Manager, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(resilience.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.resilience.get(func() (resilience.Manager, error) {
-		return openService("resilience", c.cfg.Resilience.Adapter, resilience.ParseAdapter, resilience.Open, c.cfg.Resilience.Options)
-	})
+	return Get(c, resilience.DefaultRef())
 }
 
-// Router resolves and returns the router service instance.
+// Router resolves the wired router service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Router() (router.Router, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(router.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.router.get(func() (router.Router, error) {
-		return openService("router", c.cfg.Router.Adapter, router.ParseAdapter, router.Open, c.cfg.Router.Options)
-	})
+	return Get(c, router.DefaultRef())
 }
 
-// Scheduler resolves the scheduler service. A nil Dispatcher in options is
-// replaced with the resolved job dispatcher, so ticks share the
-// process-wide queue instead of opening redundant connections. An explicit
-// Dispatcher is used as-is. A postgres scheduler pointing at an
-// already-pooled DSN borrows the shared pool (owns=false); DedicatedPool
-// or a non-shareable DSN opens a private pool as before.
+// Scheduler resolves the wired scheduler service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Scheduler() (scheduler.Scheduler, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(scheduler.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.scheduler.get(func() (scheduler.Scheduler, error) {
-		if v, shared, err := c.openSharedScheduler(); shared || err != nil {
-			return v, err
-		}
-
-		opts := c.cfg.Scheduler.Options
-		if opts.Dispatcher == nil {
-			d, err := c.Job()
-			if err != nil {
-				return nil, fmt.Errorf("container: scheduler: resolve job: %w", err)
-			}
-
-			opts.Dispatcher = d
-		}
-
-		return openService("scheduler", c.cfg.Scheduler.Adapter, scheduler.ParseAdapter, scheduler.Open, opts)
-	})
+	return Get(c, scheduler.DefaultRef())
 }
 
-// Search resolves and returns the search service instance. A db-backed
-// search (the "db" adapter) pointing at an already-pooled DSN borrows the
-// shared pool (owns=false); DedicatedPool or a non-shareable DSN opens a
-// private pool as before.
+// Search resolves the wired search service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Search() (search.Search, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(search.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.search.get(func() (search.Search, error) {
-		if v, shared, err := c.openSharedSearch(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("search", c.cfg.Search.Adapter, search.ParseAdapter, search.Open, c.cfg.Search.Options)
-	})
+	return Get(c, search.DefaultRef())
 }
 
-// Secrets resolves and returns the secrets service instance.
+// Secrets resolves the wired secrets service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Secrets() (secrets.Secrets, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(secrets.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.secrets.get(func() (secrets.Secrets, error) {
-		return openService("secrets", c.cfg.Secrets.Adapter, secrets.ParseAdapter, secrets.Open, c.cfg.Secrets.Options)
-	})
+	return Get(c, secrets.DefaultRef())
 }
 
-// Session resolves and returns the session service instance. A db-backed
-// session pointing at an already-pooled DSN borrows the shared pool
-// (owns=false); DedicatedPool or a non-shareable DSN opens a private pool
-// as before.
+// Session resolves the wired session service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Session() (session.Store, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(session.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.session.get(func() (session.Store, error) {
-		if v, shared, err := c.openSharedSession(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("session", c.cfg.Session.Adapter, session.ParseAdapter, session.Open, c.cfg.Session.Options)
-	})
+	return Get(c, session.DefaultRef())
 }
 
-// Storage resolves and returns the storage service instance.
+// Storage resolves the wired storage service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Storage() (storage.Storage, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(storage.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.storage.get(func() (storage.Storage, error) {
-		return openService("storage", c.cfg.Storage.Adapter, storage.ParseAdapter, storage.Open, c.cfg.Storage.Options)
-	})
+	return Get(c, storage.DefaultRef())
 }
 
-// Tenant resolves and returns the tenant service instance.
+// Tenant resolves the wired tenant service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Tenant() (tenant.Tenant, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(tenant.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.tenant.get(func() (tenant.Tenant, error) {
-		return openService("tenant", c.cfg.Tenant.Adapter, tenant.ParseAdapter, tenant.Open, c.cfg.Tenant.Options)
-	})
+	return Get(c, tenant.DefaultRef())
 }
 
-// VectorStore resolves and returns the vectorstore service instance. A
-// db-backed vectorstore (the "db" adapter) pointing at an already-pooled
-// DSN borrows the shared pool (owns=false); DedicatedPool or a
-// non-shareable DSN opens a private pool as before.
+// VectorStore resolves the wired vectorstore service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) VectorStore() (vectorstore.VectorStore, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(vectorstore.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.vectorstore.get(func() (vectorstore.VectorStore, error) {
-		if v, shared, err := c.openSharedVectorStore(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("vectorstore", c.cfg.VectorStore.Adapter, vectorstore.ParseAdapter, vectorstore.Open, c.cfg.VectorStore.Options)
-	})
+	return Get(c, vectorstore.DefaultRef())
 }
 
-// Webhook resolves and returns the webhook service instance.
+// Webhook resolves the wired webhook service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Webhook() (webhook.Webhook, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(webhook.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.webhook.get(func() (webhook.Webhook, error) {
-		return openService("webhook", c.cfg.Webhook.Adapter, webhook.ParseAdapter, webhook.Open, c.cfg.Webhook.Options)
-	})
+	return Get(c, webhook.DefaultRef())
 }
 
-// Workflow resolves and returns the workflow service instance. A db-backed
-// workflow (the "db" adapter) pointing at an already-pooled DSN borrows the
-// shared pool (owns=false); DedicatedPool or a non-shareable DSN opens a
-// private pool as before. Under sustained load prefer a separate workflow
-// database with DedicatedPool.
+// Workflow resolves the wired workflow service instance. It fails with
+// NotWiredError when New received no provider for the default ref.
 func (c *Container) Workflow() (workflow.Workflow, error) {
 	if c.provDefs != nil {
 		if v, ok, err := c.providedDefault(workflow.DefaultRef()); ok {
 			return v, err
 		}
 	}
-	return c.workflow.get(func() (workflow.Workflow, error) {
-		if v, shared, err := c.openSharedWorkflow(); shared || err != nil {
-			return v, err
-		}
-
-		return openService("workflow", c.cfg.Workflow.Adapter, workflow.ParseAdapter, workflow.Open, c.cfg.Workflow.Options)
-	})
+	return Get(c, workflow.DefaultRef())
 }

@@ -205,14 +205,40 @@ var (
 	_ outbox.Store           = (*stubStoreNoSetter)(nil)
 )
 
-// relayConfig returns a config whose outbox transport selector is publisher.
-func relayConfig(t *testing.T, publisher string) *config.Config {
+// relayContainer builds a container whose outbox transport selector is
+// publisher, with the given providers wired. The selector still reads the
+// (options-only) config; the store and transports resolve from providers.
+func relayContainer(t *testing.T, publisher string, providers ...Provider) *Container {
 	t.Helper()
 
-	cfg := testConfig(t)
+	cfg := config.Default()
 	cfg.Outbox.Options.Publisher = publisher
 
-	return cfg
+	c := New(cfg, providers...)
+	closeRelayContainer(t, c)
+
+	return c
+}
+
+// provideOutbox wires store as the default outbox provider.
+func provideOutbox(store outbox.Store) Provider {
+	return Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+		return store, nil
+	})
+}
+
+// provideQueue wires q as the default queue provider.
+func provideQueue(q queue.Queue) Provider {
+	return Provide(queue.DefaultRef(), func(o queue.Options) (queue.Queue, error) {
+		return q, nil
+	})
+}
+
+// provideBus wires bus as the default eventbus provider.
+func provideBus(bus eventbus.EventBus) Provider {
+	return Provide(eventbus.DefaultRef(), func(o eventbus.Options) (eventbus.EventBus, error) {
+		return bus, nil
+	})
 }
 
 // TestOutboxRelay_transportSelector pins the selector semantics: "eventbus"
@@ -235,16 +261,11 @@ func TestOutboxRelay_transportSelector(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			c := New(relayConfig(t, tt.publisher))
-			closeRelayContainer(t, c)
-
 			store := &stubRelayStore{}
 			q := &stubRelayQueue{}
 			bus := &stubRelayBus{}
 
-			mustSeed(t, &c.outbox, outbox.Store(store))
-			mustSeed(t, &c.queue, queue.Queue(q))
-			mustSeed(t, &c.eventbus, eventbus.EventBus(bus))
+			c := relayContainer(t, tt.publisher, provideOutbox(store), provideQueue(q), provideBus(bus))
 
 			started, err := c.OutboxRelay(t.Context())
 			if err != nil {
@@ -307,14 +328,10 @@ func TestOutboxRelay_transportSelector(t *testing.T) {
 func TestOutboxRelay_sharesResolvedTransport(t *testing.T) {
 	t.Parallel()
 
-	c := New(relayConfig(t, ""))
-	closeRelayContainer(t, c)
-
 	store := &stubRelayStore{}
 	q := &stubRelayQueue{}
 
-	mustSeed(t, &c.outbox, outbox.Store(store))
-	mustSeed(t, &c.queue, queue.Queue(q))
+	c := relayContainer(t, "", provideOutbox(store), provideQueue(q))
 
 	if _, err := c.OutboxRelay(t.Context()); err != nil {
 		t.Fatalf("OutboxRelay() error = %v", err)
@@ -335,13 +352,9 @@ func TestOutboxRelay_sharesResolvedTransport(t *testing.T) {
 func TestOutboxRelay_reusesCachedOutboxStore(t *testing.T) {
 	t.Parallel()
 
-	c := New(relayConfig(t, ""))
-	closeRelayContainer(t, c)
-
 	store := &stubRelayStore{}
 
-	mustSeed(t, &c.outbox, outbox.Store(store))
-	mustSeed(t, &c.queue, queue.Queue(&stubRelayQueue{}))
+	c := relayContainer(t, "", provideOutbox(store), provideQueue(&stubRelayQueue{}))
 
 	started, err := c.OutboxRelay(t.Context())
 	if err != nil {
@@ -373,19 +386,21 @@ func TestOutboxRelay_transportFailureIsBootError(t *testing.T) {
 	tests := []struct {
 		name      string
 		publisher string
-		breakIt   func(cfg *config.Config)
-		want      string
+		// extra wires every provider except the selected transport: the
+		// missing transport fails with NotWiredError.
+		extra []Provider
+		want  string
 	}{
 		{
 			name:      "queue",
 			publisher: "",
-			breakIt:   func(cfg *config.Config) { cfg.Queue.Adapter = "bogus-adapter" },
+			extra:     []Provider{provideBus(&stubRelayBus{})},
 			want:      "queue",
 		},
 		{
 			name:      "eventbus",
 			publisher: outbox.PublisherEventBus,
-			breakIt:   func(cfg *config.Config) { cfg.EventBus.Adapter = "bogus-adapter" },
+			extra:     []Provider{provideQueue(&stubRelayQueue{})},
 			want:      "eventbus",
 		},
 	}
@@ -394,14 +409,8 @@ func TestOutboxRelay_transportFailureIsBootError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := relayConfig(t, tt.publisher)
-			tt.breakIt(cfg)
-
-			c := New(cfg)
-			closeRelayContainer(t, c)
-
 			store := &stubRelayStore{}
-			mustSeed(t, &c.outbox, outbox.Store(store))
+			c := relayContainer(t, tt.publisher, append([]Provider{provideOutbox(store)}, tt.extra...)...)
 
 			got, err := c.OutboxRelay(t.Context())
 			if err == nil {
@@ -428,11 +437,9 @@ func TestOutboxRelay_transportFailureIsBootError(t *testing.T) {
 func TestOutboxRelay_storeWithoutPublisherSetter(t *testing.T) {
 	t.Parallel()
 
-	c := New(relayConfig(t, ""))
-	closeRelayContainer(t, c)
-
-	mustSeed(t, &c.outbox, outbox.Store(stubStoreNoSetter{Store: &stubRelayStore{}}))
-	mustSeed(t, &c.queue, queue.Queue(&stubRelayQueue{}))
+	c := relayContainer(t, "",
+		provideOutbox(stubStoreNoSetter{Store: &stubRelayStore{}}),
+		provideQueue(&stubRelayQueue{}))
 
 	_, err := c.OutboxRelay(t.Context())
 	if err == nil {
@@ -456,13 +463,11 @@ func TestOutboxRelay_storeWithoutPublisherSetter(t *testing.T) {
 func TestOutboxRelay_startFailurePropagates(t *testing.T) {
 	t.Parallel()
 
-	c := New(relayConfig(t, ""))
-	closeRelayContainer(t, c)
-
 	errStart := errors.New("relay refused to start")
 
-	mustSeed(t, &c.outbox, outbox.Store(&stubRelayStore{startErr: errStart}))
-	mustSeed(t, &c.queue, queue.Queue(&stubRelayQueue{}))
+	c := relayContainer(t, "",
+		provideOutbox(&stubRelayStore{startErr: errStart}),
+		provideQueue(&stubRelayQueue{}))
 
 	_, err := c.OutboxRelay(t.Context())
 	if err == nil {

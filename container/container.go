@@ -117,9 +117,7 @@ type Container struct {
 	// provDefs holds one entry per Provide call, keyed by service/name. It
 	// is written once by New and read-only after, so resolution reads it
 	// without locking. Empty (nil) when New received no providers, in
-	// which case every accessor takes the config-based path — the
-	// accessors guard the provider lookup with a nil check, so that path
-	// stays a single predictable branch.
+	// which case every accessor fails with NotWiredError.
 	provDefs map[refKey]*provider
 	// provOrder is the declaration order of provDefs, the deterministic
 	// tiebreak for eager builds, Wired, and Close.
@@ -137,8 +135,7 @@ type Container struct {
 	// env is the process environment, resolved once by resolveEnv on
 	// first use. Every provider build seeds its Options from the
 	// service defaults and overlays env before WithOptions appliers run.
-	// envErr records a failed resolution and fails every provider
-	// build; the config-based path never consults it.
+	// envErr records a failed resolution and fails every provider build.
 	env    config.Env
 	envErr error
 	// envOnce guards the one-shot environment resolution: the process
@@ -152,23 +149,22 @@ type Container struct {
 
 func (c *Container) sealed() {}
 
-// New builds a Container from cfg and optional explicit wiring. Nothing
+// New builds a Container from cfg and explicit wiring. Nothing
 // opens yet except Eager providers: every other service resolves on first
-// use, whether through a Provider (see Provide) or the config-based path.
-// A nil cfg falls back to config.Default().
+// use through its Provider (see Provide). A nil cfg falls back to
+// config.Default() for options-only settings (selectors, gates).
 //
 // The process environment resolves lazily, on the first provider build
 // (see resolveEnv), and seeds every provided Ref: service defaults from
 // DefaultOptions overlaid by ApplyEnv, then WithOptions appliers. An
-// unreadable environment fails provider builds; the config-based accessors
-// never consult it, and a container without providers never reads the process
-// environment at all.
+// unreadable environment fails provider builds, and a container without
+// providers never reads the process environment at all.
 //
 // The full provider graph is validated at construction (duplicate Refs,
 // missing non-Optional dependencies, dependency cycles); findings are
-// recorded per Ref and surfaced by Get and the provider-backed accessors,
-// so validation never opens anything. With zero providers the config-based
-// path serves every accessor exactly as before.
+// recorded per Ref and surfaced by Get and the accessors, so validation
+// never opens anything. With zero providers every accessor fails with
+// NotWiredError.
 func New(cfg *config.Config, providers ...Provider) *Container {
 	if cfg == nil {
 		cfg = config.Default()

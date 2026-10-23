@@ -1,8 +1,9 @@
 # container
 
 `container` wires every configured service into one lazily resolved instance
-per process. Build it once with explicit typed providers, or fall back to the
-config-based accessors for a quick start.
+per process. Build it once with explicit typed providers; every accessor
+resolves its wired provider and fails with `NotWiredError` when none was
+wired.
 
 Service configuration comes only from `.env`, `.env.local` and the process
 environment. A config file left over from an older release is not read at all:
@@ -59,8 +60,8 @@ func Providers() []container.Provider {
 
 `core/<battery>` exposes `Ref(name)` and `DefaultRef()` for each service.
 `container.Get(c, ref)` resolves any wired ref; the accessors (`c.DB()`,
-`c.Cache()`) resolve the default instance when a provider exists and
-otherwise fall back to the config-based path.
+`c.Cache()`) resolve the default instance, failing with `NotWiredError`
+when no provider was wired for it.
 
 Dependency forms: `Provide`, `Provide1`, `Provide2`, and `Provide3` take
 typed dependencies in order. `container.Option` values customize one call:
@@ -88,31 +89,23 @@ dependencies, and dependency cycles are recorded per ref and surfaced by
 labels in sorted order. `zever explain` prints the same graph with drivers,
 dependencies, and env keys.
 
-## Config-based path
+## Provider-only resolution
 
-A container built with a config and no providers takes this path: every
-accessor resolves its service from the config and from the adapter registry,
-instead of from a wired provider.
-
-Adapters also register caller-side through each battery's core registry
-(`adapters/<battery>/<name>`). The config-based accessors use that registry
-when no provider covers the default ref:
+Every accessor resolves its service from an explicitly wired provider. A
+container built with no providers resolves nothing: every accessor fails
+with `NotWiredError` naming the missing `Provide` call. There is no
+adapter-name lookup and no registry fallback. Prefer `Provide` with a direct
+adapter import:
 
 ```go
 import (
-	authjwt "github.com/zenta-dev/zever/adapters/auth/jwt"
 	dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
 )
 
-authjwt.Register()
-dbsqlite.Register()
-
-c := container.New(config.Default())
+c := container.New(config.Default(),
+	container.Provide(db.DefaultRef(), dbsqlite.New),
+)
 ```
-
-Resolving an unregistered adapter fails with `UnknownAdapterError`
-naming the missing `Register` call. `cmd/zever` registers every adapter
-at startup, so CLI behavior is unchanged. Prefer `Provide` for new code.
 
 ## Accessors
 
