@@ -81,6 +81,7 @@ require (
 	github.com/zenta-dev/zever/orm v0.8.0
 	github.com/zenta-dev/zever/serve v0.8.0
 	github.com/zenta-dev/zever/shared/apperror v0.8.0
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
@@ -273,7 +274,6 @@ require (
 	github.com/zenta-dev/zever/core/middleware v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/resilience v0.8.0 // indirect
-	github.com/zenta-dev/zever/shared/codec v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/dbconn v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/grpcclient v0.8.0 // indirect
