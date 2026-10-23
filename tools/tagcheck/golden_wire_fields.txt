@@ -901,6 +901,8 @@ shared/mcpclient	request	Method	method	v0.7.2
 shared/mcpclient	request	Params	params	v0.7.2
 shared/mcpclient	rpcErrorWire	Code	code	v0.7.2
 shared/mcpclient	rpcErrorWire	Message	message	v0.7.2
+shared/mcpclient	TextContent	Type	type	ff0e561c1563
+shared/mcpclient	TextContent	Text	text	ff0e561c1563
 shared/providersopt	Common	SecretKey	secret_key	v0.7.2
 shared/providersopt	Common	APIKey	api_key	v0.7.2
 shared/providersopt	Common	Endpoint	endpoint	v0.7.2

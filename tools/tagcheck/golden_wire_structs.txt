@@ -295,6 +295,7 @@ serve	doctorBattery	serve/doctor.go
 shared/mcpclient	inbound	shared/mcpclient/client.go
 shared/mcpclient	request	shared/mcpclient/client.go
 shared/mcpclient	rpcErrorWire	shared/mcpclient/client.go
+shared/mcpclient	TextContent	shared/mcpclient/client.go
 shared/providersopt	Common	shared/providersopt/providersopt.go
 shared/redisopt	ConnectOptions	shared/redisopt/connect.go
 shared/redisopt	Options	shared/redisopt/options.go
