@@ -1,7 +1,4 @@
-//nolint:depguard
 package codec
-
-//nolint:depguard
 
 import (
 	"errors"
