@@ -54,7 +54,7 @@ func TestBenchWorkflowSyntax(t *testing.T) {
 		t.Fatalf("bench.yml is not valid YAML: %v", err)
 	}
 
-	for _, job := range []string{"bench-orm", "bench-container", "benchstat"} {
+	for _, job := range []string{"bench-group", "benchstat"} {
 		j, ok := wf.Jobs[job]
 		if !ok {
 			t.Fatalf("bench.yml lacks job %q (jobs: %v)", job, keysOfJobs(wf.Jobs))
