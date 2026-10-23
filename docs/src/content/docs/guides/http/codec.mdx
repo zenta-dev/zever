@@ -84,6 +84,10 @@ Keep it symmetric: whatever `Encode` writes, `Decode` must read back, including 
 - Keep payloads small: IDs and flags in sessions, not full records.
 - Use `JSONCodec` for any data you snapshot or hash.
 
+## JSON engine
+
+All JSON goes through `shared/codec`, built on `encoding/json/v2` (Go 1.27) — import the facade, never the engine directly. Defaults are Deterministic key order plus the Duration string form (`"30s"`, the shape the env layer parses). Reach for `UnmarshalStrict` when a format must fail closed on unknown fields, and `MarshalIndentCompat` only for stamp output whose bytes must stay stable.
+
 ## Troubleshooting
 
 <details>
