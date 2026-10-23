@@ -234,7 +234,8 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			// Same options-struct shape as CompletionProvider above, for the
 			// same reason: resolveProvider is part of the documentLink
 			// capability itself.
-			DocumentLinkProvider: &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
+			DocumentLinkProvider:  &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
+			CallHierarchyProvider: protocol.Boolean(true),
 		},
 		ServerInfo: protocol.ServerInfo{
 			Name:    serverName,
