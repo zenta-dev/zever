@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -403,10 +404,16 @@ func TestCodeActionsAt_unrecognized_returnsEmpty(t *testing.T) {
 	}
 
 	params := &protocol.CodeActionParams{
-		Context: protocol.CodeActionContext{Diagnostics: []protocol.Diagnostic{unrelated}},
+		Context: protocol.CodeActionContext{
+			Diagnostics: []protocol.Diagnostic{unrelated},
+			// Scope to quickfix so the format action (which this
+			// tab-indented fixture would otherwise offer) stays out of
+			// what this guard-pinning test observes.
+			Only: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+		},
 	}
 
-	got := codeActionsAt(nil, file, "file:///a.zen", params)
+	got := codeActionsAt(nil, file, "file:///a.zen", []byte(src), params)
 	if len(got) != 0 {
 		t.Errorf("codeActionsAt() = %+v, want empty", got)
 	}
@@ -434,7 +441,12 @@ func TestCodeActionsAt_recognized_returnsUnionArms(t *testing.T) {
 	relationDiag := diagToLSPDiagnostic(renameFindDiag(t, diags, "references unknown entity"), "", nil)
 
 	params := &protocol.CodeActionParams{
-		Context: protocol.CodeActionContext{Diagnostics: []protocol.Diagnostic{scalarDiag, relationDiag}},
+		Context: protocol.CodeActionContext{
+			Diagnostics: []protocol.Diagnostic{scalarDiag, relationDiag},
+			// Scope to quickfix so the count pins the two fixes, not
+			// the format action this tab-indented fixture also offers.
+			Only: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+		},
 	}
 
 	file, fileDiags := parser.New("b.zen", []byte(bSrc)).ParseFile()
@@ -442,7 +454,7 @@ func TestCodeActionsAt_recognized_returnsUnionArms(t *testing.T) {
 		t.Fatalf("unexpected parse diagnostics: %v", fileDiags)
 	}
 
-	got := codeActionsAt(result.Schema, file, id, params)
+	got := codeActionsAt(result.Schema, file, id, []byte(bSrc), params)
 	if len(got) != 2 {
 		t.Fatalf("codeActionsAt() = %d actions, want 2 (one per fix): %+v", len(got), got)
 	}
@@ -468,5 +480,626 @@ func TestCodeActionsAt_recognized_returnsUnionArms(t *testing.T) {
 
 	if !titles[`Change to "User"`] {
 		t.Errorf("titles = %v, want the relation fix Change to \"User\"", titles)
+	}
+}
+
+// findActionByTitle returns the action with the given title, failing the
+// test when no such arm exists.
+func findActionByTitle(
+	t *testing.T,
+	actions []protocol.CommandOrCodeAction,
+	title string,
+) *protocol.CodeAction {
+	t.Helper()
+
+	for _, item := range actions {
+		if action, ok := item.(*protocol.CodeAction); ok && action != nil && action.Title == title {
+			return action
+		}
+	}
+
+	t.Fatalf("no code action titled %q in %+v", title, actions)
+
+	return nil
+}
+
+// findFormatAction returns the source.formatAll action in actions, or nil
+// when the dispatch offered none.
+func findFormatAction(t *testing.T, actions []protocol.CommandOrCodeAction) *protocol.CodeAction {
+	t.Helper()
+
+	for _, item := range actions {
+		action, ok := item.(*protocol.CodeAction)
+		if !ok || action == nil || action.Kind == nil {
+			continue
+		}
+
+		if *action.Kind == sourceFormatAllKind {
+			return action
+		}
+	}
+
+	return nil
+}
+
+// formatEditsOf extracts the *protocol.TextEdit arms of a format action's
+// single TextDocumentEdit, failing the test on any shape surprise.
+func formatEditsOf(t *testing.T, action *protocol.CodeAction) []protocol.TextEdit {
+	t.Helper()
+
+	if action == nil || action.Edit == nil {
+		t.Fatal("format action has no edit")
+	}
+
+	if len(action.Edit.DocumentChanges) != 1 {
+		t.Fatalf("format action has %d document changes, want 1", len(action.Edit.DocumentChanges))
+	}
+
+	docEdit, ok := action.Edit.DocumentChanges[0].(*protocol.TextDocumentEdit)
+	if !ok {
+		t.Fatalf("document change = %T, want *protocol.TextDocumentEdit", action.Edit.DocumentChanges[0])
+	}
+
+	out := make([]protocol.TextEdit, 0, len(docEdit.Edits))
+
+	for _, element := range docEdit.Edits {
+		edit, ok := element.(*protocol.TextEdit)
+		if !ok {
+			t.Fatalf("document edit element = %T, want *protocol.TextEdit", element)
+		}
+
+		out = append(out, *edit)
+	}
+
+	return out
+}
+
+// textEditsEqual reports whether two TextEdit slices match elementwise.
+// protocol.TextEdit is all comparable fields, so == is exact.
+func textEditsEqual(a, b []protocol.TextEdit) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// workspaceChangesEqual reports whether two Changes maps hold the same
+// edits per document.
+func workspaceChangesEqual(a, b map[uri.URI][]protocol.TextEdit) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for id, edits := range a {
+		other, ok := b[id]
+		if !ok || !textEditsEqual(edits, other) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// TestWantsSourceAction_filter_admitsSourceKinds pins the Only filter: no
+// filter admits everything, any source kind (base or dotted) admits, and
+// narrower kinds alone refuse.
+func TestWantsSourceAction_filter_admitsSourceKinds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		only []protocol.CodeActionKind
+		want bool
+	}{
+		{"nil admits", nil, true},
+		{"empty admits", []protocol.CodeActionKind{}, true},
+		{"source admits", []protocol.CodeActionKind{protocol.CodeActionKindSource}, true},
+		{"source.formatAll admits", []protocol.CodeActionKind{sourceFormatAllKind}, true},
+		{
+			"source.organizeImports admits",
+			[]protocol.CodeActionKind{protocol.CodeActionKindSourceOrganizeImports},
+			true,
+		},
+		{"source.fixAll admits", []protocol.CodeActionKind{protocol.CodeActionKindSourceFixAll}, true},
+		{"quickfix refuses", []protocol.CodeActionKind{protocol.CodeActionKindQuickFix}, false},
+		{"refactor refuses", []protocol.CodeActionKind{protocol.CodeActionKindRefactor}, false},
+		{
+			"mixed quickfix and source admits",
+			[]protocol.CodeActionKind{protocol.CodeActionKindQuickFix, protocol.CodeActionKindSource},
+			true,
+		},
+		{"sourceX refuses", []protocol.CodeActionKind{protocol.CodeActionKind("sourceX")}, false},
+	}
+
+	for _, tc := range tests {
+		if got := wantsSourceAction(tc.only); got != tc.want {
+			t.Errorf("%s: wantsSourceAction(%v) = %v, want %v", tc.name, tc.only, got, tc.want)
+		}
+	}
+}
+
+// TestFormatAllAction_tabIndented_returnsDocumentChanges pins the format
+// action's shape: title, kind, a single versionless TextDocumentEdit for
+// the document, and edits identical to formatDocument output.
+func TestFormatAllAction_tabIndented_returnsDocumentChanges(t *testing.T) {
+	t.Parallel()
+
+	const id uri.URI = "file:///a.zen"
+
+	src := "entity User {\n\tid: uuid @primary\n}\n"
+
+	action := formatAllAction(id, []byte(src))
+	if action == nil {
+		t.Fatal("formatAllAction() = nil, want the format action")
+	}
+
+	if action.Title != "Format document" {
+		t.Errorf("Title = %q, want %q", action.Title, "Format document")
+	}
+
+	if action.Kind == nil || *action.Kind != sourceFormatAllKind {
+		t.Errorf("Kind = %v, want source.formatAll", action.Kind)
+	}
+
+	if action.Edit == nil || len(action.Edit.DocumentChanges) != 1 {
+		t.Fatalf("Edit.DocumentChanges has %d entries, want 1", len(action.Edit.DocumentChanges))
+	}
+
+	docEdit, ok := action.Edit.DocumentChanges[0].(*protocol.TextDocumentEdit)
+	if !ok {
+		t.Fatalf("document change = %T, want *protocol.TextDocumentEdit", action.Edit.DocumentChanges[0])
+	}
+
+	if docEdit.TextDocument.URI != id {
+		t.Errorf("TextDocument.URI = %v, want %v", docEdit.TextDocument.URI, id)
+	}
+
+	if docEdit.TextDocument.Version != nil {
+		t.Errorf("TextDocument.Version = %v, want nil (versionless edit)", *docEdit.TextDocument.Version)
+	}
+
+	if want := formatDocument("a.zen", []byte(src)); !textEditsEqual(formatEditsOf(t, action), want) {
+		t.Errorf("format edits = %+v, want formatDocument output %+v", formatEditsOf(t, action), want)
+	}
+}
+
+// TestFormatAllAction_canonicalYieldsNil pins the no-op case: an already
+// canonical document offers no format action.
+func TestFormatAllAction_canonicalYieldsNil(t *testing.T) {
+	t.Parallel()
+
+	const id uri.URI = "file:///a.zen"
+
+	for _, src := range []string{"", "entity User {\n  id: uuid @primary\n}\n"} {
+		if edits := formatDocument("a.zen", []byte(src)); len(edits) != 0 && src != "" {
+			t.Fatalf("fixture produces %d format edits, want a canonical one", len(edits))
+		}
+
+		if got := formatAllAction(id, []byte(src)); got != nil {
+			t.Errorf("formatAllAction(%q) = %+v, want nil (nothing to apply)", src, got)
+		}
+	}
+}
+
+// TestCodeActionsAt_sourceFormatAll_filtering pins dispatch of the format
+// action: offered without an Only filter or under any source kind, never
+// under quickfix or refactor alone.
+func TestCodeActionsAt_sourceFormatAll_filtering(t *testing.T) {
+	t.Parallel()
+
+	const id uri.URI = "file:///a.zen"
+
+	src := "entity User {\n\tid: uuid @primary\n}\n"
+
+	file, fileDiags := parser.New("a.zen", []byte(src)).ParseFile()
+	if fileDiags.HasErrors() {
+		t.Fatalf("unexpected parse diagnostics: %v", fileDiags)
+	}
+
+	tests := []struct {
+		name string
+		only []protocol.CodeActionKind
+		want bool
+	}{
+		{"nil Only offers", nil, true},
+		{"source Only offers", []protocol.CodeActionKind{protocol.CodeActionKindSource}, true},
+		{"source.formatAll Only offers", []protocol.CodeActionKind{sourceFormatAllKind}, true},
+		{"quickfix Only suppresses", []protocol.CodeActionKind{protocol.CodeActionKindQuickFix}, false},
+		{"refactor Only suppresses", []protocol.CodeActionKind{protocol.CodeActionKindRefactor}, false},
+	}
+
+	for _, tc := range tests {
+		params := &protocol.CodeActionParams{
+			Context: protocol.CodeActionContext{Only: tc.only},
+		}
+
+		got := findFormatAction(t, codeActionsAt(nil, file, id, []byte(src), params))
+
+		if (got != nil) != tc.want {
+			t.Errorf("%s: format action present = %v, want %v", tc.name, got != nil, tc.want)
+		}
+
+		if got != nil {
+			if want := formatDocument("a.zen", []byte(src)); !textEditsEqual(formatEditsOf(t, got), want) {
+				t.Errorf("%s: format edits = %+v, want formatDocument output %+v", tc.name, formatEditsOf(t, got), want)
+			}
+		}
+	}
+}
+
+// TestCodeActionResolveDataFromAny_shapes_recoversPayload pins the payload
+// decode every resolve path funnels through: raw JSON, in-process value and
+// pointer, and the map a JSON decode into an `any` yields.
+func TestCodeActionResolveDataFromAny_shapes_recoversPayload(t *testing.T) {
+	t.Parallel()
+
+	want := codeActionResolveData{
+		Kind:      codeActionResolveKindScalar,
+		URI:       "file:///a.zen",
+		Line:      2,
+		Character: 7,
+		Message:   `unknown field type "sting"`,
+	}
+
+	// The raw-JSON shape, built the same way dispatch attaches it.
+	holder := &protocol.CodeAction{}
+	attachCodeActionData(holder, want)
+
+	if holder.Data == nil {
+		t.Fatal("attachCodeActionData left Data nil")
+	}
+
+	t.Run("lspany", func(t *testing.T) {
+		t.Parallel()
+
+		got, ok := codeActionResolveDataFromAny(holder.Data)
+		if !ok || got != want {
+			t.Errorf("codeActionResolveDataFromAny(LSPAny) = %+v,%v, want %+v,true", got, ok, want)
+		}
+	})
+
+	t.Run("value", func(t *testing.T) {
+		t.Parallel()
+
+		got, ok := codeActionResolveDataFromAny(want)
+		if !ok || got != want {
+			t.Errorf("codeActionResolveDataFromAny(value) = %+v,%v, want %+v,true", got, ok, want)
+		}
+	})
+
+	t.Run("pointer", func(t *testing.T) {
+		t.Parallel()
+
+		got, ok := codeActionResolveDataFromAny(&want)
+		if !ok || got != want {
+			t.Errorf("codeActionResolveDataFromAny(pointer) = %+v,%v, want %+v,true", got, ok, want)
+		}
+	})
+
+	t.Run("map", func(t *testing.T) {
+		t.Parallel()
+
+		m := map[string]any{
+			"kind":      want.Kind,
+			"uri":       want.URI,
+			"line":      float64(want.Line),
+			"character": float64(want.Character),
+			"message":   want.Message,
+		}
+
+		got, ok := codeActionResolveDataFromAny(m)
+		if !ok || got != want {
+			t.Errorf("codeActionResolveDataFromAny(map) = %+v,%v, want %+v,true", got, ok, want)
+		}
+	})
+}
+
+// TestCodeActionResolveDataFromAny_unmatched_reportsFalse pins every
+// rejection: bad JSON, a payload without a kind, and foreign shapes.
+func TestCodeActionResolveDataFromAny_unmatched_reportsFalse(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		data any
+	}{
+		{"bad json", protocol.LSPAny([]byte("{oops"))},
+		{"json without kind", protocol.LSPAny([]byte(`{"uri":"file:///a.zen"}`))},
+		{"map without kind", map[string]any{"uri": "file:///a.zen"}},
+		{"nil pointer", (*codeActionResolveData)(nil)},
+		{"foreign string", "scalar"},
+		{"nil", nil},
+	}
+
+	for _, tc := range cases {
+		if got, ok := codeActionResolveDataFromAny(tc.data); ok || got != (codeActionResolveData{}) {
+			t.Errorf("%s: codeActionResolveDataFromAny() = %+v,%v, want zero,false", tc.name, got, ok)
+		}
+	}
+}
+
+// TestUint32FromAny_shapes_convertsNumbers pins the map-path number
+// decoding: JSON float64s and Go ints land, negatives and foreign shapes
+// degrade to zero.
+func TestUint32FromAny_shapes_convertsNumbers(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   any
+		want uint32
+	}{
+		{"float", float64(3), 3},
+		{"negative float", float64(-1), 0},
+		{"huge float", float64(math.MaxUint32) + 1024, 0},
+		{"uint32", uint32(7), 7},
+		{"int", 5, 5},
+		{"negative int", -2, 0},
+		{"huge int", math.MaxUint32 + 1, 0},
+		{"string", "3", 0},
+		{"nil", nil, 0},
+	}
+
+	for _, tc := range cases {
+		if got := uint32FromAny(tc.in); got != tc.want {
+			t.Errorf("%s: uint32FromAny(%v) = %d, want %d", tc.name, tc.in, got, tc.want)
+		}
+	}
+}
+
+// TestCodeActionResolve_scalarFillsEditWhenAbsent pins the lazy path: an
+// action stripped of its eager edit regains the identical edit on resolve.
+func TestCodeActionResolve_scalarFillsEditWhenAbsent(t *testing.T) {
+	s := NewServer()
+	openDoc(t, s, serverDocA, serverBrokenDoc)
+
+	actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		Context: protocol.CodeActionContext{
+			Diagnostics: []protocol.Diagnostic{{
+				Range:   protocol.Range{Start: cursorOn(t, serverBrokenDoc, 1, "strnig")},
+				Message: protocol.String(`unknown field type "strnig"`),
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction: %v", err)
+	}
+
+	eager := findActionByTitle(t, actions, `Change to "string"`)
+	if eager.Edit == nil {
+		t.Fatal("eager scalar fix has no edit")
+	}
+
+	stripped := *eager
+	stripped.Edit = nil
+
+	resolved, err := s.CodeActionResolve(t.Context(), &stripped)
+	if err != nil {
+		t.Fatalf("CodeActionResolve: %v", err)
+	}
+
+	if resolved.Edit == nil {
+		t.Fatal("CodeActionResolve left Edit nil, want the rebuilt edit")
+	}
+
+	if !workspaceChangesEqual(resolved.Edit.Changes, eager.Edit.Changes) {
+		t.Errorf("resolved edits = %+v, want eager edits %+v", resolved.Edit.Changes, eager.Edit.Changes)
+	}
+}
+
+// TestCodeActionResolve_relationFillsEditWhenAbsent pins the lazy path for
+// the relation fix across two documents.
+func TestCodeActionResolve_relationFillsEditWhenAbsent(t *testing.T) {
+	aSrc := "entity User {\n\tid: uuid @primary\n}\n"
+	bSrc := "entity Task {\n" +
+		"\tid: uuid @primary\n" +
+		"\tuser_id: uuid\n" +
+		"\tbelongs_to user: Usr @foreign_key(user_id)\n" +
+		"}\n"
+
+	s := NewServer()
+	openDoc(t, s, serverDocA, aSrc)
+	openDoc(t, s, serverDocB, bSrc)
+
+	actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocB)},
+		Context: protocol.CodeActionContext{
+			Diagnostics: []protocol.Diagnostic{{
+				Range:   protocol.Range{Start: cursorOn(t, bSrc, 3, "Usr")},
+				Message: protocol.String(`relation Task.user references unknown entity "Usr"`),
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction: %v", err)
+	}
+
+	eager := findActionByTitle(t, actions, `Change to "User"`)
+	if eager.Edit == nil {
+		t.Fatal("eager relation fix has no edit")
+	}
+
+	stripped := *eager
+	stripped.Edit = nil
+
+	resolved, err := s.CodeActionResolve(t.Context(), &stripped)
+	if err != nil {
+		t.Fatalf("CodeActionResolve: %v", err)
+	}
+
+	if resolved.Edit == nil {
+		t.Fatal("CodeActionResolve left Edit nil, want the rebuilt edit")
+	}
+
+	if !workspaceChangesEqual(resolved.Edit.Changes, eager.Edit.Changes) {
+		t.Errorf("resolved edits = %+v, want eager edits %+v", resolved.Edit.Changes, eager.Edit.Changes)
+	}
+}
+
+// TestCodeActionResolve_formatFillsDocumentChangesWhenAbsent pins the lazy
+// path for the format action: the stripped DocumentChanges come back
+// identical to the formatting output.
+func TestCodeActionResolve_formatFillsDocumentChangesWhenAbsent(t *testing.T) {
+	s := NewServer()
+	openDoc(t, s, serverDocA, serverValidDoc)
+
+	actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		Context: protocol.CodeActionContext{
+			Only: []protocol.CodeActionKind{protocol.CodeActionKindSource},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction: %v", err)
+	}
+
+	if len(actions) != 1 {
+		t.Fatalf("CodeAction(source only) = %d actions, want 1 (the format action)", len(actions))
+	}
+
+	eager := findFormatAction(t, actions)
+	if eager == nil {
+		t.Fatal("CodeAction(source only) offered no format action")
+	}
+
+	stripped := *eager
+	stripped.Edit = nil
+
+	resolved, err := s.CodeActionResolve(t.Context(), &stripped)
+	if err != nil {
+		t.Fatalf("CodeActionResolve: %v", err)
+	}
+
+	if resolved.Edit == nil {
+		t.Fatal("CodeActionResolve left Edit nil, want the rebuilt DocumentChanges")
+	}
+
+	if want := formatDocument("a.zen", []byte(serverValidDoc)); !textEditsEqual(formatEditsOf(t, resolved), want) {
+		t.Errorf("resolved edits = %+v, want formatDocument output %+v", formatEditsOf(t, resolved), want)
+	}
+}
+
+// TestCodeActionResolve_editPresent_roundTripsUnchanged pins idempotence:
+// an action that already carries an edit keeps it byte-for-byte, even with
+// no resolve payload at all.
+func TestCodeActionResolve_editPresent_roundTripsUnchanged(t *testing.T) {
+	s := NewServer()
+	openDoc(t, s, serverDocA, serverBrokenDoc)
+
+	actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		Context: protocol.CodeActionContext{
+			Diagnostics: []protocol.Diagnostic{{
+				Range:   protocol.Range{Start: cursorOn(t, serverBrokenDoc, 1, "strnig")},
+				Message: protocol.String(`unknown field type "strnig"`),
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction: %v", err)
+	}
+
+	eager := findActionByTitle(t, actions, `Change to "string"`)
+
+	before := eager.Edit
+
+	resolved, err := s.CodeActionResolve(t.Context(), eager)
+	if err != nil {
+		t.Fatalf("CodeActionResolve: %v", err)
+	}
+
+	if resolved.Edit == nil || !workspaceChangesEqual(resolved.Edit.Changes, before.Changes) {
+		t.Errorf("resolved edits = %+v, want the untouched eager edits %+v", resolved.Edit, before)
+	}
+
+	// No payload and no edit either: still a no-op, never an error.
+	bare, err := s.CodeActionResolve(t.Context(), &protocol.CodeAction{Title: "bare"})
+	if err != nil {
+		t.Fatalf("CodeActionResolve(bare): %v", err)
+	}
+
+	if bare.Edit != nil {
+		t.Errorf("CodeActionResolve(bare).Edit = %+v, want nil", bare.Edit)
+	}
+}
+
+// TestCodeActionResolve_staleDocument_yieldsNoEdit pins the best-effort
+// contract: when the document changed such that no fix applies anymore,
+// resolve finds nothing and leaves the action edit-less rather than
+// inventing an edit.
+func TestCodeActionResolve_staleDocument_yieldsNoEdit(t *testing.T) {
+	s := NewServer()
+	openDoc(t, s, serverDocA, serverBrokenDoc)
+
+	actions, err := s.CodeAction(t.Context(), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		Context: protocol.CodeActionContext{
+			Diagnostics: []protocol.Diagnostic{{
+				Range:   protocol.Range{Start: cursorOn(t, serverBrokenDoc, 1, "strnig")},
+				Message: protocol.String(`unknown field type "strnig"`),
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction: %v", err)
+	}
+
+	eager := findActionByTitle(t, actions, `Change to "string"`)
+
+	fixed := "entity User {\n\tid: zzzqqq\n}\n"
+	openDoc(t, s, serverDocA, fixed)
+
+	stripped := *eager
+	stripped.Edit = nil
+
+	resolved, err := s.CodeActionResolve(t.Context(), &stripped)
+	if err != nil {
+		t.Fatalf("CodeActionResolve: %v", err)
+	}
+
+	if resolved.Edit != nil {
+		t.Errorf("CodeActionResolve(stale).Edit = %+v, want nil (no fix applies anymore)", resolved.Edit)
+	}
+}
+
+// TestCodeActionResolve_unknownKind_yieldsUnchanged pins the fallback: a
+// payload with an unrecognized kind round-trips without an edit.
+func TestCodeActionResolve_unknownKind_yieldsUnchanged(t *testing.T) {
+	s := NewServer()
+
+	action := &protocol.CodeAction{Title: "unknown"}
+	attachCodeActionData(action, codeActionResolveData{Kind: "nope", URI: serverDocA})
+	action.Edit = nil
+
+	resolved, err := s.CodeActionResolve(t.Context(), action)
+	if err != nil {
+		t.Fatalf("CodeActionResolve: %v", err)
+	}
+
+	if resolved.Edit != nil {
+		t.Errorf("CodeActionResolve(unknown kind).Edit = %+v, want nil", resolved.Edit)
+	}
+}
+
+// TestCodeActionResolve_nilParams_returnsNull pins the handler's nil
+// guard: resolving nothing answers null, not an error.
+func TestCodeActionResolve_nilParams_returnsNull(t *testing.T) {
+	s := NewServer()
+
+	resolved, err := s.CodeActionResolve(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("CodeActionResolve(nil): %v", err)
+	}
+
+	if resolved != nil {
+		t.Errorf("CodeActionResolve(nil) = %+v, want null", resolved)
 	}
 }

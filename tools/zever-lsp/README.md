@@ -39,15 +39,16 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Sync | `textDocument/didOpen`, `textDocument/didChange` (full), `textDocument/didSave`, `textDocument/didClose`, `workspace/didChangeWatchedFiles` |
 | Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array; each diagnostic carries a stable `zen-###` code — see [Diagnostic codes](#diagnostic-codes) below) |
 | Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback) |
-| Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
+| Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/typeDefinition` (the named type under the cursor: a scalar or unknown type is honestly null), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
 | Hover | `textDocument/hover` |
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
 | Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |
 | Formatting | `textDocument/formatting`, `textDocument/rangeFormatting`, `textDocument/onTypeFormatting` |
 | Actions | `textDocument/codeAction` (quick fixes for unknown scalar types and unknown relation targets) |
 | Rename | `textDocument/prepareRename`, `textDocument/rename` (entities, fields, jobs, services, RPCs) |
-| Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` |
-| Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module and `errors:`-case annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
+| Code lens | `textDocument/codeLens`, `codeLens/resolve` (per-declaration `N reference(s)` counts; info-only, gated by `zever.codelens.references`) |
+| Semantic tokens | `textDocument/semanticTokens/full` (with delta), `textDocument/semanticTokens/range` (the `definition` modifier marks declaration identifiers) |
+| Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module, `errors:`-case, and `paramNames:` parameter-name annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
 | Configuration | `workspace/didChangeConfiguration` (`zever.*` settings, see [Configuration](#configuration) below) |
 | Lifecycle | `initialize`, `initialized`, `shutdown`, `exit`, `$/setTrace` |
 
@@ -86,7 +87,11 @@ ignored and keep their default.
   "zever": {
     "inlayHints": {
       "implicitModule": true,
-      "errorCases": true
+      "errorCases": true,
+      "paramNames": false
+    },
+    "codelens": {
+      "references": true
     },
     "diagnostics": {
       "debounceMs": 250
@@ -99,6 +104,8 @@ ignored and keep their default.
 | --- | --- | --- |
 | `zever.inlayHints.implicitModule` | `true` | `(module: public)` hints on declarations resolving to the implicit public module (shown only when the schema mixes public and named modules) |
 | `zever.inlayHints.errorCases` | `true` | status/gRPC-name annotations on `errors: { ... }` case names |
+| `zever.codelens.references` | `true` | `N reference(s)` lenses on top-level declarations (entities, messages, services, RPCs, jobs, schedules, sagas, enums) |
+| `zever.inlayHints.paramNames` | `false` | `name:` annotations on positional `dispatch: Job(...)` call arguments (skipped for already-named arguments and same-name single-argument calls) |
 | `zever.diagnostics.debounceMs` | `250` | how long an edit burst must settle before recompiling (values ≤ 0 keep the default) |
 
 ## Diagnostic codes

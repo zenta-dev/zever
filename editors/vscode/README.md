@@ -11,6 +11,8 @@ Editor support for the [zever](https://github.com/zenta-dev/zever) schema DSL: `
   - prepare-rename + rename (entity, field, job, service, RPC), find-references and document-highlight
   - workspace-symbol search, folding-range, semantic-tokens and inlay hints (+resolve)
 - **Format on save**: once `editor.formatOnSave` is enabled for the `zen` language, saving a `.zen` file formats the document through the server. Formatting is syntactic (indentation and token spacing).
+- **Schema status**: a `zen` language status item (`$(database) Zen: …`) showing the active document's `entity`/`message`/`service` counts plus the current error-diagnostic count. Scanned client-side from the open document (no extra server requests); turns amber when errors are present.
+- **Snippets**: client-side TextMate snippets for `zen` (`snippets/zen.json`, no LSP involvement) — see below.
 
 ## Prerequisite: the `zever-lsp` binary
 
@@ -64,6 +66,33 @@ The extension contributes the following settings (under `zever.*`):
 ## Commands
 
 - `Zever: Restart Language Server` (`zever.restartServer`): stops and restarts the language server client. Available from the command palette.
+
+## Schema status item
+
+While a `.zen` file is active, the status bar shows e.g.
+`$(database) Zen: 2 entities, 1 message, 1 service, 0 errors`. The
+declaration counts are scanned from the open document's text (lines starting
+with `entity`/`message`/`service`); the error count comes from the document's
+current diagnostics. The item refreshes as you type, switch editors, or when
+diagnostics change, and turns amber while the document has errors. With no
+`.zen` file active it collapses to `$(database) Zen`.
+
+## Snippets
+
+Client-side TextMate snippets for the `zen` language (wired via
+`contributes.snippets`, no language server involved). Type a prefix and press
+`Tab`:
+
+| Prefix     | Expands to                              |
+|------------|-----------------------------------------|
+| `entity`   | `entity` block with `id: uuid @primary` |
+| `message`  | `message` block with one field          |
+| `service`  | `service` block with one `rpc`          |
+| `job`      | `job` block with a `queue:` option      |
+| `schedule` | `schedule` block with `cron:`/`dispatch:` |
+| `enum`     | `enum` block with two values            |
+| `saga`     | `saga` block with one `execute:`/`compensate:` step |
+| `relation` | relation field (`has_many`/`has_one`/`belongs_to`/`many_to_many` choice) for use inside an `entity` block |
 
 ## Known limitations
 

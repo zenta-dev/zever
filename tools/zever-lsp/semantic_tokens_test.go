@@ -900,3 +900,177 @@ func TestClassifyNilEnumAndSagaDecls(t *testing.T) {
 		t.Errorf("nil/positionless decls produced spans: %+v", c.spans)
 	}
 }
+
+// decodedTokenFull is a decodedToken plus its raw modifier mask, for tests
+// that pin the definition bit. The shared decodeSemanticTokens helper
+// deliberately ignores modifiers so the pre-existing position/type
+// assertions keep passing untouched.
+type decodedTokenFull struct {
+	Line      int
+	StartChar int
+	Length    int
+	TokenType string
+	Modifiers uint32
+}
+
+// decodeSemanticTokensFull reverses encodeSemanticTokens like
+// decodeSemanticTokens does, but also surfaces each token's modifier mask.
+func decodeSemanticTokensFull(t *testing.T, data []uint32) []decodedTokenFull {
+	t.Helper()
+
+	if len(data)%5 != 0 {
+		t.Fatalf("semantic token data length %d is not a multiple of 5", len(data))
+	}
+
+	var (
+		out      []decodedTokenFull
+		line     int
+		startCol int
+	)
+
+	for i := 0; i < len(data); i += 5 {
+		deltaLine := int(data[i])
+		deltaChar := int(data[i+1])
+
+		line += deltaLine
+		if deltaLine == 0 {
+			startCol += deltaChar
+		} else {
+			startCol = deltaChar
+		}
+
+		typeIndex := int(data[i+3])
+		if typeIndex < 0 || typeIndex >= len(semanticTokenLegend.TokenTypes) {
+			t.Fatalf("token type index %d is outside the legend", typeIndex)
+		}
+
+		out = append(out, decodedTokenFull{
+			Line:      line,
+			StartChar: startCol,
+			Length:    int(data[i+2]),
+			TokenType: semanticTokenLegend.TokenTypes[typeIndex],
+			Modifiers: data[i+4],
+		})
+	}
+
+	return out
+}
+
+// TestSemanticTokenLegendPinsModifiers pins the legend's wire shape: the
+// standard type list plus exactly one modifier, "definition", whose bit is
+// semTokDefinitionBit. The modifier list is append-only by convention, so a
+// client that does not know "definition" keeps resolving every old index.
+func TestSemanticTokenLegendPinsModifiers(t *testing.T) {
+	if len(semanticTokenLegend.TokenModifiers) != 1 || semanticTokenLegend.TokenModifiers[0] != "definition" {
+		t.Errorf("TokenModifiers = %q, want [definition]", semanticTokenLegend.TokenModifiers)
+	}
+
+	if semTokDefinitionBit != 1 {
+		t.Errorf("semTokDefinitionBit = %d, want 1 (bit 0, the first modifier)", semTokDefinitionBit)
+	}
+}
+
+// definitionModifierSrc exercises every declaration kind plus reference
+// sites that must NOT carry the bit.
+const definitionModifierSrc = "entity User {\n" +
+	"\tid: uuid @primary\n" +
+	"\thas_many orders: Order\n" +
+	"}\n" +
+	"entity Order {\n" +
+	"\tid: uuid @primary\n" +
+	"}\n" +
+	"message Ping {\n" +
+	"\tid: uuid\n" +
+	"}\n" +
+	"service Svc {\n" +
+	"\trpc Get(id: uuid) -> User {\n" +
+	"\t\tauth: none\n" +
+	"\t}\n" +
+	"}\n" +
+	"job Nightly(to: string) {\n" +
+	"\tqueue: default\n" +
+	"}\n" +
+	"schedule Tick {\n" +
+	"\tcron: \"0 0 * * *\"\n" +
+	"\tdispatch: Nightly(\"a\")\n" +
+	"}\n" +
+	"saga Flow {\n" +
+	"\tstep first {\n" +
+	"\t\texecute: Svc.Get\n" +
+	"\t}\n" +
+	"}\n" +
+	"enum Status {\n" +
+	"\tok\n" +
+	"}\n"
+
+// TestClassifyFileDefinitionModifier pins the definition bit: every decl
+// name and every field name at its declaration carries it, while type
+// references, targets, returns, call names, step references, queue names,
+// parameter names and enum values carry none.
+func TestClassifyFileDefinitionModifier(t *testing.T) {
+	file, _ := parser.New("semantic_test.zen", []byte(definitionModifierSrc)).ParseFile()
+	if file == nil {
+		t.Fatal("parser returned no file")
+	}
+
+	tokens := decodeSemanticTokensFull(t, encodeSemanticTokens(classifyFile(file, definitionModifierSrc)))
+	lines := strings.Split(definitionModifierSrc, "\n")
+
+	// modifierAt finds the token starting at substr's first occurrence on
+	// the 0-based line and returns its modifier mask.
+	modifierAt := func(line int, substr string) uint32 {
+		t.Helper()
+
+		idx := strings.Index(lines[line], substr)
+		if idx < 0 {
+			t.Fatalf("fixture line %d lacks %q: %q", line, substr, lines[line])
+		}
+
+		for _, tok := range tokens {
+			if tok.Line == line && tok.StartChar == idx {
+				return tok.Modifiers
+			}
+		}
+
+		t.Fatalf("no token at line %d char %d (%q)", line, idx, substr)
+
+		return 0
+	}
+
+	tests := []struct {
+		name string
+		line int
+		text string
+		want uint32
+	}{
+		{"entity decl name", 0, "User", semTokDefinitionBit},
+		{"entity field name", 1, "id", semTokDefinitionBit},
+		{"relation field name", 2, "orders", semTokDefinitionBit},
+		{"relation target reference", 2, "Order", 0},
+		{"second entity decl name", 4, "Order", semTokDefinitionBit},
+		{"scalar type reference", 1, "uuid", 0},
+		{"message decl name", 7, "Ping", semTokDefinitionBit},
+		{"message field name", 8, "id", semTokDefinitionBit},
+		{"service decl name", 10, "Svc", semTokDefinitionBit},
+		{"rpc decl name", 11, "Get", semTokDefinitionBit},
+		{"rpc param name", 11, "id", 0},
+		{"rpc returns reference", 11, "User", 0},
+		{"job decl name", 15, "Nightly", semTokDefinitionBit},
+		{"queue name", 16, "default", 0},
+		{"schedule decl name", 18, "Tick", semTokDefinitionBit},
+		{"dispatch job reference", 20, "Nightly", 0},
+		{"saga decl name", 22, "Flow", semTokDefinitionBit},
+		{"saga step service reference", 24, "Svc", 0},
+		{"saga step rpc reference", 24, "Get", 0},
+		{"enum decl name", 27, "Status", semTokDefinitionBit},
+		{"enum value", 28, "ok", 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := modifierAt(tc.line, tc.text); got != tc.want {
+				t.Errorf("modifiers at line %d %q = %d, want %d", tc.line, tc.text, got, tc.want)
+			}
+		})
+	}
+}

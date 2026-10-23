@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -28,7 +30,7 @@ func hoverAt(schema *ir.Schema, file *ast.File, cursor protocol.Position) *proto
 	}
 
 	if entity := entityNameAt(file, cursor); entity != nil {
-		return markdownHover(entityDeclHoverMarkdown(entity), identRange(entity.NamePos, entity.Name))
+		return markdownHover(entityDeclHoverMarkdown(file, entity), identRange(entity.NamePos, entity.Name))
 	}
 
 	if name, pos, ok := errorCaseAt(file, cursor); ok {
@@ -36,11 +38,11 @@ func hoverAt(schema *ir.Schema, file *ast.File, cursor protocol.Position) *proto
 	}
 
 	if msg := messageNameAt(file, cursor); msg != nil {
-		return markdownHover(messageDeclHoverMarkdown(msg), identRange(msg.NamePos, msg.Name))
+		return markdownHover(messageDeclHoverMarkdown(file, msg), identRange(msg.NamePos, msg.Name))
 	}
 
 	if enum := enumNameAt(file, cursor); enum != nil {
-		return markdownHover(enumDeclHoverMarkdown(enum), identRange(enum.NamePos, enum.Name))
+		return markdownHover(enumDeclHoverMarkdown(file, enum), identRange(enum.NamePos, enum.Name))
 	}
 
 	if saga := sagaNameAt(file, cursor); saga != nil {
@@ -167,17 +169,19 @@ func validateHint(field *ast.FieldDecl) string {
 }
 
 // entityDeclHoverMarkdown summarises an entity declaration under the cursor.
-func entityDeclHoverMarkdown(entity *ast.EntityDecl) string {
+func entityDeclHoverMarkdown(file *ast.File, entity *ast.EntityDecl) string {
 	base := fmt.Sprintf("```zen\nentity %s\n```\n\n%d field(s), %d relation(s).",
 		entity.Name, len(entity.Fields), len(entity.Relations))
 
-	return base + docCommentParagraph(entity.DocComment)
+	return base + docCommentParagraph(entity.DocComment) +
+		definedInLine(file) +
+		hoverReferencedBy(file, renameTarget{Kind: entityKind, Name: entity.Name, Pos: entity.NamePos})
 }
 
 // messageDeclHoverMarkdown summarises a message declaration under the
 // cursor: its field count and doc comment, then one bullet per field in the
 // same rendered shape a relation target's hover lists an entity's fields.
-func messageDeclHoverMarkdown(message *ast.MessageDecl) string {
+func messageDeclHoverMarkdown(file *ast.File, message *ast.MessageDecl) string {
 	var sb strings.Builder
 
 	fmt.Fprintf(&sb, "```zen\nmessage %s\n```\n\n%d field(s).",
@@ -188,12 +192,16 @@ func messageDeclHoverMarkdown(message *ast.MessageDecl) string {
 	sb.WriteString(cappedNamedList(
 		renderFieldBullets(message.Fields), len(message.Fields)))
 
+	sb.WriteString(definedInLine(file))
+
+	sb.WriteString(hoverReferencedBy(file, renameTarget{Kind: messageKind, Name: message.Name, Pos: message.NamePos}))
+
 	return sb.String()
 }
 
 // enumDeclHoverMarkdown summarises a named enum declaration under the
 // cursor: its value list capped at hoverFieldLimit, same as a field listing.
-func enumDeclHoverMarkdown(enum *ast.EnumDecl) string {
+func enumDeclHoverMarkdown(file *ast.File, enum *ast.EnumDecl) string {
 	var sb strings.Builder
 
 	fmt.Fprintf(&sb, "```zen\nenum %s\n```", enum.Name)
@@ -207,6 +215,10 @@ func enumDeclHoverMarkdown(enum *ast.EnumDecl) string {
 	}
 
 	sb.WriteString(cappedNamedList(bullets, len(enum.Values)))
+
+	sb.WriteString(definedInLine(file))
+
+	sb.WriteString(hoverReferencedBy(file, renameTarget{Kind: enumKind, Name: enum.Name, Pos: enum.NamePos}))
 
 	return sb.String()
 }
@@ -305,6 +317,189 @@ func cappedNamedList(bullets []string, count int) string {
 	}
 
 	return sb.String()
+}
+
+// definedInLine renders the "`defined in <relpath>`" hover line naming the
+// file that declares the hovered symbol, or "" when the file carries no
+// name. The path is relative to the process working directory (which, for a
+// workspace opened at its root, reads as the workspace-relative path, e.g.
+// `defined in schema/billing/x.zen`) with a base-name fallback, so hover
+// needs no workspace-root threading.
+func definedInLine(file *ast.File) string {
+	if file == nil || file.Name == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("\n\n`defined in %s`", definedInDisplay(file.Name))
+}
+
+// definedInDisplay renders name relative to the working directory, falling
+// back to the base name when the path is absolute, outside the working
+// directory, or otherwise not relatable: an absolute or escaping path would
+// otherwise leak machine-specific directories into the hover card.
+func definedInDisplay(name string) string {
+	if !filepath.IsAbs(name) {
+		return filepath.ToSlash(filepath.Clean(name))
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		if rel, err := filepath.Rel(cwd, name); err == nil && rel != "" && rel != "." &&
+			rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(rel)
+		}
+	}
+
+	return filepath.ToSlash(filepath.Base(name))
+}
+
+// hoverReferencedBy builds the "Referenced by" hover section for an
+// entity/message/enum declaration: one bullet per same-file reference site
+// naming it, capped at hoverFieldLimit with the same "… N more" tail the
+// field lists use, or "" when nothing else in the file names it. It reuses
+// refsFnForKind (the same walker referencesAt resolves through), so the
+// listed sites stay consistent with what rename would touch; the reference
+// walk is single-file because hoverAt only sees the current file. Each
+// bullet names the enclosing site (e.g. `Order.user_id` for a field type,
+// `dispatch: SyncOrders` for a schedule dispatch) via describeRefSite.
+func hoverReferencedBy(file *ast.File, target renameTarget) string {
+	refsFn := refsFnForKind(target)
+	if refsFn == nil || file == nil {
+		return ""
+	}
+
+	var bullets []string
+
+	for _, ref := range refsFn(file) {
+		if ref.Name != target.Name || ref.Pos.Line <= 0 {
+			continue
+		}
+
+		if ref.Pos == target.Pos {
+			continue
+		}
+
+		bullets = append(bullets, "- `"+describeRefSite(file, ref)+"`")
+	}
+
+	if len(bullets) == 0 {
+		return ""
+	}
+
+	return "\n\nReferenced by:" + cappedNamedList(bullets, len(bullets))
+}
+
+// describeRefSite names the declaration site holding ref in
+// Owner.member shape: a field type in entity Order naming User reads
+// `Order.user_id`, a schedule dispatch naming job SyncOrders reads
+// `dispatch: SyncOrders`. Anything the scans below do not recognize (a
+// position from a newer walker arm) falls back to a line number rather
+// than an empty bullet.
+func describeRefSite(file *ast.File, ref symbolRef) string {
+	for _, decl := range flattenDecls(file) {
+		switch d := decl.(type) {
+		case *ast.EntityDecl:
+			if desc, ok := describeEntityRefSite(d, ref); ok {
+				return desc
+			}
+		case *ast.MessageDecl:
+			for _, field := range d.Fields {
+				if field == nil || field.Type == nil {
+					continue
+				}
+
+				if ref.Pos == field.Type.NamePos {
+					return d.Name + "." + field.Name
+				}
+			}
+		case *ast.ServiceDecl:
+			if desc, ok := describeServiceRefSite(d, ref); ok {
+				return desc
+			}
+		case *ast.JobDecl:
+			for _, param := range d.Params {
+				if param == nil || param.Type == nil {
+					continue
+				}
+
+				if ref.Pos == param.Type.NamePos {
+					return d.Name + "(" + param.Name + ")"
+				}
+			}
+		case *ast.ScheduleDecl:
+			if call, ok := d.Dispatch.(*ast.CallValue); ok && ref.Pos == call.NamePos {
+				return "dispatch: " + call.Name
+			}
+		}
+	}
+
+	return fmt.Sprintf("line %d", ref.Pos.Line)
+}
+
+// describeEntityRefSite names an entity-held reference site: a field's own
+// name or type position reads `Order.user_id`, a relation target reads
+// `Order.user`, and an index column reads `Order.user_id`.
+func describeEntityRefSite(entity *ast.EntityDecl, ref symbolRef) (string, bool) {
+	for _, field := range entity.Fields {
+		if field == nil {
+			continue
+		}
+
+		if ref.Pos == field.NamePos || (field.Type != nil && ref.Pos == field.Type.NamePos) {
+			return entity.Name + "." + field.Name, true
+		}
+	}
+
+	for _, rel := range entity.Relations {
+		if rel != nil && ref.Pos == rel.TargetPos {
+			return entity.Name + "." + rel.FieldName, true
+		}
+	}
+
+	for _, idx := range entity.Indexes {
+		if idx == nil {
+			continue
+		}
+
+		for i, col := range idx.Columns {
+			if i < len(idx.ColumnPos) && ref.Pos == idx.ColumnPos[i] {
+				return entity.Name + "." + col, true
+			}
+		}
+	}
+
+	return "", false
+}
+
+// describeServiceRefSite names a service-held reference site: an rpc return
+// type reads `TaskService.GetTask`, a permission resource reads
+// `TaskService.GetTask permission`, and a parameter type reads
+// `TaskService.GetTask(id)`.
+func describeServiceRefSite(service *ast.ServiceDecl, ref symbolRef) (string, bool) {
+	for _, rpc := range service.RPCs {
+		if rpc == nil {
+			continue
+		}
+
+		if ref.Pos == rpc.ReturnsPos {
+			return service.Name + "." + rpc.Name, true
+		}
+
+		if resource, ok := permissionResourceRef(rpc); ok && ref.Pos == resource.Pos {
+			return service.Name + "." + rpc.Name + " permission", true
+		}
+
+		for _, param := range rpc.Params {
+			if param == nil || param.Type == nil {
+				continue
+			}
+
+			if ref.Pos == param.Type.NamePos {
+				return service.Name + "." + rpc.Name + "(" + param.Name + ")", true
+			}
+		}
+	}
+
+	return "", false
 }
 
 // docCommentParagraph renders doc as its own trailing Markdown paragraph

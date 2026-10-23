@@ -309,6 +309,7 @@ tools/vulngate	allowFile	tools/vulngate/vulngate.go
 tools/vulngate	findingMsg	tools/vulngate/vulngate.go
 tools/vulngate	frame	tools/vulngate/vulngate.go
 tools/zever-lsp	callHierarchyData	tools/zever-lsp/call_hierarchy.go
+tools/zever-lsp	codeActionResolveData	tools/zever-lsp/code_action.go
 tools/zever-lsp	completionResolveData	tools/zever-lsp/completion.go
 tools/zever-mcp	callParams	tools/zever-mcp/server.go
 tools/zever-mcp	callToolResult	tools/zever-mcp/protocol.go

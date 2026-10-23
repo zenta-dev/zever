@@ -1,0 +1,74 @@
+{
+  "Zen entity": {
+    "prefix": "entity",
+    "body": [
+      "entity ${1:Name} {",
+      "\t${2:id}: uuid @primary",
+      "\t$0",
+      "}"
+    ],
+    "description": "New zen entity block"
+  },
+  "Zen message": {
+    "prefix": "message",
+    "body": [
+      "message ${1:Name} {",
+      "\t${2:field}: ${3:string}$0",
+      "}"
+    ],
+    "description": "New zen message block"
+  },
+  "Zen service": {
+    "prefix": "service",
+    "body": [
+      "service ${1:Name}Service {",
+      "\trpc ${2:Action}(${3:id}: ${4:uuid}) -> ${5:Result} {",
+      "\t\thttp: ${6|GET,POST,PUT,PATCH,DELETE|} \"${7:/v1/path}\"",
+      "\t\tauth: required$0",
+      "\t}",
+      "}"
+    ],
+    "description": "New zen service block with one rpc"
+  },
+  "Zen job": {
+    "prefix": "job",
+    "body": [
+      "job ${1:Name}(${2:param}: ${3:uuid}) {",
+      "\tqueue: ${4:default}$0",
+      "}"
+    ],
+    "description": "New zen job block"
+  },
+  "Zen schedule": {
+    "prefix": "schedule",
+    "body": [
+      "schedule ${1:Name} {",
+      "\tcron: \"${2:0 0 * * *}\"",
+      "\tdispatch: ${3:JobName}()$0",
+      "}"
+    ],
+    "description": "New zen schedule block"
+  },
+  "Zen enum": {
+    "prefix": "enum",
+    "body": "enum ${1:Status} { ${2:active}, ${3:inactive}$0 }",
+    "description": "New zen enum block"
+  },
+  "Zen saga": {
+    "prefix": "saga",
+    "body": [
+      "saga ${1:Name} {",
+      "\tstep ${2:step} {",
+      "\t\texecute: ${3:Service}.${4:Action}",
+      "\t\tcompensate: ${3:Service}.${5:Compensate}$0",
+      "\t}",
+      "}"
+    ],
+    "description": "New zen saga block with one step"
+  },
+  "Zen relation": {
+    "prefix": "relation",
+    "body": "${1|has_many,has_one,belongs_to,many_to_many|} ${2:name}: ${3:Type} @foreign_key(${4:foreign_key})$0",
+    "description": "Relation field inside a zen entity block"
+  }
+}

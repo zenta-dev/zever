@@ -18,6 +18,13 @@ type Settings struct {
 	ImplicitModuleHints bool
 	// ErrorCaseHints gates the errors-case status inlay hint family.
 	ErrorCaseHints bool
+	// CodeLensReferences gates the "N reference(s)" code lens family.
+	CodeLensReferences bool
+	// ParamNames gates the `name:` parameter-name inlay hint family for
+	// schedule dispatch (and saga step) call arguments. Off by default:
+	// unlike the families above, parameter names are usually obvious from
+	// context, so they are noise unless explicitly asked for.
+	ParamNames bool
 	// DebounceDelay is how long an edit burst must settle before recompiling.
 	DebounceDelay time.Duration
 }
@@ -28,6 +35,8 @@ func defaultSettings() Settings {
 	return Settings{
 		ImplicitModuleHints: true,
 		ErrorCaseHints:      true,
+		CodeLensReferences:  true,
+		ParamNames:          false,
 		DebounceDelay:       debounceDelay,
 	}
 }
@@ -36,7 +45,8 @@ func defaultSettings() Settings {
 //
 //	{
 //	  "zever": {
-//	    "inlayHints": { "implicitModule": true, "errorCases": true },
+//	    "inlayHints": { "implicitModule": true, "errorCases": true, "paramNames": false },
+//	    "codelens": { "references": true },
 //	    "diagnostics": { "debounceMs": 250 }
 //	  }
 //	}
@@ -45,6 +55,9 @@ const (
 	settingsInlayHintsKey = "inlayHints"
 	settingsImplicitKey   = "implicitModule"
 	settingsErrorCasesKey = "errorCases"
+	settingsCodeLensKey   = "codelens"
+	settingsReferencesKey = "references"
+	settingsParamNamesKey = "paramNames"
 	settingsDiagKey       = "diagnostics"
 	settingsDebounceKey   = "debounceMs"
 )
@@ -89,11 +102,21 @@ func parseSettings(raw protocol.LSPAny) (parsed Settings, ok bool) {
 		if b, bOK := jsonBool(hints[settingsErrorCasesKey]); bOK {
 			parsed.ErrorCaseHints = b
 		}
+
+		if b, bOK := jsonBool(hints[settingsParamNamesKey]); bOK {
+			parsed.ParamNames = b
+		}
 	}
 
 	if diags, diagsOK := jsonObj(section[settingsDiagKey]); diagsOK {
 		if ms, msOK := jsonFloat(diags[settingsDebounceKey]); msOK && ms > 0 {
 			parsed.DebounceDelay = time.Duration(ms * float64(time.Millisecond))
+		}
+	}
+
+	if lens, lensOK := jsonObj(section[settingsCodeLensKey]); lensOK {
+		if b, bOK := jsonBool(lens[settingsReferencesKey]); bOK {
+			parsed.CodeLensReferences = b
 		}
 	}
 

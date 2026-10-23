@@ -5,7 +5,8 @@
 // loaded) keep resolving the genuine modules.
 // They cover: the activate error path (missing zever-lsp binary surfaces one
 // install-hint notification, leaking no paths), the happy path (no error),
-// and deactivate with/without a live client.
+// deactivate with/without a live client, the countDecls schema-stats helper,
+// and the zen language status item.
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
 import * as path from 'node:path';
@@ -14,11 +15,23 @@ import type * as VscodeApi from 'vscode';
 import type { LanguageClient as LanguageClientType } from 'vscode-languageclient/node';
 import type * as ExtensionModule from './extension';
 
+interface StatusItemStub {
+  id: string;
+  selector: unknown;
+  text: string;
+}
+
 interface VscodeStub {
   window: {
     showErrorMessage: (message: string) => Thenable<string | undefined>;
+    activeTextEditor?: { document: VscodeApi.TextDocument };
+  };
+  languages: {
+    createLanguageStatusItem: (id: string, selector: unknown) => StatusItemStub;
+    getDiagnostics: (uri: VscodeApi.Uri) => VscodeApi.Diagnostic[];
   };
   __messages: string[];
+  __statusItems: StatusItemStub[];
 }
 
 interface ServerOptionsStub {
@@ -96,7 +109,7 @@ const { LanguageClient } = require(stubTargets['vscode-languageclient/node']) as
 };
 // Imported lazily so the hook above is installed before extension.js loads.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { activate, deactivate } = require('./extension') as typeof ExtensionModule;
+const { activate, deactivate, countDecls } = require('./extension') as typeof ExtensionModule;
 
 const vscodeStub = vscode as unknown as VscodeStub;
 const clientCtor = LanguageClient as unknown as LanguageClientCtor;
@@ -164,12 +177,14 @@ describe('activate', () => {
     assert.equal(vscodeStub.__messages.length, 0);
   });
 
-  it('registers a subscription that stops the client', () => {
+  it('registers subscriptions that stop the client', () => {
     const raw: TestContext = { subscriptions: [] };
     activate(raw as unknown as VscodeApi.ExtensionContext);
 
-    assert.equal(raw.subscriptions.length, 1);
-    void raw.subscriptions[0].dispose();
+    assert.ok(raw.subscriptions.length >= 1);
+    for (const sub of raw.subscriptions) {
+      void sub.dispose();
+    }
     assert.equal(clientCtor.instances[0].stopped, true);
   });
 });
@@ -188,5 +203,136 @@ describe('deactivate', () => {
     assert.ok(result instanceof Promise);
     await result;
     assert.equal(clientCtor.instances[0].stopped, true);
+  });
+});
+
+describe('countDecls', () => {
+  it('counts each declaration kind', () => {
+    assert.deepEqual(countDecls('entity A {\n}\nmessage M {\n}\nservice S {\n}\n'), {
+      entities: 1,
+      messages: 1,
+      services: 1,
+    });
+  });
+
+  it('counts indented declarations and multiples of one kind', () => {
+    assert.deepEqual(countDecls('  entity A {\n}\n\tentity B {\n}\n'), {
+      entities: 2,
+      messages: 0,
+      services: 0,
+    });
+  });
+
+  it('ignores // comment lines', () => {
+    assert.deepEqual(countDecls('// entity Fake {\nentity Real {\n}\n'), {
+      entities: 1,
+      messages: 0,
+      services: 0,
+    });
+  });
+
+  it('requires a name after the keyword', () => {
+    assert.deepEqual(countDecls('entity\nentity \nmessage\nservice\n'), {
+      entities: 0,
+      messages: 0,
+      services: 0,
+    });
+  });
+
+  it('does not count keywords mid-line', () => {
+    assert.deepEqual(countDecls('foo entity Bar\n'), {
+      entities: 0,
+      messages: 0,
+      services: 0,
+    });
+  });
+
+  it('returns zeros for empty text', () => {
+    assert.deepEqual(countDecls(''), { entities: 0, messages: 0, services: 0 });
+  });
+});
+
+describe('status item', () => {
+  const defaultGetDiagnostics = vscodeStub.languages.getDiagnostics;
+
+  function fakeZenDoc(text: string): VscodeApi.TextDocument {
+    return {
+      languageId: 'zen',
+      getText: () => text,
+      uri: {} as VscodeApi.Uri,
+    } as unknown as VscodeApi.TextDocument;
+  }
+
+  function setActiveZenEditor(text: string | undefined): void {
+    vscodeStub.window.activeTextEditor =
+      text === undefined ? undefined : { document: fakeZenDoc(text) };
+  }
+
+  beforeEach(() => {
+    vscodeStub.__messages.length = 0;
+    vscodeStub.__statusItems.length = 0;
+    clientCtor.instances.length = 0;
+    clientCtor.failWith = undefined;
+    setActiveZenEditor(undefined);
+    vscodeStub.languages.getDiagnostics = defaultGetDiagnostics;
+  });
+
+  it('creates a zen language status item', () => {
+    activate(makeContext());
+
+    assert.equal(vscodeStub.__statusItems.length, 1);
+    const [item] = vscodeStub.__statusItems;
+    assert.equal(item.id, 'zever.status');
+    assert.deepEqual(item.selector, { language: 'zen' });
+  });
+
+  it('shows idle text with no active zen editor', () => {
+    activate(makeContext());
+
+    assert.equal(vscodeStub.__statusItems[0].text, '$(database) Zen');
+  });
+
+  it('shows declaration counts for the active zen document', () => {
+    setActiveZenEditor('entity A {\n}\nentity B {\n}\nmessage M {\n}\nservice S {\n}\n');
+    activate(makeContext());
+
+    assert.equal(
+      vscodeStub.__statusItems[0].text,
+      '$(database) Zen: 2 entities, 1 message, 1 service, 0 errors'
+    );
+  });
+
+  it('uses singular nouns for counts of one', () => {
+    setActiveZenEditor('entity A {\n}\n');
+    activate(makeContext());
+
+    assert.equal(
+      vscodeStub.__statusItems[0].text,
+      '$(database) Zen: 1 entity, 0 messages, 0 services, 0 errors'
+    );
+  });
+
+  it('includes the diagnostic error count, ignoring warnings', () => {
+    setActiveZenEditor('entity A {\n}\n');
+    vscodeStub.languages.getDiagnostics = () => [
+      { severity: vscode.DiagnosticSeverity.Error } as VscodeApi.Diagnostic,
+      { severity: vscode.DiagnosticSeverity.Error } as VscodeApi.Diagnostic,
+      { severity: vscode.DiagnosticSeverity.Warning } as VscodeApi.Diagnostic,
+    ];
+    activate(makeContext());
+
+    assert.match(vscodeStub.__statusItems[0].text, /2 errors/);
+  });
+
+  it('ignores active editors for other languages', () => {
+    vscodeStub.window.activeTextEditor = {
+      document: {
+        languageId: 'typescript',
+        getText: () => 'entity Fake {\n}\n',
+      } as unknown as VscodeApi.TextDocument,
+    };
+    activate(makeContext());
+
+    assert.equal(vscodeStub.__statusItems[0].text, '$(database) Zen');
   });
 });
