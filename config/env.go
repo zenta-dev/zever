@@ -828,7 +828,7 @@ func findField(v reflect.Value, name string) (reflect.Value, bool) {
 func setOptionField(service string, dst any, path []string, value string, envName ...string) error {
 	field := strings.Join(path, ".")
 
-	// envName names the source environment variable (e.g. DB_MAXCONNS) for
+	// envName names the source environment variable (e.g. DB_MAX_CONNS) for
 	// type-error text; direct callers and tests may omit it.
 	name := ""
 	if len(envName) > 0 {

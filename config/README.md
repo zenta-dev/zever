@@ -128,7 +128,7 @@ field.
 
 Unknown heads (`PATH`, `HOME`, `FOO_BAR`), bare names (`DB`), and keys of
 other services are ignored in every mode. Only values that fail to *parse*
-for a resolved field (`DB_MAXCONNS=abc`) return `InvalidOptionsError`. Error
+for a resolved field (`DB_MAX_CONNS=abc`) return `InvalidOptionsError`. Error
 text names services and fields only — values are never echoed.
 
 Note the deliberate asymmetry with the old file layer: files were strict and
@@ -159,7 +159,7 @@ secrets) share one stdlib-only format:
 ```sh
 # comment lines and blank lines are skipped
 export DB_ADAPTER=postgres   # `export` prefix allowed
-DB_MAXCONNS=20               # unquoted; ` #` starts a comment
+DB_MAX_CONNS=20              # unquoted; ` #` starts a comment
 AUTH_JWT_SECRET='a#b ${NO}'  # single quotes: literal, no expansion
 DB_DSN="postgres://app:${DB_PASSWORD}@db:5432/app"  # double quotes: escapes + ${VAR}
 HOOK='$(not-executed)'       # $(...) and backticks are literal text

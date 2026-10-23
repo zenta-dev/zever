@@ -76,7 +76,7 @@ Bookings keeps format rules on entities (`User.email`, `Space.title`) and flow r
 
 ## Validate config at startup
 
-`config.Resolve(env)` validates strictly, so an unknown key under a wired service prefix fails fast with a did-you-mean hint. An unparsable env value returns `InvalidOptionsError` (e.g. `DB_MAXCONNS=abc`) naming the service and field, never the secret; an unknown service head and a bare name are ignored.
+`config.Resolve(env)` validates strictly, so an unknown key under a wired service prefix fails fast with a did-you-mean hint. An unparsable env value returns `InvalidOptionsError` (e.g. `DB_MAX_CONNS=abc`) naming the service and field, never the secret; an unknown service head and a bare name are ignored.
 
 ## Production checklist
 

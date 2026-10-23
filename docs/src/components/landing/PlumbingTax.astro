@@ -27,7 +27,7 @@ func main() {
 		log.Error("DB_DSN required")
 		os.Exit(1)
 	}
-	maxConns, _ := strconv.Atoi(os.Getenv("DB_MAXCONNS"))
+	maxConns, _ := strconv.Atoi(os.Getenv("DB_MAX_CONNS"))
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		log.Error("db", "err", err)

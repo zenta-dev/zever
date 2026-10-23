@@ -70,7 +70,7 @@ The env key is close to a known field, so it is a typo and fails fast with a did
 <details>
 <summary>An environment variable has no effect</summary>
 
-Env matching is ambient-safe by design: a variable that matches no field of its service is ignored, so a noisy environment cannot break startup. A key close to a known field still fails with a did-you-mean hint (a typo), and a value that matches but cannot be parsed is an error. Unknown service heads (`PATH`, `FOO_BAR`) and bare names (`DB`) are ignored. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired service prefix. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAXCONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. Layering is `defaults < .env < .env.local < process env`.
+Env matching is ambient-safe by design: a variable that matches no field of its service is ignored, so a noisy environment cannot break startup. A key close to a known field still fails with a did-you-mean hint (a typo), and a value that matches but cannot be parsed is an error. Unknown service heads (`PATH`, `FOO_BAR`) and bare names (`DB`) are ignored. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired service prefix. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAX_CONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. Layering is `defaults < .env < .env.local < process env`.
 </details>
 
 <details>
