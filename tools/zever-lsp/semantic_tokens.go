@@ -604,3 +604,84 @@ func encodeSemanticTokens(spans []tokenSpan) []uint32 {
 
 	return data
 }
+
+// semTokCacheEntry stores one full semantic-token result for delta requests.
+type semTokCacheEntry struct {
+	resultID string
+	data     []uint32
+}
+
+// boolPtr returns a pointer to v, for capability fields that take *bool.
+func boolPtr(v bool) *bool { return &v }
+
+// filterTokenSpansToRange keeps only the spans that intersect rng (half-open
+// LSP positions). Spans are single-line, so a span is dropped when its whole
+// extent lies strictly before the range start or strictly after the range end.
+func filterTokenSpansToRange(spans []tokenSpan, rng protocol.Range) []tokenSpan {
+	out := make([]tokenSpan, 0, len(spans))
+
+	for _, sp := range spans {
+		if spanIntersectsRange(sp, rng) {
+			out = append(out, sp)
+		}
+	}
+
+	return out
+}
+
+// spanIntersectsRange reports whether the single-line span sp overlaps rng.
+func spanIntersectsRange(sp tokenSpan, rng protocol.Range) bool {
+	line := uint32(sp.Line) //nolint:gosec // non-negative
+
+	if line < rng.Start.Line {
+		return false
+	}
+
+	if line > rng.End.Line {
+		return false
+	}
+
+	startChar := uint32(sp.StartChar)        //nolint:gosec // non-negative
+	endChar := startChar + uint32(sp.Length) //nolint:gosec // non-negative
+
+	if line == rng.Start.Line && endChar <= rng.Start.Character {
+		return false
+	}
+
+	if line == rng.End.Line && startChar >= rng.End.Character {
+		return false
+	}
+
+	return true
+}
+
+// computeSemTokDelta produces the edits transforming old into next.
+func computeSemTokDelta(old, next []uint32) []protocol.SemanticTokensEdit {
+	prefix := 0
+	minLen := len(old)
+	if len(next) < minLen {
+		minLen = len(next)
+	}
+
+	for prefix < minLen && old[prefix] == next[prefix] {
+		prefix++
+	}
+
+	suffix := 0
+	for suffix < minLen-prefix && old[len(old)-1-suffix] == next[len(next)-1-suffix] {
+		suffix++
+	}
+
+	deleteCount := len(old) - prefix - suffix
+	insertData := append([]uint32(nil), next[prefix:len(next)-suffix]...)
+
+	if deleteCount == 0 && len(insertData) == 0 {
+		return []protocol.SemanticTokensEdit{}
+	}
+
+	return []protocol.SemanticTokensEdit{{
+		Start:       uint32(prefix),
+		DeleteCount: uint32(deleteCount), //nolint:gosec // deleteCount is a non-negative slice length difference
+		Data:        insertData,
+	}}
+}

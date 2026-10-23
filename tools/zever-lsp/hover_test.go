@@ -524,3 +524,31 @@ func TestRenderValue_unknownType_returnsPlaceholder(t *testing.T) {
 		t.Errorf("renderValue(bogusValue) = %q, want %q", got, "?")
 	}
 }
+
+func TestHoverFieldIncludesTypeLine(t *testing.T) {
+	got := hoverText(t, cursorOn(t, hoverSrc, 2, "email"))
+
+	if !strings.Contains(got, "Type: string") {
+		t.Errorf("hover markdown missing Type line:\n%s", got)
+	}
+}
+
+func TestHoverFieldIncludesTypeHintForDefault(t *testing.T) {
+	got := hoverText(t, cursorOn(t, hoverSrc, 3, "created_at"))
+
+	if !strings.Contains(got, "Type hint") {
+		t.Errorf("hover markdown missing Type hint line:\n%s", got)
+	}
+
+	if !strings.Contains(got, "default: now()") {
+		t.Errorf("hover markdown missing default hint:\n%s", got)
+	}
+}
+
+func TestHoverFieldIncludesTypeHintForValidate(t *testing.T) {
+	got := hoverText(t, cursorOn(t, hoverSrc, 2, "email"))
+
+	if !strings.Contains(got, "Type hint") {
+		t.Errorf("hover markdown missing Type hint line:\n%s", got)
+	}
+}

@@ -186,8 +186,21 @@ func TestInitialize_capabilities(t *testing.T) {
 		t.Error("SemanticTokensProvider.Legend has no token types")
 	}
 
-	if full, ok := sem.Full.(protocol.Boolean); !ok || !bool(full) {
-		t.Errorf("SemanticTokensProvider.Full = %#v, want Boolean(true)", sem.Full)
+	switch full := sem.Full.(type) {
+	case protocol.Boolean:
+		if !bool(full) {
+			t.Errorf("SemanticTokensProvider.Full = %#v, want Boolean(true)", sem.Full)
+		}
+	case *protocol.SemanticTokensFullDelta:
+		if full.Delta == nil || !*full.Delta {
+			t.Errorf("SemanticTokensProvider.Full.Delta = %#v, want true", full.Delta)
+		}
+	default:
+		t.Errorf("SemanticTokensProvider.Full = %T, want Boolean or *SemanticTokensFullDelta", sem.Full)
+	}
+
+	if rng, ok := sem.Range.(protocol.Boolean); !ok || !bool(rng) {
+		t.Errorf("SemanticTokensProvider.Range = %#v, want Boolean(true)", sem.Range)
 	}
 }
 
@@ -1285,6 +1298,124 @@ func TestSemanticTokensFull(t *testing.T) {
 
 		if tokens != nil {
 			t.Errorf("SemanticTokensFull unknown doc = %+v, want null", tokens)
+		}
+	})
+}
+
+func TestSemanticTokensRange(t *testing.T) {
+	t.Run("range returns subset", func(t *testing.T) {
+		s := NewServer()
+		openDoc(t, s, serverDocA, serverValidDoc)
+
+		full, err := s.SemanticTokensFull(t.Context(), &protocol.SemanticTokensParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		})
+		if err != nil || full == nil {
+			t.Fatalf("SemanticTokensFull: %v", err)
+		}
+
+		rng := protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 100}}
+		tokens, err := s.SemanticTokensRange(t.Context(), &protocol.SemanticTokensRangeParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			Range:        rng,
+		})
+		if err != nil {
+			t.Fatalf("SemanticTokensRange: %v", err)
+		}
+		if tokens == nil || len(tokens.Data) == 0 {
+			t.Fatalf("SemanticTokensRange returned no data")
+		}
+		if len(tokens.Data) > len(full.Data) {
+			t.Errorf("range data %d > full data %d", len(tokens.Data), len(full.Data))
+		}
+	})
+
+	t.Run("unknown document is null", func(t *testing.T) {
+		s := NewServer()
+		tokens, err := s.SemanticTokensRange(t.Context(), &protocol.SemanticTokensRangeParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
+			Range:        protocol.Range{},
+		})
+		if err != nil {
+			t.Fatalf("SemanticTokensRange: %v", err)
+		}
+		if tokens != nil {
+			t.Errorf("SemanticTokensRange unknown doc = %+v, want null", tokens)
+		}
+	})
+}
+
+func TestSemanticTokensFullDelta(t *testing.T) {
+	t.Run("no previous returns full", func(t *testing.T) {
+		s := NewServer()
+		openDoc(t, s, serverDocA, serverValidDoc)
+
+		res, err := s.SemanticTokensFullDelta(t.Context(), &protocol.SemanticTokensDeltaParams{
+			TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			PreviousResultID: "",
+		})
+		if err != nil {
+			t.Fatalf("SemanticTokensFullDelta: %v", err)
+		}
+		full, ok := res.(*protocol.SemanticTokens)
+		if !ok || full == nil || full.ResultID == nil {
+			t.Fatalf("want full result, got %#v", res)
+		}
+	})
+
+	t.Run("mismatch returns full", func(t *testing.T) {
+		s := NewServer()
+		openDoc(t, s, serverDocA, serverValidDoc)
+
+		res, err := s.SemanticTokensFullDelta(t.Context(), &protocol.SemanticTokensDeltaParams{
+			TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			PreviousResultID: "bogus",
+		})
+		if err != nil {
+			t.Fatalf("SemanticTokensFullDelta: %v", err)
+		}
+		if _, ok := res.(*protocol.SemanticTokens); !ok {
+			t.Fatalf("want full result on mismatch, got %#v", res)
+		}
+	})
+
+	t.Run("matching returns delta", func(t *testing.T) {
+		s := NewServer()
+		openDoc(t, s, serverDocA, serverValidDoc)
+
+		full, err := s.SemanticTokensFull(t.Context(), &protocol.SemanticTokensParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+		})
+		if err != nil || full == nil || full.ResultID == nil {
+			t.Fatalf("SemanticTokensFull: %v", err)
+		}
+
+		// change document to force a delta
+		openDoc(t, s, serverDocA, serverValidDoc+"\n// trailing\n")
+
+		res, err := s.SemanticTokensFullDelta(t.Context(), &protocol.SemanticTokensDeltaParams{
+			TextDocument:     protocol.TextDocumentIdentifier{URI: uri.URI(serverDocA)},
+			PreviousResultID: *full.ResultID,
+		})
+		if err != nil {
+			t.Fatalf("SemanticTokensFullDelta: %v", err)
+		}
+		delta, ok := res.(*protocol.SemanticTokensDelta)
+		if !ok || delta == nil || delta.ResultID == nil {
+			t.Fatalf("want delta result, got %#v", res)
+		}
+	})
+
+	t.Run("unknown document is null", func(t *testing.T) {
+		s := NewServer()
+		res, err := s.SemanticTokensFullDelta(t.Context(), &protocol.SemanticTokensDeltaParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri.URI(serverUnknown)},
+		})
+		if err != nil {
+			t.Fatalf("SemanticTokensFullDelta: %v", err)
+		}
+		if res != nil {
+			t.Errorf("SemanticTokensFullDelta unknown doc = %+v, want null", res)
 		}
 	})
 }
