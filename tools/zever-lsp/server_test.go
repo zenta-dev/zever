@@ -123,6 +123,7 @@ func TestInitialize_capabilities(t *testing.T) {
 		{"DocumentSymbolProvider", caps.DocumentSymbolProvider},
 		{"WorkspaceSymbolProvider", caps.WorkspaceSymbolProvider},
 		{"DefinitionProvider", caps.DefinitionProvider},
+		{"DeclarationProvider", caps.DeclarationProvider},
 		{"HoverProvider", caps.HoverProvider},
 		{"DocumentFormattingProvider", caps.DocumentFormattingProvider},
 		{"DocumentRangeFormattingProvider", caps.DocumentRangeFormattingProvider},

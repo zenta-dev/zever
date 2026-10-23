@@ -39,7 +39,7 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Sync | `textDocument/didOpen`, `textDocument/didChange` (full), `textDocument/didSave`, `textDocument/didClose`, `workspace/didChangeWatchedFiles` |
 | Diagnostics | `textDocument/publishDiagnostics` (debounced, per-file; clean files get an empty array; each diagnostic carries a stable `zen-###` code — see [Diagnostic codes](#diagnostic-codes) below) |
 | Symbols | `textDocument/documentSymbol`, `workspace/symbol` (resolved schema preferred, per-file AST fallback) |
-| Navigation | `textDocument/definition`, `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
+| Navigation | `textDocument/definition`, `textDocument/declaration` (alias for definition — every declaration is its own declaration site), `textDocument/references`, `textDocument/documentHighlight`, `textDocument/foldingRange`, `textDocument/selectionRange`, `textDocument/documentLink` (with resolve) |
 | Hover | `textDocument/hover` |
 | Completion | `textDocument/completion` (triggers `@`, `:`, ` `), `completionItem/resolve` |
 | Signature help | `textDocument/signatureHelp` (triggers `(`, `,`) |
@@ -50,6 +50,17 @@ Declared in `server.go`'s `Initialize` and implemented in this module:
 | Inlay hints | `textDocument/inlayHint`, `inlayHint/resolve` (implicit-module and `errors:`-case annotations, per-hint-family configurable — see [Configuration](#configuration) below) |
 | Configuration | `workspace/didChangeConfiguration` (`zever.*` settings, see [Configuration](#configuration) below) |
 | Lifecycle | `initialize`, `initialized`, `shutdown`, `exit`, `$/setTrace` |
+
+## Non-goals
+
+`textDocument/prepareTypeHierarchy` (and `typeHierarchy/supertypes` /
+`subtypes`) is deliberately absent: the `.zen` DSL has nominal types with no
+inheritance. Entities, messages, enums, and sagas are unrelated nominal
+declarations (`dsl/ast`); relations are associations between entities, not
+subtyping (`dsl/ir`'s `Relation` holds a resolved target pointer, not a
+supertype); and `ir.TypeRef` is a reference union (exactly one of entity /
+message), not a subtype bound. There is no supertype or subtype to report,
+so the server answers no type-hierarchy capability rather than inventing one.
 
 ### Position encoding
 

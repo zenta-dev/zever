@@ -200,6 +200,7 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			DocumentSymbolProvider:  protocol.Boolean(true),
 			WorkspaceSymbolProvider: protocol.Boolean(true),
 			DefinitionProvider:      protocol.Boolean(true),
+			DeclarationProvider:     protocol.Boolean(true),
 			HoverProvider:           protocol.Boolean(true),
 			// Unlike the providers above, this one is a pointer to an
 			// options struct, not a bool: the trigger characters are part
@@ -497,6 +498,23 @@ func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionPara
 	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
 
 	return definitionAt(schema, file, params.Position), nil
+}
+
+// Declaration is an alias for Definition: every .zen declaration is also
+// its own declaration site (there is no separate header/implementation
+// split), so the declaration of the type named under the cursor is exactly
+// where Definition jumps. A nil result encodes LSP null, same as
+// Definition.
+func (s *Server) Declaration(ctx context.Context, params *protocol.DeclarationParams) (protocol.DeclarationResult, error) {
+	s.captureClient(ctx)
+
+	schema, file := s.schemaAndFile(string(params.TextDocument.URI))
+
+	if loc, ok := definitionAt(schema, file, params.Position).(*protocol.Location); ok && loc != nil {
+		return loc, nil
+	}
+
+	return nil, nil //nolint:nilnil // LSP encodes "nothing jumpable" as a null result, same as Definition
 }
 
 // Hover describes the symbol under the cursor, or nil for no hover.
