@@ -575,7 +575,6 @@ func TestClose_idempotent(t *testing.T) {
 }
 
 func TestOpenRegister_canonicalName(t *testing.T) {
-
 	for _, adapter := range []string{"db"} {
 		poolOpts := dbconn.SplitDSN("")
 		s, err := New(Options{Options: poolOpts})

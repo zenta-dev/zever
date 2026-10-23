@@ -12,7 +12,6 @@ import (
 )
 
 func TestRegisterWiresCDCAdapter(t *testing.T) {
-
 	s, err := New(Options{Options: outbox.Options{
 		DSN:         "postgres://localhost/db",
 		Slot:        "s",

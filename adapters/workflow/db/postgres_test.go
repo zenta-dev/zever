@@ -292,7 +292,6 @@ func TestOptionsValidate(t *testing.T) {
 }
 
 func TestRegisterOpensViaCoreOptions(t *testing.T) {
-
 	// The canonical "db" name must resolve.
 	for _, adapter := range []string{"db"} {
 		wf, err := New(Options{})

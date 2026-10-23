@@ -130,16 +130,16 @@ func awaitSIGTERM(ctx context.Context, t *testing.T) {
 func TestContainer_Shutdown_UnderSIGTERM(t *testing.T) {
 	rec := &shutdownOrder{}
 	c := New(nil,
-		Provide(db.DefaultRef(), func(o db.Options) (db.DB, error) {
+		Provide(db.DefaultRef(), func(_ db.Options) (db.DB, error) {
 			return &sigtermDB{rec: rec}, nil
 		}),
-		Provide(queue.DefaultRef(), func(o queue.Options) (queue.Queue, error) {
+		Provide(queue.DefaultRef(), func(_ queue.Options) (queue.Queue, error) {
 			return &orderQueue{rec: rec}, nil
 		}),
-		Provide(cache.DefaultRef(), func(o cache.Options) (cache.Cache, error) {
+		Provide(cache.DefaultRef(), func(_ cache.Options) (cache.Cache, error) {
 			return &orderCache{rec: rec}, nil
 		}),
-		Provide(scheduler.DefaultRef(), func(o scheduler.Options) (scheduler.Scheduler, error) {
+		Provide(scheduler.DefaultRef(), func(_ scheduler.Options) (scheduler.Scheduler, error) {
 			return &orderScheduler{rec: rec}, nil
 		}),
 	)

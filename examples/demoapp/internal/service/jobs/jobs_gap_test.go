@@ -197,7 +197,6 @@ func TestScheduledJobHandlers(t *testing.T) {
 
 // BenchmarkRunProcessOrder measures the single-row status update.
 func BenchmarkRunProcessOrder(b *testing.B) {
-
 	ctx := b.Context()
 	conn, err := dbsqlite.New(db.Options{Path: filepath.Join(b.TempDir(), "bench.db")})
 	if err != nil {

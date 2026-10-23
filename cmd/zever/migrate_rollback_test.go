@@ -57,7 +57,6 @@ func TestRunDBRollbackRejectsBadCount(t *testing.T) {
 // chain order means the single bootstrap batch rolls back as skips (CREATE
 // TABLE has no inverse) and the database is untouched.
 func TestRunDBRollbackSkipsCreateTable(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
@@ -95,7 +94,6 @@ func TestRunDBRollbackSkipsCreateTable(t *testing.T) {
 // no metadata) is reported and left in place while genuinely reversible rows
 // behind it still roll back.
 func TestRunDBRollbackSkipsLegacyRows(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
@@ -264,7 +262,6 @@ func TestRunDBRollbackUnknownAdapter(t *testing.T) {
 
 // TestOpenRollbackDBFailures pins both the adapter and open error branches.
 func TestOpenRollbackDBFailures(t *testing.T) {
-
 	if _, err := openRollbackDB("oracle", "x"); err == nil {
 		t.Fatal("expected an adapter error, got nil")
 	}
@@ -278,7 +275,6 @@ func TestOpenRollbackDBFailures(t *testing.T) {
 // TestRunDBRollbackEmptyTable proves rolling back with no recorded rows
 // reports zero without error.
 func TestRunDBRollbackEmptyTable(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
@@ -354,7 +350,6 @@ func migrateToV2(t *testing.T, dbPath string) {
 // without executing: newest-first order means the single ADD COLUMN row
 // plans a DROP COLUMN plus its bookkeeping DELETE.
 func TestRunDBRollbackDryRunPlansInverse(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
@@ -384,7 +379,6 @@ func TestRunDBRollbackDryRunPlansInverse(t *testing.T) {
 // drops that column from the live schema and deletes its schema_migrations
 // row, leaving every other column untouched.
 func TestRunDBRollbackReversesLastAddColumn(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
@@ -422,7 +416,6 @@ func TestRunDBRollbackReversesLastAddColumn(t *testing.T) {
 // schema_migrations VIEW shadows the tracking table, so EnsureMigrationsTable
 // passes vacuously while ComputeRollback cannot read rows.
 func TestRunDBRollbackComputeFailure(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
@@ -449,7 +442,6 @@ func TestRunDBRollbackComputeFailure(t *testing.T) {
 // TestRunDBRollbackEnsureFailure pins the bookkeeping error branch: the DSN
 // names a directory, so opening is lazy but the first statement fails.
 func TestRunDBRollbackEnsureFailure(t *testing.T) {
-
 	dir := t.TempDir()
 
 	if err := runDBRollback([]string{"--adapter=sqlite", "--dsn=" + dir}); err == nil {
@@ -460,7 +452,6 @@ func TestRunDBRollbackEnsureFailure(t *testing.T) {
 // TestRunDBRollbackApplyFailure pins the apply error branch: the recorded
 // ADD COLUMN inverse targets a table dropped after migrating.
 func TestRunDBRollbackApplyFailure(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 

@@ -168,17 +168,6 @@ type stubStoreNoSetter struct {
 	outbox.Store
 }
 
-// mustSeed stores value in the container's lazy slot, the only same-package
-// seam the lazy contract exposes. Seeding skips the adapter registry so no real
-// database or broker is opened.
-func mustSeed[T any](t *testing.T, slot *lazy[T], value T) {
-	t.Helper()
-
-	if _, err := slot.get(func() (T, error) { return value, nil }); err != nil {
-		t.Fatalf("seeding lazy slot failed: %v", err)
-	}
-}
-
 // closeRelayContainer shuts the container down with a live context.
 // closeContainer passes t.Context(), which the testing package cancels before
 // cleanups run, so every close would race the timeout branch and report a
@@ -222,21 +211,21 @@ func relayContainer(t *testing.T, publisher string, providers ...Provider) *Cont
 
 // provideOutbox wires store as the default outbox provider.
 func provideOutbox(store outbox.Store) Provider {
-	return Provide(outbox.DefaultRef(), func(o outbox.Options) (outbox.Store, error) {
+	return Provide(outbox.DefaultRef(), func(_ outbox.Options) (outbox.Store, error) {
 		return store, nil
 	})
 }
 
 // provideQueue wires q as the default queue provider.
 func provideQueue(q queue.Queue) Provider {
-	return Provide(queue.DefaultRef(), func(o queue.Options) (queue.Queue, error) {
+	return Provide(queue.DefaultRef(), func(_ queue.Options) (queue.Queue, error) {
 		return q, nil
 	})
 }
 
 // provideBus wires bus as the default eventbus provider.
 func provideBus(bus eventbus.EventBus) Provider {
-	return Provide(eventbus.DefaultRef(), func(o eventbus.Options) (eventbus.EventBus, error) {
+	return Provide(eventbus.DefaultRef(), func(_ eventbus.Options) (eventbus.EventBus, error) {
 		return bus, nil
 	})
 }

@@ -24,15 +24,6 @@ import (
 // errFakeUnimplemented marks fakeCtx methods that tests never invoke.
 var errFakeUnimplemented = errors.New("fakeCtx: unimplemented")
 
-// registerTestAdapters is a no-op in the provider-only container: backends
-// are wired explicitly with container.Provide, never through global
-// adapter registries. It is kept so older call sites keep compiling.
-var registerAdaptersOnce sync.Once
-
-func registerTestAdapters() {
-	registerAdaptersOnce.Do(func() {})
-}
-
 // fakeCtx implements cache.Cache and db.DB through a shared Close(ctx).
 // One pointer can back two lazy fields, which exercises pointer dedup.
 type fakeCtx struct {

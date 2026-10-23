@@ -15,7 +15,6 @@ import (
 
 // TestRunIsIdempotent runs the seeder twice and checks counts stay stable.
 func TestRunIsIdempotent(t *testing.T) {
-
 	cfg := config.Default()
 	cfg.DB.Options.Path = filepath.Join(t.TempDir(), "test.db")
 	c := container.New(cfg, testsetup.Providers(cfg)...)

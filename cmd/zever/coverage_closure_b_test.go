@@ -181,7 +181,6 @@ func TestCoverMigrateDialectHint(t *testing.T) {
 // plan AND the engine warnings without applying anything (sqlite type
 // change: detected, warned, skipped).
 func TestCoverDryRunDiffWarns(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 	v1Path := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
@@ -265,7 +264,6 @@ func poisonedCompileResult(t *testing.T, dir string) *compile.Result {
 // coverPlanErrors pins both Plan failure returns (dry-run and apply) with a
 // database that opens fine but whose plan the engine refuses.
 func TestCoverPlanErrors(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 	result := poisonedCompileResult(t, dir)
@@ -283,7 +281,6 @@ func TestCoverPlanErrors(t *testing.T) {
 // (CREATE TABLE IF NOT EXISTS is a no-op; PRAGMA sees every column) while
 // the bookkeeping read fails.
 func TestCoverApplyDiffApplyError(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 	schemaPath := writeZeverFixture(t, dir, "schema.zen", migrateSchema)
@@ -301,7 +298,6 @@ func TestCoverApplyDiffApplyError(t *testing.T) {
 // error instead of misreading the ledger. (The failure lands in
 // EnsureMigrationsTable's introspection: PRAGMA executes the view body.)
 func TestCoverRollbackViewLedgerError(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
@@ -317,7 +313,6 @@ func TestCoverRollbackViewLedgerError(t *testing.T) {
 // everything recorded (newest first), skipping CREATE TABLE rows with
 // warnings.
 func TestCoverRollbackOverCount(t *testing.T) {
-
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "migrate.db")
 
