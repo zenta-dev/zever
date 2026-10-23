@@ -13,12 +13,12 @@ below.
 
 ## Precedence
 
-1. **Default** — `Default()` returns zero-infrastructure adapters (memory,
-   local, sqlite, log, noop, ...; a few batteries default to the `db`
-   adapter instead, e.g. `outbox`, `search`, `vectorstore`) so tests run
-   without manual setup. The
-   only dev secret is the crypto key, which `Validate` requires; it is
-   deterministic and must never ship to production.
+1. **Default** — `Default()` returns options-only zero-infrastructure
+   values so tests run without manual setup. Backend selection is
+   compile-time (adapters are wired in `wiring.go` with
+   `container.Provide`), never environment: `Default()` carries no
+   adapter names. The only dev secret is the crypto key, which `Validate`
+   requires; it is deterministic and must never ship to production.
 2. **Env** — `FromEnv()` reads `.env`, then `.env.local` (both optional),
    then overlays the real process environment, and `Resolve(env)` applies
    the merged map over the defaults and validates fail-closed. `LoadEnv`
@@ -28,54 +28,52 @@ below.
 
 ## Service table
 
-| Service       | Adapters                            |
-|---------------|-------------------------------------|
-| ai            | anthropic, openai, gemini, ollama    |
-| analytics     | log, posthog                        |
-| auth          | jwt, session, oidc                  |
-| billing       | stub, stripe, paddle                |
-| cache         | memory, redis, db                   |
-| cdn           | noop, cloudflare                    |
-| crypto        | local, kms                          |
-| db            | sqlite, postgres                    |
-| document      | local, remote, latex                |
-| eventbus      | memory, redis                       |
-| flag          | static, firebase                    |
-| geo           | google, static, osm                 |
-| i18n          | embed, remote                       |
-| idempotency   | memory, redis, db              |
-| lock          | memory, redis                       |
-| log           | noop, zerolog, slog, pretty         |
-| mailer        | log, smtp                           |
-| media         | local, s3                           |
-| notification  | log, twilio, fcm                    |
-| observability | noop, stdout, otlp                  |
-| outbox        | memory, db, cdc                     |
-| password      | argon2id                            |
-| payment       | stub, stripe, paddle                |
-| permission    | noop, rbac, casbin                  |
-| queue         | memory, redis, db                   |
-| ratelimit     | memory, redis                       |
-| resilience    | memory, redis                       |
-| router        | fiber, stdhttp                      |
-| scheduler     | embedded, postgres                  |
-| search        | db, meilisearch                    |
-| secrets       | env, vault                          |
-| session       | memory, redis, db                   |
-| storage       | local, s3, r2                       |
-| tenant        | single, header                      |
-| vectorstore   | db, qdrant                         |
-| webhook       | http, queue                         |
-| workflow      | memory, db                         |
+| Service       |
+|---------------|
+| ai            |
+| analytics     |
+| auth          |
+| billing       |
+| cache         |
+| cdn           |
+| crypto        |
+| db            |
+| document      |
+| eventbus      |
+| flag          |
+| geo           |
+| i18n          |
+| idempotency   |
+| lock          |
+| log           |
+| mailer        |
+| media         |
+| notification  |
+| observability |
+| outbox        |
+| password      |
+| payment       |
+| permission    |
+| queue         |
+| ratelimit     |
+| resilience    |
+| router        |
+| scheduler     |
+| search        |
+| secrets       |
+| session       |
+| storage       |
+| tenant        |
+| vectorstore   |
+| webhook       |
+| workflow      |
 
-Two shipped adapters have no registry/config default: `session/cookie`
-and `media/ffmpeg` exist as adapter packages but are absent from the
-default adapter matrix above (and from `config.Default()`).
+Every service above carries options only; backend selection is
+compile-time (adapters are wired in `wiring.go` with
+`container.Provide`), never environment.
 
-Defaults pick the zero-infra adapter per service (ai has none — all backends
-need keys — so it defaults to `anthropic` and requires an API key via
-env; mailer defaults to `log` with a dummy localhost SMTP host/port
-because its `Validate` requires them; secrets defaults to `env` with a
+Defaults pick zero-infra option values (mailer carries a dummy localhost
+SMTP host/port because its `Validate` requires them; secrets carries a
 `ZEVER` prefix because its `Validate` requires a non-empty prefix — that
 prefix scopes the secret *names* the secrets service exposes, not service
 configuration itself).
@@ -85,7 +83,6 @@ configuration itself).
 `<SERVICE>_<FIELD>=value`, uppercased, no prefix:
 
 ```sh
-DB_ADAPTER=postgres
 DB_MAX_CONNS=20
 DB_MAX_CONN_LIFETIME=5m
 AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
@@ -99,8 +96,9 @@ nesting level is supported (`AUTH_JWT_SECRET` sets `Options.JWT.Secret`).
 The split point is resolved by matching, not by counting underscores, so a
 segment that carries an `_` of its own works too
 (`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`). Durations
-take `"5s"` style strings. `_ADAPTER` sets the service adapter (validated
-later by `Validate`, not at assignment).
+take `"5s"` style strings. Any `*_ADAPTER` key is rejected: adapter
+selection is compile-time wiring (`wiring.go` with `container.Provide`),
+so there is nothing for the environment to select.
 
 Named instances add a middle segment: `DB__REPORTING__DSN` sets the DSN of
 the `reporting` db instance. Instance names normalize case-insensitively;
@@ -158,8 +156,8 @@ secrets) share one stdlib-only format:
 
 ```sh
 # comment lines and blank lines are skipped
-export DB_ADAPTER=postgres   # `export` prefix allowed
-DB_MAX_CONNS=20              # unquoted; ` #` starts a comment
+export DB_MAX_CONNS=20       # `export` prefix allowed
+DB_DSN=postgres://app:secret@db:5432/app  # unquoted; ` #` starts a comment
 AUTH_JWT_SECRET='a#b ${NO}'  # single quotes: literal, no expansion
 DB_DSN="postgres://app:${DB_PASSWORD}@db:5432/app"  # double quotes: escapes + ${VAR}
 HOOK='$(not-executed)'       # $(...) and backticks are literal text
@@ -184,16 +182,13 @@ their `db`/`postgres` adapters (empty still means a private in-memory
 database).
 
 ```sh
-SEARCH_ADAPTER=db
 SEARCH_DSN="postgres://app:secret@db:5432/app?sslmode=require"
 SEARCH_DEDICATED_POOL=false   # default false shares; true opens a private pool
 ```
 
-`db` is the canonical DB-backed name for `search`, `vectorstore`, and
-`workflow` (empty DSN selects the embedded sqlite backend, a postgres URL
-selects postgres). It is the only name they have: the per-backend names
-(`postgres`, `sqlite`, `pgvector`) were removed with the legacy config
-file format and no longer resolve.
+Which backend opens each battery is compile-time wiring; the environment
+only tunes options. An empty DSN selects the embedded sqlite backend, a
+postgres URL selects postgres.
 
 - Matching is the exact DSN string after trim (a URL with and without a
   query string are different pools); sqlite shares by cleaned file path and
@@ -294,13 +289,13 @@ log:
 
 ```sh
 # after: .env
-DB_ADAPTER=postgres
 DB_DSN=postgres://app:secret@db:5432/app
 DB_MAX_CONNS=20
-LOG_ADAPTER=slog
 ```
 
-Rules: `adapter:` becomes `<SERVICE>_ADAPTER`; each `options:` key becomes
+Rules: `adapter:` is now compile-time wiring (`wiring.go` with
+`container.Provide`) and has no env form — any `*_ADAPTER` key fails;
+each `options:` key becomes
 `<SERVICE>_<KEY>` uppercased (`max_conns` → `DB_MAX_CONNS`); one nesting
 level flattens with a single `_` (`jwt: {secret: ...}` under auth →
 `AUTH_JWT_SECRET`); the `project:` table moves key by key to the six

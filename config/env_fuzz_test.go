@@ -41,7 +41,7 @@ func FuzzSetOptionField(f *testing.F) {
 		}
 
 		cfg := Default()
-		_, opts, ok := serviceRefs(cfg, "db")
+		opts, ok := serviceRefs(cfg, "db")
 		if !ok {
 			t.Fatal("serviceRefs(db) missing")
 		}

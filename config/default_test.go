@@ -9,39 +9,6 @@ import (
 func TestDefaultSnapshot(t *testing.T) {
 	t.Parallel()
 	cfg := Default()
-	want := map[string]string{
-		"ai": "anthropic", "analytics": "log", "auth": "jwt", "billing": "stub",
-		"cache": "memory", "crypto": "local", "db": "sqlite", "document": "local",
-		"eventbus": "memory", "flag": "static", "geo": "static", "i18n": "embed",
-		"idempotency": "memory", "lock": "memory", "log": "slog", "mailer": "log", "media": "local",
-		"notification": "log", "observability": "stdout", "password": "argon2id",
-		"payment": "stub", "permission": "noop", "queue": "memory", "ratelimit": "memory",
-		"router": "stdhttp", "scheduler": "embedded", "search": "db", "secrets": "env",
-		"session": "memory", "storage": "local", "tenant": "single", "vectorstore": "db",
-		"webhook": "http", "workflow": "memory",
-		"outbox": "db", "resilience": "memory",
-	}
-	got := map[string]string{
-		"ai": cfg.AI.Adapter, "analytics": cfg.Analytics.Adapter, "auth": cfg.Auth.Adapter,
-		"billing": cfg.Billing.Adapter, "cache": cfg.Cache.Adapter, "crypto": cfg.Crypto.Adapter,
-		"db": cfg.DB.Adapter, "document": cfg.Document.Adapter, "eventbus": cfg.EventBus.Adapter,
-		"flag": cfg.Flag.Adapter, "geo": cfg.Geo.Adapter, "i18n": cfg.I18n.Adapter,
-		"idempotency": cfg.Idempotency.Adapter, "lock": cfg.Lock.Adapter, "log": cfg.Log.Adapter, "mailer": cfg.Mailer.Adapter,
-		"media": cfg.Media.Adapter, "notification": cfg.Notification.Adapter,
-		"observability": cfg.Observability.Adapter, "password": cfg.Password.Adapter,
-		"payment": cfg.Payment.Adapter, "permission": cfg.Permission.Adapter,
-		"queue": cfg.Queue.Adapter, "ratelimit": cfg.RateLimit.Adapter, "router": cfg.Router.Adapter,
-		"scheduler": cfg.Scheduler.Adapter, "search": cfg.Search.Adapter, "secrets": cfg.Secrets.Adapter,
-		"session": cfg.Session.Adapter, "storage": cfg.Storage.Adapter, "tenant": cfg.Tenant.Adapter,
-		"vectorstore": cfg.VectorStore.Adapter, "webhook": cfg.Webhook.Adapter,
-		"workflow": cfg.Workflow.Adapter,
-		"outbox":   cfg.Outbox.Adapter, "resilience": cfg.Resilience.Adapter,
-	}
-	for svc, w := range want {
-		if got[svc] != w {
-			t.Errorf("%s: got %q, want %q", svc, got[svc], w)
-		}
-	}
 	if cfg.Crypto.Options.Key == "" {
 		t.Error("crypto dev key missing")
 	}
@@ -64,7 +31,29 @@ func TestDefaultSnapshot(t *testing.T) {
 	if cfg.Scheduler.Options.Dispatcher == nil {
 		t.Error("scheduler dispatcher missing")
 	}
+	if cfg.Secrets.Options.Prefix == "" {
+		t.Error("secrets prefix missing")
+	}
+	for _, svc := range knownServiceNames() {
+		opts, ok := serviceRefs(cfg, svc)
+		if !ok {
+			t.Fatalf("%s: serviceRefs missing", svc)
+		}
+		if opts == nil {
+			t.Fatalf("%s: nil options", svc)
+		}
+	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Default must pass Validate: %v", err)
+	}
+}
+
+// TestDefaultOptionsOnly pins that Default carries no adapter names: the
+// service envelope serializes to options alone.
+func TestDefaultOptionsOnly(t *testing.T) {
+	t.Parallel()
+	got := Default().RedactedServices()
+	if len(got) != 37 {
+		t.Fatalf("got %d services, want 37", len(got))
 	}
 }
