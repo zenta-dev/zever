@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +22,7 @@ import (
 	"github.com/zenta-dev/zever/adapters/log/noop"
 	"github.com/zenta-dev/zever/core/log"
 	"github.com/zenta-dev/zever/core/storage"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // validateBucketKey is storage.ValidateBucketKey plus the keys reserved for
@@ -942,7 +942,7 @@ func writeMetaTemp(dir, declaredType string, mode os.FileMode) string {
 
 	// Best effort (see writeBodyTemp): higher layers fall back to extension
 	// sniffing when the sidecar is absent or corrupt.
-	b, _ := json.Marshal(objectMeta{ContentType: declaredType}) // struct{string}: infallible
+	b, _ := codec.Marshal(objectMeta{ContentType: declaredType}) // struct{string}: infallible
 	_, _ = mt.Write(b)
 	_ = mt.Chmod(mode)
 	_ = mt.Close()
@@ -1097,7 +1097,7 @@ func contentTypeFor(full string) string {
 		b, err := io.ReadAll(io.LimitReader(f, 8192))
 		if err == nil {
 			var meta objectMeta
-			if json.Unmarshal(b, &meta) == nil && meta.ContentType != "" && !isScriptable(meta.ContentType) && allowedContentType(meta.ContentType) {
+			if codec.Unmarshal(b, &meta) == nil && meta.ContentType != "" && !isScriptable(meta.ContentType) && allowedContentType(meta.ContentType) {
 				return meta.ContentType
 			}
 		}

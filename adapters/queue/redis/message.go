@@ -3,9 +3,8 @@ package redis
 import (
 	"bytes"
 
-	"encoding/json/v2"
-
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 type wireMessage struct {
@@ -35,7 +34,7 @@ func (h *wireHeaders) UnmarshalJSON(data []byte) error {
 	}
 
 	var m map[string]string
-	if err := json.Unmarshal(trimmed, &m); err != nil {
+	if err := codec.Unmarshal(trimmed, &m); err != nil {
 		return err
 	}
 

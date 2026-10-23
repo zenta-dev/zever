@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"io"
 	"testing"
@@ -151,7 +150,7 @@ func (f *fakeClient) ScriptLoad(ctx context.Context, _ string) *goredis.StringCm
 func TestRedisCover_MarshalError(t *testing.T) {
 	origMarshal := jsonMarshal
 	defer func() { jsonMarshal = origMarshal }()
-	jsonMarshal = func(_ any, _ ...json.Options) ([]byte, error) {
+	jsonMarshal = func(_ any) ([]byte, error) {
 		return nil, errors.New("marshal boom")
 	}
 	a := &redisAdapter{client: &fakeClient{}}
@@ -166,7 +165,7 @@ func TestRedisCover_MarshalError(t *testing.T) {
 	}
 	// cover blockingClaim marshal
 	a2 := &redisAdapter{client: &fakeClient{blPopVal: []string{"k", `{"id":"` + queue.NewMessage("t", nil, nil).ID.String() + `","payload":null,"headers":null,"attempt":1}`}}}
-	jsonMarshal = func(_ any, _ ...json.Options) ([]byte, error) {
+	jsonMarshal = func(_ any) ([]byte, error) {
 		return nil, errors.New("marshal boom2")
 	}
 	_, _, err := a2.blockingClaim(t.Context(), "rk", "pk", "dk", "123", time.NewTimer(time.Second), time.Second)
@@ -178,7 +177,7 @@ func TestRedisCover_MarshalError(t *testing.T) {
 func TestRedisCover_UnmarshalError(t *testing.T) {
 	origUnmarshal := jsonUnmarshal
 	defer func() { jsonUnmarshal = origUnmarshal }()
-	jsonUnmarshal = func(_ []byte, _ any, _ ...json.Options) error {
+	jsonUnmarshal = func(_ []byte, _ any) error {
 		return errors.New("unmarshal boom")
 	}
 	_, err := decodeMessage(`{"id":"`+queue.NewMessage("t", nil, nil).ID.String()+`","payload":null}`, "t")
