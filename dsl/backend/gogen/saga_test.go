@@ -212,3 +212,59 @@ func parseSchemaFile(t *testing.T, name, src string) *ast.File {
 
 	return file
 }
+
+// TestGenerateSagaJSONFieldsUseJSONText proves saga input/output structs
+// render json/ref fields as jsontext.Value (the encoding/json/v2 opaque
+// payload type) rather than encoding/json's RawMessage, importing
+// encoding/json/jsontext.
+func TestGenerateSagaJSONFieldsUseJSONText(t *testing.T) {
+	t.Parallel()
+
+	schema := mustResolve(t, `entity Item {
+	id: uuid @primary
+	data: json
+}
+
+service InventoryService {
+	rpc Store(item_id: uuid, data: json) -> Item {
+		auth: required
+	}
+}
+
+saga StoreSaga {
+	step store {
+		execute: InventoryService.Store
+	}
+}`)
+
+	out, err := New().Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	got, ok := out["app/saga.go"]
+	if !ok {
+		t.Fatalf("Generate missing app/saga.go; keys = %v", keysOf(out))
+	}
+
+	src := string(got)
+
+	for _, want := range []string{
+		`"encoding/json/jsontext"`,
+		"Data jsontext.Value `json:\"data\"`",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated saga.go missing %q\n--- got ---\n%s", want, src)
+		}
+	}
+
+	for _, banned := range []string{"json.RawMessage", `"encoding/json"`} {
+		if strings.Contains(src, banned) {
+			t.Errorf("generated saga.go must not contain %q\n--- got ---\n%s", banned, src)
+		}
+	}
+
+	if _, err := parser.ParseFile(token.NewFileSet(), "app/saga.go", got, parser.SkipObjectResolution); err != nil {
+		t.Errorf("generated app/saga.go does not parse: %v", err)
+	}
+}

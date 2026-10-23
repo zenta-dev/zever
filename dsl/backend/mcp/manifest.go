@@ -12,7 +12,7 @@ type toolManifest struct {
 	Description  string         `json:"description,omitempty"`
 	InputSchema  map[string]any `json:"inputSchema"`
 	OutputSchema map[string]any `json:"outputSchema,omitempty"`
-	Paginated    bool           `json:"paginated,omitempty"`
+	Paginated    bool           `json:"paginated,omitzero"`
 }
 
 // serviceManifest groups one service's tools with the shared definitions

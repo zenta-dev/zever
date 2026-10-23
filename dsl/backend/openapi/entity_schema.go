@@ -1,11 +1,11 @@
 package openapi
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // JSONSchemaForEntity renders one named entity as a self-contained JSON
@@ -50,13 +50,13 @@ func JSONSchemaForEntity(s *ir.Schema, module, name string) (map[string]any, err
 	defs := make(map[string]any, len(d.doc.Components.Schemas))
 
 	for cname, cs := range d.doc.Components.Schemas {
-		raw, err := json.Marshal(cs)
+		raw, err := codec.Marshal(cs)
 		if err != nil {
 			return nil, err
 		}
 
 		var m map[string]any
-		if err := json.Unmarshal(raw, &m); err != nil {
+		if err := codec.Unmarshal(raw, &m); err != nil {
 			return nil, err
 		}
 

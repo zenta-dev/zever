@@ -1,14 +1,14 @@
 package mcp
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"go/format"
 	"go/parser"
 	"go/token"
 	"sort"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // renderServerModule renders a runnable MCP stdio server (package main) for
@@ -29,10 +29,12 @@ func renderServerModule(services []serviceManifest) ([]byte, error) {
 	b.WriteString("package main\n\n")
 	b.WriteString("import (\n")
 	b.WriteString("\t\"context\"\n")
-	b.WriteString("\t\"encoding/json\"\n")
+	b.WriteString("\t\"encoding/json/jsontext\"\n")
 	b.WriteString("\t\"fmt\"\n")
 	b.WriteString("\t\"io\"\n")
 	b.WriteString("\t\"os\"\n")
+	b.WriteString("\n")
+	b.WriteString("\t\"github.com/zenta-dev/zever/shared/codec\"\n")
 	b.WriteString(")\n\n")
 
 	fmt.Fprintf(&b, "const manifestJSON = %q\n\n", manifest)
@@ -66,18 +68,17 @@ func renderServerModule(services []serviceManifest) ([]byte, error) {
 	return formatted, nil
 }
 
-// marshalServices encodes services as compact JSON for embedding.
+// marshalServices encodes services as compact JSON for embedding, routed
+// through shared/codec so the generator and the emitted server agree on one
+// JSON dialect. encoding/json/v2 leaves HTML unescaped by default, so no
+// SetEscapeHTML counterpart is needed.
 func marshalServices(services []serviceManifest) (string, error) {
-	var buf bytes.Buffer
-
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-
-	if err := enc.Encode(services); err != nil {
+	data, err := codec.Marshal(services)
+	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(buf.String()), nil
+	return strings.TrimSpace(string(data)), nil
 }
 
 // goIdent sanitizes s into a valid Go identifier fragment by replacing
@@ -111,19 +112,21 @@ func collectToolNames(services []serviceManifest) []string {
 
 // serverLoopSource is the fixed stdio JSON-RPC dispatch loop emitted into
 // every generated server. Tool schemas come from manifestJSON; execution
-// delegates to mcpHandlers.
+// delegates to mcpHandlers. JSON goes through shared/codec (encoding/json/v2
+// dialect): opaque payloads are jsontext.Value, streaming decode/encode use
+// a jsontext.Decoder with codec.UnmarshalDecode and codec.MarshalLine.
 const serverLoopSource = `type rpcRequest struct {
-	JSONRPC string          ` + "`json:\"jsonrpc\"`" + `
-	ID      json.RawMessage ` + "`json:\"id,omitempty\"`" + `
-	Method  string          ` + "`json:\"method\"`" + `
-	Params  json.RawMessage ` + "`json:\"params,omitempty\"`" + `
+	JSONRPC string         ` + "`json:\"jsonrpc\"`" + `
+	ID      jsontext.Value ` + "`json:\"id,omitempty\"`" + `
+	Method  string         ` + "`json:\"method\"`" + `
+	Params  jsontext.Value ` + "`json:\"params,omitempty\"`" + `
 }
 
 type rpcResponse struct {
-	JSONRPC string          ` + "`json:\"jsonrpc\"`" + `
-	ID      json.RawMessage ` + "`json:\"id,omitempty\"`" + `
-	Result  any             ` + "`json:\"result,omitempty\"`" + `
-	Error   *rpcError       ` + "`json:\"error,omitempty\"`" + `
+	JSONRPC string         ` + "`json:\"jsonrpc\"`" + `
+	ID      jsontext.Value ` + "`json:\"id,omitempty\"`" + `
+	Result  any            ` + "`json:\"result,omitempty\"`" + `
+	Error   *rpcError      ` + "`json:\"error,omitempty\"`" + `
 }
 
 type rpcError struct {
@@ -138,7 +141,7 @@ type textContent struct {
 
 type callToolResult struct {
 	Content []textContent ` + "`json:\"content\"`" + `
-	IsError bool          ` + "`json:\"isError,omitempty\"`" + `
+	IsError bool          ` + "`json:\"isError,omitzero\"`" + `
 }
 
 type callParams struct {
@@ -162,7 +165,7 @@ type manifestService struct {
 
 func loadManifest() ([]manifestService, error) {
 	var services []manifestService
-	if err := json.Unmarshal([]byte(manifestJSON), &services); err != nil {
+	if err := codec.Unmarshal([]byte(manifestJSON), &services); err != nil {
 		return nil, err
 	}
 	return services, nil
@@ -181,16 +184,15 @@ func run(ctx context.Context, in io.Reader, out io.Writer) error {
 		return err
 	}
 
-	dec := json.NewDecoder(in)
-	enc := json.NewEncoder(out)
+	dec := jsontext.NewDecoder(in)
 
 	for {
 		var req rpcRequest
-		if err := dec.Decode(&req); err != nil {
+		if err := codec.UnmarshalDecode(dec, &req); err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			if err := enc.Encode(rpcResponse{JSONRPC: "2.0", Error: &rpcError{Code: -32700, Message: "parse error"}}); err != nil {
+			if err := codec.MarshalLine(out, rpcResponse{JSONRPC: "2.0", Error: &rpcError{Code: -32700, Message: "parse error"}}); err != nil {
 				return err
 			}
 			continue
@@ -200,7 +202,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer) error {
 			continue
 		}
 
-		if err := enc.Encode(handle(ctx, req, services)); err != nil {
+		if err := codec.MarshalLine(out, handle(ctx, req, services)); err != nil {
 			return err
 		}
 	}
@@ -237,7 +239,7 @@ func handle(ctx context.Context, req rpcRequest, services []manifestService) rpc
 
 func callTool(ctx context.Context, req rpcRequest) rpcResponse {
 	var p callParams
-	if err := json.Unmarshal(req.Params, &p); err != nil {
+	if err := codec.Unmarshal(req.Params, &p); err != nil {
 		return rpcResponse{JSONRPC: "2.0", ID: req.ID, Error: &rpcError{Code: -32602, Message: "invalid tools/call params"}}
 	}
 

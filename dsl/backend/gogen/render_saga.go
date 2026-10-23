@@ -117,7 +117,7 @@ func sagaRoleTypeNames(r sagaStepRole) (in, out, method string) {
 // in declaration order. The input carries one field per RPC param; the
 // output mirrors the RPC's returned entity/message fields (or a page shape
 // for a paginated RPC). Field types are plain standard-library Go types, so
-// values cross step boundaries through encoding/json without loss.
+// values cross step boundaries as JSON without loss.
 func renderSagaStructs(b *strings.Builder, m *ir.Module, imports map[string]bool) {
 	for _, r := range sagaRoles(m) {
 		in, out, _ := sagaRoleTypeNames(r)
@@ -199,15 +199,15 @@ func sagaReturnFields(ref *ir.TypeRef) []*ir.Field {
 // sagaFieldType maps one schema field to the plain standard-library Go type
 // the generated saga structs use. Named enums bind as strings (their value
 // set, not a shared enum type, which would need a cross-package import);
-// entity/message references bind as json.RawMessage (an opaque JSON
+// entity/message references bind as jsontext.Value (an opaque JSON
 // payload); timestamps bind as time.Time. imports gains "time" or
-// "encoding/json" when the mapping needs it. Optional scalars bind as
+// "encoding/json/jsontext" when the mapping needs it. Optional scalars bind as
 // pointers so absence survives the JSON round-trip between steps.
 func sagaFieldType(f *ir.Field, imports map[string]bool) string {
 	if f.Ref != nil {
-		imports[importJSON] = true
+		imports[importJSONText] = true
 
-		return "json.RawMessage"
+		return "jsontext.Value"
 	}
 
 	var base string
@@ -231,15 +231,15 @@ func sagaFieldType(f *ir.Field, imports map[string]bool) string {
 	case ir.TBytes:
 		base = "[]byte"
 	case ir.TJSON:
-		imports[importJSON] = true
-		base = "json.RawMessage"
+		imports[importJSONText] = true
+		base = "jsontext.Value"
 	default:
 		base = "string"
 	}
 
 	if f.Optional {
 		switch base {
-		case "[]byte", "json.RawMessage":
+		case "[]byte", "jsontext.Value":
 		default:
 			return "*" + base
 		}

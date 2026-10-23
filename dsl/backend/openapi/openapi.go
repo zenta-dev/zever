@@ -5,18 +5,18 @@
 package openapi
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/zenta-dev/zever/dsl/ir"
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
-// jsonMarshalIndent is a test seam wrapping encoding/json.MarshalIndent so
+// jsonMarshalIndent is a test seam wrapping codec.MarshalIndent so
 // tests can inject a marshal failure: openAPIDoc holds only JSON-safe
 // stdlib types (strings, maps, slices, pointers; no MarshalJSON methods or
 // interface fields), so the error branches below are unreachable via the
 // public API with real inputs.
-var jsonMarshalIndent = json.MarshalIndent
+var jsonMarshalIndent = codec.MarshalIndent
 
 // Backend renders a resolved schema to OpenAPI 3.0.3 JSON documents.
 type Backend struct{}
@@ -51,7 +51,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 			return nil, err
 		}
 
-		content, err := jsonMarshalIndent(moduleDoc.doc, "", "  ")
+		content, err := jsonMarshalIndent(moduleDoc.doc, "  ")
 		if err != nil {
 			return nil, fmt.Errorf("openapi: marshal %s spec: %w", moduleLabel(m), err)
 		}
@@ -63,7 +63,7 @@ func (b *Backend) Generate(schema *ir.Schema) (map[string][]byte, error) {
 		}
 	}
 
-	mergedContent, err := jsonMarshalIndent(merged.doc, "", "  ")
+	mergedContent, err := jsonMarshalIndent(merged.doc, "  ")
 	if err != nil {
 		return nil, fmt.Errorf("openapi: marshal merged spec: %w", err)
 	}

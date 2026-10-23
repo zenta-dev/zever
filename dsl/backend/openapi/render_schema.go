@@ -17,7 +17,7 @@ type schemaObject struct {
 	Enum       []string                 `json:"enum,omitempty"`
 	Properties map[string]*schemaObject `json:"properties,omitempty"`
 	Required   []string                 `json:"required,omitempty"`
-	Nullable   bool                     `json:"nullable,omitempty"`
+	Nullable   bool                     `json:"nullable,omitzero"`
 	// Items is the array-item schema, set only when Type == "array" (used to
 	// render a paginated operation's "items" property as an array of the
 	// page's entity schema).
@@ -32,8 +32,8 @@ type schemaObject struct {
 	// 3.0.3 -- see the package doc).
 	Minimum          *float64 `json:"minimum,omitempty"`
 	Maximum          *float64 `json:"maximum,omitempty"`
-	ExclusiveMinimum bool     `json:"exclusiveMinimum,omitempty"`
-	ExclusiveMaximum bool     `json:"exclusiveMaximum,omitempty"`
+	ExclusiveMinimum bool     `json:"exclusiveMinimum,omitzero"`
+	ExclusiveMaximum bool     `json:"exclusiveMaximum,omitzero"`
 }
 
 // applyValidation overlays field's @validate rules onto schema as the

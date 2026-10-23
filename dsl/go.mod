@@ -6,6 +6,7 @@ require (
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/google/uuid v1.6.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/zenta-dev/zever/shared/codec v0.8.0
 	google.golang.org/protobuf v1.36.12
 )
 
