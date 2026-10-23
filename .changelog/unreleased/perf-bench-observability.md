@@ -1,0 +1,14 @@
+- feat(serve): add benchmarks for middleware fold, maxBodyHandler, mergeGRPCPolicies
+- feat(core/cdn): add benchmarks for Open, Purge (URLs/Tags/All), Close, RegisteredAdapters
+- feat(core/eval): add benchmarks for ExactScorer, ContainsScorer, ClampScore, RunSuite
+- feat(shared/mcpclient): add benchmarks for New, Encode/Decode, DispatchRequest, DialStdioRetry logic
+- feat(shared/prompt): add benchmarks for all prompt builders (SystemPrompt, GroundContext, JSONRepair, etc.)
+- feat(shared/ref): add benchmarks for Default, Named, WithName, String, RefAsMapKey, RefEquality
+- feat(tools/apidiff): add benchmarks for GoModPath, IsInternalPackage, SameVersion, Backticked, EntryCovers, SectionHeaders, PendingHeaders, BreakingEntries
+- feat(tools/tagcheck): add benchmarks for LoadGolden, LoadGoldenFields, LoadExceptions, LoadAllowlist, EachDataLine, SkipDir, CheckLegacyConfigNames, WireFieldState/Key, StructTagLookup, CheckConfigParserImports
+- feat(tools/vulngate): add benchmarks for ParseFindings, ParseAllowlist, Evaluate, ValidDate, JSONUnmarshal, SortExpired
+- feat(dsl/gengrammar): add benchmarks for Keywords, ScalarTypes, VimSyntax, TmLanguage, Files, string joins, sprintf
+- feat(dsl/backend/mcp): add benchmarks for RenderService, RenderOperation, ParamSchema, FieldSchema, TypeRefSchema, EntitySchema, MessageSchema, Qualify, ScalarJSONType, ModuleLabel, OwnerModule
+- feat(adapters/cdn/noop): add benchmarks for New, Purge (URLs/Tags/All/Empty/Single), Close, Name, parallel purge
+- build: add `make bench-baseline` (count=10 run into .bench/baseline.txt) and `make bench-ab BASELINE=...` (benchstat compare)
+- ci: extend .github/workflows/bench.yml to rotating daily module-group schedule (7 groups, deterministic via day-of-week) with benchstat comparison per group

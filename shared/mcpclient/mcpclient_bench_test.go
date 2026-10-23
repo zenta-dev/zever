@@ -81,9 +81,9 @@ func BenchmarkDispatchRequest(b *testing.B) {
 // without actually spawning processes.
 func BenchmarkDialStdioRetry_Logic(b *testing.B) {
 	opts := DialOptions{
-		Attempts:         3,
-		InitialBackoff:   200 * 1000000, // 200ms in ns
-		MaxBackoff:       5 * 1000000000, // 5s in ns
+		Attempts:       3,
+		InitialBackoff: 200 * 1000000,  // 200ms in ns
+		MaxBackoff:     5 * 1000000000, // 5s in ns
 	}
 
 	b.ReportAllocs()

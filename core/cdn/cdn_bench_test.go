@@ -101,5 +101,5 @@ func BenchmarkRegisteredAdapters(b *testing.B) {
 type noopAdapter struct{}
 
 func (n *noopAdapter) Purge(_ context.Context, _ PurgeRequest) error { return nil }
-func (n *noopAdapter) Close(_ context.Context) error                { return nil }
-func (n *noopAdapter) Name() string                                 { return "bench-noop" }
+func (n *noopAdapter) Close(_ context.Context) error                 { return nil }
+func (n *noopAdapter) Name() string                                  { return "bench-noop" }
