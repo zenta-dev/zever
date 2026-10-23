@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"github.com/zenta-dev/zever/dsl/compile"
 	"github.com/zenta-dev/zever/dsl/diag"
 	"github.com/zenta-dev/zever/dsl/ir"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // compileInput is the shared schema source accepted by every tool. Files takes
@@ -24,11 +25,11 @@ type compileInput struct {
 
 // decodeArgs re-encodes a tool argument map into a typed struct.
 func decodeArgs(args map[string]any, out any) error {
-	raw, err := json.Marshal(args)
+	raw, err := codec.Marshal(args)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(raw, out)
+	return codec.Unmarshal(raw, out)
 }
 
 // compileSchema resolves the schema source and compiles it with the OpenAPI
@@ -240,7 +241,7 @@ func schemaTool() toolDef {
 				return "", errors.New(formatDiags(diags))
 			}
 
-			b, err := json.MarshalIndent(summarize(res.Schema), "", "  ")
+			b, err := codec.MarshalIndent(summarize(res.Schema), "  ")
 			if err != nil {
 				return "", err
 			}

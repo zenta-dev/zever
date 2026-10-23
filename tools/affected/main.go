@@ -10,13 +10,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // output is the JSON contract printed to stdout.
@@ -94,12 +95,10 @@ func emit(groups [][]string, reason string, stdout *os.File) int {
 	for _, g := range groups {
 		count += len(g)
 	}
-	line, err := json.Marshal(output{Groups: groups, Reason: reason, Count: count})
-	if err != nil {
+	if err := codec.MarshalLine(stdout, output{Groups: groups, Reason: reason, Count: count}); err != nil {
 		fmt.Fprintf(stdout, `{"groups":[],"reason":%q,"count":0}`+"\n", "fallback")
 		return 0
 	}
-	fmt.Fprintln(stdout, string(line))
 	return 0
 }
 

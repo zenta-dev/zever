@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,6 +19,8 @@ import (
 	"golang.org/x/exp/apidiff"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/zenta-dev/zever/shared/codec"
 )
 
 // coreModules is the Core-tier API surface the gate protects: every module
@@ -228,7 +229,7 @@ func loadBaselineAllowlist(file string) (map[string]baselineEntry, error) {
 	var doc struct {
 		Allowlist []baselineEntry `json:"allowlist"`
 	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
+	if err := codec.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("parse allowlist %s: %w", file, err)
 	}
 	out := make(map[string]baselineEntry, len(doc.Allowlist))

@@ -304,6 +304,7 @@ shared/s3opts	Options	shared/s3opts/s3opts.go
 tools/affected	output	tools/affected/main.go
 tools/apidiff	baselineEntry	tools/apidiff/apidiff.go
 tools/modgraph	modEditJSON	tools/modgraph/modgraph.go
+tools/vulngate	allowEntry	tools/vulngate/vulngate.go
 tools/vulngate	allowFile	tools/vulngate/vulngate.go
 tools/vulngate	findingMsg	tools/vulngate/vulngate.go
 tools/vulngate	frame	tools/vulngate/vulngate.go
