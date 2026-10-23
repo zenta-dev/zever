@@ -901,8 +901,8 @@ shared/mcpclient	request	Method	method	v0.7.2
 shared/mcpclient	request	Params	params	v0.7.2
 shared/mcpclient	rpcErrorWire	Code	code	v0.7.2
 shared/mcpclient	rpcErrorWire	Message	message	v0.7.2
-shared/mcpclient	TextContent	Type	type	501d62f711be
-shared/mcpclient	TextContent	Text	text	501d62f711be
+shared/mcpclient	TextContent	Type	type	535bda668ae0
+shared/mcpclient	TextContent	Text	text	535bda668ae0
 shared/providersopt	Common	SecretKey	secret_key	v0.7.2
 shared/providersopt	Common	APIKey	api_key	v0.7.2
 shared/providersopt	Common	Endpoint	endpoint	v0.7.2
@@ -939,9 +939,9 @@ tools/apidiff	baselineEntry	Module	module	v0.7.2
 tools/apidiff	baselineEntry	Reason	reason	v0.7.2
 tools/apidiff	baselineEntry	Expires	expires	v0.7.2
 tools/modgraph	modEditJSON	Module	Module	v0.7.2
-tools/vulngate	allowEntry	ID	id	7d931eae2040
-tools/vulngate	allowEntry	Reason	reason	7d931eae2040
-tools/vulngate	allowEntry	Expires	expires	7d931eae2040
+tools/vulngate	allowEntry	ID	id	f19e8e8ae4d8
+tools/vulngate	allowEntry	Reason	reason	f19e8e8ae4d8
+tools/vulngate	allowEntry	Expires	expires	f19e8e8ae4d8
 tools/vulngate	allowFile	Allowlist	allowlist	v0.7.2
 tools/vulngate	findingMsg	Finding	finding	v0.7.2
 tools/vulngate	frame	Function	function	v0.7.2
