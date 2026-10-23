@@ -110,8 +110,14 @@ type stopper interface {
 // RelatedInformation the same way: a related entry in the primary file
 // reuses src, otherwise srcFor supplies that file's source, with a point
 // range fallback when the content is unknown.
+//
+// markup selects the 3.18 message shape: when true and the diagnostic
+// carries a code (and its paired CodeDescription), Message is a Markdown
+// MarkupContent of the plain text plus a [`code`](href) doc link; every
+// other case -- unclassified diagnostics, or a client that never advertised
+// markupMessageSupport -- stays a byte-identical plain string.
 func diagToLSPDiagnostic(
-	d *diag.Diagnostic, src string, srcFor func(path string) (string, bool),
+	d *diag.Diagnostic, src string, srcFor func(path string) (string, bool), markup bool,
 ) protocol.Diagnostic {
 	severity := protocol.DiagnosticSeverityError
 	if d.Severity == diag.SeverityWarning {
@@ -150,10 +156,20 @@ func diagToLSPDiagnostic(
 
 	// Only a message matching a known class carries a code (plus its
 	// CodeDescription, which the spec requires to be paired with one);
-	// everything else stays code-less rather than inventing a class.
+	// everything else stays code-less rather than inventing a class. A
+	// markup client additionally gets the Markdown message linking that
+	// code to its documentation; a plain client gets the identical text
+	// the code-less path always sent.
 	if code := diagnosticCode(d.Msg); code != "" {
 		out.Code = protocol.String(code)
 		out.CodeDescription = protocol.CodeDescription{Href: uri.URI(diagDocURL)}
+
+		if markup {
+			out.Message = &protocol.MarkupContent{
+				Kind:  protocol.MarkupKindMarkdown,
+				Value: d.Msg + " ([`" + code + "`](" + diagDocURL + "))",
+			}
+		}
 	}
 
 	return out
@@ -176,6 +192,11 @@ type diagnosticPublisher struct {
 	// re-enter the publisher; the server wires it to an atomic settings load,
 	// which takes no other lock.
 	delayHook func() time.Duration
+	// markupHook reports whether published diagnostics should carry Markdown
+	// messages (see diagToLSPDiagnostic). Nil means plain strings. It runs
+	// while the publish lock is held, so like delayHook it must take no
+	// other lock; the server wires it to an atomic capability load.
+	markupHook func() bool
 }
 
 // newDiagnosticPublisher returns a publisher with empty state and a time.AfterFunc-driven debounce clock.
@@ -193,8 +214,9 @@ func newDiagnosticPublisher() *diagnosticPublisher {
 // Diagnostics with no file (e.g. a backend-level failure) are dropped, since
 // there is no document to attach them to. srcFor, when non-nil, supplies a
 // file's source text so each range can be widened to its enclosing
-// identifier; a nil srcFor or a miss falls back to a point range.
-func groupDiagnostics(diags diag.List, srcFor func(path string) (string, bool)) map[string][]protocol.Diagnostic {
+// identifier; a nil srcFor or a miss falls back to a point range. markup
+// selects the 3.18 Markdown message shape (see diagToLSPDiagnostic).
+func groupDiagnostics(diags diag.List, srcFor func(path string) (string, bool), markup bool) map[string][]protocol.Diagnostic {
 	grouped := make(map[string][]protocol.Diagnostic)
 
 	for _, d := range diags {
@@ -210,7 +232,7 @@ func groupDiagnostics(diags diag.List, srcFor func(path string) (string, bool)) 
 			}
 		}
 
-		grouped[d.Pos.File] = append(grouped[d.Pos.File], diagToLSPDiagnostic(d, src, srcFor))
+		grouped[d.Pos.File] = append(grouped[d.Pos.File], diagToLSPDiagnostic(d, src, srcFor, markup))
 	}
 
 	return grouped
@@ -226,7 +248,7 @@ func (p *diagnosticPublisher) publish(client protocol.Client, known []string, di
 		return nil
 	}
 
-	grouped := groupDiagnostics(diags, p.srcFor)
+	grouped := groupDiagnostics(diags, p.srcFor, p.markupEnabled())
 
 	p.mu.Lock()
 
@@ -287,6 +309,13 @@ func (p *diagnosticPublisher) publish(client protocol.Client, known []string, di
 	}
 
 	return errors.Join(errs...)
+}
+
+// markupEnabled reports whether published diagnostics should carry
+// Markdown messages. A nil hook (the zero-value publisher tests use) means
+// plain strings.
+func (p *diagnosticPublisher) markupEnabled() bool {
+	return p.markupHook != nil && p.markupHook()
 }
 
 // schedule debounces recompilation for a document: rapid keystrokes collapse

@@ -81,6 +81,19 @@ type Server struct {
 	// server is byte-based (which is why utf-8 is negotiated when offered),
 	// and semantic tokens are UTF-16-exact regardless. Guarded by mu.
 	encoding protocol.PositionEncodingKind
+
+	// markupMessage records whether the client advertised
+	// textDocument.diagnostic.markupMessageSupport at Initialize, so
+	// diagToLSPDiagnostic can send Markdown messages with doc links.
+	// changeAnnotations records whether the client advertised
+	// workspace.workspaceEdit.changeAnnotationSupport, so zever.fixAll can
+	// attach needsConfirmation annotations to foreign-file edits. Both are
+	// write-once at Initialize and read on every publish/fixAll, hence
+	// atomics rather than mu-guarded bools (the publisher's markup hook
+	// runs while the publisher holds its own lock, so it must never block
+	// on the server mutex).
+	markupMessage    atomic.Bool
+	changeAnnotation atomic.Bool
 }
 
 // NewServer returns a server with an empty workspace and no client yet. The
@@ -103,6 +116,11 @@ func NewServer() *Server {
 	// didChangeConfiguration between edit bursts is honored by the next one
 	// without any cross-lock dance.
 	publisher.delayHook = func() time.Duration { return s.currentSettings().DebounceDelay }
+
+	// The publisher consults the markup capability the same way, so a
+	// diagnostic published after Initialize carries Markdown exactly when
+	// the client asked for it.
+	publisher.markupHook = s.markupMessage.Load
 
 	return s
 }
@@ -208,6 +226,14 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 	s.inlayHintRefresh = inlayHint
 	s.mu.Unlock()
 
+	// The 3.18 capabilities decide per-response shapes rather than
+	// per-request behavior: a Markdown diagnostic message and a
+	// confirmation-annotated fixAll edit both require the client's opt-in,
+	// so they are recorded here and consulted on every publish/fixAll.
+	// Each tolerates a nil params, like clientCapsFor above.
+	s.markupMessage.Store(markupCapsFor(params))
+	s.changeAnnotation.Store(annotationCapsFor(params))
+
 	syncKind := protocol.TextDocumentSyncKindIncremental
 	enabled := true
 
@@ -255,8 +281,13 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			SignatureHelpProvider: &protocol.SignatureHelpOptions{
 				TriggerCharacters: []string{"(", ","},
 			},
-			DocumentFormattingProvider:      protocol.Boolean(true),
-			DocumentRangeFormattingProvider: protocol.Boolean(true),
+			DocumentFormattingProvider: protocol.Boolean(true),
+			// The options-struct form (rather than a bare bool) advertises
+			// rangesSupport: the 3.18 textDocument/rangesFormatting method
+			// this server serves alongside the single-range one below.
+			DocumentRangeFormattingProvider: &protocol.DocumentRangeFormattingOptions{
+				RangesSupport: boolPtr(true),
+			},
 			DocumentOnTypeFormattingProvider: protocol.DocumentOnTypeFormattingOptions{
 				FirstTriggerCharacter: "\n",
 				MoreTriggerCharacter:  []string{"}", " "},
@@ -404,6 +435,34 @@ func refreshCapsFor(params *protocol.InitializeParams) (codeLens, inlayHint bool
 	}
 
 	return codeLens, inlayHint
+}
+
+// markupCapsFor reads whether the client supports MarkupContent in
+// diagnostic messages: textDocument.diagnostic.markupMessageSupport, the
+// guard the 3.18 spec puts on Diagnostic.message carrying MarkupContent.
+// Every pointer in the chain may be nil -- a client that advertises no
+// diagnostic pull block negotiates plain strings -- so each level is guarded
+// the same way refreshCapsFor guards its own chain.
+func markupCapsFor(params *protocol.InitializeParams) bool {
+	if params == nil || params.Capabilities.TextDocument == nil ||
+		params.Capabilities.TextDocument.Diagnostic == nil ||
+		params.Capabilities.TextDocument.Diagnostic.MarkupMessageSupport == nil {
+		return false
+	}
+
+	return *params.Capabilities.TextDocument.Diagnostic.MarkupMessageSupport
+}
+
+// annotationCapsFor reads whether the client supports change annotations on
+// workspace edits: workspace.workspaceEdit.changeAnnotationSupport, the
+// guard the spec puts on AnnotatedTextEdit and WorkspaceEdit.changeAnnotations.
+// Presence of the block (not any sub-flag) is the opt-in, so a non-nil
+// pointer negotiates support. A nil anywhere in the chain -- a client with
+// no workspaceEdit block -- negotiates plain edits.
+func annotationCapsFor(params *protocol.InitializeParams) bool {
+	return params != nil && params.Capabilities.Workspace != nil &&
+		params.Capabilities.Workspace.WorkspaceEdit != nil &&
+		params.Capabilities.Workspace.WorkspaceEdit.ChangeAnnotationSupport != nil
 }
 
 // Initialized handles the initialized notification by publishing the first
@@ -850,6 +909,44 @@ func (s *Server) RangeFormatting(ctx context.Context, params *protocol.DocumentR
 	edits := formatDocument(path, []byte(content))
 
 	return filterEditsToRange(edits, params.Range), nil
+}
+
+// RangesFormatting formats each requested range of a document (LSP 3.18
+// textDocument/rangesFormatting): it runs formatDocument once over the
+// whole buffer and concatenates the per-range filterEditsToRange results,
+// deduplicating edits covered by overlapping ranges. An unknown document
+// yields nil.
+func (s *Server) RangesFormatting(ctx context.Context, params *protocol.DocumentRangesFormattingParams) ([]protocol.TextEdit, error) {
+	s.captureClient(ctx)
+
+	uriStr := string(params.TextDocument.URI)
+
+	content, ok := s.ws.DocContent(uriStr)
+	if !ok {
+		return nil, nil
+	}
+
+	path, _ := uriToPath(uriStr)
+
+	edits := formatDocument(path, []byte(content))
+
+	var out []protocol.TextEdit
+
+	seen := make(map[protocol.TextEdit]struct{}, len(edits))
+
+	for _, rng := range params.Ranges {
+		for _, edit := range filterEditsToRange(edits, rng) {
+			if _, dup := seen[edit]; dup {
+				continue
+			}
+
+			seen[edit] = struct{}{}
+
+			out = append(out, edit)
+		}
+	}
+
+	return out, nil
 }
 
 // OnTypeFormatting reuses formatDocument and narrows the result to the line

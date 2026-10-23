@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -101,7 +103,7 @@ func (s *Server) executeFixAll(args []protocol.LSPAny) (protocol.LSPAny, error) 
 
 	file := s.parseDoc(uriStr)
 
-	grouped := groupDiagnostics(diags, s.publisher.srcFor)
+	grouped := groupDiagnostics(diags, s.publisher.srcFor, s.markupMessage.Load())
 
 	callParams := &protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{URI: id},
@@ -111,7 +113,7 @@ func (s *Server) executeFixAll(args []protocol.LSPAny) (protocol.LSPAny, error) 
 		},
 	}
 
-	merged := &protocol.WorkspaceEdit{Changes: map[uri.URI][]protocol.TextEdit{}}
+	merged := map[uri.URI][]protocol.TextEdit{}
 
 	for _, item := range codeActionsAt(schema, file, id, []byte(content), callParams) {
 		action, ok := item.(*protocol.CodeAction)
@@ -120,16 +122,102 @@ func (s *Server) executeFixAll(args []protocol.LSPAny) (protocol.LSPAny, error) 
 		}
 
 		for docID, edits := range action.Edit.Changes {
-			merged.Changes[docID] = append(merged.Changes[docID], edits...)
+			merged[docID] = append(merged[docID], edits...)
 		}
 	}
 
-	raw, err := json.Marshal(merged)
+	// Only fixAll uses change annotations: codeAction/resolve keeps
+	// rebuilding plain edits (see hasCodeActionEdit), so a resolved action
+	// never invents a confirmation the client did not negotiate.
+	edit := buildFixAllEdit(uriStr, merged, s.changeAnnotation.Load())
+
+	raw, err := json.Marshal(edit)
 	if err != nil {
 		return nil, fmt.Errorf("zever-lsp: %s cannot encode the fix edit: %w", CommandFixAll, err)
 	}
 
 	return protocol.LSPAny(raw), nil
+}
+
+// buildFixAllEdit renders collected per-file quickfix edits as a
+// WorkspaceEdit. Without annotation support -- or when every fix lands in
+// the requested document -- it is the legacy plain Changes edit, so
+// same-file responses stay byte-identical to what older clients received.
+// When the client advertised workspace.workspaceEdit.changeAnnotationSupport
+// and fixes span other files, edits in the requested document stay silent
+// plain TextEdits inside DocumentChanges while each foreign file's edits
+// become AnnotatedTextEdits sharing one needsConfirmation ChangeAnnotation
+// for that file, so the editor confirms before touching files the user did
+// not ask to fix.
+func buildFixAllEdit(requested string, merged map[uri.URI][]protocol.TextEdit, annotate bool) *protocol.WorkspaceEdit {
+	if !annotate {
+		return &protocol.WorkspaceEdit{Changes: merged}
+	}
+
+	var foreign []uri.URI
+
+	for docID, edits := range merged {
+		if len(edits) == 0 {
+			continue
+		}
+
+		if string(docID) != requested {
+			foreign = append(foreign, docID)
+		}
+	}
+
+	// Same-file-only: no annotations to carry, so keep the plain shape.
+	if len(foreign) == 0 {
+		return &protocol.WorkspaceEdit{Changes: merged}
+	}
+
+	sort.Slice(foreign, func(i, j int) bool { return foreign[i] < foreign[j] })
+
+	out := &protocol.WorkspaceEdit{
+		ChangeAnnotations: make(map[protocol.ChangeAnnotationIdentifier]protocol.ChangeAnnotation, len(foreign)),
+	}
+
+	if edits := merged[uri.URI(requested)]; len(edits) > 0 {
+		elements := make([]protocol.TextDocumentEditElement, len(edits))
+		for i := range edits {
+			elements[i] = &edits[i]
+		}
+
+		out.DocumentChanges = append(out.DocumentChanges, &protocol.TextDocumentEdit{
+			TextDocument: protocol.OptionalVersionedTextDocumentIdentifier{
+				TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: uri.URI(requested)},
+			},
+			Edits: elements,
+		})
+	}
+
+	for i, docID := range foreign {
+		edits := merged[docID]
+		annotationID := protocol.ChangeAnnotationIdentifier("zever-fixAll-" + strconv.Itoa(i+1))
+
+		out.ChangeAnnotations[annotationID] = protocol.ChangeAnnotation{
+			Label:             "Apply zever fixes in " + string(docID),
+			NeedsConfirmation: boolPtr(true),
+		}
+
+		elements := make([]protocol.TextDocumentEditElement, len(edits))
+
+		for j := range edits {
+			elements[j] = &protocol.AnnotatedTextEdit{
+				TextEdit:     edits[j],
+				AnnotationID: annotationID,
+			}
+		}
+
+		out.DocumentChanges = append(out.DocumentChanges, &protocol.TextDocumentEdit{
+			TextDocument: protocol.OptionalVersionedTextDocumentIdentifier{
+				TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: docID},
+			},
+			Edits: elements,
+		})
+	}
+
+	return out
 }
 
 // emptyWorkspaceEdit encodes an empty WorkspaceEdit as LSPAny: the fixAll

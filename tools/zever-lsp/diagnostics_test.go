@@ -244,7 +244,7 @@ func TestDiagToLSPDiagnostic(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := diagToLSPDiagnostic(tc.in, "", nil)
+			got := diagToLSPDiagnostic(tc.in, "", nil, false)
 
 			if got.Range != tc.wantRange {
 				t.Errorf("Range = %+v, want %+v", got.Range, tc.wantRange)
@@ -296,7 +296,7 @@ func TestDiagToLSPDiagnosticExtendsToEnclosingIdentifier(t *testing.T) {
 				Pos:      diag.Position{File: "a.zen", Line: 1, Col: tc.col},
 				Severity: diag.SeverityError,
 				Msg:      "boom",
-			}, src, nil)
+			}, src, nil, false)
 
 			if got.Range != want {
 				t.Errorf("Range = %+v, want %+v", got.Range, want)
@@ -328,7 +328,7 @@ func TestDiagToLSPDiagnosticFallsBackToPoint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := diagToLSPDiagnostic(&diag.Diagnostic{Pos: tc.pos, Msg: "boom"}, tc.src, nil)
+			got := diagToLSPDiagnostic(&diag.Diagnostic{Pos: tc.pos, Msg: "boom"}, tc.src, nil, false)
 			if want := pointRange(tc.pos); got.Range != want {
 				t.Errorf("Range = %+v, want point range %+v", got.Range, want)
 			}
@@ -354,7 +354,7 @@ func TestGroupDiagnosticsUsesSourceFor(t *testing.T) {
 	grouped := groupDiagnostics(diag.List{
 		{Pos: diag.Position{File: "a.zen", Line: 1, Col: 8}, Msg: "widened"},
 		{Pos: diag.Position{File: "b.zen", Line: 1, Col: 8}, Msg: "point"},
-	}, srcFor)
+	}, srcFor, false)
 
 	wantWidened := protocol.Range{
 		Start: protocol.Position{Line: 0, Character: 7},
@@ -407,7 +407,7 @@ func TestGroupDiagnosticsByFile(t *testing.T) {
 		nil,
 	}
 
-	grouped := groupDiagnostics(diags, nil)
+	grouped := groupDiagnostics(diags, nil, false)
 
 	if len(grouped) != 2 {
 		t.Fatalf("grouped into %d files, want 2 (%v)", len(grouped), grouped)
@@ -789,7 +789,7 @@ func TestDiagToLSPDiagnosticCarriesCode(t *testing.T) {
 	classified := diagToLSPDiagnostic(&diag.Diagnostic{
 		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
 		Msg: `unknown field type "strnig"`,
-	}, "", nil)
+	}, "", nil, false)
 
 	code, ok := classified.Code.(protocol.String)
 	if !ok || string(code) != diagCodeUnknownFieldType {
@@ -805,7 +805,7 @@ func TestDiagToLSPDiagnosticCarriesCode(t *testing.T) {
 	unclassified := diagToLSPDiagnostic(&diag.Diagnostic{
 		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
 		Msg: "no class here",
-	}, "", nil)
+	}, "", nil, false)
 
 	if unclassified.Code != nil {
 		t.Errorf("unclassified Code = %#v, want nil", unclassified.Code)
@@ -813,6 +813,148 @@ func TestDiagToLSPDiagnosticCarriesCode(t *testing.T) {
 
 	if unclassified.CodeDescription.Href != "" {
 		t.Errorf("unclassified CodeDescription = %+v, want zero", unclassified.CodeDescription)
+	}
+}
+
+// TestDiagToLSPDiagnosticMarkupMessage pins both 3.18 message shapes: a
+// classified diagnostic for a markup client carries a Markdown
+// MarkupContent of the plain text plus a [`code`](href) doc link (with the
+// code and CodeDescription still present), while an unclassified diagnostic
+// -- or any diagnostic for a plain client -- stays a byte-identical plain
+// string with no link to invent.
+func TestDiagToLSPDiagnosticMarkupMessage(t *testing.T) {
+	t.Parallel()
+
+	const msg = `unknown field type "strnig"`
+
+	markup := diagToLSPDiagnostic(&diag.Diagnostic{
+		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
+		Msg: msg,
+	}, "", nil, true)
+
+	content, ok := markup.Message.(*protocol.MarkupContent)
+	if !ok {
+		t.Fatalf("markup Message = %#v, want *protocol.MarkupContent", markup.Message)
+	}
+
+	if content.Kind != protocol.MarkupKindMarkdown {
+		t.Errorf("MarkupContent.Kind = %q, want markdown", content.Kind)
+	}
+
+	want := msg + " ([`" + diagCodeUnknownFieldType + "`](" + diagDocURL + "))"
+	if content.Value != want {
+		t.Errorf("MarkupContent.Value = %q, want %q", content.Value, want)
+	}
+
+	if code, ok := markup.Code.(protocol.String); !ok || string(code) != diagCodeUnknownFieldType {
+		t.Errorf("markup Code = %#v, want the zen-001 string arm", markup.Code)
+	}
+
+	if href := string(markup.CodeDescription.Href); href != diagDocURL {
+		t.Errorf("markup CodeDescription.Href = %q, want the doc URL", href)
+	}
+
+	plain := diagToLSPDiagnostic(&diag.Diagnostic{
+		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
+		Msg: msg,
+	}, "", nil, false)
+
+	if got, ok := plain.Message.(protocol.String); !ok || string(got) != msg {
+		t.Errorf("plain Message = %#v, want %q verbatim", plain.Message, msg)
+	}
+
+	unclassified := diagToLSPDiagnostic(&diag.Diagnostic{
+		Pos: diag.Position{File: "a.zen", Line: 1, Col: 1},
+		Msg: "no class here",
+	}, "", nil, true)
+
+	if got, ok := unclassified.Message.(protocol.String); !ok || string(got) != "no class here" {
+		t.Errorf("unclassified markup Message = %#v, want the plain string (no link to invent)", unclassified.Message)
+	}
+}
+
+// TestGroupDiagnosticsMarkupPropagates proves the markup flag flows through
+// grouping, so a markup client's publish carries Markdown while the default
+// path stays plain.
+func TestGroupDiagnosticsMarkupPropagates(t *testing.T) {
+	t.Parallel()
+
+	diags := diag.List{
+		{Pos: diag.Position{File: "a.zen", Line: 1, Col: 1}, Msg: `unknown field type "strnig"`},
+	}
+
+	if _, ok := groupDiagnostics(diags, nil, true)["a.zen"][0].Message.(*protocol.MarkupContent); !ok {
+		t.Error("groupDiagnostics(markup=true) did not produce MarkupContent")
+	}
+
+	if _, ok := groupDiagnostics(diags, nil, false)["a.zen"][0].Message.(protocol.String); !ok {
+		t.Error("groupDiagnostics(markup=false) did not produce a plain string")
+	}
+}
+
+// TestPublishMarkupMessageEndToEnd proves the negotiated capability drives
+// the published shape: a markup client gets Markdown with a doc link, a
+// plain client gets the identical text it always received.
+func TestPublishMarkupMessageEndToEnd(t *testing.T) {
+	t.Parallel()
+
+	publishFor := func(t *testing.T, markup bool) protocol.Diagnostic {
+		t.Helper()
+
+		s := NewServer()
+
+		params := &protocol.InitializeParams{}
+		if markup {
+			yes := true
+			params.Capabilities.TextDocument = &protocol.TextDocumentClientCapabilities{
+				Diagnostic: &protocol.DiagnosticClientCapabilities{MarkupMessageSupport: &yes},
+			}
+		}
+
+		if _, err := s.Initialize(t.Context(), params); err != nil {
+			t.Fatalf("Initialize: %v", err)
+		}
+
+		fake := &fakeClient{}
+		s.setClient(fake)
+		openDoc(t, s, serverDocA, serverBrokenDoc)
+
+		list, ok := fake.published(diagURI(t, serverDocA))
+		if !ok || len(list) == 0 {
+			t.Fatalf("publish sent nothing for the broken document (markup=%v)", markup)
+		}
+
+		return list[0]
+	}
+
+	markupDiag := publishFor(t, true)
+
+	content, ok := markupDiag.Message.(*protocol.MarkupContent)
+	if !ok {
+		t.Fatalf("markup publish Message = %#v, want *protocol.MarkupContent", markupDiag.Message)
+	}
+
+	if content.Kind != protocol.MarkupKindMarkdown {
+		t.Errorf("markup publish Kind = %q, want markdown", content.Kind)
+	}
+
+	if !strings.Contains(content.Value, "([`"+diagCodeUnknownFieldType+"`]("+diagDocURL+"))") {
+		t.Errorf("markup publish Value = %q, want the zen-001 doc link", content.Value)
+	}
+
+	plainDiag := publishFor(t, false)
+
+	msg, ok := plainDiag.Message.(protocol.String)
+	if !ok {
+		t.Fatalf("plain publish Message = %#v, want protocol.String", plainDiag.Message)
+	}
+
+	if strings.Contains(string(msg), "([`"+diagCodeUnknownFieldType+"`](") {
+		t.Errorf("plain publish unexpectedly carries a doc link: %q", msg)
+	}
+
+	if want := string(msg) + " ([`" + diagCodeUnknownFieldType + "`](" + diagDocURL + "))"; content.Value != want {
+		t.Errorf("markup publish Value = %q, want plain text plus link %q", content.Value, want)
 	}
 }
 
