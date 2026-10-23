@@ -144,6 +144,16 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.ws.SetRoot(root)
 	}
 
+	// Multi-root workspaces: register every folder beyond the primary so
+	// Rescan walks all of them. SetRoot already covers the first.
+	if params != nil {
+		if folders, ok := params.WorkspaceFolders.Get(); ok && len(folders) > 1 {
+			for i := 1; i < len(folders); i++ {
+				s.ws.AddRoot(string(folders[i].URI))
+			}
+		}
+	}
+
 	// textDocument/documentLink.tooltipSupport is the one client capability
 	// a handler needs to behave differently (resolve fills Tooltip only for
 	// a client that asked for tooltips), so it is the only one this server
@@ -168,7 +178,7 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 		s.mu.Unlock()
 	}
 
-	syncKind := protocol.TextDocumentSyncKindFull
+	syncKind := protocol.TextDocumentSyncKindIncremental
 	enabled := true
 
 	return &protocol.InitializeResult{
@@ -234,8 +244,14 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 			// Same options-struct shape as CompletionProvider above, for the
 			// same reason: resolveProvider is part of the documentLink
 			// capability itself.
-			DocumentLinkProvider:  &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
-			CallHierarchyProvider: protocol.Boolean(true),
+			DocumentLinkProvider:   &protocol.DocumentLinkOptions{ResolveProvider: &enabled},
+			CallHierarchyProvider:  protocol.Boolean(true),
+			Workspace: &protocol.WorkspaceOptions{
+				WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{
+					Supported:           boolPtr(true),
+					ChangeNotifications: protocol.String("workspace/didChangeWorkspaceFolders"),
+				},
+			},
 		},
 		ServerInfo: protocol.ServerInfo{
 			Name:    serverName,
@@ -340,11 +356,26 @@ func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
 	s.captureClient(ctx)
 
-	// The server advertises full sync, so every change event carries the whole
-	// document as a *TextDocumentContentChangeWholeDocument arm.
+	uriStr := string(params.TextDocument.URI)
+
+	// Handle both whole-document and incremental arms: full-sync clients keep
+	// sending whole-document changes, while incremental clients send partial
+	// edits that are applied on top of the current buffer.
 	for _, change := range params.ContentChanges {
-		if whole, ok := change.(*protocol.TextDocumentContentChangeWholeDocument); ok {
-			s.ws.SetDoc(string(params.TextDocument.URI), whole.Text)
+		switch v := change.(type) {
+		case *protocol.TextDocumentContentChangeWholeDocument:
+			s.ws.SetDoc(uriStr, v.Text)
+		case *protocol.TextDocumentContentChangePartial:
+			current, _ := s.ws.DocContent(uriStr)
+			s.ws.SetDoc(uriStr, applyIncrementalEdit(current, v))
+		default:
+			// Tolerate the interface/boxed forms some clients/tests use.
+			if whole, ok := change.(*protocol.TextDocumentContentChangeWholeDocument); ok {
+				s.ws.SetDoc(uriStr, whole.Text)
+			} else if partial, ok := change.(*protocol.TextDocumentContentChangePartial); ok {
+				current, _ := s.ws.DocContent(uriStr)
+				s.ws.SetDoc(uriStr, applyIncrementalEdit(current, partial))
+			}
 		}
 	}
 
@@ -382,6 +413,27 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 // republishes, since on-disk files changed outside any open buffer.
 func (s *Server) DidChangeWatchedFiles(ctx context.Context, _ *protocol.DidChangeWatchedFilesParams) error {
 	s.captureClient(ctx)
+	s.ws.Rescan()
+	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
+
+	return nil
+}
+
+// DidChangeWorkspaceFolders updates the set of workspace roots in response
+// to a client-side folder change and rescans.
+func (s *Server) DidChangeWorkspaceFolders(ctx context.Context, params *protocol.DidChangeWorkspaceFoldersParams) error {
+	s.captureClient(ctx)
+
+	if params != nil {
+		for _, folder := range params.Event.Added {
+			s.ws.AddRoot(string(folder.URI))
+		}
+
+		for _, folder := range params.Event.Removed {
+			s.ws.RemoveRoot(string(folder.URI))
+		}
+	}
+
 	s.ws.Rescan()
 	s.refreshDiagnostics() //nolint:contextcheck // publish is intentionally background: the stored client serves contexts (e.g. debounce timer) that carry none
 
