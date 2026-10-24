@@ -22,7 +22,7 @@ func posAfter(t *testing.T, src, marker string) protocol.Position {
 		t.Fatalf("marker %q not found in %q", marker, src)
 	}
 
-	return protocol.Position{Character: uint32(idx + len(marker))} //nolint:gosec // indexes non-negative
+	return protocol.Position{Character: uint32(idx + len(marker))} // indexes non-negative
 }
 
 // paramIndex looks a parameter's declared index up by name, so test
@@ -69,7 +69,7 @@ func TestSignatureHelpNoneOutsideCall(t *testing.T) {
 		"id: uuid",
 		"foo(bar",
 	} {
-		got := signatureHelpAt(src, protocol.Position{Character: uint32(len(src))}) //nolint:gosec // len never negative
+		got := signatureHelpAt(src, protocol.Position{Character: uint32(len(src))}) // len never negative
 		if got != nil {
 			t.Errorf("signatureHelpAt(%q) = %+v, want nil", src, got)
 		}
@@ -433,7 +433,7 @@ func dispatchCursor(t *testing.T, src, marker string) protocol.Position {
 
 	for i, line := range strings.Split(src, "\n") {
 		if strings.HasSuffix(line, marker) {
-			return protocol.Position{Line: uint32(i), Character: uint32(len(line))} //nolint:gosec // test fixture
+			return protocol.Position{Line: uint32(i), Character: uint32(len(line))} // test fixture
 		}
 	}
 

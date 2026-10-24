@@ -208,7 +208,7 @@ func TestRenameEntityEdits_rpcReturnType_isRewritten(t *testing.T) {
 		t.Errorf("c.zen edit line = %d, want 1 (the rpc signature line)", rpcEdits[0].Range.Start.Line)
 	}
 
-	wantCol := uint32(strings.Index(strings.Split(renameServiceSrc, "\n")[1], "-> User") + len("-> ")) //nolint:gosec // test fixture
+	wantCol := uint32(strings.Index(strings.Split(renameServiceSrc, "\n")[1], "-> User") + len("-> ")) // test fixture
 	if rpcEdits[0].Range.Start.Character != wantCol {
 		t.Errorf("c.zen edit column = %d, want %d (the return type ident)", rpcEdits[0].Range.Start.Character, wantCol)
 	}
@@ -242,7 +242,7 @@ func TestRenameEntityEdits_permissionResource_isRewritten(t *testing.T) {
 	}
 
 	permLine := strings.Split(renamePermissionSrc, "\n")[2]
-	wantCol := uint32(strings.Index(permLine, "resource: User") + len("resource: ")) //nolint:gosec // test fixture
+	wantCol := uint32(strings.Index(permLine, "resource: User") + len("resource: ")) // test fixture
 
 	if permEdits[0].Range.Start.Line != 2 || permEdits[0].Range.Start.Character != wantCol {
 		t.Errorf("d.zen edit start = %+v, want line 2 char %d (the resource ident)",
@@ -666,7 +666,7 @@ func TestRenameTargetAt_eachKind_resolves(t *testing.T) {
 
 			cursor := cursorOn(t, tc.src, tc.line, tc.needle)
 			if tc.nudgePastRune != "" {
-				cursor.Character += uint32(len(tc.nudgePastRune)) //nolint:gosec // test fixture
+				cursor.Character += uint32(len(tc.nudgePastRune)) // test fixture
 			}
 
 			renameTargetMustResolve(t, parsed[tc.file], cursor, tc.wantKind, tc.wantName, tc.wantOwner)

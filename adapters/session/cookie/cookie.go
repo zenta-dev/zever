@@ -138,7 +138,7 @@ func New(sessionID string, cfg Options) *http.Cookie {
 	// Secure, HttpOnly and SameSite are all set above, defaulted to their
 	// secure values when cfg leaves them unset; gosec's G124 cannot see
 	// that through the local variables, hence the nosec.
-	c := &http.Cookie{ //nolint:gosec // G124: secure/httpOnly/sameSite defaulted above
+	c := &http.Cookie{ // G124: secure/httpOnly/sameSite defaulted above
 		Name:     name,
 		Value:    sessionID,
 		Path:     path,

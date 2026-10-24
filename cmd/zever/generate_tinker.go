@@ -97,7 +97,7 @@ func GenerateTinker(cfg GenerateTinkerConfig) (string, error) {
 		return "", fmt.Errorf("%s: mkdir %q: %w", tag, cfg.OutDir, err)
 	}
 
-	if err := os.WriteFile(path, src, 0o644); err != nil { //nolint:gosec // generated scaffold, not a secret
+	if err := os.WriteFile(path, src, 0o644); err != nil { // generated scaffold, not a secret
 		return "", fmt.Errorf("%s: write %q: %w", tag, path, err)
 	}
 

@@ -1526,7 +1526,7 @@ func addBatteryToProject(tag string, tgt addTarget, force, dryRun, diffOnly, yes
 		}
 	}
 
-	if werr := os.WriteFile(appPath, []byte(updated), 0o644); werr != nil { //nolint:gosec // project-owned scaffold path
+	if werr := os.WriteFile(appPath, []byte(updated), 0o644); werr != nil { // project-owned scaffold path
 		return fmt.Errorf("%s: write %q: %w", tag, appPath, werr)
 	}
 
@@ -1539,7 +1539,7 @@ func addBatteryToProject(tag string, tgt addTarget, force, dryRun, diffOnly, yes
 
 	updatedExample, _ := appendEnvExample(string(example), section, tgt.battery, tgt.name)
 	if updatedExample != string(example) {
-		if werr := os.WriteFile(".env.example", []byte(updatedExample), 0o644); werr != nil { //nolint:gosec // project config, not a secret
+		if werr := os.WriteFile(".env.example", []byte(updatedExample), 0o644); werr != nil { // project config, not a secret
 			return fmt.Errorf("%s: write .env.example: %w", tag, werr)
 		}
 	}
@@ -1548,7 +1548,7 @@ func addBatteryToProject(tag string, tgt addTarget, force, dryRun, diffOnly, yes
 	updatedGomod := updateGoModForAdd(string(gomod), sel, version)
 
 	if updatedGomod != string(gomod) {
-		if werr := os.WriteFile("go.mod", []byte(updatedGomod), 0o644); werr != nil { //nolint:gosec // go.mod is not a secret
+		if werr := os.WriteFile("go.mod", []byte(updatedGomod), 0o644); werr != nil { // go.mod is not a secret
 			return fmt.Errorf("%s: write go.mod: %w", tag, werr)
 		}
 	}
@@ -1812,7 +1812,7 @@ func ensureRecipeGoMod(tag string) error {
 		return nil
 	}
 
-	if werr := os.WriteFile("go.mod", []byte(updated), 0o644); werr != nil { //nolint:gosec // go.mod is not a secret
+	if werr := os.WriteFile("go.mod", []byte(updated), 0o644); werr != nil { // go.mod is not a secret
 		return fmt.Errorf("%s: write go.mod: %w", tag, werr)
 	}
 

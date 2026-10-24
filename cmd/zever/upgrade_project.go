@@ -336,7 +336,7 @@ func runUpgradeProjectWith(ctx context.Context, opts projectUpgradeOptions) erro
 		notes = projectBreakingNotes(raw, current, tag)
 	}
 
-	if werr := os.WriteFile(filepath.Join(dir, "go.mod"), bumped, 0o644); werr != nil { //nolint:gosec // developer project file
+	if werr := os.WriteFile(filepath.Join(dir, "go.mod"), bumped, 0o644); werr != nil { // developer project file
 		return fmt.Errorf("zever upgrade: write go.mod: %w", werr)
 	}
 

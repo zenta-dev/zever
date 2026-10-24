@@ -85,7 +85,7 @@ func TestTagReleaseRefusesStalePins(t *testing.T) {
 	mustWriteFile(t, filepath.Join(root, "INSTALL"), "default=v1.2.2\n")
 
 	run := func(args ...string) (string, error) {
-		cmd := exec.CommandContext(t.Context(), "bash", append([]string{script}, args...)...) //nolint:gosec // test runs the repo script with fixed args
+		cmd := exec.CommandContext(t.Context(), "bash", append([]string{script}, args...)...) // test runs the repo script with fixed args
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+t.TempDir())
 		b, runErr := cmd.CombinedOutput()

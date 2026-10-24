@@ -16,7 +16,7 @@ func BenchmarkCheckFile(b *testing.B) {
 	}
 
 	p := filepath.Join(root, "violations.go")
-	if err := os.WriteFile(p, src, 0o600); err != nil { //nolint:gosec // p is under b.TempDir(), not user input
+	if err := os.WriteFile(p, src, 0o600); err != nil { // p is under b.TempDir(), not user input
 		b.Fatal(err)
 	}
 

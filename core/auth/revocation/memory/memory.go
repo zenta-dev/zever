@@ -236,7 +236,7 @@ func (s *store) startPruner() {
 	// The ticker is constructed synchronously (not inside the goroutine)
 	// so the newTicker seam is read happens-before New returns: tests
 	// swapping the seam never race a still-starting pruner goroutine.
-	//nolint:gosec // math/rand suffices for non-security jitter.
+	// math/rand suffices for non-security jitter.
 	jitter := time.Duration(mrand.Int63n(int64(DefaultPruneJitterWindow))) - DefaultPruneJitterWindow/2
 	ticker := newTicker(DefaultPruneInterval + jitter)
 

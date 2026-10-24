@@ -705,7 +705,7 @@ func writeOutputs(outDir string, outputs map[string]map[string][]byte) error {
 				return fmt.Errorf("zever compile: mkdir %q: %w", filepath.Dir(dest), err)
 			}
 
-			if err := os.WriteFile(dest, content, 0o644); err != nil { //nolint:gosec // generated source output, not a secret
+			if err := os.WriteFile(dest, content, 0o644); err != nil { // generated source output, not a secret
 				return fmt.Errorf("zever compile: write %q: %w", dest, err)
 			}
 		}

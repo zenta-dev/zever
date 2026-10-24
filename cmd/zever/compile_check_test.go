@@ -68,7 +68,7 @@ func TestCompileCheckDetectsDrift(t *testing.T) {
 		t.Fatalf("read %q: %v", stale, readErr)
 	}
 
-	if writeErr := os.WriteFile(stale, append(data, []byte("\n# stale hand edit\n")...), 0o600); writeErr != nil { //nolint:gosec // test temp dir
+	if writeErr := os.WriteFile(stale, append(data, []byte("\n# stale hand edit\n")...), 0o600); writeErr != nil { // test temp dir
 		t.Fatalf("write stale %q: %v", stale, writeErr)
 	}
 
@@ -207,7 +207,7 @@ func TestCompileCheckJSONEmitsEnvelope(t *testing.T) {
 		t.Fatalf("read %q: %v", stale, err)
 	}
 
-	if err := os.WriteFile(stale, append(data, 0x0a), 0o600); err != nil { //nolint:gosec // test temp dir
+	if err := os.WriteFile(stale, append(data, 0x0a), 0o600); err != nil { // test temp dir
 		t.Fatalf("write stale %q: %v", stale, err)
 	}
 

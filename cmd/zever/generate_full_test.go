@@ -216,7 +216,7 @@ func TestGenerateFullDiffPrintsWithoutWriting(t *testing.T) {
 		t.Fatalf("read %q: %v", victim, readErr)
 	}
 
-	if staleErr := os.WriteFile(victim, append(before, []byte("\n-- stale\n")...), 0o600); staleErr != nil { //nolint:gosec // test-controlled temp path
+	if staleErr := os.WriteFile(victim, append(before, []byte("\n-- stale\n")...), 0o600); staleErr != nil { // test-controlled temp path
 		t.Fatalf("write stale: %v", staleErr)
 	}
 
@@ -281,7 +281,7 @@ func TestGenerateFullCheckDetectsDrift(t *testing.T) {
 		t.Fatalf("read %q: %v", victim, readErr)
 	}
 
-	if staleErr := os.WriteFile(victim, append(data, 0x0a), 0o600); staleErr != nil { //nolint:gosec // test-controlled temp path
+	if staleErr := os.WriteFile(victim, append(data, 0x0a), 0o600); staleErr != nil { // test-controlled temp path
 		t.Fatalf("write stale: %v", staleErr)
 	}
 
@@ -326,7 +326,7 @@ func TestGenerateFullCheckStubRules(t *testing.T) {
 	}
 
 	// A hand-modified stub is never drift.
-	if err := os.WriteFile(stub, append(handwritten, []byte("\n// mine\n")...), 0o600); err != nil { //nolint:gosec // test-controlled temp path
+	if err := os.WriteFile(stub, append(handwritten, []byte("\n// mine\n")...), 0o600); err != nil { // test-controlled temp path
 		t.Fatalf("write stub: %v", err)
 	}
 
@@ -371,7 +371,7 @@ func TestGenerateFullCheckStrictOnVersionOnly(t *testing.T) {
 		t.Fatal("restamp changed no bytes; stamp shape changed?")
 	}
 
-	if err := os.WriteFile(victim, restamped, 0o600); err != nil { //nolint:gosec // test-controlled temp path
+	if err := os.WriteFile(victim, restamped, 0o600); err != nil { // test-controlled temp path
 		t.Fatalf("write restamped: %v", err)
 	}
 

@@ -245,7 +245,7 @@ func randDuration(span float64) time.Duration {
 // concurrent callers landing in the same nanosecond identical seeds (and
 // therefore identical "random" delays), defeating the point of jitter.
 func randFloat64() float64 {
-	//nolint:gosec // G404: math/rand/v2 suffices for retry jitter, which is not security-sensitive.
+	// G404: math/rand/v2 suffices for retry jitter, which is not security-sensitive.
 	return rand.Float64()
 }
 

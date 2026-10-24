@@ -34,7 +34,7 @@ func TestSandboxWrapsCommand(t *testing.T) {
 	stubBin(t, "pdflatex", fakeTexOK)
 	log := filepath.Join(t.TempDir(), "bwrap.log")
 	bwrap := filepath.Join(t.TempDir(), "bwrap")
-	if err := os.WriteFile(bwrap, []byte(strings.Replace(fakeBwrap, "LOGPATH", `"`+log+`"`, 1)), 0o700); err != nil { //nolint:gosec // test stub must be executable.
+	if err := os.WriteFile(bwrap, []byte(strings.Replace(fakeBwrap, "LOGPATH", `"`+log+`"`, 1)), 0o700); err != nil { // test stub must be executable.
 		t.Fatal(err)
 	}
 

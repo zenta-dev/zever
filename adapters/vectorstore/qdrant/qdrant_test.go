@@ -107,7 +107,7 @@ func (f *stubClient) Query(_ context.Context, req *qdrant.QueryPoints) ([]*qdran
 	q := req.Query.GetNearest().GetDense().GetData()
 	limit := 10
 	if req.Limit != nil {
-		limit = int(*req.Limit) //nolint:gosec // G115: test-only limit fits in int
+		limit = int(*req.Limit) // G115: test-only limit fits in int
 	}
 
 	f.mu.Lock()
@@ -167,7 +167,7 @@ func (f *stubClient) CreateCollection(_ context.Context, req *qdrant.CreateColle
 	}
 
 	f.exists = true
-	f.dim = int(req.VectorsConfig.GetParams().GetSize()) //nolint:gosec // G115: test-only dimension fits in int
+	f.dim = int(req.VectorsConfig.GetParams().GetSize()) // G115: test-only dimension fits in int
 
 	return nil
 }
@@ -188,7 +188,7 @@ func (f *stubClient) GetCollectionInfo(_ context.Context, _ string) (*qdrant.Col
 	params := &qdrant.CollectionParams{}
 	if !f.noParams {
 		params.VectorsConfig = qdrant.NewVectorsConfig(&qdrant.VectorParams{
-			Size:     uint64(f.dim), //nolint:gosec // G115: test-only conversion
+			Size:     uint64(f.dim), // G115: test-only conversion
 			Distance: qdrant.Distance_Cosine,
 		})
 	}

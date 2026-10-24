@@ -170,7 +170,7 @@ func fmtOneFile(path string, write bool) (bool, error) {
 	}
 
 	if write {
-		if err := os.WriteFile(path, out, 0o644); err != nil { //nolint:gosec // rewriting a schema file the caller passed in, not a secret
+		if err := os.WriteFile(path, out, 0o644); err != nil { // rewriting a schema file the caller passed in, not a secret
 			return false, fmt.Errorf("zever fmt: write %q: %w", path, err)
 		}
 	}

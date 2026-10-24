@@ -217,7 +217,7 @@ func assertNoShippingLeak(t *testing.T, out string) {
 			return nil
 		}
 
-		data, err := os.ReadFile(path) //nolint:gosec // test fixture tree
+		data, err := os.ReadFile(path) // test fixture tree
 		if err != nil {
 			return err
 		}

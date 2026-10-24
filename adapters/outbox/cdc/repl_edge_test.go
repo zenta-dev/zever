@@ -242,7 +242,7 @@ func ldmWALBytes(prefix string, content []byte, lsn uint64) []byte {
 
 	var ln [4]byte
 
-	binary.BigEndian.PutUint32(ln[:], uint32(len(content))) //nolint:gosec // test payloads are tiny
+	binary.BigEndian.PutUint32(ln[:], uint32(len(content))) // test payloads are tiny
 	buf = append(buf, ln[:]...)
 
 	return append(buf, content...)

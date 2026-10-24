@@ -141,7 +141,7 @@ func signatureHelpAt(src string, cursor protocol.Position) *protocol.SignatureHe
 	// Proof: index comes from activeArgument (starts at 0, only incremented)
 	// and is only reassigned from paramIndexByName when the result is >= 0,
 	// so index < 0 is impossible and the old clamp was dead.
-	active := protocol.NewNullable(uint32(index)) //nolint:gosec // proven non-negative above
+	active := protocol.NewNullable(uint32(index)) // proven non-negative above
 
 	sig := signatureInformation(nameTok.Lit, spec)
 	sig.ActiveParameter = active
@@ -224,7 +224,7 @@ func dispatchSignatureHelp(schema *ir.Schema, src string, cursor protocol.Positi
 	// and is only reassigned from paramIndexByName when the result is >= 0,
 	// so index < 0 is impossible and no clamp is needed beyond the
 	// past-the-end case above.
-	active := protocol.NewNullable(uint32(index)) //nolint:gosec // proven non-negative above
+	active := protocol.NewNullable(uint32(index)) // proven non-negative above
 
 	sig.ActiveParameter = active
 

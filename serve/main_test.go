@@ -161,7 +161,7 @@ func TestTLSBootServesHTTPSWithHSTS(t *testing.T) {
 	tlsBase := strings.Replace(base, "http://", "https://", 1)
 
 	client := &http.Client{Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // test-only loopback client.
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // test-only loopback client.
 	}}
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tlsBase+"/healthz", nil)

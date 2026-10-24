@@ -64,7 +64,7 @@ func gifBytes(t *testing.T, w, h int) []byte {
 func writeChunk(buf *bytes.Buffer, typ string, data []byte) {
 	var ln [4]byte
 
-	binary.BigEndian.PutUint32(ln[:], uint32(len(data))) //nolint:gosec // test chunk payloads are tiny
+	binary.BigEndian.PutUint32(ln[:], uint32(len(data)))
 	buf.Write(ln[:])
 	buf.WriteString(typ)
 	buf.Write(data)
@@ -1485,7 +1485,7 @@ func withFakeBin(t *testing.T, files map[string]string) {
 	dir := t.TempDir()
 
 	for name, body := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755); err != nil { //nolint:gosec // test helper installs executable fake binaries
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}

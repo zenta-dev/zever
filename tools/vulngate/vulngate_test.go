@@ -145,7 +145,7 @@ func stubGovulncheck(t *testing.T, fixture string) string {
 		t.Fatal(err)
 	}
 	stub := filepath.Join(dir, "govulncheck-stub")
-	//nolint:gosec // test stub must be executable to serve as a fake govulncheck binary
+	// test stub must be executable to serve as a fake govulncheck binary
 	if err := os.WriteFile(stub, []byte("#!/bin/sh\ncat "+fixPath+"\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}

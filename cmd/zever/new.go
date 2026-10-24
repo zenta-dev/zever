@@ -886,8 +886,8 @@ func resolveFramework(tag string, plan *NewConfig, frameworkVersion string) erro
 		return fmt.Errorf("%s: %w", tag, err)
 	}
 
-	if _, err := os.Stat(filepath.Join(abs, "go.mod")); err != nil { //nolint:gosec // fwDir is an explicit user flag; read-only checkout probe, no write or serve
-		if _, werr := os.Stat(filepath.Join(abs, "go.work")); werr != nil { //nolint:gosec // fwDir is an explicit user flag; read-only checkout probe, no write or serve
+	if _, err := os.Stat(filepath.Join(abs, "go.mod")); err != nil { // fwDir is an explicit user flag; read-only checkout probe, no write or serve
+		if _, werr := os.Stat(filepath.Join(abs, "go.work")); werr != nil { // fwDir is an explicit user flag; read-only checkout probe, no write or serve
 			return fmt.Errorf("%s: %q does not look like a zever checkout (no go.mod or go.work): %w", tag, fwDir, err)
 		}
 	}
@@ -932,7 +932,7 @@ func detectFrameworkCheckout() (string, error) {
 // modulePathOf reads the module path out of the go.mod at path, returning ""
 // if the file does not exist or declares none.
 func modulePathOf(path string) string {
-	data, err := os.ReadFile(path) //nolint:gosec // walking parent directories looking for a go.mod is the point
+	data, err := os.ReadFile(path) // walking parent directories looking for a go.mod is the point
 	if err != nil {
 		return ""
 	}
@@ -961,7 +961,7 @@ func modulePathOf(path string) string {
 // itself builds with. Falls back to defaultGoVersion (also extract.go's
 // fallback) if that cannot be read.
 func detectGoVersion(frameworkDir string) string {
-	data, err := os.ReadFile(filepath.Join(frameworkDir, "go.mod")) //nolint:gosec // developer-supplied checkout path
+	data, err := os.ReadFile(filepath.Join(frameworkDir, "go.mod")) // developer-supplied checkout path
 	if err != nil {
 		return defaultGoVersion
 	}
@@ -984,7 +984,7 @@ func detectGoVersion(frameworkDir string) string {
 // project's toolchain version when scaffolding into a cwd that already has a
 // go.mod (so we don't invent a version).
 func goVersionOf(path string) string {
-	data, err := os.ReadFile(path) //nolint:gosec // path is cwd go.mod, not user input
+	data, err := os.ReadFile(path) // path is cwd go.mod, not user input
 	if err != nil {
 		return ""
 	}
