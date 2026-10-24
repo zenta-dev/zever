@@ -131,8 +131,16 @@ jobs:
             -p 9090:9090 \
             adobe/s3mock:4.11.0
           for i in $(seq 1 30); do
-            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9090/)" = "200" ]; then
-              echo "s3mock live after ${i}x5s"
+            # S3Mock rarely returns 200 on `/`; any HTTP response (200/403/
+            # 404/S3 XML errors like NoSuchBucket) means the server is up.
+            # Only a connection failure (curl exit != 0, code 000) retries.
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9090/ || true)"
+            if [ -n "$code" ] && [ "$code" != "000" ]; then
+              echo "s3mock live after ${i}x5s (HTTP $code)"
+              exit 0
+            fi
+            if curl -s http://localhost:9090/ 2>/dev/null | grep -qE 'NoSuchBucket|NoSuchKey|AccessDenied'; then
+              echo "s3mock live after ${i}x5s (S3 error shape)"
               exit 0
             fi
             sleep 5

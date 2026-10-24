@@ -41,17 +41,13 @@ env:
      {"day":6,"modules":["./adapters/.../memory/...","./adapters/.../log/..."],"label":"adapters-memory+log"}]
 
 jobs:
+  # Single job: compute today's group once (date -u +%w) and run only it.
+  # No matrix fan-out — one runner per workflow run.
   bench-group:
-    name: bench-${{ matrix.group.label }}
+    name: bench-group
     runs-on: ubuntu-24.04
     continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        # Deterministic selection: pick the group matching today's day-of-week.
-        # The fromJson parses MODULE_GROUPS; the filter selects the entry where
-        # day == (current date in UTC) % 7.
-        group: ${{ fromJson(env.MODULE_GROUPS) }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -62,15 +58,15 @@ jobs:
         run: |
           DAY=$(date -u +%w)  # 0=Sun..6=Sat
           echo "day=$DAY" >> $GITHUB_OUTPUT
-          # Filter the matrix to only today's group
-          echo "${{ toJson(matrix.group) }}" | jq -c "select(.day == $DAY)" > /tmp/group.json || true
-          if [ ! -s /tmp/group.json ]; then
+          # Single selection: pick today's group from MODULE_GROUPS once.
+          GROUP=$(printf '%s' "$MODULE_GROUPS" | jq -c --argjson day "$DAY" '[.[] | select(.day == $day)][0]')
+          if [ -z "$GROUP" ] || [ "$GROUP" = "null" ]; then
             echo "No group for day $DAY, skipping"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            cat /tmp/group.json | jq -r '.modules[]' | tr '\n' ' ' > /tmp/modules.txt
+            printf '%s' "$GROUP" | jq -r '.modules | join(" ")' > /tmp/modules.txt
             echo "modules=$(cat /tmp/modules.txt)" >> $GITHUB_OUTPUT
-            echo "label=$(cat /tmp/group.json | jq -r '.label')" >> $GITHUB_OUTPUT
+            echo "label=$(printf '%s' "$GROUP" | jq -r '.label')" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       - name: Run benchmarks
@@ -94,6 +90,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [bench-group]
     continue-on-error: true
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
