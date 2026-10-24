@@ -1,3 +1,6 @@
+# Offline docs gates (audit, lint, legacy-config, check-links + self-tests)
+# are duplicated in the ci.yml `docs-audit` job, which is the PR-blocking
+# copy; the docs.yml `build` job below is the deploy path.
 name: docs
 
 on:
