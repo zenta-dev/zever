@@ -10,8 +10,8 @@ Zever is a Go multi-module monorepo (`go 1.27.3`). Your application imports `cor
 ## The four roles
 
 ```text
-core/<b>          battery interface + Register/Open registry (container resolves)
-adapters/<b>/<a>  one Go module per adapter; Register() wires it into its core registry
+core/<b>          battery interface + Options + DefaultRef (container resolves)
+adapters/<b>/<a>  one Go module per adapter; New constructor wired with container.Provide
 shared/*          SDK-free helpers (codec, redisclient, s3opts, retry, ...)
 wiring            config/ container/    layered config + lazy resolver
 language          dsl/                  .zen compiler frontend (compile time only)
@@ -82,7 +82,7 @@ The dialect comes per call from `conn.Dialect()`, so the same query code prints 
 - No globals and no `init()` wiring. `ctx` is the first argument of IO functions and is never stored in a struct.
 - Exported identifiers need a doc comment starting with the name. `goimports` local prefix is `github.com/zenta-dev/zever`; `depguard` denies `github.com/pkg/errors` and `io/ioutil`.
 - Do not add methods to a public service interface: it breaks every implementer. Add a new interface instead.
-- New service shape: interface plus `Register`/`Open` registry in `core/<b>`, one module per adapter in `adapters/<b>/<a>` with a `Register()` call, shared SDK-free code in `shared/*`, and a `README.md` with an adapter table.
+- New service shape: interface plus `Options` and `DefaultRef` in `core/<b>`, one module per adapter in `adapters/<b>/<a>` with a `New` constructor wired via `container.Provide`, shared SDK-free code in `shared/*`, and a `README.md` with an adapter table.
 - Timeouts and intervals are `time.Duration` (cookie `MaxAge` int seconds excepted); pool options use the `MaxConn*` prefix order. Options that are JSON-serialized (wire types, and the option maps `config` redacts) need snake_case `json` tags.
 - Tests stay deterministic: no `time.Sleep` sync, no network, no unseeded randomness. File suffixes (`cover`, `live`, `bench`, `internal`, `race`, `closure`) encode purpose; helpers use `stub*`, `must*`, `freshAdapter`.
 - Shutdown is a deploy contract: one container per process, closed in dependency order with a timeout parent (see [Lifecycle](../../concepts/lifecycle/)).

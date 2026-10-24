@@ -131,11 +131,12 @@ go test ./examples/...            # everything, zero infra
 go test -race ./examples/...     # race detector
 ```
 
-Zero-infra defaults need nothing else. Infra adapters are opt-in via env
+Zero-infra defaults need nothing else. Infra backends are opt-in by wiring a different adapter in `internal/app/wiring.go` and setting its env options
 (documented per example when added):
 
 ```sh
-# DB_ADAPTER=postgres DB_DSN=... go test ./examples/showcase/...
+# Wire the postgres adapter in wiring.go, then set its DSN:
+# DB_DSN=... go test ./examples/showcase/...
 ```
 
 ## Known gaps (found via `zever doctor`, not fixed here)

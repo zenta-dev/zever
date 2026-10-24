@@ -4,8 +4,9 @@
 // Scaffolded by `zever generate worker` (hand-written to match its shape).
 // The scheduler dispatches onto the queue and the worker consumes from it, so
 // both must share one queue: with the in-process memory adapter that means
-// one process. Swapping the queue adapter for redis/nats via QUEUE_* env is
-// what makes this distributable, with no code change here.
+// one process. Swapping the queue backend for redis is a wiring change
+// (swap the Queue Provide entry in internal/app/wiring.go, then rebuild);
+// that is what makes this distributable.
 package main
 
 import (

@@ -1,7 +1,9 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// Explicit Register calls register exactly the adapters selected in
+// Wiring lives in wiring.go: one container.Provide entry per battery naming
+// the compiled-in adapter constructor. Changing a backend means editing
+// that entry and rebuilding; nothing is selected from the environment.
 // Config is env-only. JWT secret comes from the environment only: set
 // AUTH_JWT_SECRET to at least 32 bytes. It is never stored in a file.
 package app

@@ -1,7 +1,9 @@
 // Package app builds the config and container shared by this project's
 // binaries.
 //
-// Explicit Register calls register exactly the adapters selected in
+// Wiring lives in wiring.go: one container.Provide entry per battery naming
+// the compiled-in adapter constructor. Changing an adapter means editing
+// that entry and rebuilding; nothing is selected from the environment.
 // Config is env-only. JWT secret comes from the environment only: set
 // AUTH_JWT_SECRET to at least 32 bytes. It is never stored in a file.
 package app
@@ -59,9 +61,10 @@ func New() (*container.Container, error) {
 	return container.New(cfg, Providers()...), nil
 }
 
-// Register wires every adapter selected via env into its battery
-// registry. Registration is idempotent and performs no I/O. New calls it;
+// Register is a no-op kept for entrypoints that call it directly.
+// Backends are wired with container.Provide entries in wiring.go, so there
+// is no registry to populate. New builds the container from Providers;
 // entrypoints that build the container themselves (cmd/server applies runtime
-// defaults to the config before container.New) call it directly.
+// defaults to the config before container.New) use Providers directly.
 func Register() {
 }

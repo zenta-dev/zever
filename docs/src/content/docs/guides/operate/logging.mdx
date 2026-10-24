@@ -1,11 +1,11 @@
 ---
 title: Logging
-description: Log structured events through one interface and swap slog, zerolog, pretty, or noop by config.
+description: Log structured events through one interface and swap slog, zerolog, pretty, or noop by wiring.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every service logs through one interface, `log.Logger`. Swap the adapter and every line changes shape with no call-site changes: `noop` for tests, `slog` for the stdlib, `zerolog` for high-throughput JSON, `pretty` for local development. Resolve one logger per process and inject it.
+Every service logs through one interface, `log.Logger`. Swap the wired backend and every line changes shape with no call-site changes: `noop` for tests, `slog` for the stdlib, `zerolog` for high-throughput JSON, `pretty` for local development. Resolve one logger per process and inject it.
 
 ## Quick start
 
@@ -15,7 +15,7 @@ Every service logs through one interface, `log.Logger`. Swap the adapter and eve
 ```sh
 ```
 
-The only option is `min_level` (minimum severity). `Options.Validate()` accepts the zero value, and the adapter choice is validated at resolve time. The container wires nothing, so register the adapter first:
+The only option is `min_level` (minimum severity). `Options.Validate()` accepts the zero value. The backend is chosen by the `container.Provide` entry in `internal/app/wiring.go`, never by config; the snippet below shows the explicit form:
 
 ```go title="main.go"
 import (
@@ -56,7 +56,7 @@ level=INFO msg="request handled" user_id=u_123 duration=12ms
 
 Prefer `Str`/`Int`/`Dur` over `Any` for hot fields, because `Any` uses reflection. Reserve `Any` for dynamic payloads, and never pass request bodies, headers, or config maps through it. `RequestLogger` emits one line per request (method, path, status, `duration_ms` (fractional milliseconds), plus `request_id` when present); `Recover` logs panics with value and stack, then responds 500. Emit one line per failure, with no duplicates.
 
-The API: `Logger` exposes `Debug()`, `Info()`, `Warn()`, `Error()`, `Fatal()`, `With()`, `WithContext(ctx)`, `Enabled(level)`, `Sync()`, and `Name()`. `Event` exposes `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Dur`, `Time`, `Err`, `AnErr(key, err)`, `Any`, `Msg`, `Msgf(format, args...)`, and `Send`. Helpers: `log.ContextWithLogger(ctx, l)`, `log.FromContext(ctx, fallback)`, `log.Open(adapter, opts)`, and `middleware.RequestLogger(logger)`.
+The API: `Logger` exposes `Debug()`, `Info()`, `Warn()`, `Error()`, `Fatal()`, `With()`, `WithContext(ctx)`, `Enabled(level)`, `Sync()`, and `Name()`. `Event` exposes `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Dur`, `Time`, `Err`, `AnErr(key, err)`, `Any`, `Msg`, `Msgf(format, args...)`, and `Send`. Helpers: `log.ContextWithLogger(ctx, l)`, `log.FromContext(ctx, fallback)`, `container.Provide(log.DefaultRef(), logslog.New)`, and `middleware.RequestLogger(logger)`.
 
 ## Carry a logger through context
 
@@ -68,7 +68,7 @@ Never pass raw config or headers into `Any`, which may print DSNs and keys. Use 
 
 ## Production checklist
 
-- One process, one adapter: `slog` for stdlib-only builds, `zerolog` for high-throughput JSON, `pretty` for local shells, `noop` for tests.
+- One process, one backend: `slog` for stdlib-only builds, `zerolog` for high-throughput JSON, `pretty` for local shells, `noop` for tests.
 - Buffered providers flush through their own `Shutdown(ctx)`, which `c.Close(ctx)` probes. Do not exit before `Close` returns or trailing lines drop.
 - Shutdown never blocks past 5s per service (or the parent deadline). Keep log I/O fast and never format unbounded payloads.
 
@@ -77,7 +77,7 @@ Never pass raw config or headers into `Any`, which may print DSNs and keys. Use 
 <details>
 <summary>No log output in tests</summary>
 
-The resolved adapter is `noop`, correct for hermetic tests. Assert behavior, not lines, or resolve `slog` explicitly.
+The wired backend is `noop`, correct for hermetic tests. Assert behavior, not lines, or wire `slog` explicitly.
 </details>
 
 <details>
