@@ -178,7 +178,7 @@ func startLaunch(ctx context.Context, entryDir string, passthroughArgs []string,
 	// deadline: runLaunch cancels ctx on a repeated signal to reap `go run`
 	// when the child ignores the first. entryDir comes from the developer's
 	// own zever config, not from untrusted input.
-	//nolint:gosec // see above
+	// see above
 	cmd := exec.CommandContext(ctx, "go", buildGoRunArgs(entryDir, passthroughArgs)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 

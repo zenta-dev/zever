@@ -103,7 +103,7 @@ func TestNew_DefaultPath(t *testing.T) {
 		if err2 != nil {
 			t.Fatalf("read fixture: %v", err2)
 		}
-		if writeErr := os.WriteFile(filepath.Join(dir, "cities.json"), data2, 0o600); writeErr != nil { //nolint:gosec // test temp path
+		if writeErr := os.WriteFile(filepath.Join(dir, "cities.json"), data2, 0o600); writeErr != nil { // test temp path
 			t.Fatalf("write: %v", writeErr)
 		}
 		t.Chdir(dir)

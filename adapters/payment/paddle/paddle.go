@@ -288,10 +288,10 @@ func parsePaddleAmount(s string) (int64, error) {
 			return math.MinInt64, nil
 		}
 
-		return -int64(cents), nil //nolint:gosec // G115: cents <= limit <= MaxInt64+1, MinInt64 handled above
+		return -int64(cents), nil // G115: cents <= limit <= MaxInt64+1, MinInt64 handled above
 	}
 
-	return int64(cents), nil //nolint:gosec // G115: cents <= limit == MaxInt64 here
+	return int64(cents), nil // G115: cents <= limit == MaxInt64 here
 }
 
 // formatPaddleAmount renders minor units as a Paddle major-unit decimal so
@@ -301,7 +301,7 @@ func formatPaddleAmount(amount int64) string {
 
 	var mag uint64
 	if neg {
-		mag = uint64(-(amount + 1)) + 1 //nolint:gosec // G115: amount < 0 so -(amount+1) >= 0 fits
+		mag = uint64(-(amount + 1)) + 1 // G115: amount < 0 so -(amount+1) >= 0 fits
 	} else {
 		mag = uint64(amount)
 	}

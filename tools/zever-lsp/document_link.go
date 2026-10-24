@@ -146,14 +146,14 @@ func trimURLPunctuation(url string) string {
 func commentLinkRange(text string, start, end, line int) protocol.Range {
 	return protocol.Range{
 		Start: protocol.Position{
-			//nolint:gosec // line indexes and measured widths are non-negative
+			// line indexes and measured widths are non-negative
 			Line:      uint32(line),
-			Character: uint32(lineWidth(text[:start])), //nolint:gosec // line widths non-negative
+			Character: uint32(lineWidth(text[:start])), // line widths non-negative
 		},
 		End: protocol.Position{
-			//nolint:gosec // line indexes and measured widths are non-negative
+			// line indexes and measured widths are non-negative
 			Line:      uint32(line),
-			Character: uint32(lineWidth(text[:end])), //nolint:gosec // line widths non-negative
+			Character: uint32(lineWidth(text[:end])), // line widths non-negative
 		},
 	}
 }

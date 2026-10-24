@@ -64,8 +64,8 @@ func findCandidate(cands []candidate, label string) (candidate, bool) {
 // line, the usual hand-built cursor for lexical-tier completion fixtures.
 func atLineEnd(src string, line int) protocol.Position {
 	return protocol.Position{
-		Line:      uint32(line),                                //nolint:gosec // test fixture line index
-		Character: uint32(len(strings.Split(src, "\n")[line])), //nolint:gosec // len never negative
+		Line:      uint32(line),                                // test fixture line index
+		Character: uint32(len(strings.Split(src, "\n")[line])), // len never negative
 	}
 }
 
@@ -120,7 +120,7 @@ func TestCompletionRelationTargetCrossFile(t *testing.T) {
 	})
 
 	file, _ := parser.New("c.zen", []byte(taskSrc)).ParseFile()
-	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(taskSrc, "\n")[2]))} //nolint:gosec // len never negative
+	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(taskSrc, "\n")[2]))} // len never negative
 
 	items := completionAt(result.Schema, file, taskSrc, cursor)
 	labels := completionLabels(items)
@@ -183,7 +183,7 @@ func TestCompletionValidateArgName(t *testing.T) {
 	src := "entity User {\n\tname: string @validate(\n}\n"
 
 	file, _ := parser.New("u.zen", []byte(src)).ParseFile()
-	cursor := protocol.Position{Line: 1, Character: uint32(len(strings.Split(src, "\n")[1]))} //nolint:gosec // len never negative
+	cursor := protocol.Position{Line: 1, Character: uint32(len(strings.Split(src, "\n")[1]))} // len never negative
 
 	items := completionAt(nil, file, src, cursor)
 	labels := completionLabels(items)
@@ -232,7 +232,7 @@ func TestCompletionValidateArgNameNarrowsByScalarType(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			file, _ := parser.New("u.zen", []byte(tc.src)).ParseFile()
-			cursor := protocol.Position{Line: 1, Character: uint32(len(strings.Split(tc.src, "\n")[1]))} //nolint:gosec // test fixture
+			cursor := protocol.Position{Line: 1, Character: uint32(len(strings.Split(tc.src, "\n")[1]))} // test fixture
 
 			labels := completionLabels(completionAt(nil, file, tc.src, cursor))
 
@@ -263,7 +263,7 @@ func TestCompletionValidateArgNameFallsBackWhenTypeUnknown(t *testing.T) {
 	src := "entity User {\n\tname: string\n\t\t@validate(\n}\n"
 
 	file, _ := parser.New("u.zen", []byte(src)).ParseFile()
-	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(src, "\n")[2]))} //nolint:gosec // test fixture
+	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(src, "\n")[2]))} // test fixture
 
 	labels := completionLabels(completionAt(nil, file, src, cursor))
 
@@ -304,7 +304,7 @@ func TestCompletionOnDeleteValue(t *testing.T) {
 	src := "entity Task {\n\tuser_id: uuid\n\tbelongs_to user: User @on_delete(\n}\n"
 
 	file, _ := parser.New("t.zen", []byte(src)).ParseFile()
-	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(src, "\n")[2]))} //nolint:gosec // len never negative
+	cursor := protocol.Position{Line: 2, Character: uint32(len(strings.Split(src, "\n")[2]))} // len never negative
 
 	items := completionAt(nil, file, src, cursor)
 	labels := completionLabels(items)
@@ -1220,7 +1220,7 @@ func TestCompletionDispatchValueOffersJobs(t *testing.T) {
 			file, _ := parser.New("s.zen", []byte(src)).ParseFile()
 
 			cursor := atLineEnd(src, 4)
-			cursor.Character -= uint32(len(tc.value)) //nolint:gosec // test fixture arithmetic
+			cursor.Character -= uint32(len(tc.value)) // test fixture arithmetic
 
 			items := completionAt(nil, file, src, cursor)
 			labels := completionLabels(items)
@@ -1671,7 +1671,7 @@ func TestCompletionSnippetBraceMagic(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			file, _ := parser.New("m.zen", []byte(tc.src)).ParseFile()
-			cursor := protocol.Position{Line: uint32(tc.line), Character: uint32(tc.char)} //nolint:gosec // test fixture indices
+			cursor := protocol.Position{Line: uint32(tc.line), Character: uint32(tc.char)} // test fixture indices
 
 			item, ok := findCompletionItem(completionAtWithCaps(nil, file, tc.src, cursor, snippetCaps()), tc.label)
 			if !ok {

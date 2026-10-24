@@ -204,7 +204,7 @@ func pointServeAtStub(t *testing.T, repoRoot, scaffoldDir string) {
 		t.Fatal("scaffold go.mod has no serve replace to repoint")
 	}
 
-	if err := os.WriteFile(gomodPath, []byte(strings.Join(out, "\n")), 0o600); err != nil { //nolint:gosec // test temp dir
+	if err := os.WriteFile(gomodPath, []byte(strings.Join(out, "\n")), 0o600); err != nil { // test temp dir
 		t.Fatalf("write scaffold go.mod: %v", err)
 	}
 }

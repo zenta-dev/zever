@@ -61,7 +61,7 @@ func (h *hasher) Verify(_ context.Context, hash, pwd string) (bool, error) {
 		return false, err
 	}
 
-	computed := argon2.IDKey([]byte(pwd), salt, params.time, params.memory, params.threads, uint32(len(expected))) //nolint:gosec // G115: len comes from a successfully decoded stored hash, not attacker input
+	computed := argon2.IDKey([]byte(pwd), salt, params.time, params.memory, params.threads, uint32(len(expected))) // G115: len comes from a successfully decoded stored hash, not attacker input
 
 	if subtle.ConstantTimeCompare(computed, expected) == 1 {
 		return true, nil
@@ -80,7 +80,7 @@ func (h *hasher) NeedsRehash(_ context.Context, hash string) (bool, error) {
 		return true, nil
 	}
 
-	if uint32(len(expected)) != h.opts.KeyLen { //nolint:gosec // G115: len comes from a successfully decoded stored hash, not attacker input
+	if uint32(len(expected)) != h.opts.KeyLen { // G115: len comes from a successfully decoded stored hash, not attacker input
 		return true, nil
 	}
 

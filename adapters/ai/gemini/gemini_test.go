@@ -153,7 +153,7 @@ func openWithServer(t *testing.T, srv *httptest.Server) ai.AI { //nolint:unused
 	ad, _ := a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if tr.TLSClientConfig == nil {
-			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		} else {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}
@@ -170,7 +170,7 @@ func openWithKeyAndServer(t *testing.T, key string, srv *httptest.Server) ai.AI 
 	ad, _ := a.(*adapter)
 	if tr, ok := ad.client.ClientConfig().HTTPClient.Transport.(*http.Transport); ok {
 		if tr.TLSClientConfig == nil {
-			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+			tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		} else {
 			tr.TLSClientConfig.InsecureSkipVerify = true
 		}

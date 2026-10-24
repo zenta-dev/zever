@@ -39,7 +39,7 @@ func cursorOn(t *testing.T, src string, line int, needle string) protocol.Positi
 		t.Fatalf("%q not found on line %d (%q)", needle, line, lines[line])
 	}
 
-	return protocol.Position{Line: uint32(line), Character: uint32(col)} //nolint:gosec // test fixture
+	return protocol.Position{Line: uint32(line), Character: uint32(col)} // test fixture
 }
 
 // definitionLocs unwraps a DefinitionResult union into its LocationSlice arm,
@@ -92,7 +92,7 @@ func TestDefinitionAtRelationTargetJumpsAcrossFiles(t *testing.T) {
 	// target type, not the field name, by searching past "belongs_to user: ".
 	line := 3
 	col := strings.Index(strings.Split(defBSrc, "\n")[line], ": User") + len(": ")
-	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} //nolint:gosec // test fixture
+	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} // test fixture
 
 	locations := definitionLocs(t, definitionAt(schema, file, cursor))
 

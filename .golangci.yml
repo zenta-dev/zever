@@ -140,7 +140,12 @@ linters:
       enable:
         - shadow
     gosec:
-      # Curated security rules: enable only high-confidence, actionable checks.
+      # Curated security rules: run only high-confidence, actionable checks.
+      # The allow-list key is `includes`: gosec settings never had an
+      # `enable` key (v2.14 and v2.15 alike), so `enable:` was silently
+      # ignored and gosec ran every default rule instead of this list.
+      # IDs not listed here are skipped, for rules and analyzers alike,
+      # which is also how the G7xx taint analyzers stay off (see G703).
       # Excluded false-positive-heavy rules:
       #  G103: unsafe in generated protobuf code
       #  G104: unhandled errors (often intentional pass-through)
@@ -151,7 +156,7 @@ linters:
       #  G402: TLS InsecureSkipVerify (explicit opt-in for testing)
       #  G404: weak random (retry/pruner jitter, non-security)
       #  G703: taint analysis (high FP rate on validated paths)
-      enable:
+      includes:
         - G101  # hardcoded credentials
         - G102  # bind to all interfaces
         - G106  # ssh.InsecureIgnoreHostKey
@@ -171,6 +176,14 @@ linters:
         - G504  # import blacklist
         - G505  # import blacklist
         - G601  # implicit memory aliasing
+      # Fail closed on bare suppressions: every #nosec must name a rule ID
+      # and carry a `-- reason` (gosec v2.29+, surfaced via golangci v2.15).
+      # This covers #nosec only; //nolint:gosec directives keep their
+      # inline reasons by convention, enforced in review.
+      config:
+        global:
+          nosec-require-rules: true
+          nosec-require-justification: true
   exclusions:
     presets:
       - comments

@@ -309,7 +309,7 @@ func TestRenderTimeout(t *testing.T) {
 func texLiveVersion(tb testing.TB) int {
 	tb.Helper()
 
-	//nolint:gosec // fixed argv; read-only --version probe for the feature-skip check.
+	// Fixed argv; read-only --version probe for the feature-skip check.
 	out, err := exec.CommandContext(tb.Context(), document.DefaultLatexCommand, "--version").Output()
 	if err != nil {
 		tb.Skipf("%s --version: %v", document.DefaultLatexCommand, err)

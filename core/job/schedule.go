@@ -99,14 +99,14 @@ func (s *Scheduler) addSchedule(spec, jobName string, args any, sched cron.Sched
 		s.fireWithSchedule(jobName, args, spec, sched)
 	}))
 
-	//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
+	// cron EntryIDs are a small positive sequence starting at 1.
 	return EntryID(id)
 }
 
 // Remove unregisters the schedule with the given ID.
 // An unknown ID is a no-op returning nothing, per cron.Cron.Remove semantics.
 func (s *Scheduler) Remove(id EntryID) {
-	//nolint:gosec // IDs originate from Every, a small positive cron sequence.
+	// IDs originate from Every, a small positive cron sequence.
 	s.cron.Remove(cron.EntryID(id))
 }
 
@@ -115,7 +115,7 @@ func (s *Scheduler) Entries() []EntryID {
 	entries := s.cron.Entries()
 	ids := make([]EntryID, 0, len(entries))
 	for _, e := range entries {
-		//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
+		// cron EntryIDs are a small positive sequence starting at 1.
 		ids = append(ids, EntryID(e.ID))
 	}
 

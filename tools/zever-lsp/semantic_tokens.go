@@ -679,10 +679,10 @@ func encodeSemanticTokens(spans []tokenSpan) []uint32 {
 		}
 
 		data = append(data,
-			uint32(deltaLine),      //nolint:gosec // spans sorted ascending: deltas never negative
-			uint32(deltaChar),      //nolint:gosec // spans sorted ascending: deltas never negative
-			uint32(span.Length),    //nolint:gosec // token lengths never negative
-			uint32(span.TokenType), //nolint:gosec // token types are non-negative kind indexes
+			uint32(deltaLine),      // spans sorted ascending: deltas never negative
+			uint32(deltaChar),      // spans sorted ascending: deltas never negative
+			uint32(span.Length),    // token lengths never negative
+			uint32(span.TokenType), // token types are non-negative kind indexes
 			span.Modifiers,         // declaration identifiers carry the definition bit, references none
 		)
 
@@ -718,7 +718,7 @@ func filterTokenSpansToRange(spans []tokenSpan, rng protocol.Range) []tokenSpan 
 
 // spanIntersectsRange reports whether the single-line span sp overlaps rng.
 func spanIntersectsRange(sp tokenSpan, rng protocol.Range) bool {
-	line := uint32(sp.Line) //nolint:gosec // non-negative
+	line := uint32(sp.Line) // non-negative
 
 	if line < rng.Start.Line {
 		return false
@@ -728,8 +728,8 @@ func spanIntersectsRange(sp tokenSpan, rng protocol.Range) bool {
 		return false
 	}
 
-	startChar := uint32(sp.StartChar)        //nolint:gosec // non-negative
-	endChar := startChar + uint32(sp.Length) //nolint:gosec // non-negative
+	startChar := uint32(sp.StartChar)        // non-negative
+	endChar := startChar + uint32(sp.Length) // non-negative
 
 	if line == rng.Start.Line && endChar <= rng.Start.Character {
 		return false
@@ -768,7 +768,7 @@ func computeSemTokDelta(old, next []uint32) []protocol.SemanticTokensEdit {
 
 	return []protocol.SemanticTokensEdit{{
 		Start:       uint32(prefix),
-		DeleteCount: uint32(deleteCount), //nolint:gosec // deleteCount is a non-negative slice length difference
+		DeleteCount: uint32(deleteCount), // deleteCount is a non-negative slice length difference
 		Data:        insertData,
 	}}
 }

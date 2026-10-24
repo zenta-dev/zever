@@ -10,7 +10,7 @@
 # The fuzz tests themselves are owned by stream A (config/*_test.go); this
 # script only wires the CI execution. Target list must track the Fuzz*
 # functions in config: FuzzParseDotEnv, FuzzSetOptionField, FuzzMatchService,
-# FuzzApplyEnvSecretScrub.
+# FuzzApplyEnvSecretScrub, FuzzResolve.
 #
 # Usage: FUZZTIME=60s bash tools/ci-env-fuzz-smoke.sh
 set -euo pipefail
@@ -20,7 +20,7 @@ FUZZTIME="${FUZZTIME:-60s}"
 
 command -v go >/dev/null 2>&1 || { echo "ci-env-fuzz-smoke: go toolchain not on PATH" >&2; exit 1; }
 
-for fn in FuzzParseDotEnv FuzzSetOptionField FuzzMatchService FuzzApplyEnvSecretScrub; do
+for fn in FuzzParseDotEnv FuzzSetOptionField FuzzMatchService FuzzApplyEnvSecretScrub FuzzResolve; do
   echo "== config $fn ($FUZZTIME)"
   go -C "$ROOT/config" test -run '^$' -fuzz "^${fn}\$" -fuzztime "$FUZZTIME" .
 done

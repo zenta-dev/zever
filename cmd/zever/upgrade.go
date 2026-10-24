@@ -630,7 +630,7 @@ func installUpgradePOSIX(data []byte, exePath string) error {
 func stageUpgradeWindows(data []byte, exePath string) (string, error) {
 	staged := strings.TrimSuffix(exePath, filepath.Ext(exePath)) + ".new.exe"
 
-	if err := os.WriteFile(staged, data, 0o755); err != nil { //nolint:gosec // staged path derives from the running binary location and must stay executable.
+	if err := os.WriteFile(staged, data, 0o755); err != nil { // staged path derives from the running binary location and must stay executable.
 		return "", fmt.Errorf("zever upgrade: stage new binary: %w", err)
 	}
 

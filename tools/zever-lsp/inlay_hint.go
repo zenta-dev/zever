@@ -335,7 +335,7 @@ func implicitModuleHint(module *ir.Module, namePos diag.Position, name string) (
 // starts at p, in LSP's 0-based line/character coordinates.
 func afterIdent(p diag.Position, ident string) protocol.Position {
 	end := lspPosition(p)
-	end.Character += uint32(len(ident)) //nolint:gosec // len is never negative
+	end.Character += uint32(len(ident)) // len is never negative
 
 	return end
 }

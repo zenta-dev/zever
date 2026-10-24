@@ -80,7 +80,7 @@ func runPins(root string, mods map[string]string, ver string, set bool, stdout, 
 		want := withWorkReplaces(string(wb), workReplaces(mods, ver))
 		if want != string(wb) {
 			if set {
-				if err := os.WriteFile(workPath, []byte(want), 0o644); err != nil { //nolint:gosec // go.work is world-readable
+				if err := os.WriteFile(workPath, []byte(want), 0o644); err != nil { // go.work is world-readable
 					fmt.Fprintf(stderr, "modgraph: %v\n", err)
 					return 1
 				}
@@ -102,7 +102,7 @@ func runPins(root string, mods map[string]string, ver string, set bool, stdout, 
 			if n == 0 {
 				continue
 			}
-			if err := os.WriteFile(path, []byte(out), 0o644); err != nil { //nolint:gosec // go.mod is world-readable
+			if err := os.WriteFile(path, []byte(out), 0o644); err != nil { // go.mod is world-readable
 				fmt.Fprintf(stderr, "modgraph: %v\n", err)
 				return 1
 			}

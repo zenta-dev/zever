@@ -41,7 +41,7 @@ func TestCompatMatrixCheckRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f, append(raw, '\n'), 0o600); err != nil { //nolint:gosec // f is under t.TempDir(), not user input
+	if err := os.WriteFile(f, append(raw, '\n'), 0o600); err != nil { // f is under t.TempDir(), not user input
 		t.Fatal(err)
 	}
 	stdout.Reset()

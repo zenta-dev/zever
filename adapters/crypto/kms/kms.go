@@ -194,14 +194,14 @@ func (d *driver) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) 
 	out = append(out, envelopeVersion)
 
 	var lb [2]byte
-	binary.BigEndian.PutUint16(lb[:], uint16(len(d.keyID))) //nolint:gosec // length bounded above
+	binary.BigEndian.PutUint16(lb[:], uint16(len(d.keyID)))
 	out = append(out, lb[:]...)
 	out = append(out, d.keyID...)
 
 	if len(encDEK) > math.MaxUint16 {
 		return nil, fmt.Errorf("kms: %w: encrypted data key too long", crypto.ErrInvalidKey)
 	}
-	binary.BigEndian.PutUint16(lb[:], uint16(len(encDEK))) //nolint:gosec // length bounded above
+	binary.BigEndian.PutUint16(lb[:], uint16(len(encDEK)))
 	out = append(out, lb[:]...)
 	out = append(out, encDEK...)
 	out = append(out, nonce...)

@@ -29,7 +29,7 @@ func TestEveryReusesCachedSchedule(t *testing.T) {
 	var entrySched any
 
 	for _, e := range s.cron.Entries() {
-		//nolint:gosec // IDs originate from Every, a small positive cron sequence.
+		// IDs originate from Every, a small positive cron sequence.
 		if EntryID(e.ID) == id {
 			entrySched = e.Schedule
 

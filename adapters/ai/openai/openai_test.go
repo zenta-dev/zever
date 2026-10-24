@@ -145,7 +145,7 @@ func TestNewHTTPClient_Fallback(t *testing.T) {
 func TestNewHTTPClient_UpgradeLegacyTLS(t *testing.T) {
 	// Mutates global DefaultTransport: must not be parallel.
 	prev := http.DefaultTransport
-	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}} //nolint:gosec
+	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}
 	t.Cleanup(func() { http.DefaultTransport = prev })
 
 	c := newHTTPClient(0, false, false)
@@ -1347,7 +1347,7 @@ func TestNewHTTPClientFromTransport(t *testing.T) {
 		t.Fatalf("nil TLSConfig not correct")
 	}
 	// legacy TLS
-	c = newHTTPClientFromTransport(0, false, false, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}) //nolint:gosec
+	c = newHTTPClientFromTransport(0, false, false, &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}})
 	if tr, ok := c.Transport.(*http.Transport); !ok || tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("legacy TLS not upgraded")
 	}

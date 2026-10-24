@@ -412,7 +412,7 @@ func GenerateModule(cfg GenerateModuleConfig) (string, error) {
 		return "", fmt.Errorf("%s: mkdir %q: %w", tag, dir, err)
 	}
 
-	if err := os.WriteFile(path, []byte(stub), 0o644); err != nil { //nolint:gosec // generated schema stub, not a secret
+	if err := os.WriteFile(path, []byte(stub), 0o644); err != nil { // generated schema stub, not a secret
 		return "", fmt.Errorf("%s: write %q: %w", tag, path, err)
 	}
 

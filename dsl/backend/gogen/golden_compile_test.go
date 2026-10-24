@@ -303,7 +303,7 @@ func workspaceModulePaths(t *testing.T, root string) []string {
 			return nil
 		}
 
-		data, readErr := os.ReadFile(path) //nolint:gosec // path comes from filepath.WalkDir over the repo root, not user input
+		data, readErr := os.ReadFile(path) // path comes from filepath.WalkDir over the repo root, not user input
 		if readErr != nil {
 			return readErr
 		}

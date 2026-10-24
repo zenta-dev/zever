@@ -115,7 +115,7 @@ func writeScaffold(tag, path string, content []byte, force bool) error {
 		return fmt.Errorf("%s: mkdir %q: %w", tag, filepath.Dir(path), err)
 	}
 
-	if err := os.WriteFile(path, content, 0o644); err != nil { //nolint:gosec // generated source, not a secret
+	if err := os.WriteFile(path, content, 0o644); err != nil { // generated source, not a secret
 		return fmt.Errorf("%s: write %q: %w", tag, path, err)
 	}
 
