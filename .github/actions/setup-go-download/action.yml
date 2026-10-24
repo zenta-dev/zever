@@ -1,0 +1,24 @@
+name: setup-go-download
+description: Set up Go and pre-download workspace modules with retries (scaffolding for future migration).
+inputs:
+  go-version-file:
+    description: File to read the Go version from.
+    default: go.work
+    required: false
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: ${{ inputs.go-version-file }}
+        cache-dependency-path: |
+          go.work.sum
+          **/go.sum
+    - name: Pre-download modules (retry on transient proxy errors)
+      shell: bash
+      run: |
+        for i in 1 2 3; do
+          make -s download-all && exit 0
+          echo "download attempt $i failed; retrying"; sleep $((i * 10))
+        done
+        exit 1

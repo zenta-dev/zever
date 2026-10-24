@@ -55,6 +55,12 @@ jobs:
             orm/**/testdata/fuzz
             core/**/testdata/fuzz
             config/testdata/fuzz
+            adapters/webhook/**/testdata/fuzz
+            adapters/storage/**/testdata/fuzz
+            adapters/payment/**/testdata/fuzz
+            adapters/auth/jwt/testdata/fuzz
+            adapters/secrets/vault/testdata/fuzz
+            shared/codec/testdata/fuzz
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-
@@ -93,6 +99,12 @@ jobs:
             orm/**/testdata/fuzz
             core/**/testdata/fuzz
             config/testdata/fuzz
+            adapters/webhook/**/testdata/fuzz
+            adapters/storage/**/testdata/fuzz
+            adapters/payment/**/testdata/fuzz
+            adapters/auth/jwt/testdata/fuzz
+            adapters/secrets/vault/testdata/fuzz
+            shared/codec/testdata/fuzz
           key: fuzz-corpus-${{ github.run_id }}
       - name: Upload corpus artifact
         if: always()
@@ -104,5 +116,11 @@ jobs:
             orm/**/testdata/fuzz
             core/**/testdata/fuzz
             config/testdata/fuzz
+            adapters/webhook/**/testdata/fuzz
+            adapters/storage/**/testdata/fuzz
+            adapters/payment/**/testdata/fuzz
+            adapters/auth/jwt/testdata/fuzz
+            adapters/secrets/vault/testdata/fuzz
+            shared/codec/testdata/fuzz
           if-no-files-found: warn
           retention-days: 30

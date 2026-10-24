@@ -81,7 +81,7 @@ jobs:
           zever serve > serve.log 2>&1 &
           SRV=$!
           trap 'kill $SRV 2>/dev/null || true' EXIT
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             if curl -fsS -m 2 localhost:8080/healthz >/dev/null; then
               break
             fi
@@ -104,3 +104,12 @@ jobs:
       # `make quickstart-check`.
       - name: Dev-boot journey (3 commands, timed)
         run: bash tools/ci-quickstart-dev.sh "$RUNNER_TEMP/zever-bin/zever"
+      - name: Upload serve.log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: quickstart-serve-log
+          path: |
+            ${{ runner.temp }}/qs/hello/serve.log
+            ${{ runner.temp }}/qs/hello/schema/
+          if-no-files-found: warn

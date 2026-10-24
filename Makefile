@@ -319,6 +319,16 @@ deps-sync-check: ## Verify no dependency drift remains after a bump
 dependabot-check: ## Verify .github/dependabot.yml lists every module (regenerate: bash tools/gen-dependabot.sh)
 	bash tools/gen-dependabot.sh --check
 
+.PHONY: check-workflows
+check-workflows: ## Verify every make target referenced by GitHub workflows exists in this Makefile
+	git diff --check
+	@missing=""; \
+	all="$$(grep -rhoE 'make [a-z0-9._-]+' .github/workflows/*.yml .github/actions/*/*.yml 2>/dev/null | sed 's/^make //'; grep -rhoE 'make -[a-z]+ [a-z0-9._-]+' .github/workflows/*.yml .github/actions/*/*.yml 2>/dev/null | awk '{print $$NF}')"; \
+	for t in $$(printf '%s\n' "$$all" | grep -v '^-' | sort -u); do \
+		grep -q "^$$t:" $(MAKEFILE_LIST) || missing="$$missing $$t"; \
+	done; \
+	[ -z "$$missing" ] || { echo "workflow targets missing from Makefile:$$missing" >&2; exit 1; }
+
 lint-all: ## Run golangci-lint in every module (shard via SHARD_TOTAL/SHARD_INDEX, override list via MODULES)
 	@command -v $(GOLANGCI_LINT) >/dev/null 2>&1 || { printf '%s\n' "golangci-lint not found: run 'make setup'"; exit 1; }
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GOLANGCI_LINT) run ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
