@@ -63,6 +63,12 @@ This report documents the benchmark results for constant-time verification paths
 | **Replay Windows** | Verified | Webhook signatures embed timestamp; `verifySignatureHeader` checks age against tolerance (default 5min) |
 | **Weak KDF** | Verified | Password adapter uses Argon2id (PHC canonical); `argon2.IDKey` with configurable params |
 | **Code Exec Through Diagnostics** | Verified | No eval/exec in diagnostic paths; `cmd/zever/tinker` is dev-only with stderr warning |
+| **Signature Envelope Drift** | Verified | `webhook/http` deliver side locked by `FuzzSignEnvelope`: envelope shape, independent HMAC-SHA256 recomputation, determinism |
+| **Target Credential Leak** | Verified | `redactTarget` locked by `FuzzRedactTarget`: redacted output never contains the URL password |
+| **S3 Key Validation** | Verified | `storage.ValidKey`/`ValidateBucketKey` locked by `FuzzKeyValidation`: gate agreement, canonical-form/traversal/control-char properties, `ErrInvalidKey`/`ErrInvalidBucket` sentinels; `FuzzEscapeKey` locks slash-preserving segment round-trip |
+| **Config Overlay Shape** | Verified | `Resolve` locked by `FuzzResolve`: never panics, deterministic, errors return nil config (no half-applied overlay) |
+| **Bare Suppressions** | Verified | gosec `nosec-require-rules` + `nosec-require-justification` (gosec v2.29.0 via golangci v2.15.0); all `#nosec` carry rule IDs with `-- reason`, all `//nolint:gosec` carry inline reasons |
+| **Taint Analysis (G701-G710)** | Accepted risk | G7xx analyzers stay off the `includes` allow-list: FP-heavy on validated paths; `cmd/zever` sinks (`exec.CommandContext` on `go`/`goBin`, scaffold `os.WriteFile`) take argv/Project paths from CLI flags, not request input — REPORT NOTE, do not enable |
 
 ## Verification Checklist
 
