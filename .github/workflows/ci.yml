@@ -451,7 +451,7 @@ jobs:
 
   # Fuzz smoke: a short run of security-critical fuzz targets across the
   # repo (DSL frontend, webhook signatures/envelopes, storage traversal, S3
-  # key validation, payment webhooks, JWT claims). Not a soak: it catches
+  # key validation, payment webhooks, vault response parsing, JWT claims). Not a soak: it catches
   # regressions that the
   # committed seed corpus plus mutation can reach. Failing inputs are
   # written under testdata/fuzz and should be committed with the fix.
@@ -473,7 +473,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all MODULES="config dsl adapters/webhook/queue adapters/webhook/http adapters/storage/local adapters/storage/s3 adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt" && exit 0
+          make -s download-all MODULES="config dsl adapters/webhook/queue adapters/webhook/http adapters/storage/local adapters/storage/s3 adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt adapters/secrets/vault" && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -526,6 +526,14 @@ jobs:
             go -C adapters/payment/stripe test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
             echo "== adapters/payment/paddle ${target}"
             go -C adapters/payment/paddle test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
+      - name: Fuzz vault response parsing
+        working-directory: adapters/secrets/vault
+        run: |
+          set -euo pipefail
+          for target in FuzzGetResponse FuzzListResponse FuzzEscapeMount FuzzValidateOptions; do
+            echo "== ${target}"
+            go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
           done
       - name: Fuzz JWT token claims
         working-directory: adapters/auth/jwt
