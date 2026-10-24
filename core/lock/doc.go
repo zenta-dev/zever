@@ -8,7 +8,7 @@
 // plus Factory. TTL and RetryInterval are typed durations with memory and redis
 // backends. Unsupported features fail closed.
 //
-// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: import the adapter package and wire its New constructor with container.Provide. Options are typed with
 // zero-infra defaults for tests: empty Options falls back to DefaultTTL and
 // DefaultRetryInterval, and the memory adapter needs no server. Configuration
 // comes from the environment only: .env, .env.local, and the process

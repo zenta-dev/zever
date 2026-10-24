@@ -6,8 +6,7 @@ import (
 	"github.com/zenta-dev/zever/core/crypto"
 )
 
-// benchAdapter registers a stub crypto backend once and returns its adapter
-// so Open can be measured without paying the registration cost.
+// BenchmarkOptionsValidate measures Options validation for a crypto backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := validOpts()
 
@@ -21,7 +20,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	}
 }
 
-// BenchmarkParseAdapter measures adapter name parsing.
+// BenchmarkIsDevCryptoKey measures the dev-key detection hot path.
 func BenchmarkIsDevCryptoKey(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()

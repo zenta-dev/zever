@@ -7,8 +7,7 @@ import (
 	"github.com/zenta-dev/zever/core/secrets"
 )
 
-// benchSecretsAdapter registers a stub secrets backend once and returns its
-// adapter so Open can be measured without the one-shot registration cost.
+// BenchmarkValidateName measures secret name validation.
 func BenchmarkValidateName(b *testing.B) {
 	name := "db.password_2024"
 

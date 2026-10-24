@@ -4,7 +4,7 @@
 //
 // Type safety: CDN plus typed Options plus Factory. Options carry APIToken, ZoneID, and BaseURL; PurgeRequest describes what to invalidate and unsupported shapes fail closed.
 //
-// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: import the adapter package and wire its New constructor with container.Provide. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.CDN(). Lazy per-service singleton, retry on error. See container/README.md.
 //

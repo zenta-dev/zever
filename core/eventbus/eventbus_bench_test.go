@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// BenchmarkRegister measures registry insertion for a fresh adapter key.
+// BenchmarkPublish measures publish through a wrapped fake bus.
 func BenchmarkPublish(b *testing.B) {
 	bus := Wrap(newFakeBus())
 	ctx := b.Context()

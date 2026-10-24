@@ -6,8 +6,7 @@ import (
 	"github.com/zenta-dev/zever/core/cache"
 )
 
-// benchCacheAdapter registers a stub factory once and returns its adapter so
-// Open can be measured without paying the one-shot registration cost.
+// BenchmarkOptionsValidate measures Options validation for a cache backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := cache.Options{Capacity: 1024}
 
@@ -20,5 +19,3 @@ func BenchmarkOptionsValidate(b *testing.B) {
 		}
 	}
 }
-
-// BenchmarkOpenShared measures the shared-registry lookup plus factory path.

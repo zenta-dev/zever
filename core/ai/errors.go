@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	// ErrNilFactory is returned when an adapter factory is nil.
+	// ErrNilFactory is returned when a nil backend factory is provided.
 	ErrNilFactory = errors.New("ai: nil factory")
-	// ErrDuplicateAdapter is returned on duplicate adapter registration.
+	// ErrDuplicateAdapter is returned for a duplicate adapter name.
 	ErrDuplicateAdapter = errors.New("ai: duplicate adapter")
-	// ErrUnknownAdapter is returned for an unregistered adapter.
+	// ErrUnknownAdapter is returned for an unknown adapter name.
 	ErrUnknownAdapter = errors.New("ai: unknown adapter")
 	// ErrInvalidAdapter is returned for an invalid adapter name.
 	ErrInvalidAdapter = errors.New("ai: invalid adapter")
@@ -47,7 +47,7 @@ func (e InvalidAdapterError) Unwrap() error {
 	return ErrInvalidAdapter
 }
 
-// DuplicateAdapterError reports a duplicate adapter registration.
+// DuplicateAdapterError reports a duplicate adapter name.
 type DuplicateAdapterError struct {
 	Adapter string
 }
@@ -55,7 +55,7 @@ type DuplicateAdapterError struct {
 // DuplicateError aliases DuplicateAdapterError for compatibility.
 type DuplicateError = DuplicateAdapterError
 
-// Error returns a human-readable duplicate-registration message.
+// Error returns a human-readable duplicate-adapter message.
 func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
@@ -65,7 +65,7 @@ func (e DuplicateAdapterError) Unwrap() error {
 	return ErrDuplicateAdapter
 }
 
-// UnknownAdapterError reports a lookup of an unregistered adapter.
+// UnknownAdapterError reports an unknown adapter name.
 type UnknownAdapterError struct {
 	Adapter string
 }

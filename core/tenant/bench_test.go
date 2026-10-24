@@ -4,9 +4,7 @@ import (
 	"testing"
 )
 
-// benchTenantAdapter registers a stub tenant once and returns its adapter so
-// Open can be measured without the one-shot registration cost.
-
+// BenchmarkOptionsValidate measures Options validation for a tenant backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{Header: "X-Tenant-ID", SubdomainRegex: `^[a-z0-9-]+$`}
 

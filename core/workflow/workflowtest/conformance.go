@@ -12,8 +12,8 @@ import (
 
 // Conformance verifies factory-built engines implement the
 // workflow.Workflow contract: Start/Query round-trip, duplicate workflow
-// IDs, unknown steps/runs/queries, completed-run guards, Open/Register
-// registry wiring, and Close. Each subtest takes a fresh instance from
+// IDs, unknown steps/runs/queries, completed-run guards, RegisterStep
+// wiring, and Close. Each subtest takes a fresh instance from
 // factory so cases stay isolated. Engines execute the "greet" echo step
 // synchronously, so Signal and Cancel against a started run must fail
 // closed with ErrRunCompleted; the kit requires factory products to

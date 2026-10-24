@@ -5,9 +5,7 @@ import (
 	"testing"
 )
 
-// benchWebhookAdapter registers a stub webhook once and returns its adapter so
-// Open can be measured without the one-shot registration cost.
-
+// BenchmarkOptionsValidate measures Options validation for a webhook backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{Timeout: 5, MaxRetries: 3, ReplayTolerance: 300}
 

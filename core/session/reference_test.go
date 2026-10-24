@@ -10,14 +10,9 @@ import (
 )
 
 // referenceDoc is the per-battery reference page generated from this package.
-// The tests below pin it to the code: every registered adapter, every
-// Options key, and every sentinel error must appear on the page. Edit the
-// page and the code together.
+// The tests below pin it to the code: every Options key, and every
+// sentinel error must appear on the page. Edit the page and the code together.
 const referenceDoc = "../../docs/src/content/docs/reference/session.mdx"
-
-// TestReferencePageListsAdapters pins the reference adapters table to the
-// Adapter constants plus the db adapter: every known adapter has a cell,
-// and the config service key names the battery.
 
 // TestReferencePageListsOptionKeys pins the reference options table to the
 // Options struct: every JSON key (recursing into named blocks, skipping the

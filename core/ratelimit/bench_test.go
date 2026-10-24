@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-// benchAdapter registers a stub limiter once and returns its adapter so Open
-// can be measured without paying the one-shot registration cost.
+// BenchmarkValidateKey measures rate-limit key validation.
 func BenchmarkValidateKey(b *testing.B) {
 	key := "user:123:endpoint"
 
