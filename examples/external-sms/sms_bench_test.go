@@ -9,18 +9,13 @@ import (
 	"github.com/zenta-dev/zever/config"
 )
 
-// benchSMS returns an open stub backend after ensuring the plugin is
-// registered exactly once.
+// benchSMS returns a fresh stub backend constructed in code.
 func benchSMS(b *testing.B) sms.SMS {
 	b.Helper()
 
-	if err := ensureRegistered(); err != nil {
-		b.Fatalf("RegisterPlugin: %v", err)
-	}
-
-	svc, err := sms.Open(sms.Stub, sms.Options{From: "+15550000"})
+	svc, err := sms.New(sms.Options{From: "+15550000"})
 	if err != nil {
-		b.Fatalf("Open: %v", err)
+		b.Fatalf("New: %v", err)
 	}
 	return svc
 }
@@ -39,13 +34,9 @@ func BenchmarkStubSend(b *testing.B) {
 	}
 }
 
-// BenchmarkBuildFromConfig measures decoding cfg.Plugins["sms"] and opening
-// the code-wired adapter: the container plugin build path.
+// BenchmarkBuildFromConfig measures decoding cfg.Plugins["sms"] and
+// constructing the code-wired backend: the container plugin build path.
 func BenchmarkBuildFromConfig(b *testing.B) {
-	if err := ensureRegistered(); err != nil {
-		b.Fatalf("RegisterPlugin: %v", err)
-	}
-
 	cfg := config.Default()
 	cfg.Plugins = map[string]config.Service[jsontext.Value]{
 		"sms": {Options: jsontext.Value(`{"from":"+15550000"}`)},
@@ -60,13 +51,15 @@ func BenchmarkBuildFromConfig(b *testing.B) {
 	}
 }
 
-// BenchmarkParseAdapter measures adapter-name parsing.
-func BenchmarkParseAdapter(b *testing.B) {
+// BenchmarkNew measures direct backend construction in code.
+func BenchmarkNew(b *testing.B) {
+	opts := sms.Options{From: "+15550000"}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := sms.ParseAdapter("stub"); err != nil {
-			b.Fatalf("ParseAdapter: %v", err)
+		if _, err := sms.New(opts); err != nil {
+			b.Fatalf("New: %v", err)
 		}
 	}
 }

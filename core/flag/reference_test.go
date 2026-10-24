@@ -10,14 +10,12 @@ import (
 )
 
 // referenceDoc is the per-battery reference page generated from this package.
-// The tests below pin it to the code: every registered adapter, every
-// Options key, and every sentinel error must appear on the page. Edit the
-// page and the code together.
+// The tests below pin it to the code: every Options key, and every
+// sentinel error must appear on the page. Edit the page and the code together.
 const referenceDoc = "../../docs/src/content/docs/reference/flag.mdx"
 
-// TestReferencePageListsAdapters pins the reference adapters table to the
-// Adapter constants: every known adapter has a cell, and the config service
-// key names the battery.
+// TestReferencePageListsOptionKeys pins the reference options table to the
+// Options struct: every JSON key must appear on the page.
 func TestReferencePageListsOptionKeys(t *testing.T) {
 	t.Parallel()
 

@@ -45,10 +45,6 @@ func Conformance(t *testing.T, factory func(t *testing.T) idempotency.Store) {
 	t.Run("Close", func(t *testing.T) { conformanceClose(t, factory) })
 }
 
-// checkOpenRegister proves the factory-built backends against the
-// shared registry. It returns a descriptive error on the first
-// contract violation so unit tests can drive every branch.
-
 func conformanceExecuteReplay(t *testing.T, factory func(t *testing.T) idempotency.Store) {
 	t.Helper()
 

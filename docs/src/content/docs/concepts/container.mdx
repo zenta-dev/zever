@@ -37,7 +37,7 @@ func Providers() []container.Provider {
 c := container.New(cfg, Providers())
 ```
 
-`cfg` is the `*config.Config` you resolved from the environment; `nil` is valid too. `container.Get(c, DB)` resolves any wired ref. The accessors (`c.DB()`, `c.Cache()`) resolve the default instance when a provider covers it, and otherwise fall back to the config-based path. Graph validation runs at `New`: duplicate refs, missing non-`Optional` dependencies, and cycles surface from `Get` as `DuplicateRefError`, `NotWiredError`, and `DependencyCycleError`.
+`cfg` is the `*config.Config` you resolved from the environment; `nil` is valid too. `container.Get(c, DB)` resolves any wired ref. The accessors (`c.DB()`, `c.Cache()`) resolve the default instance when a provider covers it, and otherwise fail with `NotWiredError` naming the missing `container.Provide` entry. Graph validation runs at `New`: duplicate refs, missing non-`Optional` dependencies, and cycles surface from `Get` as `DuplicateRefError`, `NotWiredError`, and `DependencyCycleError`.
 
 ## Where the adapter and the options come from
 

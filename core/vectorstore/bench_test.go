@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-// benchVectorAdapter registers a stub store once and returns its adapter so
-// Open can be measured without the one-shot registration cost.
+// benchEmbedding builds a deterministic test vector.
 func benchEmbedding() []float32 {
 	v := make([]float32, DefaultDimension)
 	for i := range v {

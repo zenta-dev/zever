@@ -134,9 +134,7 @@ export function envKeyProblems(code) {
         continue;
       }
       if (field.toUpperCase() === 'ADAPTER' && svc in truth) {
-        const known = [...(truth[svc]?.adapters ?? [])];
-        if (known.length && !known.includes(value))
-          out.push(`env ${m[1]}_ADAPTER: "${value}" is not a ${svc} adapter (known: ${known.join(', ')})`);
+        out.push(`env ${m[1]}_ADAPTER: adapter selection is code, not config (wire ${svc} in internal/app/wiring.go with container.Provide and rebuild; *_ADAPTER keys are rejected)`);
       }
       if (svc in truth && field.toUpperCase() !== 'ADAPTER') {
         const cf = canonFieldsRepo(svc);
@@ -192,7 +190,11 @@ const ALLOW = [
   // .github/workflows/flake.yml:37), so it is toolchain plumbing, not config.
   { dir: '.github/', re: /^env FLAKE_COUNT: "/, why: 'make test-flake passes it to go test -count (Makefile:267, .github/workflows/flake.yml:37)' },
   // Records of things removed on purpose keep the removed spelling.
-  { dir: '.changelog/unreleased/', re: /^env VECTORSTORE_ADAPTER: "pgvector" is not a vectorstore adapter /, why: 'the fragment records the removed non-canonical spelling on purpose (fix-cli-canonical-adapters.md)' },
+  // History fragments record removed adapter-key spellings on purpose while
+  // documenting the removal; the keys they name fail resolution by design.
+  { dir: '.changelog/unreleased/', re: /^env (?:CACHE|QUEUE)_ADAPTER: adapter selection is code, not config/, why: 'the fragment records the removed CLI help wording on purpose (fix-cli-env-key-prose.md)' },
+  { dir: '.changelog/unreleased/', re: /^env VECTORSTORE_ADAPTER: adapter selection is code, not config/, why: 'the fragment records the removed non-canonical spelling on purpose (fix-cli-canonical-adapters.md)' },
+  { dir: '.changelog/unreleased/', re: /^env (?:SEARCH|VECTORSTORE|WORKFLOW)_ADAPTER: adapter selection is code, not config/, why: 'the fragment records the removed adapter aliases on purpose (fix-break-adapter-aliases.md)' },
   // `zever db rollback --count n` documents the legacy stdlib flagset flag;
   // --count is not on the cobra help tree (see cmd_facts_allow.json).
   { dir: 'orm/', re: /^flag --count \(after "zever db"\) not in cmd\/zever$/, why: 'legacy stdlib flagset flag for `zever db rollback --count` (orm/DIALECTS.md)' },
@@ -425,7 +427,7 @@ function selfTest() {
   let failed = 0;
   const cases = [
     { name: 'env: a bogus service head is rejected', run: () => checkEnv('```sh\nNOPEX_ADAPTER=x\n```'), expect: 1 },
-    { name: 'env: a real default-instance key passes', run: () => checkEnv('```sh\nDB_ADAPTER=postgres\n```'), expect: 0 },
+    { name: 'env: an adapter selector is rejected', run: () => checkEnv('```sh\nDB_ADAPTER=postgres\n```'), expect: 1 },
     { name: 'env: a __DEFAULT__ spelling is rejected', run: () => checkEnv('set `DB__DEFAULT__DSN=x`'), expect: 1 },
     { name: 'env: a named instance in prose passes', run: () => checkEnv('set `DB__REPORTING__DSN=...`'), expect: 0 },
     { name: 'env: a valueless key named in prose passes', run: () => checkEnv('set `DB_DSN` yourself'), expect: 0 },

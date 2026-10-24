@@ -978,7 +978,7 @@ func refCall(name string) string {
 }
 
 // adapterBindingAlias returns the adapter import alias for sel (see
-// adapterBinding, which also returns the path and Register call).
+// adapterBinding, which also returns the path).
 func adapterBindingAlias(sel batterySelection) string {
 	alias, _ := adapterBinding(sel)
 

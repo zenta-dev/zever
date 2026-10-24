@@ -37,7 +37,7 @@ type RedisOptions struct {
 // Options configures cache backend selection and backend-specific settings.
 type Options struct {
 	// Adapter names the cache backend. Selection is compile-time: import
-	// the adapter package and call its New constructor with these Options.
+	// the adapter package and wire its New constructor with container.Provide.
 	Adapter string `json:"adapter"`
 	// Capacity hints at the expected number of cache entries.
 	Capacity int `json:"capacity"`

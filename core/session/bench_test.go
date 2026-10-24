@@ -5,9 +5,7 @@ import (
 	"time"
 )
 
-// benchSessionAdapter registers a stub store once and returns its adapter so
-// Open can be measured without the one-shot registration cost.
-
+// BenchmarkNewID measures session ID generation.
 func BenchmarkNewID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()

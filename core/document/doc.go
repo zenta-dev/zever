@@ -4,7 +4,7 @@
 //
 // Type safety: Document plus typed Options plus Factory. OutputFormat is a string type limited to pdf, png, and jpg; Quality is clamped to 0-100. Unsupported features fail closed.
 //
-// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: import the adapter package and wire its New constructor with container.Provide. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Document(). Lazy per-service singleton, retry on error. See container/README.md.
 //

@@ -3,8 +3,9 @@
 //
 // The scheduler dispatches onto the queue and the worker consumes from it,
 // so both share one queue: with the in-process memory adapter that means
-// one process. Swapping the queue adapter via QUEUE_* env makes this
-// distributable with no code change here.
+// one process. Swapping the queue backend is a wiring change (swap the Queue
+// Provide entry in internal/app/wiring.go, then rebuild); that is what makes
+// this distributable.
 package main
 
 import (

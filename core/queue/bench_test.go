@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-// benchQueueAdapter registers a stub queue once and returns its adapter so
-// Open can be measured without paying the one-shot registration cost.
+// BenchmarkNewMessage measures queue message construction.
 func BenchmarkNewMessage(b *testing.B) {
 	payload := NewPayload([]byte("hello world"))
 	headers := NewHeaders(map[string]string{"content-type": "text/plain"})

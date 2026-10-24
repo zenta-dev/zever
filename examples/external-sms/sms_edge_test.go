@@ -12,7 +12,7 @@ import (
 )
 
 // registerOnce and errRegister make RegisterPlugin safe to call from
-// concurrent tests and benchmarks: registration is process-wide, so it must
+// concurrent tests: plugin registration is process-wide, so it must
 // happen exactly once.
 var (
 	registerOnce sync.Once
@@ -25,17 +25,33 @@ func ensureRegistered() error {
 	return errRegister
 }
 
+// TestNewValidatesOptions pins the constructor boundary: empty options
+// fail closed with ErrInvalidOptions, valid options open a backend.
+func TestNewValidatesOptions(t *testing.T) {
+	t.Parallel()
+
+	if _, err := sms.New(sms.Options{}); !errors.Is(err, sms.ErrInvalidOptions) {
+		t.Fatalf("New empty = %v, want ErrInvalidOptions", err)
+	}
+
+	svc, err := sms.New(sms.Options{From: "+15550000"})
+	if err != nil {
+		t.Fatalf("New valid: %v", err)
+	}
+
+	if svc == nil {
+		t.Fatal("New returned nil SMS")
+	}
+}
+
 // TestStubSendInvalidArgs pins the empty-boundary error path: an empty
 // recipient or body must fail with ErrInvalidOptions, not panic.
 func TestStubSendInvalidArgs(t *testing.T) {
 	t.Parallel()
 
-	if err := ensureRegistered(); err != nil {
-		t.Fatalf("RegisterPlugin: %v", err)
-	}
-	svc, err := sms.Open(sms.Stub, sms.Options{From: "+15550000"})
+	svc, err := sms.New(sms.Options{From: "+15550000"})
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 
 	tests := []struct {
@@ -57,68 +73,15 @@ func TestStubSendInvalidArgs(t *testing.T) {
 	}
 }
 
-// TestOpenErrorPaths covers the constructor boundaries: unknown adapter and
-// invalid options.
-func TestOpenErrorPaths(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		adapter sms.Adapter
-		opts    sms.Options
-		want    error
-	}{
-		{"invalid options", sms.Stub, sms.Options{}, sms.ErrInvalidOptions},
-		{"unknown adapter", sms.Adapter("nope"), sms.Options{From: "x"}, sms.ErrUnknownAdapter},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if _, err := sms.Open(tc.adapter, tc.opts); !errors.Is(err, tc.want) {
-				t.Fatalf("Open = %v, want %v", err, tc.want)
-			}
-		})
-	}
-}
-
-// TestRegisterNilFactory pins the nil-factory guard.
-func TestRegisterNilFactory(t *testing.T) {
-	t.Parallel()
-
-	if err := sms.Register(sms.Adapter("nil-factory"), nil); !errors.Is(err, sms.ErrNilFactory) {
-		t.Fatalf("Register = %v, want ErrNilFactory", err)
-	}
-}
-
-// TestParseAdapterEmpty pins the invalid-adapter boundary.
-func TestParseAdapterEmpty(t *testing.T) {
-	t.Parallel()
-
-	if _, err := sms.ParseAdapter(""); !errors.Is(err, sms.ErrInvalidAdapter) {
-		t.Fatalf("ParseAdapter(\"\") = %v, want ErrInvalidAdapter", err)
-	}
-}
-
-// TestAdapterString pins the empty-adapter display contract.
-func TestAdapterString(t *testing.T) {
-	t.Parallel()
-
-	if got := sms.Adapter("").String(); got != "unknown" {
-		t.Fatalf("empty Adapter.String() = %q, want unknown", got)
-	}
-	if got := sms.Stub.String(); got != "stub" {
-		t.Fatalf("Stub.String() = %q, want stub", got)
-	}
-}
-
-// TestBuildFromConfigErrorPaths covers nil config, missing entry, and
-// corrupt options. Adapter selection is code (RegisterStub wires the stub),
-// so there is no unknown-adapter path through config.
+// TestBuildFromConfigErrorPaths covers nil config, a missing entry,
+// invalid options, and corrupt options. Backend selection is code
+// (BuildFromConfig calls New), so invalid options fail closed here.
 func TestBuildFromConfigErrorPaths(t *testing.T) {
 	t.Parallel()
 
-	if err := ensureRegistered(); err != nil {
-		t.Fatalf("RegisterPlugin: %v", err)
+	invalid := config.Default()
+	invalid.Plugins = map[string]config.Service[jsontext.Value]{
+		"sms": {Options: jsontext.Value(`{"from":""}`)},
 	}
 
 	tests := []struct {
@@ -128,6 +91,7 @@ func TestBuildFromConfigErrorPaths(t *testing.T) {
 	}{
 		{"nil config", nil, sms.ErrInvalidOptions},
 		{"missing entry", config.Default(), sms.ErrInvalidOptions},
+		{"invalid options", invalid, sms.ErrInvalidOptions},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

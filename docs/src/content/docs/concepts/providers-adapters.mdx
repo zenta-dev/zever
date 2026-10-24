@@ -22,7 +22,7 @@ Application code speaks the interface; the container speaks the typed providers:
 conn, err := c.DB() // the wired db instance, built once and cached
 ```
 
-Each battery still keeps a `Register`/`Open` registry, which the config-based path resolves an adapter name against:
+Each battery keeps one small interface plus typed `Options` and a `DefaultRef`. Adapters are plain constructors wired with `container.Provide`:
 
 ```go
 // Package db: one small interface.
@@ -34,9 +34,18 @@ type DB interface {
 	Dialect() string
 }
 
-// Adapter sqlite registers itself; postgres registers itself elsewhere.
-// Call Register once from main (no init magic); app code holds no globals.
-func Register() { _ = db.Register(db.SQLite, New) }
+// Adapter sqlite lives in its own module; postgres lives elsewhere.
+// Import the one you ship and bind it with container.Provide in
+// internal/app/wiring.go; app code holds no globals.
+import dbsqlite "github.com/zenta-dev/zever/adapters/db/sqlite"
+
+var DB = db.DefaultRef()
+
+func Providers() []container.Provider {
+	return []container.Provider{
+		container.Provide(DB, dbsqlite.New),
+	}
+}
 ```
 
 ## Swap an adapter
@@ -55,7 +64,7 @@ DB_MAX_CONNS=20
 CACHE_ADDR=redis:6379
 ```
 
-Env names carry no prefix: the default instance reads `<SERVICE>_<FIELD>` (`DB_MAX_CONNS=20`), and a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAX_CONNS=20`) but only reaches the container through a matching named Ref such as `db.Ref("primary")`. every instance opens the adapter its `container.Provide` call binds. Handlers keep calling `c.DB()` and `c.Cache()`. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
+Env names carry no prefix: the default instance reads `<SERVICE>_<FIELD>` (`DB_MAX_CONNS=20`), and a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAX_CONNS=20`) but only reaches the container through a matching named Ref such as `db.Ref("primary")`. Every instance opens the adapter its `container.Provide` call binds. Handlers keep calling `c.DB()` and `c.Cache()`. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
 
 Most swaps are invisible to handlers: placeholders stay `?` on both `db` drivers (postgres rewrites to `$n` before pgx) and route params read through `router.Param`. Where backends differ, the adapter fails fast or documents the gap. Two known gaps:
 

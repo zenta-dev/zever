@@ -3,7 +3,7 @@ title: Config reference
 description: Every Zever config service, adapter, option key, default, and environment variable, plus the layering and strictness rules.
 ---
 
-Zever config is one block per service, shaped `{ adapter, options }`: the adapter name sits beside the option map, never inside it. This page lists all 37 services and every option each one accepts.
+Zever config is one options block per service. This page lists all 37 services and every option each one accepts. Backends are wired in code with `container.Provide` in `internal/app/wiring.go`; the environment only tunes options, never selects backends.
 
 ## Layering and rules
 

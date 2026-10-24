@@ -105,13 +105,13 @@ The [migration guide](../migration/) carries the key-by-key map.
 
 ## Redact config before printing
 
-Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  adapter=<x>` header per service plus its masked options, then a `<service>/<NAME>` section per named instance.
+Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  driver=<x>` header per service plus its masked options, then a `<service>/<NAME>` section per named instance. The driver names the code-wired constructor from `internal/app/wiring.go`; the config carries options only.
 
 Duration options (`DB_MAX_CONN_LIFETIME`, `AI_TIMEOUT`, ...) print in the same string form the env layer parses (`30s`, `5m`), in the human table and the `--json` envelope alike, never as a raw nanosecond count.
 
 ```go title="main.go"
 for name, sc := range cfg.RedactedServices() {
-    fmt.Println(name, sc.Adapter, sc.Options)
+    fmt.Println(name, sc.Options)
 }
 ```
 

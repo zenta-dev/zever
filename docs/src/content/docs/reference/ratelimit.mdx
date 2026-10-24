@@ -57,7 +57,7 @@ Every sentinel below is a package-level `ErrXxx` in `core/ratelimit` (see `error
 | `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
 | `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `memory.New`) before `Open` |
+| `ErrUnknownAdapter` | kept for compatibility; the registry is gone | Backends are chosen by import with `container.Provide` (for example `memory.New`), never parsed from a name |
 | `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
 | `ErrInvalidOptions` | `Options.Validate` failed (bad `rate`/`burst`, negative TTLs, bad Redis address or prefix, bad `trusted_proxies` entry) | Fix the named field; blank or unparsable proxy entries name the entry |
 | `ErrInvalidKey` | Rate-limit key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the length only, never the key |

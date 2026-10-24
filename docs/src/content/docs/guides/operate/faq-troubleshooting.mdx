@@ -18,7 +18,7 @@ No. It compiles `.zen` schemas into infrastructure only: database access, cachin
 <details>
 <summary>How do I swap an adapter, say sqlite for postgres?</summary>
 
-Change adapter via `zever add db/postgres`, then rebuild. `zever add` does the `go.mod` require, the wiring.go `container.Provide` entry, and the config stanza; nothing else changes. No code that uses the `db.DB` interface changes. See [Choosing batteries](../../extend/choosing-batteries/).
+Change adapter via `zever add db/postgres`, then rebuild. `zever add` does the `go.mod` require, the wiring.go `container.Provide` entry, and the `.env.example` option keys; nothing else changes. No code that uses the `db.DB` interface changes. See [Choosing batteries](../../extend/choosing-batteries/).
 </details>
 
 <details>
@@ -88,15 +88,15 @@ The `jwt` adapter needs a secret of at least 32 bytes and `config.Default()` shi
 ### Adapters and the container
 
 <details>
-<summary>An unknown or unregistered adapter error at startup</summary>
+<summary>A missing backend (`NotWiredError`) at startup</summary>
 
-The adapter's package was never imported and its `Register()` never called. `zever add <battery>/<adapter>` wires both. The generated server validates every enabled battery at boot and reports the missing ones with did-you-mean hints; `zever doctor` shows the same per battery.
+The adapter's package was never imported and no `container.Provide` entry covers it. `zever add <battery>/<adapter>` wires both the import and the `Provide` entry. The generated server validates every enabled battery at boot and reports the missing ones with did-you-mean hints; `zever doctor` shows the same per battery.
 </details>
 
 <details>
 <summary><code>zever doctor</code> reports FAIL for one battery</summary>
 
-The battery is enabled but cannot resolve from the current config: a missing secret, an unreachable DSN, or an adapter that is not registered in the process running the check. Read the error text, fix the option, and re-run. Doctor only checks batteries enabled in your project config.
+The battery is enabled but cannot resolve from the current config: a missing secret, an unreachable DSN, or a backend with no `container.Provide` entry in the process running the check. Read the error text, fix the option, and re-run. Doctor only checks batteries your project enables.
 </details>
 
 <details>

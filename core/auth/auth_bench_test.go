@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// benchAdapter registers a stub auth backend once and returns its adapter so
-// Open can be measured without paying the registration cost.
+// BenchmarkOptionsValidate measures Options validation for an auth backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{
 		JWT:  JWTOptions{MaxTTL: time.Hour, Leeway: time.Second},
@@ -61,5 +60,3 @@ func BenchmarkCloneValue(b *testing.B) {
 		}
 	}
 }
-
-// BenchmarkParseAdapter measures adapter name parsing.

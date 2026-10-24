@@ -2,12 +2,12 @@
 
 A fully functional demo app that exercises **every battery** in `zever` via
 HTTP and background jobs. One `.zen` schema drives the ORM, Protobuf API and
-SQL schema; `container.Container` resolves only explicitly-registered adapters.
+SQL schema; `container.Container` resolves only explicitly wired adapters.
 
 This app runs with **zero external services** — every battery uses its
 in-memory/local adapter by default (sqlite files under `data/`). Swap
-adapters in `internal/app/wiring.go` or via env (`AUTH_JWT_SECRET`,
-`DB_MAX_CONNS`, …) for production.
+backends in `internal/app/wiring.go` and rebuild, and tune options
+via env (`AUTH_JWT_SECRET`, `DB_MAX_CONNS`, ...) for production.
 
 > Split with `examples/showcase`: **demoapp = battery breadth over HTTP**
 > (one endpoint per battery, thin handlers), **showcase = DSL depth** (every
@@ -131,7 +131,7 @@ zever compile examples/demoapp/schema/app.zen --backend=atlas,gogen,openapi,prot
 `internal/api/testdata/schema.sql` is the DDL from
 `zever db migrate --dry-run --adapter=sqlite` (run from `examples/demoapp/`).
 
-Hand-owned, never overwritten: `internal/app/app.go` (adapter selection,
+Hand-owned, never overwritten: `internal/app/app.go` (adapter wiring,
 dev JWT secret, RBAC rules, i18n/storage/search/vector/geo/flag runtime
 defaults), `internal/service/jobs/*` bodies, `internal/service/seed/seed.go`
 bodies, `internal/api/*` handlers, schema, locales/fixtures,

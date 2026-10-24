@@ -5,16 +5,16 @@ import (
 	"fmt"
 )
 
-// ErrNilFactory is returned when an adapter factory is nil.
+// ErrNilFactory is returned when a nil backend factory is provided.
 var ErrNilFactory = errors.New("log: nil factory")
 
-// ErrDuplicateAdapter is returned on duplicate adapter registration.
+// ErrDuplicateAdapter is returned for a duplicate adapter name.
 var ErrDuplicateAdapter = errors.New("log: duplicate adapter")
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
 var ErrDuplicate = ErrDuplicateAdapter
 
-// ErrUnknownAdapter is returned for an unregistered adapter.
+// ErrUnknownAdapter is returned for an unknown adapter name.
 var ErrUnknownAdapter = errors.New("log: unknown adapter")
 
 // ErrInvalidLevel is returned for an invalid level name.
@@ -23,16 +23,16 @@ var ErrInvalidLevel = errors.New("log: invalid level")
 // ErrInvalidAdapter is returned for an invalid adapter name.
 var ErrInvalidAdapter = errors.New("log: invalid adapter")
 
-// DuplicateAdapterError reports a repeated Register for the same adapter.
+// DuplicateAdapterError reports a duplicate adapter name.
 type DuplicateAdapterError struct {
-	// Adapter is the already-registered adapter.
+	// Adapter is the duplicate adapter name.
 	Adapter string
 }
 
 // DuplicateError aliases DuplicateAdapterError for compatibility.
 type DuplicateError = DuplicateAdapterError
 
-// Error returns a human-readable description of the duplicate registration.
+// Error returns a human-readable description of the duplicate adapter.
 func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
@@ -40,9 +40,9 @@ func (e DuplicateAdapterError) Error() string {
 // Unwrap returns ErrDuplicateAdapter for errors.Is matching.
 func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
-// UnknownAdapterError reports an Open for an unregistered adapter.
+// UnknownAdapterError reports an unknown adapter name.
 type UnknownAdapterError struct {
-	// Adapter is the requested but unregistered adapter.
+	// Adapter is the unknown adapter name.
 	Adapter string
 }
 
@@ -68,7 +68,7 @@ func (e InvalidLevelError) Error() string {
 // Unwrap returns ErrInvalidLevel for errors.Is matching.
 func (e InvalidLevelError) Unwrap() error { return ErrInvalidLevel }
 
-// InvalidAdapterError reports a ParseAdapter failure, carrying the bad input.
+// InvalidAdapterError reports an invalid adapter name, carrying the bad input.
 type InvalidAdapterError struct {
 	// Adapter is the unrecognized adapter name.
 	Adapter string

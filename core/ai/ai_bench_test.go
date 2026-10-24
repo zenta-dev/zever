@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// benchAdapter registers a stub AI once and returns its adapter so Open can
-// be measured without paying the (one-shot) registration cost.
+// BenchmarkOptionsValidate measures Options validation for an AI backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{BaseURL: "https://api.openai.com/v1", Timeout: 30 * time.Second}
 
@@ -19,5 +18,3 @@ func BenchmarkOptionsValidate(b *testing.B) {
 		}
 	}
 }
-
-// BenchmarkParseAdapter measures adapter name parsing.

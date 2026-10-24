@@ -9,9 +9,9 @@
 // redis/nats is a wiring change (workerProviders below, then rebuild);
 // that is what makes this distributable.
 //
-// The container is wired here directly (config.Resolve + explicit adapter
-// registration) so this track stays disjoint from the sibling server track
-// that owns internal/app.
+// The container is wired here directly (config.Resolve + explicit
+// container.Provide entries) so this track stays disjoint from the sibling
+// server track that owns internal/app.
 package main
 
 import (
