@@ -220,22 +220,52 @@ func corsHeadersAllowed(requested string, allowed map[string]bool) bool {
 // addVary appends names to the Vary header without duplicating existing ones.
 func addVary(w http.ResponseWriter, names ...string) {
 	existing := w.Header().Get("Vary")
-	seen := make(map[string]bool)
-	var parts []string
-	for _, part := range strings.Split(existing, ",") {
-		name := strings.TrimSpace(part)
-		if name == "" {
-			continue
-		}
-		seen[strings.ToLower(name)] = true
-		parts = append(parts, name)
+	if existing == "" {
+		w.Header().Set("Vary", strings.Join(names, ", "))
+
+		return
 	}
+
+	// Slow path: a downstream handler already set Vary. Vary lists stay
+	// tiny (1-3 entries here), so a case-insensitive linear scan over the
+	// trimmed parts replaces the per-response dedup map. Trimmed parts
+	// substring the existing value, so only the final Join allocates.
+	var stack [8]string
+
+	parts := stack[:0]
+
+	rest := existing
+	for {
+		var part string
+
+		var ok bool
+
+		part, rest, ok = strings.Cut(rest, ",")
+		if name := strings.TrimSpace(part); name != "" && !hasVaryName(parts, name) {
+			parts = append(parts, name)
+		}
+
+		if !ok {
+			break
+		}
+	}
+
 	for _, name := range names {
-		if seen[strings.ToLower(name)] {
-			continue
+		if !hasVaryName(parts, name) {
+			parts = append(parts, name)
 		}
-		seen[strings.ToLower(name)] = true
-		parts = append(parts, name)
 	}
+
 	w.Header().Set("Vary", strings.Join(parts, ", "))
+}
+
+// hasVaryName reports whether name matches any entry case-insensitively.
+func hasVaryName(parts []string, name string) bool {
+	for _, part := range parts {
+		if strings.EqualFold(part, name) {
+			return true
+		}
+	}
+
+	return false
 }
