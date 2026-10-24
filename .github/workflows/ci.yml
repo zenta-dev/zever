@@ -298,7 +298,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all && exit 0
+            make -s download-all && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -442,7 +442,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          (cd examples/external-sms && GOWORK=off go mod download) && exit 0
+            (cd examples/external-sms && GOWORK=off go mod download) && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -473,7 +473,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all MODULES="config dsl shared/codec adapters/webhook/queue adapters/webhook/http adapters/storage/local adapters/storage/s3 adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt adapters/secrets/vault" && exit 0
+            make -s download-all MODULES="config dsl shared/codec adapters/webhook/queue adapters/webhook/http adapters/storage/local adapters/storage/s3 adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt adapters/secrets/vault" && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -573,7 +573,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all && exit 0
+            make -s download-all && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -764,6 +764,7 @@ jobs:
             if ! go -C "$m" test -run='^$' -bench=. -benchtime=100x -count=1 -cpu=1 -benchmem ./... > ".bench/$slug.txt" 2>&1; then
               echo "::error::benchmark failed: $m"
               cat ".bench/$slug.txt"
+              tail -n 20 ".bench/$slug.txt"
               failed="$failed $m"
             fi
           done
@@ -807,7 +808,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all MODULES="core/auth core/crypto core/password core/authz core/payment adapters/payment/stripe adapters/payment/paddle" && exit 0
+            make -s download-all MODULES="core/auth core/crypto core/password core/authz core/payment adapters/payment/stripe adapters/payment/paddle" && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -923,7 +924,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all && exit 0
+            make -s download-all && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -937,6 +938,8 @@ jobs:
       # proxy, and falls back to the local intra-repo closure while the
       # pinned siblings are unpublished. Offline: empty file:// proxy and a
       # stubbed cyclonedx-gomod. Local mirror: `make sbom-test`.
+      # Scoping: MODULES overrides SHARD_* per the Makefile
+      # $(if $(MODULES),$(MODULES),$(SHARD_MODULES)) selector.
       - name: SBOM resolution script tests
         run: make sbom-test
       - name: Generate SBOM (affected modules)
@@ -974,7 +977,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          (cd docs/examples && GOWORK=off go mod download) && exit 0
+            (cd docs/examples && GOWORK=off go mod download) && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
