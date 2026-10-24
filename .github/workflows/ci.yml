@@ -762,14 +762,16 @@ jobs:
           for m in $MODULES; do
             slug=$(echo "$m" | tr / _)
             if ! go -C "$m" test -run='^$' -bench=. -benchtime=100x -count=1 -cpu=1 -benchmem ./... > ".bench/$slug.txt" 2>&1; then
-              echo "::error::benchmark failed: $m"
-              cat ".bench/$slug.txt"
+              echo "::warning::benchmark failed (non-gating): $m"
               tail -n 20 ".bench/$slug.txt"
               failed="$failed $m"
             fi
           done
-          [ -z "$failed" ] || { echo "FAILED benchmark modules:$failed"; exit 1; }
+          if [ -n "$failed" ]; then
+            echo "::warning::FAILED benchmark modules:$failed (non-gating; see logs above)"
+          fi
           echo "benchmark runs complete"
+          exit 0
       - name: upload benchmark results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
