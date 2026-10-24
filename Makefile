@@ -197,6 +197,13 @@ bench-ab: ## Compare benchmarks against baseline (requires BASELINE=.bench/basel
 	failed=""; for d in $(if $(MODULES),$(MODULES),$(SHARD_MODULES)); do echo "== $$d =="; if ! (cd $$d && $(GO) test -run='^$$' -bench=. -benchmem -count=10 ./...); then failed="$$failed $$d"; echo "::error::module failed: $$d"; fi; done 2>&1 | tee .bench/head.txt; [ -z "$$failed" ] || { echo "FAILED modules:$$failed"; exit 1; }
 	benchstat $(BASELINE) .bench/head.txt
 
+.PHONY: bench-profile
+bench-profile: ## CPU+memory profiles for hot paths (shared/codec, orm/render, container)
+	@mkdir -p .bench
+	cd shared/codec && $(GO) test -run='^$$' -bench=. -benchmem -cpuprofile=$(CURDIR)/.bench/codec-cpu.prof -memprofile=$(CURDIR)/.bench/codec-mem.prof ./...
+	cd orm && $(GO) test -run='^$$' -bench=. -benchmem -cpuprofile=$(CURDIR)/.bench/orm-render-cpu.prof -memprofile=$(CURDIR)/.bench/orm-render-mem.prof ./render/...
+	cd container && $(GO) test -run='^$$' -bench=. -benchmem -cpuprofile=$(CURDIR)/.bench/container-cpu.prof -memprofile=$(CURDIR)/.bench/container-mem.prof ./...
+
 .PHONY: cover
 cover: ## Run tests with coverage and print the total
 	$(GO) test -covermode=atomic -coverprofile=$(COVERAGE) ./...
