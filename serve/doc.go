@@ -4,9 +4,9 @@
 // answer health probes, and shut down gracefully on SIGINT/SIGTERM.
 //
 // Serve is adapter-agnostic: it imports core batteries and shared leaves
-// only, never an adapters/* module. Adapter registration stays in the
-// generated app package (explicit imports plus Register calls), which
-// passes providers into Main and Worker.
+// only, never an adapters/* module. Adapter wiring stays in the
+// generated app package (explicit imports plus container.Provide entries),
+// which passes providers into Main and Worker.
 //
 // Environment (explicit Option wins over process env over default):
 //
