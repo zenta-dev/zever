@@ -56,8 +56,7 @@ func TestDuplicateAdapterError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrDuplicateAdapter) = false, want true", err)
 	}
 
-	var target DuplicateAdapterError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[DuplicateAdapterError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -70,8 +69,7 @@ func TestDuplicateAliases_compat(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrDuplicate) = false, want true", err)
 	}
 
-	var target DuplicateError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[DuplicateError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T alias", err)
 	}
 
@@ -92,8 +90,7 @@ func TestUnknownAdapterError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrUnknownAdapter) = false, want true", err)
 	}
 
-	var target UnknownAdapterError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[UnknownAdapterError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -114,8 +111,7 @@ func TestInvalidAdapterError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrInvalidAdapter) = false, want true", err)
 	}
 
-	var target InvalidAdapterError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[InvalidAdapterError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -136,8 +132,7 @@ func TestInvalidOptionsError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrInvalidOptions) = false, want true", err)
 	}
 
-	var target InvalidOptionsError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[InvalidOptionsError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -158,8 +153,7 @@ func TestNotFoundError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrNotFound) = false, want true", err)
 	}
 
-	var target NotFoundError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[NotFoundError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -180,8 +174,7 @@ func TestUnsupportedMethodError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrUnsupportedMethod) = false, want true", err)
 	}
 
-	var target UnsupportedMethodError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[UnsupportedMethodError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -198,8 +191,8 @@ func TestAmountMismatchError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrAmountMismatch) = false, want true", err)
 	}
 
-	var target AmountMismatchError
-	if !errors.As(fmtWrap(err), &target) {
+	target, ok := errors.AsType[AmountMismatchError](fmtWrap(err))
+	if !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 
@@ -220,8 +213,7 @@ func TestSizeLimitError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrWebhookTooLarge) = false, want true", err)
 	}
 
-	var target SizeLimitError
-	if !errors.As(fmtWrap(err), &target) {
+	if _, ok := errors.AsType[SizeLimitError](fmtWrap(err)); !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 }
@@ -242,8 +234,8 @@ func TestDuplicateEventError_message_unwrap(t *testing.T) {
 		t.Errorf("errors.Is(%v, ErrDuplicateEvent) = false, want true", err)
 	}
 
-	var target DuplicateEventError
-	if !errors.As(fmtWrap(err), &target) {
+	target, ok := errors.AsType[DuplicateEventError](fmtWrap(err))
+	if !ok {
 		t.Errorf("errors.As failed for %T", err)
 	}
 

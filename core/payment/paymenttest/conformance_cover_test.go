@@ -468,12 +468,8 @@ func TestCheck_concurrent(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+	for range 8 {
+		wg.Go(func() {
 			ctx := context.Background()
 
 			if err := checkCreateGet(ctx, healthyStubPayment()); err != nil {
@@ -487,7 +483,7 @@ func TestCheck_concurrent(t *testing.T) {
 			if err := checkClose(healthyStubPayment()); err != nil {
 				t.Errorf("checkClose() = %v, want nil", err)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
