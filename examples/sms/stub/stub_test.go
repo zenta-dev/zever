@@ -2,7 +2,6 @@ package stub_test
 
 import (
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/zenta-dev/zever/examples/sms"
@@ -16,28 +15,13 @@ type recorder interface {
 	From() string
 }
 
-// registerOnce registers the stub factory exactly once for the process; the
-// registry is process-wide, so repeated registration would error.
-var registerOnce sync.Once
-
-// ensureRegistered registers the stub backend once and returns its result.
-func ensureRegistered(t *testing.T) {
-	t.Helper()
-
-	registerOnce.Do(func() {
-		if err := stub.Register(); err != nil {
-			t.Fatalf("Register: %v", err)
-		}
-	})
-}
-
-// openStub opens the registered stub backend with a valid sender.
+// openStub opens a fresh stub backend with a valid sender. Every call
+// returns an independent instance: backends share no process-global state,
+// so tests never interfere.
 func openStub(t *testing.T) sms.SMS {
 	t.Helper()
 
-	ensureRegistered(t)
-
-	svc, err := sms.Open(sms.Stub, sms.Options{From: "+15550000"})
+	svc, err := stub.Open(sms.Options{From: "+15550000"})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

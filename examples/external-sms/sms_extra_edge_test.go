@@ -1,8 +1,6 @@
 package sms_test
 
 import (
-	"errors"
-	"strings"
 	"sync"
 	"testing"
 
@@ -13,12 +11,9 @@ import (
 func TestStubConcurrentSend(t *testing.T) {
 	t.Parallel()
 
-	if err := ensureRegistered(); err != nil {
-		t.Fatalf("RegisterPlugin: %v", err)
-	}
-	svc, err := sms.Open(sms.Stub, sms.Options{From: "+15550000"})
+	svc, err := sms.New(sms.Options{From: "+15550000"})
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 
 	const n = 32
@@ -50,12 +45,9 @@ func TestStubConcurrentSend(t *testing.T) {
 func TestSentCopyIsolation(t *testing.T) {
 	t.Parallel()
 
-	if err := ensureRegistered(); err != nil {
-		t.Fatalf("RegisterPlugin: %v", err)
-	}
-	svc, err := sms.Open(sms.Stub, sms.Options{From: "+15550000"})
+	svc, err := sms.New(sms.Options{From: "+15550000"})
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	if err := svc.Send(t.Context(), "+15550001", "one"); err != nil {
 		t.Fatalf("Send: %v", err)
@@ -72,20 +64,38 @@ func TestSentCopyIsolation(t *testing.T) {
 	}
 }
 
-// TestRegisterDuplicate pins duplicate adapter registration error.
-func TestRegisterDuplicate(t *testing.T) {
+// TestNewInstancesAreIndependent pins the code-wiring contract: every New
+// call returns an isolated backend with no process-global state, so hosts
+// switch backends by calling a different constructor and rebuilding.
+func TestNewInstancesAreIndependent(t *testing.T) {
 	t.Parallel()
 
-	if err := ensureRegistered(); err != nil {
-		t.Fatalf("RegisterPlugin: %v", err)
+	first, err := sms.New(sms.Options{From: "+15550000"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
 	}
-	err := sms.Register(sms.Stub, func(_ sms.Options) (sms.SMS, error) {
-		return nil, errors.New("duplicate factory")
-	})
-	if !errors.Is(err, sms.ErrDuplicate) {
-		t.Fatalf("duplicate Register = %v, want ErrDuplicate", err)
+	second, err := sms.New(sms.Options{From: "+15550000"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
 	}
-	if !strings.Contains(err.Error(), "stub") {
-		t.Fatalf("duplicate error = %q, want adapter name", err.Error())
+
+	if err := first.Send(t.Context(), "+15550001", "one"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	firstSent, ok := first.(interface{ Sent() []sms.Message })
+	if !ok {
+		t.Fatal("stub does not expose Sent()")
+	}
+	secondSent, ok := second.(interface{ Sent() []sms.Message })
+	if !ok {
+		t.Fatal("stub does not expose Sent()")
+	}
+
+	if got := len(firstSent.Sent()); got != 1 {
+		t.Fatalf("first sent = %d, want 1", got)
+	}
+	if got := len(secondSent.Sent()); got != 0 {
+		t.Fatalf("second sent = %d, want 0 (independent instance)", got)
 	}
 }
