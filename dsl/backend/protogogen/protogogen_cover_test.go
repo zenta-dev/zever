@@ -79,7 +79,7 @@ func writeFakeGo(t *testing.T, body string) {
 
 	dir := t.TempDir()
 
-	if err := os.WriteFile(filepath.Join(dir, "go"), []byte(body), 0o755); err != nil { //nolint:gosec // test-only fake `go` binary must be executable to shadow PATH
+	if err := os.WriteFile(filepath.Join(dir, "go"), []byte(body), 0o755); err != nil { // test-only fake `go` binary must be executable to shadow PATH
 		t.Fatalf("write fake go: %v", err)
 	}
 

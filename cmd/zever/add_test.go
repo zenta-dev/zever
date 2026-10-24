@@ -346,7 +346,7 @@ func TestRunAddMatchesPinnedVersion(t *testing.T) {
 
 	pinned := strings.Replace(string(data), "require github.com/zenta-dev/zever/container v0.4.0", "require github.com/zenta-dev/zever/container v1.9.9", 1)
 
-	if werr := os.WriteFile(gomodPath, []byte(pinned), 0o600); werr != nil { //nolint:gosec // test temp dir
+	if werr := os.WriteFile(gomodPath, []byte(pinned), 0o600); werr != nil { // test temp dir
 		t.Fatalf("write go.mod: %v", werr)
 	}
 

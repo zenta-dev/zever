@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1415,5 +1416,54 @@ func TestGRPCClient_closeClosesConns(t *testing.T) {
 
 	if got := conn.GetState(); got != connectivity.Shutdown {
 		t.Errorf("conn state after Close = %v, want %v", got, connectivity.Shutdown)
+	}
+}
+
+// TestGRPCClient_parallelDistinctTargets pins that concurrent GRPCClient
+// builds for distinct targets are race-free and each target caches its own
+// conn. It guards the shared-pointer cache: a value cache would copy the
+// mutex while aliasing the map and race here under -race.
+func TestGRPCClient_parallelDistinctTargets(t *testing.T) {
+	t.Parallel()
+
+	c := newTestContainer(t)
+
+	const callers = 16
+
+	conns := make([]*grpc.ClientConn, callers)
+	errs := make([]error, callers)
+
+	var wg sync.WaitGroup
+	for i := range callers {
+		wg.Add(1)
+
+		go func(i int) {
+			defer wg.Done()
+
+			target := "static:///par-" + strconv.Itoa(i)
+			conn, err := c.GRPCClient(target,
+				grpcclient.WithInsecure(),
+				grpcclient.WithStaticResolver(map[string][]string{
+					"par-" + strconv.Itoa(i): {"localhost:1"},
+				}))
+			conns[i], errs[i] = conn, err
+		}(i)
+	}
+	wg.Wait()
+
+	seen := make(map[*grpc.ClientConn]bool)
+	for i := range callers {
+		if errs[i] != nil {
+			t.Fatalf("GRPCClient(target %d) failed: %v", i, errs[i])
+		}
+
+		if conns[i] == nil {
+			t.Fatalf("GRPCClient(target %d) returned nil conn", i)
+		}
+
+		if seen[conns[i]] {
+			t.Fatalf("GRPCClient(target %d) shares a conn with another target", i)
+		}
+		seen[conns[i]] = true
 	}
 }

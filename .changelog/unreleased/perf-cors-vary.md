@@ -1,0 +1,1 @@
+- perf(core/middleware): CORS `Vary` handling no longer allocates a dedup map per response. Empty `Vary` takes a direct join; a pre-set `Vary` dedups with a case-insensitive linear scan over stack-backed parts.

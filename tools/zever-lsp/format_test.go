@@ -408,7 +408,7 @@ func TestLineRange_condition_expected(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := lineRange(tc.line, tc.start, tc.end)
 
-			if got.Start.Line != uint32(tc.line) || got.End.Line != uint32(tc.line) { //nolint:gosec // table values non-negative
+			if got.Start.Line != uint32(tc.line) || got.End.Line != uint32(tc.line) { // table values non-negative
 				t.Errorf("lineRange() lines = %d/%d, want %d", got.Start.Line, got.End.Line, tc.line)
 			}
 

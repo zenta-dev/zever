@@ -805,7 +805,7 @@ func TestTransportNonStandardDefault(t *testing.T) {
 func TestTransportUpgradesLegacyTLS(t *testing.T) {
 	// Mutates http.DefaultTransport: must NOT be parallel.
 	prev := http.DefaultTransport
-	//nolint:gosec // test-only legacy TLS version to verify the driver upgrades it to TLS 1.2.
+	// Test-only legacy TLS version to verify the driver upgrades it to TLS 1.2.
 	http.DefaultTransport = &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS10}}
 	defer func() { http.DefaultTransport = prev }()
 

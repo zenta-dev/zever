@@ -97,7 +97,7 @@ func whitespaceLineRange(content string, cursor protocol.Position) (protocol.Ran
 		return protocol.Range{}, false
 	}
 
-	width := uint32(len(lines[line])) //nolint:gosec // line width is non-negative
+	width := uint32(len(lines[line])) // line width is non-negative
 
 	return protocol.Range{
 		Start: protocol.Position{Line: cursor.Line, Character: 0},

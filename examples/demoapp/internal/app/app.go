@@ -49,7 +49,7 @@ const (
 // toward a real deployment should instead copy examples/bookings'
 // internal/app/app.go Config, which fails closed when AUTH_JWT_SECRET is
 // missing or shorter than 32 bytes.
-const DevJWTSecret = "dev-only-insecure-secret-32bytes!!" //nolint:gosec
+const DevJWTSecret = "dev-only-insecure-secret-32bytes!!" //nolint:gosec // dev-only demo constant, never used in prod paths
 
 // Config returns the resolved configuration: zever's zero-infra defaults,
 // overlaid by .env/.env.local discovery and by environment

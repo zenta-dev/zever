@@ -121,7 +121,7 @@ func writeSkillFile(dir string, root *cobra.Command) error {
 
 	path := filepath.Join(dir, "SKILL.md")
 
-	if err := os.WriteFile(path, []byte(renderSkill(root)), 0o644); err != nil { //nolint:gosec // generated docs, not a secret
+	if err := os.WriteFile(path, []byte(renderSkill(root)), 0o644); err != nil { // generated docs, not a secret
 		return fmt.Errorf("zever docs: write skill: %w", err)
 	}
 

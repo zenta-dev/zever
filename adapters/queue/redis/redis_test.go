@@ -19,7 +19,7 @@ func TestRedactURL_masks(t *testing.T) {
 		{"empty", queue.Options{}, ""},
 		{"plain addr passthrough", queue.Options{Addr: "localhost:6379"}, "localhost:6379"},
 		{"url password masked", queue.Options{URL: "redis://:s3cret@h:6379"}, "redis://:xxxxx@h:6379"},
-		{"url user+password masked", queue.Options{URL: "redis://user:s3cret@h:6379"}, "redis://user:xxxxx@h:6379"}, //nolint:gosec
+		{"url user+password masked", queue.Options{URL: "redis://user:s3cret@h:6379"}, "redis://user:xxxxx@h:6379"}, //nolint:gosec // fixture fake password for masking test
 		{"addr fallback masked", queue.Options{Addr: "redis://:s3cret@h:6379"}, "redis://:xxxxx@h:6379"},
 		{"url preferred over addr", queue.Options{URL: "redis://:s3cret@h:6379", Addr: "redis://:other@h:6379"}, "redis://:xxxxx@h:6379"},
 		{"unparsable raw", queue.Options{URL: "redis://[::1"}, "redis://[::1"},

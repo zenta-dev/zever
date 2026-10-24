@@ -27,7 +27,7 @@ func TestEveryWithScheduleReusesPassedSchedule(t *testing.T) {
 	}
 
 	for _, e := range s.cron.Entries() {
-		//nolint:gosec // IDs originate from Every, a small positive cron sequence.
+		// IDs originate from Every, a small positive cron sequence.
 		if EntryID(e.ID) == id && e.Schedule != parsed {
 			t.Fatalf("entry Schedule %p != passed %p", e.Schedule, parsed)
 		}

@@ -456,7 +456,7 @@ func (d *driver) registerParsed(parsed cron.Schedule, args any, slot string) sch
 		d.fire(d.tickCtx, slot)
 	}))
 
-	//nolint:gosec // cron EntryIDs are a small positive sequence starting at 1.
+	// cron EntryIDs are a small positive sequence starting at 1.
 	entry := scheduler.EntryID(id)
 	d.slots[entry] = slot
 	d.args[slot] = args
@@ -613,7 +613,7 @@ func (d *driver) Remove(id scheduler.EntryID) error {
 	}
 	d.mu.Unlock()
 
-	//nolint:gosec // IDs originate from Schedule, a small positive cron sequence.
+	// IDs originate from Schedule, a small positive cron sequence.
 	d.cron.Remove(cron.EntryID(id))
 
 	if ok {

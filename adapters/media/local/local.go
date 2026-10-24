@@ -137,7 +137,7 @@ func (a *adapter) Upload(_ context.Context, path string, data []byte, opts media
 		return media.Asset{}, fmt.Errorf("local: mkdir: %w", err)
 	}
 
-	if err := os.WriteFile(dest, data, 0o644); err != nil { //nolint:gosec // media file, not secret
+	if err := os.WriteFile(dest, data, 0o644); err != nil {
 		return media.Asset{}, fmt.Errorf("local: write: %w", err)
 	}
 
