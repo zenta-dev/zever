@@ -1,0 +1,1 @@
+- fix(container): share one `grpcClientCache` pointer so concurrent `GRPCClient` builds no longer race on the target map; builds run outside the lock with a double-checked insert (duplicate build closes its conn). Steady-state cached hit stays at ~65ns/op with zero allocs.

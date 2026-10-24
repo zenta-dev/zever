@@ -244,7 +244,11 @@ func (c *Container) GRPC(opts ...grpc.ServerOption) (*grpc.Server, error) {
 
 // grpcClientCache holds one lazily built *grpc.ClientConn per target
 // string (see GRPCClient). The mutex makes the cache goroutine-safe; the
-// lazy wrapper gives singleflight build semantics for the cache itself.
+// lazy wrapper holds a pointer so every caller shares one mutex and one
+// map (a value would copy the mutex while aliasing the map, breaking
+// mutual exclusion). Builds run outside the lock with a double-checked
+// insert, so concurrent builds for distinct targets proceed in parallel
+// and only the insert serializes.
 type grpcClientCache struct {
 	mu    sync.Mutex
 	conns map[string]*grpc.ClientConn
@@ -252,21 +256,31 @@ type grpcClientCache struct {
 
 // get returns the cached conn for target, building and caching one on
 // first use. A failed build is not cached: the error returns to the caller
-// and the next call retries.
+// and the next call retries. Concurrent builders for the same target may
+// each build a conn; the loser closes its duplicate.
 func (c *grpcClientCache) get(target string, build func() (*grpc.ClientConn, error)) (*grpc.ClientConn, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if conn, ok := c.conns[target]; ok {
+		c.mu.Unlock()
+
 		return conn, nil
 	}
+	c.mu.Unlock()
 
 	conn, err := build()
 	if err != nil {
 		return nil, err
 	}
 
+	c.mu.Lock()
+	if existing, ok := c.conns[target]; ok {
+		c.mu.Unlock()
+		_ = conn.Close()
+
+		return existing, nil
+	}
 	c.conns[target] = conn
+	c.mu.Unlock()
 
 	return conn, nil
 }
@@ -278,8 +292,8 @@ func (c *grpcClientCache) get(target string, build func() (*grpc.ClientConn, err
 // options keep the first build. The conns close with the container.
 // grpcclient.New performs no IO, so resolving never dials.
 func (c *Container) GRPCClient(target string, opts ...grpcclient.Option) (*grpc.ClientConn, error) {
-	cache, err := c.grpcClients.get(func() (grpcClientCache, error) {
-		return grpcClientCache{conns: make(map[string]*grpc.ClientConn)}, nil
+	cache, err := c.grpcClients.get(func() (*grpcClientCache, error) {
+		return &grpcClientCache{conns: make(map[string]*grpc.ClientConn)}, nil
 	})
 	if err != nil {
 		return nil, err
