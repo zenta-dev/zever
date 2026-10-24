@@ -14,7 +14,7 @@ Zever generates plumbing, never business logic. This page is the escape-hatch ma
 | `schema/*.zen` | You | The single source of truth. Everything else derives from it. |
 | `generated/*` | Compiler (`zever compile`) | Never hand-edit. Regenerate, or gate drift (below). |
 | `internal/app/wiring.go`, `cmd/*`, `db/seed/*` | You after eject | Scaffolded once by `zever new`; thereafter yours. The server template resolves a fixed battery set. Delete what you don't call. |
-| `.env.example` | You | Batteries and adapters via env vars; strict keys only. |
+| `.env.example` | You | Option keys via env vars; backends via `wiring.go`; strict keys only. |
 | `.github/workflows/ci.yml` | You after eject | Scaffolded once; regenerate step plus the `--check` drift gate. |
 
 Every file under `generated/` starts with a provenance header naming the CLI release that produced it and the schema revision it was compiled from:

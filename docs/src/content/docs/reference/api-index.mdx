@@ -3,7 +3,7 @@ title: API index
 description: Package entry points with container accessors for every service.
 ---
 
-Battery interfaces live in `core/<b>` with the `Register`/`Open` registry, each adapter lives in its own module at `adapters/<b>/<a>` with a `Register()` call wiring it in, and SDK-free helpers live in `shared/*`. Import the `core` interface plus the adapter modules you need and resolve through `container`. The `dsl/*` packages are internal-only: runtime code must not import the compiler.
+Battery interfaces live in `core/<b>` with typed `Options` and a `DefaultRef`, each adapter lives in its own module at `adapters/<b>/<a>` exposing a `New` constructor wired with `container.Provide`, and SDK-free helpers live in `shared/*`. Import the `core` interface plus the adapter modules you need and resolve through `container`. The `dsl/*` packages are internal-only: runtime code must not import the compiler.
 
 ## Construct and resolve
 
@@ -148,6 +148,6 @@ Per-service bound is 5s only when the parent context carries no deadline; otherw
 
 ## Related
 
-- [Adapters matrix](../adapters-matrix/) for adapter choice per service.
+- [Adapters matrix](../adapters-matrix/) for the wired backend per service.
 - [Config reference](../config/) for values behind accessors.
 - [CLI reference](../cli/) for runtime commands over the container.

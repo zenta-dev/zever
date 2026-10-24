@@ -31,7 +31,7 @@ Env vars: `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION` (the backend is wired in co
 
 ## Upsert and query vectors
 
-The container wires nothing: register the adapter first. `VectorStore()` resolves lazily, caches, and retries.
+Wire the backend with a `container.Provide` entry in `internal/app/wiring.go` (the snippet below shows the explicit form). `VectorStore()` resolves lazily, caches, and retries.
 
 ```go title="main.go" check
 package main

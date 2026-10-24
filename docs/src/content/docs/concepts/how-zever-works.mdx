@@ -37,7 +37,7 @@ The two halves meet at generated code only. Your running service imports generat
 ## Why it works this way
 
 - **Swapping is wiring plus env.** Changing `sqlite` to `postgres` or `memory` to `redis` edits `internal/app/wiring.go` and the env, never call sites.
-- **No hidden wiring.** There are no globals and no `init()` registration: you wire every instance yourself with `container.Provide`, and an adapter you register by hand does it with a `Register()` call.
+- **No hidden wiring.** There are no globals and no `init()` registration: you wire every instance yourself with `container.Provide` in `internal/app/wiring.go` and rebuild.
 - **Compile-time cost, run-time speed.** Parsing and resolving happen once, ahead of time, so request-time code stays plain Go.
 
 ## Related

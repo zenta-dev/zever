@@ -52,7 +52,7 @@ Every sentinel below is a package-level `ErrXxx` in `core/flag` (see `errors.go`
 | `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
 | `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `static.New`) before `Open` |
+| `ErrUnknownAdapter` | kept for compatibility; the registry is gone | Backends are chosen by import with `container.Provide` (for example `static.New`), never parsed from a name |
 | `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
 | `ErrInvalidOptions` | `Options.Validate` failed (for example negative `firebase.timeout`) | Keep `firebase.timeout >= 0`; adapters validate their own required fields |
 | `ErrInvalidKey` | Flag key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the key length only, never the key itself |

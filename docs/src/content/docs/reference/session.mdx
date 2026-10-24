@@ -56,7 +56,7 @@ Every sentinel below is a package-level `ErrXxx` in `core/session` (see `errors.
 | `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
 | `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | `Open` with an unregistered adapter name | Call the adapter's `Register()` (for example `memory.New`) before `Open` |
+| `ErrUnknownAdapter` | kept for compatibility; the registry is gone | Backends are chosen by import with `container.Provide` (for example `memory.New`), never parsed from a name |
 | `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
 | `ErrInvalidOptions` | `Options.Validate` failed (negative `ttl`, bad Redis address or prefix) | Fix the named field |
 | `ErrInvalidID` | Malformed session ID | Reject the request; the error carries the ID length only, never the ID |

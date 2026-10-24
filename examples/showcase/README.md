@@ -41,7 +41,7 @@ CLI-owned, regenerate anytime: `generated/` (via `zever compile` from repo
 root), `internal/api/testdata/schema.sql` (via `zever db migrate --dry-run`),
 entrypoint structure (`cmd/server`, `cmd/worker` — regenerate in a scratch
 project with `go.mod` since examples carry none, then copy).
-Hand-owned, never overwritten: `internal/app/app.go` (adapter selection, JWT
+Hand-owned, never overwritten: `internal/app/app.go` (adapter wiring, JWT
 gate, i18n/permission runtime defaults), `internal/service/shop/shop_service.go`
 (9 RPC bodies), `internal/service/jobs/*` bodies (Deps-closure = filled-in stub
 form), `internal/service/seed/seed.go` bodies, `internal/api/*` rich shapes,
