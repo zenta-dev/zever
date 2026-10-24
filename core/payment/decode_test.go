@@ -2,6 +2,7 @@ package payment
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -30,9 +31,9 @@ func TestLimitDecode_overCap_returnsSizeLimit(t *testing.T) {
 		t.Fatalf("LimitDecode err = %v, want ErrWebhookTooLarge", err)
 	}
 
-	var sle SizeLimitError
-	if !errors.As(err, &sle) {
-		t.Fatalf("err %T is not *SizeLimitError", err)
+	var sle, ok = errors.AsType[SizeLimitError](err)
+	if !ok {
+		t.Fatalf("err %T is not SizeLimitError", err)
 	}
 
 	if sle.Size != len(data) || sle.Limit != len(data)-1 {
@@ -62,9 +63,9 @@ func TestLimitDecode_nonPositiveLimit_returnsSizeLimit(t *testing.T) {
 				t.Fatalf("LimitDecode err = %v, want ErrWebhookTooLarge", err)
 			}
 
-			var sle SizeLimitError
-			if !errors.As(err, &sle) {
-				t.Fatalf("err %T is not *SizeLimitError", err)
+			var _, ok = errors.AsType[SizeLimitError](err)
+			if !ok {
+				t.Fatalf("err %T is not SizeLimitError", err)
 			}
 		})
 	}
@@ -74,8 +75,13 @@ func TestLimitDecode_invalidJSON_returnsError(t *testing.T) {
 	t.Parallel()
 
 	var v Result
-	if err := LimitDecode([]byte(`{invalid`), &v, 1<<20); err == nil {
+	err := LimitDecode([]byte(`{invalid`), &v, 1<<20)
+	if err == nil {
 		t.Fatalf("LimitDecode invalid JSON = nil, want error")
+	}
+
+	if !strings.HasPrefix(err.Error(), "payment:") {
+		t.Errorf("LimitDecode err = %q, want payment: prefix", err)
 	}
 }
 
@@ -83,7 +89,12 @@ func TestLimitDecode_truncated_returnsError(t *testing.T) {
 	t.Parallel()
 
 	var v Result
-	if err := LimitDecode([]byte(`{"ID": "pay_1"`), &v, 1<<20); err == nil {
+	err := LimitDecode([]byte(`{"ID": "pay_1"`), &v, 1<<20)
+	if err == nil {
 		t.Fatalf("LimitDecode truncated = nil, want error")
+	}
+
+	if !strings.HasPrefix(err.Error(), "payment:") {
+		t.Errorf("LimitDecode err = %q, want payment: prefix", err)
 	}
 }
