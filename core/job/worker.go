@@ -281,10 +281,6 @@ func (w *Worker) log() log.Logger {
 // handler error, nil when the message was handled or dead-lettered without a
 // handler failure.
 func (w *Worker) process(ctx context.Context, msg queue.Message, topic string) error {
-	if msg.Headers == nil {
-		msg.Headers = make(map[string]string)
-	}
-
 	jobName := msg.Headers[headerJobName]
 	def, ok := Lookup(jobName)
 
@@ -401,6 +397,9 @@ func (w *Worker) handleDeadLetter(
 
 func (w *Worker) handleRetry(ctx context.Context, msg queue.Message, topic, jobName string, attempt int, policy RetryPolicy) {
 	headers := msg.Headers.Clone()
+	if headers == nil {
+		headers = make(queue.Headers, 1)
+	}
 	headers[headerAttempt] = strconv.Itoa(attempt + 1)
 
 	if err := w.Q.PushDelayed(ctx, topic, msg.Payload, headers, policy.Backoff(attempt)); err != nil {
