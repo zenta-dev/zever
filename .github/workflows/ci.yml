@@ -450,8 +450,9 @@ jobs:
         run: GOWORK=off go -C examples/external-sms test -count=1 ./...
 
   # Fuzz smoke: a short run of security-critical fuzz targets across the
-  # repo (DSL frontend, webhook signatures, storage traversal, payment
-  # webhooks, JWT claims). Not a soak: it catches regressions that the
+  # repo (DSL frontend, webhook signatures/envelopes, storage traversal, S3
+  # key validation, payment webhooks, JWT claims). Not a soak: it catches
+  # regressions that the
   # committed seed corpus plus mutation can reach. Failing inputs are
   # written under testdata/fuzz and should be committed with the fix.
   fuzz-smoke:
@@ -472,7 +473,7 @@ jobs:
       - name: Pre-download modules (retry on transient proxy errors)
         run: |
           for i in 1 2 3; do
-          make -s download-all MODULES="config dsl adapters/webhook/queue adapters/storage/local adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt" && exit 0
+          make -s download-all MODULES="config dsl adapters/webhook/queue adapters/webhook/http adapters/storage/local adapters/storage/s3 adapters/payment/stripe adapters/payment/paddle adapters/auth/jwt" && exit 0
             echo "download attempt $i failed; retrying"; sleep $((i * 10))
           done
           exit 1
@@ -493,11 +494,27 @@ jobs:
             echo "== ${target}"
             go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
           done
+      - name: Fuzz webhook signature envelope (http deliver side)
+        working-directory: adapters/webhook/http
+        run: |
+          set -euo pipefail
+          for target in FuzzSignEnvelope FuzzRedactTarget; do
+            echo "== ${target}"
+            go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
       - name: Fuzz storage traversal
         working-directory: adapters/storage/local
         run: |
           set -euo pipefail
           for target in FuzzTraversal FuzzPresignKeyValidation FuzzSymlinkContainment; do
+            echo "== ${target}"
+            go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
+      - name: Fuzz S3 key validation
+        working-directory: adapters/storage/s3
+        run: |
+          set -euo pipefail
+          for target in FuzzKeyValidation FuzzEscapeKey; do
             echo "== ${target}"
             go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
           done
