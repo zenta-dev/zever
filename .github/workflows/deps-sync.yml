@@ -73,6 +73,13 @@ jobs:
       # would break this job instead of resolving it.
       GOTOOLCHAIN: auto
     steps:
+      - name: check-sync-token
+        id: check-sync-token
+        run: |
+          if [ "${HAS_SYNC_TOKEN}" != 'true' ]; then
+            echo "::notice::No DEPS_SYNC_TOKEN secret: the sync push will use GITHUB_TOKEN, which does not retrigger CI. Close and reopen the PR after the sync commit to run CI on it."
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.ref }}
