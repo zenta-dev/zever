@@ -18,7 +18,7 @@ func ambientEnv() Env {
 
 	env["DB_DSN"] = "/tmp/zever-bench.db"
 	env["DB_MAXCONNS"] = "20"
-	env["LOG_MIN_LEVEL"] = "info"
+	env["LOG_MIN_LEVEL"] = "1"
 
 	return env
 }
@@ -70,7 +70,7 @@ func BenchmarkDefault(b *testing.B) {
 // BenchmarkResolveEnv measures the full env-only resolution (defaults,
 // env overlay, fail-closed validate) from a small valid Env.
 func BenchmarkResolveEnv(b *testing.B) {
-	env := Env{"DB_MAXCONNS": "10", "LOG_MIN_LEVEL": "info"}
+	env := Env{"DB_MAXCONNS": "10", "LOG_MIN_LEVEL": "1"}
 
 	b.ReportAllocs()
 	b.ResetTimer()
