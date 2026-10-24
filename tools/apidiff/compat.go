@@ -45,7 +45,7 @@ func compatMatrix() string {
 
 // runCompatMatrix implements --compat-matrix: write the rendered doc to file.
 func runCompatMatrix(file string, stdout io.Writer) int {
-	if err := os.WriteFile(file, []byte(compatMatrix()), 0o644); err != nil { //nolint:gosec // docs are world-readable
+	if err := os.WriteFile(file, []byte(compatMatrix()), 0o644); err != nil { // docs are world-readable
 		fmt.Fprintf(stdout, "apidiff: write %s: %v\n", file, err)
 		return 1
 	}

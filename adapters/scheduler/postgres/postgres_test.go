@@ -280,7 +280,7 @@ func findEntry(t *testing.T, d *driver, id scheduler.EntryID) cron.Entry {
 	t.Helper()
 
 	for _, e := range d.cron.Entries() {
-		//nolint:gosec // IDs originate from Schedule, a small positive cron sequence.
+		// IDs originate from Schedule, a small positive cron sequence.
 		if e.ID == cron.EntryID(id) {
 			return e
 		}

@@ -415,7 +415,7 @@ func TestParamNameHintsAppear(t *testing.T) {
 	for i, arg := range []string{`"a"`, `"b"`} {
 		wantChar := strings.Index(lines[dispatchLine], arg)
 
-		//nolint:gosec // test fixture offsets are non-negative
+		// test fixture offsets are non-negative
 		if hints[i].Position.Line != uint32(dispatchLine) ||
 			hints[i].Position.Character != uint32(wantChar) {
 			t.Errorf("hint %d position = %+v, want line %d char %d (start of %s)",

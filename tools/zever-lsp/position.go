@@ -128,7 +128,7 @@ func isIdentByte(b byte) bool {
 func identRange(p diag.Position, ident string) protocol.Range {
 	start := lspPosition(p)
 	end := start
-	end.Character += uint32(len(ident)) //nolint:gosec // len is non-negative
+	end.Character += uint32(len(ident)) // len is non-negative
 
 	return protocol.Range{Start: start, End: end}
 }

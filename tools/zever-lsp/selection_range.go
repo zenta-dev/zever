@@ -125,8 +125,8 @@ func documentRangeAt(src string) *protocol.Range {
 	return &protocol.Range{
 		Start: protocol.Position{Line: 0, Character: 0},
 		End: protocol.Position{
-			Line:      uint32(len(lines) - 1),                 //nolint:gosec // non-negative line count
-			Character: uint32(lineWidth(lines[len(lines)-1])), //nolint:gosec // non-negative width
+			Line:      uint32(len(lines) - 1),                 // non-negative line count
+			Character: uint32(lineWidth(lines[len(lines)-1])), // non-negative width
 		},
 	}
 }
@@ -143,13 +143,13 @@ func tokenRangeAt(tok token.Token, src string) *protocol.Range {
 	}
 
 	start := protocol.Position{
-		Line:      uint32(tok.Pos.Line - 1), //nolint:gosec // lexer positions non-negative
-		Character: uint32(tok.Pos.Col - 1),  //nolint:gosec // lexer positions non-negative
+		Line:      uint32(tok.Pos.Line - 1), // lexer positions non-negative
+		Character: uint32(tok.Pos.Col - 1),  // lexer positions non-negative
 	}
 
 	return &protocol.Range{
 		Start: start,
-		End:   protocol.Position{Line: start.Line, Character: start.Character + uint32(width)}, //nolint:gosec // non-negative
+		End:   protocol.Position{Line: start.Line, Character: start.Character + uint32(width)}, // non-negative
 	}
 }
 
@@ -210,8 +210,8 @@ func lineRangeAt(src string, line int) *protocol.Range {
 	}
 
 	return &protocol.Range{
-		Start: protocol.Position{Line: uint32(line), Character: 0},                              //nolint:gosec // non-negative
-		End:   protocol.Position{Line: uint32(line), Character: uint32(lineWidth(lines[line]))}, //nolint:gosec // non-negative
+		Start: protocol.Position{Line: uint32(line), Character: 0},                              // non-negative
+		End:   protocol.Position{Line: uint32(line), Character: uint32(lineWidth(lines[line]))}, // non-negative
 	}
 }
 
@@ -271,10 +271,10 @@ func braceBlockRangeAt(tokens []token.Token, src string, cursor protocol.Positio
 	open, closeBrace := tokens[best], tokens[match[best]]
 
 	return &protocol.Range{
-		Start: protocol.Position{Line: uint32(open.Pos.Line - 1), Character: 0}, //nolint:gosec // lexer positions non-negative
+		Start: protocol.Position{Line: uint32(open.Pos.Line - 1), Character: 0}, // lexer positions non-negative
 		End: protocol.Position{
-			Line:      uint32(closeBrace.Pos.Line - 1),                           //nolint:gosec // lexer positions non-negative
-			Character: uint32(lineWidth(lineSourceAt(src, closeBrace.Pos.Line))), //nolint:gosec // non-negative
+			Line:      uint32(closeBrace.Pos.Line - 1),                           // lexer positions non-negative
+			Character: uint32(lineWidth(lineSourceAt(src, closeBrace.Pos.Line))), // non-negative
 		},
 	}
 }

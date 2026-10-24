@@ -96,7 +96,7 @@ func TestHoverOnFieldWithoutAttributes(t *testing.T) {
 func TestHoverOnRelationTarget(t *testing.T) {
 	line := 9
 	col := strings.Index(strings.Split(hoverSrc, "\n")[line], ": User") + len(": ")
-	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} //nolint:gosec // test fixture
+	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} // test fixture
 
 	got := hoverText(t, cursor)
 
@@ -166,7 +166,7 @@ func TestHoverRelationTargetCapsFieldList(t *testing.T) {
 		if idx := strings.Index(line, ": Wide"); idx >= 0 {
 			cursor = protocol.Position{
 				Line:      uint32(i),               // test fixture
-				Character: uint32(idx + len(": ")), //nolint:gosec // test fixture
+				Character: uint32(idx + len(": ")), // test fixture
 			}
 
 			break
@@ -258,7 +258,7 @@ func TestHoverOnEntityNameIncludesDocComment(t *testing.T) {
 func TestHoverOnRelationTargetIncludesDocComment(t *testing.T) {
 	line := 10
 	col := strings.Index(strings.Split(docCommentSrc, "\n")[line], ": User") + len(": ")
-	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} //nolint:gosec // test fixture
+	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} // test fixture
 
 	got := hoverTextForSrc(t, docCommentSrc, cursor)
 
@@ -363,7 +363,7 @@ func TestHoverOnUnresolvedRelationTarget(t *testing.T) {
 
 	line := 3
 	col := strings.Index(strings.Split(src, "\n")[line], ": Ghost") + len(": ")
-	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} //nolint:gosec // test fixture
+	cursor := protocol.Position{Line: uint32(line), Character: uint32(col)} // test fixture
 
 	h := hoverAt(nil, file, cursor)
 	if h == nil {
@@ -406,7 +406,7 @@ func TestHoverOnRelationTargetWithoutFields(t *testing.T) {
 		if idx := strings.Index(line, ": Empty"); idx >= 0 {
 			cursor = protocol.Position{
 				Line:      uint32(i),               // test fixture
-				Character: uint32(idx + len(": ")), //nolint:gosec // test fixture
+				Character: uint32(idx + len(": ")), // test fixture
 			}
 
 			break

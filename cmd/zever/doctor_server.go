@@ -47,7 +47,7 @@ var runServerDoctor = func(ctx context.Context, entry string) (serverDoctorRepor
 	// entry comes from the developer's own environment (the
 	// ZEVER_SERVER_ENTRY env key), not from untrusted input; argv stays
 	// separate elements, no shell.
-	//nolint:gosec // see above
+	// see above
 	cmd := exec.CommandContext(ctx, "go", buildGoRunArgs(entry, []string{"--doctor"})...)
 
 	var stdout, stderr bytes.Buffer

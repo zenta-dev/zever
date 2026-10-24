@@ -19,7 +19,7 @@ func benchCursor(line int, needle string) protocol.Position {
 	if col < 0 {
 		panic("needle not found: " + needle)
 	}
-	return protocol.Position{Line: uint32(line), Character: uint32(col)} //nolint:gosec // test fixture offsets
+	return protocol.Position{Line: uint32(line), Character: uint32(col)} // test fixture offsets
 }
 
 // benchSchema compiles the hover fixture once for the benchmarks.

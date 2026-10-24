@@ -237,7 +237,7 @@ func findUninstallLSP(pathEnv, goos string) []string {
 		for _, name := range uninstallLSPNames(goos) {
 			candidate := filepath.Join(dir, name)
 
-			//nolint:gosec // candidate joins operator-controlled PATH entries for a read-only existence check.
+			// candidate joins operator-controlled PATH entries for a read-only existence check.
 			st, err := os.Stat(candidate)
 			if err != nil || st.IsDir() {
 				continue

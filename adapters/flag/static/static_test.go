@@ -28,7 +28,7 @@ func writeTempFlags(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "flags.json")
-	//nolint:gosec // test-only path under TempDir.
+	// Test-only path under TempDir.
 	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
 		t.Fatalf("write temp flags: %v", err)
 	}

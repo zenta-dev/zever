@@ -431,7 +431,7 @@ func decodeCursorValue(tag byte, payload []byte) (any, error) {
 			return nil, errors.New("orm: CursorKey.Decode: corrupt int32 value")
 		}
 
-		return int32(n), nil //nolint:gosec // tag was validated as int32
+		return int32(n), nil // tag was validated as int32
 	case cursorTagFloat:
 		bits, sz := binary.Uvarint(payload)
 		if sz <= 0 {

@@ -237,7 +237,7 @@ func localImports(root, moddir string) (map[string]bool, error) {
 		if !strings.HasSuffix(d.Name(), ".go") {
 			return nil
 		}
-		content, err := os.ReadFile(p) //nolint:gosec // G122: p comes from walking the repository root; modgraph is a dev tool, not a production service
+		content, err := os.ReadFile(p) // G122: p comes from walking the repository root; modgraph is a dev tool, not a production service
 		if err != nil {
 			return err
 		}

@@ -431,7 +431,7 @@ func (s *Store) doEnsureCollection(ctx context.Context, dim int) error {
 			return fmt.Errorf("qdrant: collection %q has no vector params", "vectors")
 		}
 
-		got := int(info.GetConfig().GetParams().GetVectorsConfig().GetParams().GetSize()) //nolint:gosec // G115: dimension fits in int
+		got := int(info.GetConfig().GetParams().GetVectorsConfig().GetParams().GetSize()) // G115: dimension fits in int
 
 		if got != dim {
 			return fmt.Errorf(
@@ -452,7 +452,7 @@ func (s *Store) doEnsureCollection(ctx context.Context, dim int) error {
 	if err := s.client.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: "vectors",
 		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-			Size:     uint64(dim), //nolint:gosec // G115: dimension is positive by design
+			Size:     uint64(dim), // G115: dimension is positive by design
 			Distance: qdrant.Distance_Cosine,
 		}),
 	}); err != nil {

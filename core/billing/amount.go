@@ -46,7 +46,7 @@ func ParseMinorUnits(s string, currency string) (int64, error) {
 		return 0, ErrAmountOverflow
 	}
 
-	mag := uint64(whole) * uint64(scale) //nolint:gosec // G115: whole holds unsigned digits, scale is positive
+	mag := uint64(whole) * uint64(scale) // G115: whole holds unsigned digits, scale is positive
 
 	if fracStr != "" {
 		frac, err := parseFraction(fracStr, scale)
@@ -54,7 +54,7 @@ func ParseMinorUnits(s string, currency string) (int64, error) {
 			return 0, err
 		}
 
-		mag += uint64(frac) //nolint:gosec // G115: frac is a non-negative magnitude
+		mag += uint64(frac) // G115: frac is a non-negative magnitude
 	}
 
 	if sign > 0 {
@@ -73,7 +73,7 @@ func ParseMinorUnits(s string, currency string) (int64, error) {
 		return math.MinInt64, nil
 	}
 
-	return -int64(mag), nil //nolint:gosec // G115: mag <= MaxInt64 past the 1<<63 guard
+	return -int64(mag), nil // G115: mag <= MaxInt64 past the 1<<63 guard
 }
 
 // FormatMinorUnits formats minor units as a decimal major-unit amount string
@@ -86,13 +86,13 @@ func ParseMinorUnits(s string, currency string) (int64, error) {
 func FormatMinorUnits(v int64, currency string) string {
 	exp := CurrencyExponent(currency)
 	scale := scaleForCurrency(currency)
-	uscale := uint64(scale) //nolint:gosec // G115: scale is a positive power of ten
+	uscale := uint64(scale) // G115: scale is a positive power of ten
 
 	neg := v < 0
 
 	var mag uint64
 	if neg {
-		mag = uint64(-(v + 1)) + 1 //nolint:gosec // G115: v < 0, so -(v+1) is non-negative
+		mag = uint64(-(v + 1)) + 1 // G115: v < 0, so -(v+1) is non-negative
 	} else {
 		mag = uint64(v)
 	}

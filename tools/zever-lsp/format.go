@@ -80,11 +80,11 @@ func lineRange(line, startCol, endCol int) protocol.Range {
 
 	return protocol.Range{
 		Start: protocol.Position{
-			Line:      uint32(line), //nolint:gosec // line is a 0-based lexer counter, never negative
+			Line:      uint32(line), // line is a 0-based lexer counter, never negative
 			Character: uint32(startCol),
 		},
 		End: protocol.Position{
-			Line:      uint32(line), //nolint:gosec // line is a 0-based lexer counter, never negative
+			Line:      uint32(line), // line is a 0-based lexer counter, never negative
 			Character: uint32(endCol),
 		},
 	}

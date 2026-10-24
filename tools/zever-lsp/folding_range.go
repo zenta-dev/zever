@@ -90,9 +90,9 @@ func appendFoldRange(ranges *[]protocol.FoldingRange, openLine, closeLine int) {
 	}
 
 	*ranges = append(*ranges, protocol.FoldingRange{
-		//nolint:gosec // source line numbers are small and non-negative
+		// source line numbers are small and non-negative
 		StartLine: uint32(openLine - 1),
-		//nolint:gosec // source line numbers are small and non-negative
+		// source line numbers are small and non-negative
 		EndLine: uint32(closeLine - 1),
 	})
 }

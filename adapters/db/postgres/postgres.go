@@ -363,16 +363,16 @@ func New(opts db.Options) (db.DB, error) {
 	}
 
 	if opts.MaxConns > 0 {
-		config.MaxConns = int32(opts.MaxConns) //nolint:gosec // G115: pool size bounded by design
+		config.MaxConns = int32(opts.MaxConns)
 	} else {
 		// pgxpool's own default is max(4, runtime.NumCPU()), which ignores
 		// cgroup CPU limits. GOMAXPROCS is container-aware (Go 1.25+), so
 		// derive the default from it to respect a constrained container.
-		config.MaxConns = int32(max(4, runtime.GOMAXPROCS(0))) //nolint:gosec // G115: pool size bounded by design
+		config.MaxConns = int32(max(4, runtime.GOMAXPROCS(0)))
 	}
 
 	if opts.MinConns > 0 {
-		config.MinConns = int32(opts.MinConns) //nolint:gosec // G115: pool size bounded by design
+		config.MinConns = int32(opts.MinConns)
 	}
 
 	if opts.MaxConnLifetime > 0 {

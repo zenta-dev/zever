@@ -1,10 +1,13 @@
 package container
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/zenta-dev/zever/config"
 	"github.com/zenta-dev/zever/core/queue"
+	"github.com/zenta-dev/zever/shared/grpcclient"
 )
 
 // BenchmarkContainer_NewNilConfig measures the lazy root constructor: no
@@ -89,4 +92,38 @@ func BenchmarkContainer_CloseEmpty(b *testing.B) {
 			b.Fatalf("Close: %v", err)
 		}
 	}
+}
+
+// BenchmarkGRPCClient_CachedParallel measures the steady-state GRPCClient
+// fast path (one shared cache, one map hit) under concurrent callers.
+func BenchmarkGRPCClient_CachedParallel(b *testing.B) {
+	c := New(nil)
+	conn, err := c.GRPCClient("passthrough:///bench-cached", grpcclient.WithInsecure())
+	if err != nil {
+		b.Fatalf("warmup GRPCClient: %v", err)
+	}
+	if conn == nil {
+		b.Fatal("warmup returned nil conn")
+	}
+	b.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := c.Close(ctx); err != nil {
+			b.Fatalf("Close: %v", err)
+		}
+	})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			got, err := c.GRPCClient("passthrough:///bench-cached", grpcclient.WithInsecure())
+			if err != nil {
+				b.Fatalf("GRPCClient: %v", err)
+			}
+			if got != conn {
+				b.Fatal("GRPCClient returned a new conn for a cached target")
+			}
+		}
+	})
 }

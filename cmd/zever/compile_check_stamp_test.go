@@ -21,7 +21,7 @@ func mapFiles(t *testing.T, dir string, fn func(string) string) int {
 			return err
 		}
 
-		data, readErr := os.ReadFile(path) //nolint:gosec // test temp dir
+		data, readErr := os.ReadFile(path) // test temp dir
 		if readErr != nil {
 			return readErr
 		}
@@ -33,7 +33,7 @@ func mapFiles(t *testing.T, dir string, fn func(string) string) int {
 
 		n++
 
-		return os.WriteFile(path, []byte(next), 0o600) //nolint:gosec // test temp dir
+		return os.WriteFile(path, []byte(next), 0o600) // test temp dir
 	})
 	if err != nil {
 		t.Fatalf("mapFiles: %v", err)

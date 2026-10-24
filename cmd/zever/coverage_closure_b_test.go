@@ -362,7 +362,7 @@ func TestDevChildStopKillsWedged(t *testing.T) {
 	// only kills the first sleep and the shell outlives the grace period
 	// deterministically.
 	pollFor(t, 10*time.Second, func() bool {
-		//nolint:gosec // fixed ps argv, no shell; pid is our own test child.
+		// fixed ps argv, no shell; pid is our own test child.
 		out, err := exec.CommandContext(t.Context(), "ps", "-o", "comm=", "--ppid", strconv.Itoa(cmd.Process.Pid)).Output()
 		if err != nil {
 			return false

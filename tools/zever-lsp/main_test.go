@@ -266,7 +266,7 @@ func TestMain_subprocessCover(t *testing.T) {
 
 	// Prove main() itself ran under coverage: convert the child's coverdata
 	// and require main.go's main to be fully covered.
-	funcCov := exec.CommandContext(t.Context(), "go", "tool", "covdata", "func", "-i="+coverDir) //nolint:gosec // test-only: coverDir is a t.TempDir() path, never user input
+	funcCov := exec.CommandContext(t.Context(), "go", "tool", "covdata", "func", "-i="+coverDir) // test-only: coverDir is a t.TempDir() path, never user input
 
 	out, covErr := funcCov.CombinedOutput()
 	if covErr != nil {

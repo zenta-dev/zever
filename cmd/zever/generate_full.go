@@ -524,7 +524,7 @@ func writeGenerateTree(tag string, out, stderr io.Writer, outDir, backendsSpec s
 			return fmt.Errorf("%s: mkdir %q: %w", tag, filepath.Dir(st.Path), err)
 		}
 
-		if err := os.WriteFile(st.Path, desired[st.Path], 0o644); err != nil { //nolint:gosec // generated source, not a secret
+		if err := os.WriteFile(st.Path, desired[st.Path], 0o644); err != nil { // generated source, not a secret
 			return fmt.Errorf("%s: write %q: %w", tag, st.Path, err)
 		}
 
