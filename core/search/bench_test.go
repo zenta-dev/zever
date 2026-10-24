@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-// benchSearchAdapter registers a stub search once and returns its adapter so
-// Open can be measured without paying the one-shot registration cost.
+// BenchmarkOptionsValidate measures Options validation for a search backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{Host: "https://example.com"}
 

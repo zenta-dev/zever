@@ -14,7 +14,7 @@
 // Breaker cancellation from the caller is never counted against the circuit,
 // and callers classify business errors as success through BreakerOptions.IsSuccessful.
 //
-// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: import the adapter package and wire its New constructor with container.Provide.
 // zero-infra defaults for tests. Configuration comes from the environment
 // only: .env, .env.local, and the process environment, with keys named
 // <SERVICE>_<FIELD> (no prefix). See

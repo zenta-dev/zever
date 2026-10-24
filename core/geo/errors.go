@@ -5,16 +5,16 @@ import (
 	"fmt"
 )
 
-// ErrNilFactory is returned when an adapter factory is nil.
+// ErrNilFactory is returned when a nil backend factory is provided.
 var ErrNilFactory = errors.New("geo: nil factory")
 
-// ErrDuplicateAdapter is returned on duplicate adapter registration.
+// ErrDuplicateAdapter is returned for a duplicate adapter name.
 var ErrDuplicateAdapter = errors.New("geo: duplicate adapter")
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
 var ErrDuplicate = ErrDuplicateAdapter
 
-// ErrUnknownAdapter is returned for an unregistered adapter.
+// ErrUnknownAdapter is returned for an unknown adapter name.
 var ErrUnknownAdapter = errors.New("geo: unknown adapter")
 
 // ErrInvalidAdapter is returned for an invalid adapter name.
@@ -32,7 +32,7 @@ var ErrInvalidCoordinate = errors.New("geo: invalid coordinate")
 // ErrTooLarge is returned when a geo response exceeds the size limit.
 var ErrTooLarge = errors.New("geo: response too large")
 
-// InvalidAdapterError reports a failed adapter name parse.
+// InvalidAdapterError reports an invalid adapter name.
 type InvalidAdapterError struct {
 	// Adapter is the invalid adapter name.
 	Adapter string
@@ -46,16 +46,16 @@ func (e InvalidAdapterError) Error() string {
 // Unwrap returns ErrInvalidAdapter.
 func (e InvalidAdapterError) Unwrap() error { return ErrInvalidAdapter }
 
-// DuplicateAdapterError reports a double registration.
+// DuplicateAdapterError reports a duplicate adapter name.
 type DuplicateAdapterError struct {
-	// Adapter is the already-registered adapter.
+	// Adapter is the duplicate adapter name.
 	Adapter string
 }
 
 // DuplicateError aliases DuplicateAdapterError for compatibility.
 type DuplicateError = DuplicateAdapterError
 
-// Error returns a human-readable duplicate-registration message.
+// Error returns a human-readable duplicate-adapter message.
 func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
@@ -63,9 +63,9 @@ func (e DuplicateAdapterError) Error() string {
 // Unwrap returns ErrDuplicateAdapter.
 func (e DuplicateAdapterError) Unwrap() error { return ErrDuplicateAdapter }
 
-// UnknownAdapterError reports an open of an unregistered adapter.
+// UnknownAdapterError reports an unknown adapter name.
 type UnknownAdapterError struct {
-	// Adapter is the unregistered adapter.
+	// Adapter is the unknown adapter name.
 	Adapter string
 }
 

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// BenchmarkRegister measures registry insertion for a fresh adapter key.
+// BenchmarkValidCoord measures coordinate validation.
 func BenchmarkValidCoord(b *testing.B) {
 	b.ReportAllocs()
 
@@ -34,7 +34,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	}
 }
 
-// BenchmarkAdapterString measures canonical adapter naming.
+// BenchmarkGeocode measures address geocoding through a stub backend.
 func BenchmarkGeocode(b *testing.B) {
 	g := &stubGeo{}
 	ctx := b.Context()

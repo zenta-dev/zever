@@ -8,17 +8,17 @@
 // Subject, Resource, and Decision are typed, Effect is Allow or Deny, and roles
 // map to inherited roles. Unsupported features fail closed.
 //
-// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: import the adapter package and wire its New constructor with container.Provide. Options are typed with zero-infra defaults for tests. Configuration comes from the environment only: .env, .env.local, and the process environment, with keys named <SERVICE>_<FIELD> (no prefix). See config/README.md.
 //
 // Container: container.New(cfg) then c.Permission(). Lazy per-service singleton, retry on error. See container/README.md.
 //
-// Lifecycle: ctx is first arg for IO, never stored. Close releases resources; only resolved services close. Checker is stateless and exposes no Close; model and policy files load once at Open.
+// Lifecycle: ctx is first arg for IO, never stored. Close releases resources; only resolved services close. Checker is stateless and exposes no Close; model and policy files load once at construction.
 //
 // Errors: sentinel errors, errors.Is compatible, prefixed permission:. Name service and field only in errors.
 //
 // Security: never log secrets or raw option maps, use config.RedactedServices. Callers deny on error (fail-closed), model and policy paths reject dot-dot traversal and must exist, role names cap at 256 characters.
 //
-// Performance: rule validation is linear in rule count, RBAC checks read in-memory maps, Casbin files load once at Open. Bounded pools and timeouts.
+// Performance: rule validation is linear in rule count, RBAC checks read in-memory maps, Casbin files load once at construction. Bounded pools and timeouts.
 //
 // Concurrency: safe for concurrent use unless noted. No globals, no init wiring.
 //

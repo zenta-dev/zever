@@ -6,13 +6,13 @@ import (
 )
 
 var (
-	// ErrNilFactory is returned when registering a nil factory.
+	// ErrNilFactory is returned when a nil backend factory is provided.
 	ErrNilFactory = errors.New("cdn: nil factory")
-	// ErrDuplicateAdapter is returned when registering an adapter twice.
+	// ErrDuplicateAdapter is returned for a duplicate adapter name.
 	ErrDuplicateAdapter = errors.New("cdn: duplicate adapter")
-	// ErrUnknownAdapter is returned when opening an unregistered adapter.
+	// ErrUnknownAdapter is returned for an unknown adapter name.
 	ErrUnknownAdapter = errors.New("cdn: unknown adapter (forgotten import?)")
-	// ErrInvalidAdapter is returned when parsing an empty adapter name.
+	// ErrInvalidAdapter is returned for an invalid adapter name.
 	ErrInvalidAdapter = errors.New("cdn: invalid adapter")
 	// ErrClosed is returned when operating on a closed CDN client.
 	ErrClosed = errors.New("cdn: closed")
@@ -34,7 +34,7 @@ func (e InvalidAdapterError) Unwrap() error {
 	return ErrInvalidAdapter
 }
 
-// DuplicateError reports a repeated adapter registration.
+// DuplicateError reports a duplicate adapter name.
 type DuplicateError struct {
 	// Adapter is the duplicated adapter.
 	Adapter string
@@ -50,7 +50,7 @@ func (e DuplicateError) Unwrap() error {
 	return ErrDuplicateAdapter
 }
 
-// UnknownAdapterError reports an unregistered adapter lookup.
+// UnknownAdapterError reports an unknown adapter name.
 type UnknownAdapterError struct {
 	// Adapter is the unknown adapter.
 	Adapter string

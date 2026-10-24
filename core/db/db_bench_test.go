@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// BenchmarkRegister measures registry insertion for a fresh adapter key.
+// BenchmarkOptionsValidate measures pool option validation.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{MaxConns: 10, MinConns: 2, MaxConnLifetime: time.Hour, MaxConnIdleTime: time.Minute}
 
@@ -19,7 +19,7 @@ func BenchmarkOptionsValidate(b *testing.B) {
 	}
 }
 
-// BenchmarkAdapterString measures canonical adapter naming.
+// BenchmarkIsolationLevelString measures isolation level string conversion.
 func BenchmarkIsolationLevelString(b *testing.B) {
 	level := Serializable
 

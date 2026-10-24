@@ -5,16 +5,16 @@ import (
 	"fmt"
 )
 
-// ErrNilFactory is returned when an adapter factory is nil.
+// ErrNilFactory is returned when a nil backend factory is provided.
 var ErrNilFactory = errors.New("workflow: nil factory")
 
-// ErrDuplicateAdapter is returned on duplicate adapter registration.
+// ErrDuplicateAdapter is returned for a duplicate adapter name.
 var ErrDuplicateAdapter = errors.New("workflow: duplicate adapter")
 
 // ErrDuplicate aliases ErrDuplicateAdapter for compatibility.
 var ErrDuplicate = ErrDuplicateAdapter
 
-// ErrUnknownAdapter is returned for an unregistered adapter.
+// ErrUnknownAdapter is returned for an unknown adapter name.
 var ErrUnknownAdapter = errors.New("workflow: unknown adapter")
 
 // ErrInvalidAdapter is returned for an invalid adapter name.
@@ -57,16 +57,16 @@ var ErrSagaCompensationFailed = errors.New("workflow: saga compensation failed")
 // converted across the typed-to-untyped bridge (see NewTypedStep).
 var ErrTypedStepConvert = errors.New("workflow: convert typed saga step value")
 
-// DuplicateAdapterError reports a duplicate adapter registration.
+// DuplicateAdapterError reports a duplicate adapter name.
 type DuplicateAdapterError struct {
-	// Adapter is the already-registered adapter.
+	// Adapter is the duplicate adapter name.
 	Adapter string
 }
 
 // DuplicateError aliases DuplicateAdapterError for compatibility.
 type DuplicateError = DuplicateAdapterError
 
-// Error returns a human-readable duplicate-registration message.
+// Error returns a human-readable duplicate-adapter message.
 func (e DuplicateAdapterError) Error() string {
 	return fmt.Sprintf("%s: %s", ErrDuplicateAdapter, e.Adapter)
 }
@@ -76,9 +76,9 @@ func (e DuplicateAdapterError) Unwrap() error {
 	return ErrDuplicateAdapter
 }
 
-// UnknownAdapterError reports a lookup of an unregistered adapter.
+// UnknownAdapterError reports an unknown adapter name.
 type UnknownAdapterError struct {
-	// Adapter is the unregistered adapter.
+	// Adapter is the unknown adapter name.
 	Adapter string
 }
 

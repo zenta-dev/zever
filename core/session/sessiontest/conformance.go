@@ -224,9 +224,6 @@ func checkTTLExpiry(ctx context.Context, s session.Store, ttl, timeout time.Dura
 	return errors.Join(errs...)
 }
 
-// checkOpenRegister proves the production Open path returns the
-// registered probe, rejects duplicates, and reports unknown adapters.
-
 func conformanceErrors(t *testing.T, factory func(t *testing.T) session.Store) {
 	t.Helper()
 

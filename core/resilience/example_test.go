@@ -21,5 +21,3 @@ func ExampleDo() {
 	fmt.Println(v)
 	// Output: ok
 }
-
-// ExampleParseAdapter parses a custom adapter name.

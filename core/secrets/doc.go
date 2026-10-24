@@ -4,7 +4,7 @@
 //
 // Type safety: Secrets plus typed Options plus Factory. Options carry Addr plus Token plus Mount plus ProjectID plus Prefix plus Region; ValidateName enforces safe names. Unsupported features fail closed.
 //
-// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: importing the adapter wires it. Options are typed with zero-infra defaults for tests. Env backend reads prefixed variables directly (prefixed). See config/README.md.
+// DX: construct backends directly with the adapter package's New constructor. Backend selection is compile-time: import the adapter package and wire its New constructor with container.Provide. Options are typed with zero-infra defaults for tests. Env backend reads prefixed variables directly (prefixed). See config/README.md.
 //
 // Container: container.New(cfg) then c.Secrets(). Lazy per-service singleton, retry on error. See container/README.md.
 //

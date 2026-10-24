@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// BenchmarkRegister measures registry insertion for a fresh adapter key.
+// BenchmarkValidateKey measures flag key validation.
 func BenchmarkValidateKey(b *testing.B) {
 	b.ReportAllocs()
 
@@ -56,5 +56,3 @@ func BenchmarkEvalContextRoundTrip(b *testing.B) {
 		}
 	}
 }
-
-// BenchmarkAdapterString measures canonical adapter naming.

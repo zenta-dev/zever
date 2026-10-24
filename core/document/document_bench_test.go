@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// BenchmarkRegister measures registry insertion for a fresh adapter key.
+// BenchmarkOptionsValidate measures render option validation.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{
 		Timeout:        time.Second,
@@ -33,7 +33,7 @@ func BenchmarkClampQuality(b *testing.B) {
 	}
 }
 
-// BenchmarkAdapterString measures canonical adapter naming.
+// BenchmarkRender measures document rendering through a stub backend.
 func BenchmarkRender(b *testing.B) {
 	doc := &stubDocument{out: []byte("%PDF-1.4")}
 	source := []byte("\\documentclass{article}")

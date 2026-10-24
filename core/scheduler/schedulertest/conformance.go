@@ -25,9 +25,8 @@ const (
 	DefaultPollInterval = 20 * time.Millisecond
 )
 
-// adapterSeq keeps throwaway registry names unique across Conformance runs
-// in one process. jobSeq keeps globally registered job names unique so
-// parallel adapter suites never collide on the process-wide job registry.
+// jobSeq keeps globally registered job names unique so parallel suites
+// never collide on the process-wide job registry.
 var (
 	jobSeq atomic.Uint64
 )
@@ -35,7 +34,7 @@ var (
 // Conformance verifies factory-built schedulers implement the
 // scheduler.Scheduler contract against the dispatcher it is given:
 // Schedule/Entries/Remove lifecycle, spec and job validation, idempotent
-// Start, Stop, Open/Register wiring, and at-least-once in-process firing.
+// Start, Stop, dispatcher wiring, and at-least-once in-process firing.
 // Each subtest takes a fresh instance from factory so cases stay isolated.
 // Fire-polling uses a ticker with a deadline, never time.Sleep, and never
 // touches the network.
@@ -418,7 +417,3 @@ func checkFire(ctx context.Context, s scheduler.Scheduler, q queue.Queue, jobNam
 		}
 	}
 }
-
-// checkOpenRegister proves the production Open path returns the
-// registered scheduler, rejects duplicates, and reports unknown
-// adapters. The dispatcher for Open uses a throwaway stub queue.

@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// benchRouterAdapter registers a stub router once and returns its adapter so
-// Open can be measured without paying the one-shot registration cost.
+// BenchmarkChiPattern measures chi-style route pattern parsing.
 func BenchmarkChiPattern(b *testing.B) {
 	pattern := "/api/v1/users/:id<[0-9]+>/items/{item:[a-z]+}"
 

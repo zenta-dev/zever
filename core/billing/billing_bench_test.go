@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-// benchAdapter registers a stub billing backend once and returns its adapter
-// so Open can be measured without paying the registration cost.
+// BenchmarkOptionsValidate measures Options validation for a billing backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{Endpoint: "https://api.stripe.com/hook"}
 
@@ -42,5 +41,3 @@ func BenchmarkCurrencyExponent(b *testing.B) {
 		}
 	}
 }
-
-// BenchmarkParseAdapter measures adapter name parsing.

@@ -4,8 +4,7 @@ import (
 	"testing"
 )
 
-// benchAdapter registers a stub checker once and returns its adapter so
-// Open can be measured without paying the (one-shot) registration cost.
+// BenchmarkOptionsValidate measures Options validation for a permission backend.
 func BenchmarkOptionsValidate(b *testing.B) {
 	opts := Options{
 		Rules: []Rule{

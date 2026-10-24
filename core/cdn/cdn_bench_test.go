@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// BenchmarkOpen measures the CDN factory lookup and instantiation.
+// BenchmarkPurge_Noop measures purge of a single URL through a no-op backend.
 func BenchmarkPurge_Noop(b *testing.B) {
 	c := &noopAdapter{}
 	ctx := b.Context()
@@ -65,7 +65,7 @@ func BenchmarkClose_Noop(b *testing.B) {
 	}
 }
 
-// BenchmarkRegisteredAdapters measures the sorted adapter list lookup.
+// noopAdapter discards purges and reports a fixed name for benchmarks.
 type noopAdapter struct{}
 
 func (n *noopAdapter) Purge(_ context.Context, _ PurgeRequest) error { return nil }
