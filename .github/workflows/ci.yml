@@ -539,8 +539,10 @@ jobs:
         working-directory: adapters/auth/jwt
         run: |
           set -euo pipefail
-          # JWT fuzz targets will be added when needed
-          echo "JWT fuzz targets: verify FuzzVerify when added"
+          for target in FuzzVerify; do
+            echo "== ${target}"
+            go test -run '^$' -fuzz "^${target}\$" -fuzztime 20s .
+          done
 
   # Scaffold gate: `zever new` -> go mod tidy -> build/vet/test, plus
   # golangci-lint under the scaffold's own .golangci.yml, so a fresh project
