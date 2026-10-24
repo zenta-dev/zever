@@ -48,7 +48,7 @@ jobs:
             go.work.sum
             **/go.sum
       - name: Restore fuzz corpus (best-effort)
-        uses: actions/cache/restore@8b402aa82689d5dd8a3298a246a9c4aa4dfa9bf0 # v5.0.3
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             dsl/**/testdata/fuzz
@@ -92,7 +92,7 @@ jobs:
           done
       - name: Save grown corpus
         if: always()
-        uses: actions/cache/save@8b402aa82689d5dd8a3298a246a9c4aa4dfa9bf0 # v5.0.3
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             dsl/**/testdata/fuzz
