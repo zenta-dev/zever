@@ -42,8 +42,7 @@ func TestOptions_Validate_violations_table(t *testing.T) {
 				}
 			}
 
-			var ioe InvalidOptionsError
-			if !errors.As(err, &ioe) {
+			if _, ok := errors.AsType[InvalidOptionsError](err); !ok {
 				t.Errorf("err %T is not *InvalidOptionsError", err)
 			}
 		})
