@@ -1,1 +1,0 @@
-- fix(config): an unknown adapter now reports the `config: ` prefix once (`config: unknown adapter "memmory" for service "cache"`), so the `zever doctor` adapters row no longer reads `config: config: unknown adapter ...`. The failure still matches `config.ErrUnknownAdapter` through `errors.Is`.

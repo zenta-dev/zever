@@ -1,2 +1,0 @@
-- **Breaking:** `dsl/diag`: `Diagnostic` carries a new `Related []RelatedInfo` field (related locations, e.g. the first declaration of a duplicate), so `Diagnostic` values are no longer comparable with `==` and cannot be used as map keys. Compare field-by-field or with `reflect.DeepEqual`.
-- feat(dsl,lsp): duplicate diagnostics (duplicate top-level declarations, enum values, error codes, saga steps) now carry the first declaration as a structured related location, surfaced as LSP `relatedInformation` by `zever-lsp`.

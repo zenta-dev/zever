@@ -1,1 +1,0 @@
-- fix(cli): `zever add ci` now scaffolds `runs-on: ubuntu-24.04` instead of `ubuntu-latest`, so generated projects get the same pinned, non-migrating runner image the zever repo uses rather than inheriting the `ubuntu-latest` migration to Ubuntu 26.

@@ -1,2 +1,0 @@
-- fix(config): `config.Resolve`/`config.ApplyEnv` stop rejecting unrelated ambient environment variables (the flat `<SERVICE>_<FIELD>` namespace collided with `AI_AGENT`, `LOG_LEVEL`, `DB_URL` and `CACHE_DIR`, so `zever` refused to start in a noisy environment).
-- feat(config): add `config.UnresolvedKeys`, which lists the env keys that were ignored so a caller (for example `zever doctor`) can report them; a key with a non-empty `Suggestion` is a near-miss typo.

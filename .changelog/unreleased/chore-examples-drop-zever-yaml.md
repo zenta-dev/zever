@@ -1,1 +1,0 @@
-- chore(examples): drop the dead `zever.yaml` files from `bookings`, `demoapp`, `showcase`, and `todo`. Service config has been env-only since v0.8.0, so the framework ignores those files entirely; each example ships a `.env.example` instead.

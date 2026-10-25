@@ -1,1 +1,0 @@
-- perf(core/job): worker no longer allocates an empty headers map for headerless messages; the retry path allocates lazily instead. Headerless `process` drops from 3 to 2 allocs/op (112 to 64 B/op).

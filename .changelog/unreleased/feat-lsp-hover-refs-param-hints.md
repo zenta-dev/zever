@@ -1,3 +1,0 @@
-- feat(lsp): entity/message/enum hover cards now show a `` `defined in <relpath>` `` line and a capped "Referenced by" list (e.g. `` `Order.user_id` ``, `` `dispatch: SyncOrders` ``) reusing the rename/reference walkers.
-- feat(lsp): new opt-in `zever.inlayHints.paramNames` setting (default `false`) annotating positional `dispatch: Job(...)` arguments with `name:` labels, with rust-analyzer-style noise heuristics (already-named arguments and same-name single-argument calls are skipped).
-- feat(lsp): semantic-token legend gains the `definition` modifier, emitted on declaration identifiers (decl names and field names at declaration); references carry no modifier bit.

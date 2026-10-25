@@ -1,1 +1,0 @@
-- fix(cli): `zever new --help` and `zever add --help` list every flag the parsers accept (`--with`, `--yes`, `--list-batteries`, `--no-tidy`, `--name`, `--uses`, `--diff`), and `zever compile --help` lists `--strict`; the `add` help text names `internal/app/wiring.go` and `.env.example` instead of the removed `zever.yaml` stanza.
