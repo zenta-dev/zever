@@ -5,11 +5,11 @@ description: Allow browser calls from other origins with strict, fail-closed cro
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`middleware.CORS` enforces strict cross-origin rules as HTTP middleware. Use it when browsers call your API from another origin; requests without `Origin` pass through.
+Strict cross-origin HTTP middleware for browser calls, requests without `Origin` pass through.
 
-## Wire CORS first
+## Wire CORS
 
-Zever owns no `cors` config section. Decode your app's own block into `middleware.Options` (snake_case `json` tags) and wire it outermost with `r.Use` before any `Handle`:
+No `cors` config section: decode your app's block into `middleware.Options` (snake_case `json` tags), `r.Use` outermost before any `Handle`:
 
 ```yaml
 cors:
@@ -38,46 +38,46 @@ handler := middleware.CORS(middleware.Options{
 })(mux)
 ```
 
-`MaxAge` is a `time.Duration`, rendered as delay-seconds (`10m` becomes `600`).
+`MaxAge` is a `time.Duration` in delay-seconds (`10m` becomes `600`).
 
-## Know what CORS answers
+## Responses
 
 | Request | Response |
 |---|---|
 | No `Origin` | Passes through, no CORS headers. |
-| Allowed origin, simple | Handler runs; `Allow-Origin` echoes origin, `Vary: Origin`. |
-| Allowed origin, preflight match | `204` with `Allow-Origin`, `Allow-Methods`, `Allow-Headers`, `Max-Age`. |
-| Allowed origin, preflight mismatch | `403`, no `Allow-Origin`. |
-| Disallowed origin | Never reflected; simple requests pass, preflights fall through. |
+| Allowed origin, simple | Handler runs. `Allow-Origin` echoes origin, `Vary: Origin`. |
+| Allowed preflight match | `204` with `Allow-Origin`, `Allow-Methods`, `Allow-Headers`, `Max-Age`. |
+| Allowed preflight mismatch | `403`, no `Allow-Origin`. |
+| Disallowed origin | Never reflected, simple passes, preflights fall through. |
 
-## Validate options
+## Validate
 
-`Options.Validate` rejects fail-open shapes: empty origin/method lists, blank entries, `*` with `AllowCredentials`, negative `MaxAge`; invalid options fail closed with `500 {"error":"internal error"}`. A wildcard `*` without credentials echoes `*` for any origin. `DefaultCORSMaxAge` (`0`) omits `Max-Age`, so browsers preflight every request.
+`Options.Validate` rejects fail-open shapes (empty origin/method lists, blank entries, `*` with `AllowCredentials`, negative `MaxAge`), invalid options fail closed with `500 {"error":"internal error"}`. A credentialless `*` echoes `*` for any origin. `DefaultCORSMaxAge` (`0`) omits `Max-Age`, so browsers preflight every request.
 
-Keep `CORS` outermost so preflights skip logging and rate limiting, and call `r.Use` before `Handle`, since `stdhttp` snapshots middleware per route. CORS is HTTP-only ([chain order](../middleware/#order-the-chain)).
+Keep `CORS` outermost (preflights skip logging and rate limiting), call `r.Use` before `Handle` (`stdhttp` snapshots middleware per route). HTTP-only ([chain order](../middleware/#order-the-chain)).
 
 ## Troubleshooting
 
 <details>
-<summary>Preflights are logged or rate-limited</summary>
+<summary>Logged or rate-limited preflights</summary>
 
-`CORS` sits inside `RequestLogger` or `RateLimit`. Move it outermost.
+Move `CORS` outermost.
 </details>
 
 <details>
-<summary>The browser blocks a valid origin</summary>
+<summary>Browser blocks a valid origin</summary>
 
-Not an exact allowlist match. Add the exact origin.
+Allowlist mismatch, add the exact origin.
 </details>
 
 <details>
-<summary>Preflight returns an unexpected 403</summary>
+<summary>Unexpected preflight 403</summary>
 
-The method or a requested header is outside the allowlist (header matching is case-insensitive). Add the missing entry.
+Method or header outside the allowlist (matching is case-insensitive), add it.
 </details>
 
 <details>
-<summary>Every CORS request returns 500</summary>
+<summary>All CORS requests 500</summary>
 
 `Options` is invalid, often `*` with credentials.
 </details>
@@ -86,5 +86,5 @@ The method or a requested header is outside the allowlist (header matching is ca
 
 <CardGrid>
   <LinkCard title="Middleware" href="../middleware/" description="Chain order." />
-  <LinkCard title="Routing" href="../routing/" description="Where the wrapped mux comes from." />
+  <LinkCard title="Routing" href="../routing/" description="Wrapped mux." />
 </CardGrid>

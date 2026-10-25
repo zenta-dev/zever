@@ -5,7 +5,7 @@ description: Publish and subscribe to in-process events, and fan out across inst
 
 import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`eventbus.EventBus` lets producers publish and walk away while zero or more live listeners react. Use it for notify-style fan-out where no reaction is load-bearing, like a `booking.created` signal. (The bookings example delivers `booking.created` through [webhooks](../webhooks/), not this bus.) No durability and no redelivery for offline handlers, so put must-run work on the [queue](../queue/) via `job.Dispatcher`.
+`eventbus.EventBus` lets producers publish while zero or more live listeners react. For notify-style fan-out where no reaction is load-bearing (e.g. `booking.created` signal, the bookings example delivers it via [webhooks](../webhooks/)). No durability or redelivery for offline handlers, must-run work goes on the [queue](../queue/) via `job.Dispatcher`.
 
 ## Quick start
 
@@ -46,15 +46,15 @@ func main() {
 }
 ```
 
-Output: `push saw hello` and `pull saw hello`. Push (`Subscribe`) takes a handler and returns an unsubscribe closure; pull (`SubscribeChan`) returns a channel. Keep payloads small, versioned JSON.
+Output: `push saw hello` and `pull saw hello`. `Subscribe` takes a handler and returns an unsubscribe closure, `SubscribeChan` returns a channel. Keep payloads small, versioned JSON.
 
 ## Subscribe without leaking goroutines
 
-Every subscription needs an explicit exit path, or leak tests flag the stray goroutine: defer the unsubscribe closure after `Subscribe`, and `Unsubscribe` after `SubscribeChan`. Closing the bus also ends subscriptions. Topics must be non-empty and at most 256 bytes (`MaxTopicLen`). Payloads are at most 4 MiB (`MaxMessageSize`); oversize publishes fail closed. Set `OnPanic` (never validated) where a bad subscriber must not take down the publisher. Cap fan-out with `max_handlers`: unbounded subscribes from request paths leak handlers.
+Every subscription needs an exit path or leak tests flag it: defer the unsubscribe closure after `Subscribe`, and `Unsubscribe` after `SubscribeChan`. Closing the bus also ends subscriptions. Topics: non-empty, max 256 bytes (`MaxTopicLen`). Payloads max 4 MiB (`MaxMessageSize`), oversize publishes fail. Set `OnPanic` (never validated) so a bad subscriber can't take down the publisher. Cap fan-out with `max_handlers`: unbounded subscribes from request paths leak handlers.
 
 ## Fan out across instances with Redis
 
-Use `redis` when a publish on one process must reach a subscriber on another; call sites do not change.
+Use `redis` when a publish on one process must reach another, call sites don't change.
 
 <Tabs>
   <TabItem label="YAML">
@@ -76,7 +76,7 @@ EVENTBUS_HANDLER_TIMEOUT=30s
   </TabItem>
 </Tabs>
 
-Keys are strict snake_case, with Redis pooling under a nested `redis` block. Zero means the adapter default (`buffer_size` 1024, `max_handlers` 128, `handler_timeout` 30s, `close_timeout` 5s); only negative values fail. Env is strict about the keys it understands: an unknown key under a wired service prefix fails with a did-you-mean hint, an unknown service head is ignored, and an unparsable resolved value errors. All keys: [eventbus config reference](../../../reference/config/#eventbus).
+Keys are strict snake_case, Redis pooling nests under `redis`. Zero means adapter default (`buffer_size` 1024, `max_handlers` 128, `handler_timeout` 30s, `close_timeout` 5s), only negatives fail. Unknown keys under a wired service prefix fail with a did-you-mean hint, unknown service heads are ignored, unparsable values error. All keys: [eventbus config reference](../../../reference/config/#eventbus).
 
 | Adapter | Package | Notes |
 |---|---|---|
@@ -90,42 +90,23 @@ c := container.New(config.Default(), container.Provide(eventbus.DefaultRef(), ev
 bus, err := c.EventBus() // alias c.Eventbus()
 ```
 
-`EventBus()` resolves lazily and caches; on error the cache clears. `New` always returns a bus with pull support: adapters expose the `Pusher` push core and the package wraps it. `Close() error` takes no context. See [the container](../../../concepts/container/).
-
-Publishing to a topic with no subscriber is a quiet no-op.
+`EventBus()` resolves lazily and caches, on error the cache clears. `New` always returns a bus with pull support: adapters expose the `Pusher` push core and the package wraps it. `Close() error` takes no context. See [the container](../../../concepts/container/). Publishing to a topic with no subscriber is a quiet no-op.
 
 ## Production checklist
 
-- Not durable: a handler offline at publish time misses the message, with no replay.
-- Backpressure drops newest: a full per-topic buffer (default 1024) drops the newest message for that subscriber only. Size `buffer_size` for burst plus handler latency.
-- Bound handler time with `handler_timeout` (default 30s); a stuck handler holds its slot and its buffer fills, causing drops.
-- Never put secrets in payloads. Redaction covers logged config, not message bodies.
+- Not durable: offline handlers miss messages, no replay.
+- Drop-newest backpressure: full per-topic buffer (default 1024) drops the newest message for that subscriber only. Size `buffer_size` for burst + latency.
+- Bound handler time with `handler_timeout` (30s), a stuck handler holds its slot and fills its buffer.
+- No secrets in payloads. Redaction covers logged config, not bodies.
 
 ## Troubleshooting
 
-<details>
-<summary>A subscriber on host B never fires for publishes on host A</summary>
-
-The `memory` adapter in a multi-instance deploy; delivery is in-process. Set `eventbus.adapter` to `redis` with a shared `addr` and `prefix`, then confirm every instance resolves the same endpoint through redacted output.
-</details>
-
-<details>
-<summary>Messages vanish under load with no error</summary>
-
-The per-topic buffer is full and drop-newest backpressure engaged. Raise `buffer_size`, shorten handler work (enqueue a job for slow I/O), and look for a slow subscriber starving its channel.
-</details>
-
-<details>
-<summary>Strict load rejects buffersize or maxhandlers</summary>
-
-Flat pre-rename spellings; keys are `buffer_size`, `max_handlers`, `handler_timeout`, `close_timeout`. Rename them and use integer nanoseconds. Env still accepts compact spellings because `_` is ignored.
-</details>
-
-<details>
-<summary>A leak test fails after adding a subscription</summary>
-
-No exit path: the unsubscribe func was never called, or the `SubscribeChan` channel never reached `Unsubscribe` or bus `Close`. Defer both as above.
-</details>
+| Symptom | Fix |
+|---|---|
+| Subscriber on B never fires for A publishes | `memory` is in-process, set `eventbus.adapter` to `redis` with shared `addr`/`prefix` |
+| Messages vanish under load, no error | Buffer full, drop-newest engaged, raise `buffer_size`, shorten handler work (enqueue a job), find slow subscriber |
+| Strict load rejects `buffersize`/`maxhandlers` | Pre-rename spellings, use `buffer_size`, `max_handlers`, `handler_timeout`, `close_timeout` (integer ns). Env ignores `_` |
+| Leak test fails after new subscription | No exit path, defer unsubscribe/`Unsubscribe` or bus `Close` |
 
 ## Related
 

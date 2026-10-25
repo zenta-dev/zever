@@ -5,7 +5,7 @@ description: Follow one Zever process from config load to container close, and w
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-A Zever process runs four phases: load config, build the container, resolve services on first use, and close. Knowing the phase tells you whether a failure is fail-fast, retryable, or a shutdown problem.
+Four phases per process: load config, build the container, resolve on first use, close. The phase tells you whether a failure is fail-fast, retryable, or a shutdown problem.
 
 ## The four phases
 
@@ -15,36 +15,30 @@ config.FromEnv + Resolve  ->  container.New  ->  resolve on first use  ->  Close
                               process          retry on error              first, leaves later
 ```
 
-Build one container per process; no globals or `init()` wiring; `container.New(nil)` is valid.
+Build one container per process, no globals or `init()` wiring, `container.New(nil)` is valid.
 
-- **1. Load config**: env merges into one `Config`; failures are `InvalidOptionsError` or unparsable values. Validation runs at load, so an invalid option value fails in phase 1, not mid-request. An unwired service passes load and fails on first resolution with `NotWiredError` naming the missing `container.Provide` entry. `config.FromEnv()` reads `.env`, `.env.local`, and the process environment; `config.Resolve(env)` turns that map into the typed `Config`; `config.LoadEnv(files...)` is the explicit-file variant. The default instance reads `SERVICE_FIELD`; a named instance reads `SERVICE__NAME__FIELD`. See the [Config reference](../../reference/config/) for keys. `Default()` dev secrets belong in tests only.
-- **2. Build container**: one `Container` owns future connections; `New` never dials and `nil` cfg is valid.
-- **3a. First resolution**: adapter constructed and cached; on error the cache clears and the next call retries.
-- **3b. Steady serving**: cached instance reused per accessor; per-call errors only, no rebuild.
-- **3c. Shared resolution**: `Scheduler()` resolves `Job()` then `Queue()`; one shared connection.
-- **4. Close**: resolved services shut down in order; `errors.Join` of per-service errors.
-
-## Load config once at boot
-
-Config layers as `defaults < .env < .env.local < process env`: env is strict about the keys it understands (an unknown key under a wired service prefix fails with a did-you-mean hint) and ignores everything else (unknown service heads, bare names). Validation runs at load, so an invalid option value fails in phase 1, not mid-request. An unwired service passes load and fails on first resolution with `NotWiredError`. `config.FromEnv()` reads `.env`, `.env.local`, and the process environment; `config.Resolve(env)` turns that map into the typed `Config`. The default instance reads `SERVICE_FIELD`; a named instance reads `SERVICE__NAME__FIELD` and needs a matching named Ref. See the [Config reference](../../reference/config/) for keys. `Default()` dev secrets belong in tests only.
+- **1. Load config**: `config.FromEnv()` reads `.env`, `.env.local`, and process env. `config.Resolve(env)` builds the typed `Config` (`config.LoadEnv(files...)` for explicit files). Defaults read `SERVICE_FIELD`, named instances read `SERVICE__NAME__FIELD` via a matching named Ref. Env is strict about keys it understands (an unknown key under a wired service prefix fails with a did-you-mean hint) and ignores the rest (unknown service heads, bare names). Invalid values fail here as `InvalidOptionsError`, not mid-request. Unwired services pass load and fail on first resolution with `NotWiredError` naming the missing `container.Provide` entry. See the [Config reference](../../reference/config/) for keys. `Default()` dev secrets belong in tests only.
+- **2. Build container**: one `Container` owns future connections. `New` never dials, `nil` cfg valid.
+- **3a. First resolution**: construct and cache the adapter. On error the cache clears and the next call retries.
+- **3b. Steady serving**: cached instance reused per accessor, per-call errors only, no rebuild.
+- **3c. Shared resolution**: `Scheduler()` resolves `Job()` then `Queue()`, one shared connection.
+- **4. Close**: resolved services shut down in order, `errors.Join` of per-service errors.
 
 ## Resolve lazily and reuse
 
-Resolve inside handlers and reuse the cached instance. On error the cache clears, so the next call retries instead of pinning a broken handle. `Job()` dispatches over the resolved `Queue`; `Scheduler()` shares it.
+Resolve inside handlers and reuse the cached instance. A cleared cache retries instead of pinning a broken handle. `Job()` dispatches over the resolved `Queue`, `Scheduler()` shares it.
 
 ## Close in order
 
-Stop the HTTP server first, then close the container under a timeout parent (`context.WithTimeout`, about 10s). See [Deployment](../../guides/operate/deployment/) for the full shutdown wiring.
+Stop the HTTP server first, then close the container under a timeout parent (`context.WithTimeout`, about 10s). See [Deployment](../../guides/operate/deployment/) for the full shutdown wiring. `Close` never opens anything, so an unused service cannot fail shutdown. Dependents (`scheduler`, `job`, `agent`, `rag`) close first, then leaves (`cache`, `queue`), then `db` and shared pools. Each service gets a 5s bound without a parent deadline, shared instances close once.
 
-`Close` never opens anything, so an unused service cannot fail shutdown. Dependents (`scheduler`, `job`, `agent`, `rag`) close first, then leaves (`cache`, `queue`), then `db` and shared pools, and each service gets a 5s bound without a parent deadline; shared instances close once.
-
-- **Panic during close**: `container.ClosePanicError`; the adapter panicked and shutdown continued.
-- **Per-service timeout**: `container.CloseTimeoutError`; the adapter exceeded its bound.
-- **Several failures**: `errors.Join`; inspect each with `errors.As`.
+- **Panic during close**: `container.ClosePanicError`, the adapter panicked and shutdown continued.
+- **Per-service timeout**: `container.CloseTimeoutError`, the adapter exceeded its bound.
+- **Several failures**: `errors.Join`, inspect each with `errors.As`.
 
 ## Design decisions and trade-offs
 
-Error values name the service only, never secrets; display config through `config.RedactedServices`. Both close error types are values, so a pointer `errors.As` target never matches.
+Errors name the service only, never secrets (display via `config.RedactedServices`). Both close error types are values, so `errors.As` needs a value target.
 
 ## Troubleshooting
 
@@ -57,7 +51,7 @@ An unparsable env value. The `Resolve` error names the service and field.
 <details>
 <summary>The first request fails but the next succeeds</summary>
 
-A transient backend error cleared the cache. No fix needed unless it repeats.
+A transient backend error cleared the cache. Ignore it unless it repeats.
 </details>
 
 <details>
@@ -81,8 +75,8 @@ A goroutine outlived `Close` (`go test -tags=leak ./container/`). Stop it in the
 ## Related
 
 <CardGrid>
-  <LinkCard title="Container" description="Accessor table and close probing order." href="../container/" />
-  <LinkCard title="Providers and adapters" description="Interface and provider roles." href="../providers-adapters/" />
+  <LinkCard title="Container" description="Accessors and close probing." href="../container/" />
+  <LinkCard title="Providers and adapters" description="Interfaces and provider roles." href="../providers-adapters/" />
   <LinkCard title="Compiler boundary" description="Why the compiler never runs here." href="../compiler-boundary/" />
   <LinkCard title="Deployment" description="Production shutdown wiring." href="../../guides/operate/deployment/" />
 </CardGrid>

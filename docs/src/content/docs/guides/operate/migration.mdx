@@ -5,15 +5,13 @@ description: Move service config to environment variables, wire adapters with Pr
 
 import { Aside, Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-v0.8 changes how a project configures and boots. Service config is environment-only, adapters wire through typed `container.Provide` calls, `zever new` scaffolds a smaller tree, and generated servers delegate boot to `serve.Main`. This page maps every change to its replacement.
-
-**v0.8.0 is env-only: configuration moved from a config file to `.env`.**
+v0.8 makes service config environment-only, wires adapters through typed `container.Provide` calls, delegates generated-server boot to `serve.Main`.
 
 ## At a glance
 
 | v0.7.x | v0.8.0 |
 |---|---|
-| `zever.yaml` (or `.yml`, `.json`, `.toml`) | `.env`, `.env.local`, or the process environment |
+| `zever.yaml` (or `.yml`, `.json`, `.toml`) | `.env`, `.env.local`, process environment |
 | `config.Load("zever.yaml")` | `config.FromEnv()` then `config.Resolve(env)` |
 | `project.schema_dir` | `ZEVER_SCHEMA_DIR` |
 | `project.generated_dir` | `ZEVER_GENERATED_DIR` |
@@ -24,19 +22,19 @@ v0.8 changes how a project configures and boots. Service config is environment-o
 | `search.Postgres`, `search.SQLite` | `db` |
 | `vectorstore.PGVector`, `vectorstore.SQLite` | `db` |
 | `workflow.Postgres` | `db` |
-| the `--config` file flag | gone from every command |
+| `--config` file flag | gone from every command |
 
-The rest of this page walks each row. Read [Check the migration](#check-the-migration) first if you want the short version: two commands tell you whether the translation is done.
+Two commands verify the translation: [Check the migration](#check-the-migration).
 
 ## Service config is env-only
 
-`zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read. `config.Load` is gone. `config.FromEnv()` plus `config.Resolve(env)` replace them. The framework does not look for a legacy file at all: no probe, no discovery step, no warning.
+`zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read. `config.Load` is gone. `config.FromEnv()` plus `config.Resolve(env)` replace it: no probe, discovery, or warning.
 
 <Aside type="danger" title="A leftover file is inert">
-A v0.7.x file left in the working directory is silently ignored. Every service falls back to its compiled-in wiring, so a half-translated project looks healthy while it talks to the wrong database. Nothing will tell you: translate the file by hand and delete it. The mapping is mechanical: every `options:` key becomes `<SERVICE>_<KEY>`, and each `adapter:` becomes a `container.Provide` entry (plus import) in `internal/app/wiring.go`.
+A leftover v0.7.x file is silently ignored: every service falls back to compiled-in wiring, so a half-translated project looks healthy while talking to the wrong database. Translate it by hand and delete it: every `options:` key becomes `<SERVICE>_<KEY>`, each `adapter:` a `container.Provide` entry (plus import) in `internal/app/wiring.go`.
 </Aside>
 
-Translate each `adapter:` and `options:` key to an uppercase env variable. Every service uses `<SERVICE>_<FIELD>`; named instances use `<SERVICE>__<NAME>__<FIELD>`.
+Translate each `adapter:`/`options:` key to uppercase env: `<SERVICE>_<FIELD>`, named instances `<SERVICE>__<NAME>__<FIELD>`.
 
 | Service | Env prefix | Default adapter |
 |---|---|---|
@@ -78,8 +76,6 @@ Translate each `adapter:` and `options:` key to an uppercase env variable. Every
 | webhook | `WEBHOOK_` | http |
 | workflow | `WORKFLOW_` | memory |
 
-Example:
-
 ```diff title="zever.yaml -> .env"
 -db:
 -  adapter: postgres
@@ -92,8 +88,6 @@ Example:
 +DB_MAX_CONNS=20
 ```
 
-The same project as a `.env` file, with an AI key, a JWT secret, and a named second database:
-
 ```sh title=".env"
 DB_DSN=postgres://app:secret@db:5432/app
 DB_MAX_CONNS=20
@@ -102,13 +96,13 @@ AUTH_JWT_SECRET=prod-secret-at-least-32-bytes-long
 DB__REPORTING__DSN=postgres://app:secret@db:5432/reporting
 ```
 
-A named instance reaches the container only through a matching named Ref (`db.Ref("reporting")`) wired with `container.Provide`. The default instance reads the flat `<SERVICE>_<FIELD>` namespace.
+Named instances reach the container only through a matching `container.Provide`-wired Ref (`db.Ref("reporting")`).
 
-Rules: `adapter:` becomes a `container.Provide` entry in `internal/app/wiring.go` (there is no adapter env key -- any `*_ADAPTER` key fails resolution); each `options:` key becomes `<SERVICE>_<KEY>` uppercased; one nesting level flattens with a single underscore (`jwt.secret` under auth becomes `AUTH_JWT_SECRET`); durations are Go strings in env (`5s`, `1m`), not integer nanoseconds. Keys with no string form (maps, lists) cannot move to env. Full mapping and defaults: [Config reference](../../../reference/config/).
+`adapter:` becomes a `container.Provide` entry in `internal/app/wiring.go` (no adapter env key. Any `*_ADAPTER` key fails resolution), each `options:` key becomes `<SERVICE>_<KEY>` uppercased, one nesting level flattens with a single underscore (`jwt.secret` becomes `AUTH_JWT_SECRET`), durations are Go strings in env (`5s`, `1m`). Keys with no string form (maps, lists) cannot move to env. See [Config reference](../../../reference/config/).
 
 ## Adapter names
 
-Three services dropped the alias names that only existed for the old file. The DB-backed wiring is one constructor now (`searchdb.New` and friends), and the DSN decides the backend: a postgres URL selects postgres, anything else selects embedded sqlite.
+Three services dropped file-only alias names. One DB-backed constructor now (`searchdb.New` and friends). The DSN picks the backend: postgres URL selects postgres, anything else embedded sqlite.
 
 | v0.7.x alias | v0.8.0 name | Backend picked from the DSN |
 |---|---|---|
@@ -128,11 +122,11 @@ Three services dropped the alias names that only existed for the old file. The D
 (no env change: the same `db` constructor reads the DSN and picks the backend)
 ```
 
-`core/db` keeps two real databases behind two constructors (`dbsqlite.New`, `dbpostgres.New`): switching is an import plus a `container.Provide` change, not aliases. A removed backend does not fall back to a default. A stale `*_ADAPTER` key fails resolution instead of quietly picking a backend you did not ask for.
+`core/db` keeps two real databases behind two constructors (`dbsqlite.New`, `dbpostgres.New`): switching is an import plus a `container.Provide` change. Removed backends never fall back to a default. A stale `*_ADAPTER` key fails resolution instead of quietly picking an unasked backend.
 
 ## Wire adapters with Provide
 
-The container never resolves adapters through name registries: there is no registry. `zever new` scaffolds one `Ref` var plus one `container.Provide` entry per instance, and `zever add <battery>` inserts more. Adapters expose only a `New` constructor; the container path is `Provide`.
+No name registries: `zever new` scaffolds one `Ref` var plus one `container.Provide` entry per instance. `zever add <battery>` inserts more. Adapters expose only a `New` constructor. The container path is `Provide`.
 
 ```diff title="internal/app/wiring.go"
 -package app
@@ -151,12 +145,12 @@ The container never resolves adapters through name registries: there is no regis
 +}
 ```
 
-Resolve through the container with `container.Get`, or keep using the accessors when the default instance is wired:
+Resolve with `container.Get`, or keep accessors when the default instance is wired:
 
 ```go title="internal/app/wiring.go"
 import (
-	"github.com/zenta-dev/zever/container"
-	"github.com/zenta-dev/zever/core/db"
+    "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/db"
 )
 
 var DB = db.DefaultRef()
@@ -164,7 +158,7 @@ var DB = db.DefaultRef()
 // Providers wires DB to the sqlite adapter; Get(c, DB) returns the *sql.DB handle.
 ```
 
-`Provide1`, `Provide2`, and `Provide3` add typed dependencies. Options come from `config.DefaultOptions` overlaid with env, then `container.WithOptions` appliers run last:
+`Provide1`, `Provide2`, `Provide3` add typed dependencies. Options come from `config.DefaultOptions` overlaid with env. `container.WithOptions` appliers run last:
 
 ```diff title="internal/app/wiring.go"
  return []container.Provider{
@@ -175,22 +169,22 @@ var DB = db.DefaultRef()
  }
 ```
 
-Graph validation runs at `container.New`: duplicate `Ref`s, missing non-`Optional` dependencies, and cycles surface from `container.Get` with typed `DuplicateRefError`, `NotWiredError`, or `DependencyCycleError`. `zever explain` prints the wiring graph. See [Container](../../../concepts/container/).
+At `container.New`, duplicate `Ref`s, missing non-`Optional` dependencies, and cycles surface from `container.Get` as `DuplicateRefError`, `NotWiredError`, or `DependencyCycleError`. Print the graph with `zever explain`. See [Container](../../../concepts/container/).
 
 ## Scaffold flags
 
-`zever new` picks batteries with `--with`, not `--profile`. `--profile` still works as a deprecated alias that prints the equivalent `--with` form.
+`zever new` picks batteries with `--with`, not `--profile`. `--profile` remains a deprecated alias printing the equivalent `--with` form.
 
 ```diff
 -zever new hello --profile api
 +zever new hello --with cache,queue=redis,auth
 ```
 
-`--batteries` and `--adapters` still work. `zever new` scaffolds the minimal tree (about eight files): `go.mod`, `schema/app.zen`, `cmd/server/main.go`, `internal/app/wiring.go`, `internal/service/hello`, `.env`, `.env.example`, and `.gitignore`. Recipes such as `docker`, `ci`, `worker`, `seed`, `compose`, and `k8s` are opt-in via `zever add <recipe>`.
+`--batteries` and `--adapters` still work. `zever new` scaffolds the tree (about eight files): `go.mod`, `schema/app.zen`, `cmd/server/main.go`, `internal/app/wiring.go`, `internal/service/hello`, `.env`, `.env.example`, `.gitignore`. Recipes (`docker`, `ci`, `worker`, `seed`, `compose`, `k8s`) are opt-in via `zever add <recipe>`.
 
 ## Generated servers use serve.Main
 
-The generated `cmd/server/main.go` is thin. It parses `-addr` and `-grpc-addr`, then calls `serve.Main` with the app's providers and modules. `serve.Main` owns config resolution, container construction, signal handling, and graceful shutdown.
+The generated `cmd/server/main.go` is thin: it parses `-addr` and `-grpc-addr`, then calls `serve.Main` with the app's providers and modules, which owns config resolution, container construction, signal handling, and graceful shutdown.
 
 ```diff title="cmd/server/main.go"
 -func main() {
@@ -216,75 +210,75 @@ The generated `cmd/server/main.go` is thin. It parses `-addr` and `-grpc-addr`, 
 +}
 ```
 
-Listen addresses and runtime toggles come from env or options: `PORT` (default `8080`), `GRPC_ADDR` (empty disables gRPC), `PPROF_ADDR` (loopback pprof, empty disables), `GRPC_REFLECTION`, and `ZEVER_ENV`. Security defaults stay fail-closed: reflection off unless opted in, TLS 1.2 floor, security headers, and refusal of the deterministic dev crypto key outside a dev `ZEVER_ENV`. See [Serve module](https://github.com/zenta-dev/zever/tree/main/serve).
+Listen addresses come from env or options: `PORT` (default `8080`), `GRPC_ADDR` (empty disables gRPC), `PPROF_ADDR` (loopback pprof, empty disables), `GRPC_REFLECTION`, `ZEVER_ENV`. Security defaults stay fail-closed: opt-in reflection, TLS 1.2 floor, security headers, no dev crypto key outside a dev `ZEVER_ENV`. See [Serve module](https://github.com/zenta-dev/zever/tree/main/serve).
 
 ## CLI surface
 
-- `worker` and `schedule run` are the canonical commands. `queue:work` and `schedule:run` still work as hidden aliases.
-- `doctor` scopes its report to wired providers; it no longer takes `--config`.
-- `config show` prints per-instance redacted values and no longer takes `--config`.
-- `zever explain` prints the wiring graph when invoked bare, or one service's wiring for `zever explain db` / `zever explain db/analytics`.
-- `zever add <battery>/<adapter>` edits `internal/app/wiring.go` with `go/ast`, appends to `.env.example`, and runs `go get` plus `go mod tidy`.
+- `worker` and `schedule run` are canonical. `queue:work` and `schedule:run` remain hidden aliases.
+- `doctor` scopes its report to wired providers (no `--config`).
+- `config show` prints per-instance redacted values (no `--config`).
+- `zever explain` prints the wiring graph bare, or one service's wiring for `zever explain db` / `zever explain db/analytics`.
+- `zever add <battery>/<adapter>` edits `internal/app/wiring.go` via `go/ast`, appends to `.env.example`, runs `go get` plus `go mod tidy`.
 
 ## Project layout settings
 
-Project layout is defaults-only, overridable by six `ZEVER_*` variables (no file, no `--config` flag). The v0.7.x `project` stanza moved key by key:
+Project layout is defaults-only, overridable by six `ZEVER_*` variables (no file, no `--config` flag):
 
-| v0.7.x file key | v0.8.0 env variable | Overrides | Default |
+| v0.7.x key | v0.8.0 variable | Overrides | Default |
 |---|---|---|---|
-| `project.schema_dir` | `ZEVER_SCHEMA_DIR` | `.zen` schema directory | `schema` |
-| `project.generated_dir` | `ZEVER_GENERATED_DIR` | generated-code directory | `generated` |
-| `project.server_entry` | `ZEVER_SERVER_ENTRY` | server entrypoint package | `cmd/server` |
-| `project.worker_entry` | `ZEVER_WORKER_ENTRY` | worker entrypoint package | `cmd/worker` |
+| `project.schema_dir` | `ZEVER_SCHEMA_DIR` | schema dir | `schema` |
+| `project.generated_dir` | `ZEVER_GENERATED_DIR` | generated dir | `generated` |
+| `project.server_entry` | `ZEVER_SERVER_ENTRY` | server entrypoint | `cmd/server` |
+| `project.worker_entry` | `ZEVER_WORKER_ENTRY` | worker entrypoint | `cmd/worker` |
 | `project.tinker_entry` | `ZEVER_TINKER_ENTRY` | tinker shim entrypoint | `cmd/tinker-shim` |
-| `project.seed_entry` | `ZEVER_SEED_ENTRY` | seed entrypoint package | `db/seed` |
+| `project.seed_entry` | `ZEVER_SEED_ENTRY` | seed entrypoint | `db/seed` |
 
 ## Check the migration
 
 <Steps>
-1. Read the resolved values back. `zever config show` prints one `<service>  driver=<x>` header per service with its redacted options, and one `<service>/<NAME>` section per named instance. Compare it with the file you translated: every service you configured must show the wired driver and the option values you moved over.
+1. Read the resolved values: `zever config show` prints one `<service>  driver=<x>` header per service with redacted options, plus one `<service>/<NAME>` section per named instance. Every configured service must show the wired driver and the moved-over values.
 
    ```sh
    zever config show
    ```
 
-2. Resolve every wired battery. `zever doctor` checks each one and exits non-zero when a check fails, so it gates a pre-deploy pipeline.
+2. Resolve every wired battery: `zever doctor` exits non-zero on failure, so it gates a pre-deploy pipeline.
 
    ```sh
    zever doctor
    ```
 </Steps>
 
-A wrong value is loud, so those two commands are enough:
+A wrong value is loud:
 
 | What is wrong | What you see |
 |---|---|
-| A stale adapter key (for example a removed `SEARCH_ADAPTER` variable) | `config: unknown field "ADAPTER" for service "search": adapter selection removed; wire in internal/app/wiring.go with container.Provide and rebuild` |
-| A misspelled key, for example `DB_MAXCONN=20` | `config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`, then `check env key "DB_MAXCONN" (did you mean "DB_MAX_CONNS"?)` |
-| A value that does not parse, for example `DB_MAX_CONNS=abc` | `config: invalid options db: config: invalid value for field "MAX_CONNS" from env DB_MAX_CONNS: expected int` |
-| A v0.7.x file still in the working directory | nothing at all: the file is never read, so every service falls back to its compiled-in wiring |
+| A stale adapter key (e.g. a removed `SEARCH_ADAPTER` variable) | `config: unknown field "ADAPTER" for service "search": adapter selection removed; wire in internal/app/wiring.go with container.Provide and rebuild` |
+| A misspelled key, e.g. `DB_MAXCONN=20` | `config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`, then `check env key "DB_MAXCONN" (did you mean "DB_MAX_CONNS"?)` |
+| An unparsable value, e.g. `DB_MAX_CONNS=abc` | `config: invalid options db: config: invalid value for field "MAX_CONNS" from env DB_MAX_CONNS: expected int` |
+| A leftover v0.7.x file in the working directory | nothing at all: the file is never read, so every service falls back to its compiled-in wiring |
 
-That last row is the only silent one. A leftover file never fails a check, so compare `zever config show` against the file you translated, then delete the file.
+Only the last row is silent: a leftover file never fails a check, so compare and delete.
 
 ## Migration checklist
 
-1. Move every `zever.yaml` stanza to `.env` or the process environment using the table above.
-2. Point the `search`, `vectorstore`, and `workflow` services at the `db` constructors (`searchdb.New` and friends take the DSN and pick the backend).
-3. Move the `project` stanza to the `ZEVER_*` variables.
-4. Delete `zever.yaml`; nothing reads it, so a leftover file is ignored and its values are lost.
+1. Move every `zever.yaml` stanza to `.env` or process env (table above).
+2. Point `search`, `vectorstore`, `workflow` at the `db` constructors (`searchdb.New` and friends pick the backend from the DSN).
+3. Move the `project` stanza to `ZEVER_*`.
+4. Delete `zever.yaml`: unread, a leftover is ignored and its values are lost.
 5. Replace `config.Load(...)` with `config.FromEnv()` plus `config.Resolve(env)`.
-6. Replace adapter `Register()` wiring with `container.Provide` entries in `internal/app/wiring.go` (imports plus entries; nothing is registered anymore).
-7. Replace `--profile` with `--with` in scripts and CI.
-8. Regenerate the server entrypoint so it calls `serve.Main` with providers and modules.
-9. Update Kubernetes manifests to inject `env:` from a Secret (no mounted config file).
-10. Run `zever config show` and `zever doctor`, and compare the output with the values you moved over.
+6. Replace adapter `Register()` wiring with `container.Provide` entries plus imports in `internal/app/wiring.go`.
+7. Replace `--profile` with `--with` everywhere.
+8. Regenerate the server entrypoint around `serve.Main` with providers and modules.
+9. Update Kubernetes manifests to inject `env:` from a Secret.
+10. Run `zever config show` and `zever doctor`. Compare against the moved-over values.
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Configuration" href="../configuration/" description="Env layering, precedence, and fail-closed rules." />
-  <LinkCard title="Upgrade" href="../upgrade/" description="Bump a version, read the breaking changes, fix the common breaks." />
-  <LinkCard title="Container" href="../../../concepts/container/" description="Typed Refs, Provide, and the wiring graph." />
-  <LinkCard title="Config reference" href="../../../reference/config/" description="Every service, key, and default." />
-  <LinkCard title="Quickstart" href="../../../start/quickstart/" description="Scaffold and serve a working endpoint." />
+  <LinkCard title="Configuration" href="../configuration/" description="Env layering and fail-closed rules." />
+  <LinkCard title="Upgrade" href="../upgrade/" description="Bump versions, fix the common breaks." />
+  <LinkCard title="Container" href="../../../concepts/container/" description="Typed Refs, Provide, wiring graph." />
+  <LinkCard title="Config reference" href="../../../reference/config/" description="Services, keys, defaults." />
+  <LinkCard title="Quickstart" href="../../../start/quickstart/" description="Scaffold and serve." />
 </CardGrid>

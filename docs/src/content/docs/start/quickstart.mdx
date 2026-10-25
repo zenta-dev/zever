@@ -5,7 +5,7 @@ description: Install, scaffold a project, and serve a working endpoint in three 
 
 import { Steps, Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-You will install Zever, scaffold a project, and serve a working `GET /hello` endpoint. It takes about five minutes. You need Go 1.27+ and the `zever` CLI ([installation](../installation/)).
+Serve `GET /hello` in ~5 minutes. Needs Go 1.27+, `zever` CLI ([installation](../installation/)).
 
 <Tabs syncKey="os">
 <TabItem label="Linux">
@@ -31,16 +31,16 @@ irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex
 </TabItem>
 </Tabs>
 
-Then check it with `zever --version`.
+Then run `zever --version`.
 
-## Scaffold the project
+## Scaffold
 
 ```sh
 zever new hello
 cd hello
 ```
 
-`zever new` writes the minimal tree: `schema/app.zen`, `cmd/server/main.go`, `internal/app/wiring.go`, the sample `internal/service/hello` module, `.env`, `.env.example`, `.gitignore`, and a `README.md`. It also runs `go mod tidy`, so the project builds as-is.
+Writes `schema/app.zen`, `cmd/server/main.go`, `internal/app/wiring.go`, sample `internal/service/hello`, `.env`, `.env.example`, `.gitignore`, `README.md`. Runs `go mod tidy`, builds as-is.
 
 Expected output (abridged):
 
@@ -51,11 +51,9 @@ Expected output (abridged):
   wrote hello/internal/service/hello/service.go
 ```
 
-The battery picker adds more services: `zever new hello --with cache,queue=redis,auth` (or `--interactive` for the prompt). `--with` takes a comma-separated list of batteries with optional adapter pins. See [Customizing and leaving Zever](../../guides/extend/customizing-and-leaving/) for the "batteries you actually need" table with measured dependency footprints.
+Add services via `--with` (comma list, optional pins): `zever new hello --with cache,queue=redis,auth` (`--interactive` prompts). See [Customizing and leaving Zever](../../guides/extend/customizing-and-leaving/).
 
-## Serve it
-
-Run the watcher. It compiles, starts the server on `:8080`, and restarts on schema or source changes:
+## Serve
 
 ```sh
 zever dev
@@ -65,7 +63,7 @@ zever dev
 {"time":"...","level":"INFO","msg":"http server listening","addr":":8080"}
 ```
 
-`zever serve` runs the same server without watching. In a second terminal, call the sample endpoint:
+`zever dev` watches and restarts. `zever serve` runs once. Second terminal:
 
 ```sh
 curl -i localhost:8080/hello
@@ -78,11 +76,11 @@ Content-Type: application/json
 {"hello":"world"}
 ```
 
-The sample module registers `GET /hello` and resolves the logger from the container. `GET /healthz` always returns 200, and `GET /readyz` returns 200 once the database ping succeeds.
+Registers `GET /hello`, logger from container. `GET /healthz` → 200. `GET /readyz` → 200 after DB ping.
 
 ## What you built
 
-`zever new` scaffolds a typed wiring file, not a config file. `internal/app/wiring.go` declares one `Ref` per service and one `container.Provide` entry per instance, and `cmd/server/main.go` hands those providers plus the modules to `serve.Main`. Adding a battery later is one command:
+Typed wiring: one `Ref` + one `container.Provide` per service in `internal/app/wiring.go`. `cmd/server/main.go` passes providers + modules to `serve.Main`. Add later:
 
 ```sh
 zever add cache/redis
@@ -92,8 +90,8 @@ zever add db --name analytics
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Build a booking API" description="A full service with auth, queue, and worker." href="../../tutorials/build-a-booking-api/" />
-  <LinkCard title="How Zever works" description="Schema, compiler, container, adapters in one page." href="../../concepts/how-zever-works/" />
-  <LinkCard title="Project layout" description="Where every package lives." href="../project-layout/" />
-  <LinkCard title="CLI reference" description="Every command and flag." href="../../reference/cli/" />
+  <LinkCard title="Build a booking API" description="Full service: auth, queue, worker." href="../../tutorials/build-a-booking-api/" />
+  <LinkCard title="How Zever works" description="Schema, compiler, container, adapters." href="../../concepts/how-zever-works/" />
+  <LinkCard title="Project layout" description="Package map." href="../project-layout/" />
+  <LinkCard title="CLI reference" description="Commands and flags." href="../../reference/cli/" />
 </CardGrid>

@@ -3,52 +3,63 @@ title: Writing docs
 description: The style guide, page types, and templates for Zever documentation.
 ---
 
-Write docs that get a reader to a working result fast, then let them go deeper. This page is the rulebook. Follow it when you add or edit any page.
+Working result fast, then deeper. Rules for adding or editing pages.
 
 ## Choose the page type first
 
-Every page has one job. Mixing jobs is the main reason docs feel long and confusing.
+One page, one job. Mixing jobs confuses.
 
 | Type | Reader's question | Lives in | Tone |
 |---|---|---|---|
-| Tutorial | "Teach me." | `tutorials/`, `start/quickstart` | Encouraging, linear, no side trips |
-| How-to guide | "Help me do X." | `guides/` | Direct, task-first, assumes the basics |
-| Concept | "Help me understand." | `concepts/` | Explains why, no step lists |
-| Reference | "Tell me the exact fact." | `reference/` | Neutral, complete, easy to scan |
+| Tutorial | "Teach me." | `tutorials/`, `start/quickstart` | Encouraging, linear |
+| How-to guide | "Help me do X." | `guides/` | Direct, task-first |
+| Concept | "Help me understand." | `concepts/` | Explains why |
+| Reference | "Tell me the exact fact." | `reference/` | Neutral, scannable |
 
-If a page needs two jobs, split it and link the halves.
+Split two-job pages, link the halves.
 
 ## Voice and style
 
-- Write to the reader: second person ("you"), present tense, active voice.
-- Put the condition before the instruction: "If you use Redis, set `cache.adapter`."
-- Keep sentences short (about 20 words) and paragraphs to 4 lines or fewer.
+- Write to "you", present tense, active voice.
+- Condition before instruction: "If you use Redis, set `cache.adapter`."
+- Sentences near 20 words, paragraphs 4 lines or fewer.
 - Use plain words. Cut "simply", "just", "easily", "note that", and "in order to".
-- Use sentence case for headings. Make headings name the task in guides ("Cache a value with a TTL").
-- Make every H2 self-contained. It should make sense if a reader or an AI agent lands on it alone, so name the subject instead of writing "as above".
-- Use numbered lists for steps, bullets for unordered items, and tables for comparisons.
-- Put code, file names, flags, and config keys in code font. Put UI labels in bold.
-- Write link text that says where the link goes. Never write "click here".
-- Say "Zever" in prose and lowercase `zever` only in code, commands, paths, and URLs.
-- Do not use em dashes or en dashes. Use a comma, colon, period, or parentheses.
+- Sentence case for headings. Name the task in guides ("Cache a value with a TTL").
+- Keep every H2 self-contained: name the subject, never "as above".
+- Numbered lists for steps, bullets for unordered items, tables for comparisons.
+- Code, file names, flags, and config keys in code font. UI labels in bold.
+- Link text names the destination. Never write "click here".
+- Say "Zever" in prose, lowercase `zever` only in code, commands, paths, URLs.
+- No em or en dashes. Use a comma, colon, period, or parentheses.
+
+## Avoid AI writing patterns
+
+- No em or en dashes (see Voice and style).
+- No bold-prefix bullets (`**Feature:** description`). Use plain bullets or a table.
+- No semicolons as separators. Use a comma or split it.
+- No formulaic transitions: "In this section", "As mentioned above", "It is important to note", "Let's dive in".
+- No buzzwords: "robust", "seamless", "comprehensive", "streamline", "unlock", "empower", "delve", "leverage", "elevate".
+- No filler: "simply", "just", "easily", "note that", "in order to", "basically", "actually", "of course", "obviously".
+- No `--` disguised as a dash.
+- No staccato fragment rhythm manufactured for effect.
 
 ## Show code that works
 
-- Every snippet runs as written. Include imports (`github.com/zenta-dev/zever/...`), and show the expected output.
-- Name the file in the code block title: ` ```go title="main.go" `.
-- Mark every complete `package main` snippet with the word `check` in the info string: ` ```go title="main.go" check `. CI (`tools/check-doc-snippets.sh`) compiles and vets each marked block in a temporary module that joins the repo workspace, so a renamed field or removed function fails the build. Unmarked blocks are fragments: CI only checks that their `github.com/zenta-dev/zever/...` imports resolve and that each `pkg.Symbol` exists. Run `tools/check-doc-snippets.sh` locally before you push.
-- Verify every config key against the Go `Options` structs (`core/<service>/options.go` and `adapters/<service>/<adapter>/options.go`). There is no generated config schema to fall back on: config is env-only. Option field names are the Go field names in snake_case (`max_conns`); environment variables are `<SERVICE>_<FIELD>` with no prefix (`DB_MAX_CONNS`), and a named instance is `<SERVICE>__<NAME>__<FIELD>`.
-- The default instance is always the flat `<SERVICE>_<FIELD>` form. `<SERVICE>__DEFAULT__<FIELD>` is a NAMED instance called `DEFAULT`, and no container wiring resolves it, so never write it. CI (`docs/scripts/audit-facts.mjs`) fails the build on that spelling, on an unknown config service, and on an adapter name the service does not have.
-- Verify every command and flag against `cmd/zever`. Never invent one.
-- Keep guide snippets minimal. Put full option lists in [Config reference](../../reference/config/) and link to the right `#service` anchor.
-- If a package `README.md` holds detail the docs lack, port it.
+- Snippets run as written. Include imports (`github.com/zenta-dev/zever/...`) and expected output.
+- Name the file in the block title: ` ```go title="main.go" `.
+- Mark complete `package main` snippets with `check`: ` ```go title="main.go" check `. CI (`tools/check-doc-snippets.sh`) compiles and vets marked blocks in a temp module joined to the workspace, so renamed fields or removed functions fail the build. Fragments (unmarked blocks): CI checks `github.com/zenta-dev/zever/...` imports resolve and each `pkg.Symbol` exists. Run `tools/check-doc-snippets.sh` before pushing.
+- Verify config keys against the Go `Options` structs (`core/<service>/options.go` and `adapters/<service>/<adapter>/options.go`). No generated schema: config is env-only. Field names are Go snake_case (`max_conns`). Environment variables are `<SERVICE>_<FIELD>` with no prefix (`DB_MAX_CONNS`). A named instance is `<SERVICE>__<NAME>__<FIELD>`.
+- The default instance is flat `<SERVICE>_<FIELD>`. `<SERVICE>__DEFAULT__<FIELD>` is a NAMED instance called `DEFAULT` that no container wiring resolves. Never write it. CI (`docs/scripts/audit-facts.mjs`) fails that spelling, unknown config services, and adapter names the service lacks.
+- Verify commands and flags against `cmd/zever`. Never invent one.
+- Keep guide snippets minimal, with full option lists in [Config reference](../../reference/config/) under its `#service` anchor.
+- Port docs-missing detail from package `README.md` files.
 
 ## Keep it short without losing facts
 
-- Lead with the answer. The first paragraph says what the thing is and when to use it, in two sentences or fewer.
-- Cut backstory, repetition, and marketing. Keep every fact, key, and failure case.
-- Move rarely needed detail into `<details>` blocks or Reference tables.
-- Use at most two callouts (`Aside`) per page. A callout that is always true belongs in the body.
+- Answer first: what it is, when to use it, in two sentences or fewer.
+- Cut backstory, repetition, marketing. Keep facts, keys, failure cases.
+- Move rare detail into `<details>` blocks or reference tables.
+- At most two callouts (`Aside`) per page. An always-true callout belongs in the body.
 - Link instead of re-explaining. Each fact has one home.
 
 ## Templates
@@ -119,19 +130,20 @@ One-line summary.
 
 ## Frontmatter
 
-- `title`: the page name, in sentence case and under 60 characters.
+- `title`: page name in sentence case, under 60 characters.
 - `description`: one sentence under 160 characters. Start guides with a verb ("Cache values with a TTL").
-- `sidebar.label`: add it only when the nav needs a shorter name.
+- `sidebar.label`: only when the nav needs a shorter name.
 
 ## Before you open a pull request
 
-1. Run `npm run build` in `docs/` and fix any warning you introduced.
-2. Run `npm run check-links` in `docs/` (it reads the built site in `docs/dist`). It checks links and anchors in the built site and must report zero broken targets.
-3. Run `npm run lint` in `docs/`. It errors on dashes, a lowercase brand name in prose, a missing or long description, and more than two callouts, and warns on title-cased headings.
-4. Run `npm run audit` in `docs/`. It cross-checks env config keys and their instance namespace, adapter names, container accessors, CLI commands and flags, and import paths against the code, and must end with 0 problems. CI runs it on every pull request, so a page that disagrees with the code fails the build.
-5. Run `npm run check-legacy-config` in `docs/`. It fails when a page tells the reader to configure Zever through a `zever.yaml`-style config file, and when the prose calls service configuration a "config file" without a file name to match. Config is env-only since v0.8.0, so such a file is inert and its values are dropped in silence. A page may name the file only to say it is never read, or in a section about migrating away from it. A "config file" that is not about service configuration is fine: a policy document, a TLS certificate, a secret token file and a Kubernetes manifest are not service config. The check reads the whole repo, not only the site: the root markdown, every module, example and editor README, the shell scripts and the Go source. A mention in `core/db/README.md` fails the build like a mention in a page does.
-6. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.
+1. Run `npm run build` in `docs/`, fix your warnings.
+2. Run `npm run check-links` in `docs/` (reads `docs/dist`): zero broken targets.
+3. Run `npm run lint` in `docs/`: errors on dashes, lowercase brand in prose, missing or long description, over two callouts. Warns on title-cased headings.
+4. Run `npm run audit` in `docs/`: cross-checks env keys, instance namespace, adapter names, container accessors, CLI commands and flags, import paths against code, ending with 0 problems. CI runs it per PR. A page disagreeing with code fails the build.
+5. Run `npm run check-legacy-config` in `docs/`. Fails on `zever.yaml`-style files, unnamed service "config files". Config is env-only since v0.8.0. Such files are inert, values drop in silence. Name it only to say it is never read, or in migration. Non-service files (policy doc, TLS cert, secret token file, Kubernetes manifest) pass. Whole-repo scan (root markdown, modules, examples, editor READMEs, scripts, Go source). A `core/db/README.md` mention fails like a page mention.
+6. De-AI pass as style guidance, not a CI gate: avoid em or en dashes, bold-prefix bullets, formulaic transitions, buzzwords, and filler. Only the `npm run lint` findings in step 3 fail the build.
+7. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.
 
-Steps 1 to 5 all gate CI: the `docs` workflow and the `docs-audit` job of the `ci` workflow fail the pull request when one of them reports a problem. The three checks also carry a self-test (`npm run lint:self-test`, `npm run check-links:self-test`, and `npm run check-legacy-config:self-test`) that proves each checker still rejects the mistakes it guards against, so a green run means the checker bites, not that it stopped looking. `make docs-gates` runs the whole set locally.
+Steps 1 to 5 gate CI: the `docs` workflow and the `docs-audit` job of the `ci` workflow fail the PR on any problem. Self-tests (`npm run lint:self-test`, `npm run check-links:self-test`, `npm run check-legacy-config:self-test`) prove each checker bites. `make docs-gates` runs the set locally.
 
-The external (http) links are the one exception. They need the network and third-party pages rot, so the lychee job in the `docs` workflow reports them instead of gating.
+External (http) links rot and need the network, so lychee reports instead of gating.

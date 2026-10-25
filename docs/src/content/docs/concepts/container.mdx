@@ -5,7 +5,7 @@ description: How typed providers and Refs wire services, how the container resol
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-The container is the only object that knows how adapters are constructed, cached, retried, and closed. One `container.New(cfg, providers...)` per process gives lazy first use and dependency-ordered close.
+The container owns adapter construction, caching, retry, and close: one `container.New(cfg, providers...)` per process, lazy first use, dependency-ordered close.
 
 ## The mental model
 
@@ -15,11 +15,11 @@ one per process             lazy first use                                      
                                                            clear on failure
 ```
 
-No globals and no `init()` wiring. `New(nil)` is valid; `Close(ctx)` never opens anything. Display config with `config.RedactedServices`, never raw option maps.
+No globals or `init()`. `New(nil)` is valid, `Close(ctx)` opens nothing. Display config only via `config.RedactedServices`.
 
 ## Wire services with typed providers
 
-Every service instance is one `Ref` bound to one adapter by one `container.Provide` call. `db.DefaultRef()` names the default instance, `db.Ref("analytics")` names a second one.
+Each instance is one `Ref` bound to one adapter by one `Provide` call: `db.DefaultRef()` the default, `db.Ref("analytics")` a second.
 
 ```go
 import (
@@ -37,17 +37,17 @@ func Providers() []container.Provider {
 c := container.New(cfg, Providers())
 ```
 
-`cfg` is the `*config.Config` you resolved from the environment; `nil` is valid too. `container.Get(c, DB)` resolves any wired ref. The accessors (`c.DB()`, `c.Cache()`) resolve the default instance when a provider covers it, and otherwise fail with `NotWiredError` naming the missing `container.Provide` entry. Graph validation runs at `New`: duplicate refs, missing non-`Optional` dependencies, and cycles surface from `Get` as `DuplicateRefError`, `NotWiredError`, and `DependencyCycleError`.
+`cfg` is the `*config.Config` resolved from the environment. `container.Get(c, DB)` resolves any wired ref. Accessors (`c.DB()`, `c.Cache()`) resolve the default instance when a provider covers it, else fail with `NotWiredError` naming the missing `container.Provide` entry. Graph validation at `New`: duplicate refs, missing non-`Optional` dependencies, and cycles surface from `Get` as `DuplicateRefError`, `NotWiredError`, and `DependencyCycleError`.
 
 ## Where the adapter and the options come from
 
-The `Provide` call names the adapter: the factory it binds is the implementation that opens. The options come from the environment. `config.DefaultOptions(service, name)` seeds a fresh typed Options value, `<SERVICE>_<FIELD>` overlays one field at a time (a named instance reads `<SERVICE>__<NAME>__<FIELD>`), and `container.WithOptions` appliers run last, so explicit options win over env ([Config reference](../../reference/config/#db)).
+The `Provide` factory picks the adapter. The environment picks the options. `config.DefaultOptions(service, name)` seeds typed `Options`, `<SERVICE>_<FIELD>` overlays fields (named instances read `<SERVICE>__<NAME>__<FIELD>`), `container.WithOptions` appliers run last ([Config reference](../../reference/config/#db)).
 
-A container built with a config and no providers resolves nothing: every accessor needs a `container.Provide` entry naming a compiled-in constructor, and an unwired service fails with `NotWiredError` naming the fix. Adapters are plain imports (`adapters/<battery>/<name>`), never registrations. `cmd/zever` wires every battery's default at startup, so CLI behavior covers everything out of the box.
+Config without providers resolves nothing: every accessor needs a `container.Provide` entry, else `NotWiredError` names the fix. Adapters are plain imports (`adapters/<battery>/<name>`), never registrations. `cmd/zever` wires every battery default, so CLI behavior works out of the box.
 
 ## Resolve services
 
-Call the accessors to resolve. Each returns one cached instance and retries after a failure.
+Accessors return one cached instance and retry after failure.
 
 - `DB()`: plus `Transactor()`
 - `Cache()`, `Queue()`: leaves, closed after dependents and snapshots
@@ -73,35 +73,35 @@ Secrets() Session() Storage() Tenant() VectorStore() Webhook() Workflow()
 
 ## Share one queue across jobs and the scheduler
 
-`Job()` builds a dispatcher over the already-resolved queue. `Scheduler()` injects that dispatcher, so no redundant connections open. Resolving `Scheduler()` resolves `Job()` and `Queue()` as a side effect.
+`Job()` builds a dispatcher over the already-resolved queue, so no redundant connections open. Resolving `Scheduler()` also resolves `Job()` and `Queue()`, so one connection serves both.
 
 ## Close services in order
 
 - **Wired instances** (every `Ref` passed to `Provide`): first, in reverse dependency order, so a dependent shuts down before the backend it borrowed.
-- **Dependents** (`scheduler`, `job`, `agent`, `rag`; they hold backend refs): next.
+- **Dependents** (`scheduler`, `job`, `agent`, `rag`): next.
 - **Snapshots** (everything without explicit ordering): middle.
 - **Leaves** (`cache`, `queue`): next.
 - **Shared pools** (`db` and registry pools, after every borrower), then plugin services.
-- **Independent** (`grpcServer` via `GracefulStop`, forced `Stop` when ctx ends; gRPC client connections): last.
+- **Independent** (`grpcServer` via `GracefulStop`, forced `Stop` when ctx ends, gRPC client connections): last.
 
-The container probes each service's shutdown shape in order: `Close(context.Context) error`, `Close() error`, `Stop() error`, `Shutdown(context.Context) error`, then no-op (for example `*job.Dispatcher`).
+The container probes each shutdown shape in order: `Close(context.Context) error`, `Close() error`, `Stop() error`, `Shutdown(context.Context) error`, else no-op (for example `*job.Dispatcher`).
 
 - `Close(ctx) error`: pooled or blocking services (`db`, `cache`, `storage`, `lock`).
-- `Close() error`: lightweight or in-memory adapters (`auth`, `queue`, `session`, `payment`).
+- `Close() error`: lightweight or in-memory (`auth`, `queue`, `session`, `payment`).
 - `Stop() error`: scheduler cron only.
-- `Shutdown(ctx) error`: observability providers (flush spans and metrics).
+- `Shutdown(ctx) error`: observability providers (flush spans, metrics).
 - none: stateless adapters (`crypto`, `log`, `password`, `permission`, `router`).
 
 ## Design decisions and trade-offs
 
-A 5s per-service bound applies without a parent deadline; shared instances close once (pointer-identity dedup), failures join with `errors.Join`, and error values name the service only.
+No parent deadline means a 5s bound per service. Shared instances close once (pointer-identity dedup). Failures join via `errors.Join`. Errors name the service only.
 
 ## Troubleshooting
 
 <details>
-<summary>An accessor errors on the first call only</summary>
+<summary>An accessor fails once, then succeeds</summary>
 
-A transient failure cleared the cache. Retry; investigate only if it repeats.
+Transient failure cleared the cache. Retry. Investigate only on repeats.
 </details>
 
 <details>
@@ -131,8 +131,8 @@ An adapter goroutine outlives `Close` (`go test -tags=leak ./container/`). Stop 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Lifecycle" description="The four phases around the container." href="../lifecycle/" />
-  <LinkCard title="Providers and adapters" description="Interface, typed providers, and swap rules." href="../providers-adapters/" />
+  <LinkCard title="Lifecycle" description="Four phases around the container." href="../lifecycle/" />
+  <LinkCard title="Providers and adapters" description="Interfaces, providers, swap rules." href="../providers-adapters/" />
   <LinkCard title="Compiler boundary" description="Why the container never links the compiler." href="../compiler-boundary/" />
   <LinkCard title="Deployment" description="Production shutdown wiring." href="../../guides/operate/deployment/" />
 </CardGrid>

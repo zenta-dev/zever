@@ -5,11 +5,11 @@ description: Store embeddings and query closest matches by cosine similarity on 
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`vectorstore.VectorStore` ranks embeddings by cosine similarity. Pair it with `ai.Embed` to embed, upsert, and query.
+`vectorstore.VectorStore` ranks embeddings by cosine similarity. Pair with `ai.Embed` to embed, upsert, and query.
 
 ## Quick start
 
-`db` serves two backends through one name: an empty `dsn` selects embedded sqlite, a postgres URL selects pgvector. Move to `qdrant` for a purpose-built vector database at scale. Your code does not change.
+`db` serves two backends under one name: empty `dsn` → embedded sqlite, postgres URL → pgvector. `qdrant` is the purpose-built vector DB at scale. Code does not change.
 
 <Tabs>
   <TabItem label="db">
@@ -27,11 +27,11 @@ VECTORSTORE_API_KEY=dev-only-key
   </TabItem>
 </Tabs>
 
-Env vars: `VECTORSTORE_DSN`, `VECTORSTORE_DIMENSION` (the backend is wired in code, not env). `dimension` defaults to 1536 (OpenAI `text-embedding-3-small`) on pgvector and fixes the column size; Qdrant checks it only when set, and embedded sqlite learns it from the first write. A mismatched vector fails with `vectorstore.ErrDimensionMismatch`, and negatives are rejected. `url` needs a scheme and host. `dedicated_pool: true` opts out of per-DSN pool sharing. The DB-backed adapter is named `db`: a sqlite path gives embedded SQLite, a postgres URL gives pgvector. See the [vectorstore options](../../../reference/config/#vectorstore).
+Backend is wired in code. `dimension` defaults to 1536 (OpenAI text-embedding-3-small) on pgvector (fixes column size), Qdrant checks it only when set, sqlite learns it from the first write. Mismatches → `vectorstore.ErrDimensionMismatch`, negatives rejected. `url` needs scheme + host. `dedicated_pool: true` opts out of sharing. Adapter is `db`: sqlite path → SQLite, postgres URL → pgvector. See [vectorstore options](../../../reference/config/#vectorstore).
 
 ## Upsert and query vectors
 
-Wire the backend with a `container.Provide` entry in `internal/app/wiring.go` (the snippet below shows the explicit form). `VectorStore()` resolves lazily, caches, and retries.
+Wire with `container.Provide` in `internal/app/wiring.go`. `VectorStore()` is lazy, cached, retried.
 
 ```go title="main.go" check
 package main
@@ -79,10 +79,10 @@ match: doc-2 0
 
 ## Production checklist
 
-- `Query` ranks by cosine similarity only. For hybrid ranking, combine with [search](../search/).
-- `topK <= 0` defaults to 10. Paginate explicitly for large result sets.
-- Use `UpsertBatch` for batches; looping `Upsert` costs one round trip per vector.
-- Empty embeddings are rejected before any I/O. `api_key` never appears in logs.
+- `Query` is cosine similarity only. For hybrid ranking, combine with [search](../search/).
+- `topK <= 0` defaults to 10, paginate explicitly for large sets.
+- Use `UpsertBatch` for batches, looping `Upsert` costs one round trip per vector.
+- Empty embeddings rejected before I/O. `api_key` never logged.
 
 See the [adapters matrix](../../../reference/adapters-matrix/) for `db` and `qdrant`.
 
@@ -91,19 +91,19 @@ See the [adapters matrix](../../../reference/adapters-matrix/) for `db` and `qdr
 <details>
 <summary>Query results look random</summary>
 
-Cause: vectors come from a different model than the stored ones, or `dimension` was set wrong. Fix: align config with the model and re-upsert; an `ErrDimensionMismatch` error means the sizes differ.
+Vectors from a different model than stored, or wrong `dimension`. Align config with the model and re-upsert, `ErrDimensionMismatch` means sizes differ.
 </details>
 
 <details>
 <summary>Writes are slow at scale</summary>
 
-Cause: you loop `Upsert`. Fix: use `UpsertBatch`.
+Looping `Upsert`. Use `UpsertBatch`.
 </details>
 
 <details>
 <summary>`qdrant` fails to resolve</summary>
 
-Cause: `url` lacks a scheme or host, or is not https. Fix: check `VECTORSTORE_URL` for a missing scheme, and set `VECTORSTORE_ALLOW_INSECURE=true` for a plain-http local server.
+`url` lacks scheme/host or is not https. Check `VECTORSTORE_URL`, set `VECTORSTORE_ALLOW_INSECURE=true` for plain-http local servers.
 </details>
 
 ## Related

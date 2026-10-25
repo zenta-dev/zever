@@ -5,11 +5,11 @@ description: Set up the zever-lsp language server, Neovim, and VS Code for .zen 
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-The `.zen` loop is CLI format and check, `zever-lsp` diagnostics, and `make generate` for grammars.
+`.zen` loop: CLI, LSP, `make generate`.
 
-## Install the language server
+## Install
 
-The [one-line installer](../../../start/installation/) installs `zever-lsp` next to `zever` (Neovim 0.11+ or VS Code); open the workspace at its root, where the scan starts.
+The [one-line installer](../../../start/installation/) puts `zever-lsp` beside `zever` (Neovim 0.11+/VS Code). Open the workspace root.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
@@ -17,11 +17,11 @@ curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | s
 go install ./tools/zever-lsp
 ```
 
-The server takes no config or flags, speaks stdio LSP only, and reports its version in `initialize`'s `serverInfo`.
+No config/flags. Stdio only. Version in `initialize` `serverInfo`.
 
-## Let coding agents use the compiler (MCP)
+## Agents (MCP)
 
-`tools/zever-mcp` is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server, so Claude Code, Cursor, and other MCP clients can validate and inspect your schemas without shelling out. It is separate from the editor language server and needs no config.
+`tools/zever-mcp` is a stdio [MCP](https://modelcontextprotocol.io) server letting Claude Code, Cursor, and other clients validate/inspect schemas without shelling out. Separate from editor LSP. No config.
 
 ```sh
 go build -o zever-mcp ./tools/zever-mcp
@@ -31,13 +31,13 @@ go build -o zever-mcp ./tools/zever-mcp
 { "mcpServers": { "zever": { "command": "/path/to/zever-mcp" } } }
 ```
 
-Each read-only tool takes `dir` (a directory of `.zen` files) or `files` (inline sources): `zever_check` validates and returns `ok` or `file:line:col` diagnostics, `zever_routes` lists the HTTP routes as JSON, `zever_schema` and `zever_explain` summarize the resolved schema, and `zever_compile` returns the merged OpenAPI document. `zever_doctor` and `zever_generate` shell out to the `zever` CLI, which must be on `PATH`, and `zever_generate` only applies after a dry-run plan and human approval. The full tool table is in [AI](../../integrations/ai/#give-coding-agents-the-compiler-over-mcp).
+Tools take `dir`/`files`: `zever_check` (`ok`/`file:line:col`), `zever_routes` (routes JSON), `zever_schema`/`zever_explain` (summaries), `zever_compile` (merged OpenAPI). `zever_doctor`/`zever_generate` shell to `zever` on `PATH`. `zever_generate` needs dry-run plan plus approval. Table: [AI](../../integrations/ai/#give-coding-agents-the-compiler-over-mcp).
 
-## Connect your editor
+## Connect editor
 
 <Tabs>
   <TabItem label="Neovim">
-Load `editors/nvim` as a runtime plugin for filetype detection and highlighting:
+Load `editors/nvim` (filetypes/highlighting):
 
 ```lua
 {
@@ -48,7 +48,7 @@ Load `editors/nvim` as a runtime plugin for filetype detection and highlighting:
 }
 ```
 
-LSP registration is not automatic:
+LSP registration is manual:
 
 ```lua
 vim.lsp.config('zever-lsp', {
@@ -71,13 +71,13 @@ vim.api.nvim_create_autocmd('BufWritePre', {
 ```
   </TabItem>
   <TabItem label="VS Code">
-Install the extension from `editors/vscode` and keep `zever-lsp` on `$PATH`; it is a client only and does not bundle the server. Enable `editor.formatOnSave` for `zen`.
+Install `editors/vscode`. Keep `zever-lsp` on `$PATH` (client only) with `editor.formatOnSave` for `zen`.
   </TabItem>
 </Tabs>
 
-To verify, open a `.zen` file, add an unknown scalar, and confirm a diagnostic appears (Neovim `:lua vim.diagnostic.open_float()`, VS Code Problems), then clears when fixed.
+Verify with an unknown scalar: confirm the diagnostic appears (`:lua vim.diagnostic.open_float()`/Problems), then clears.
 
-## Run the CLI loop
+## CLI loop
 
 ```sh
 zever fmt --write schema/*.zen
@@ -86,58 +86,58 @@ zever check schema/*.zen
 
 | Command | Purpose |
 |---|---|
-| `zever fmt --write <files...>` | Format files in place (without `--write`, list those that would change). |
+| `zever fmt --write <files...>` | Format in place (list changes without `--write`). |
 | `zever check <files...>` | Report diagnostics. |
 | `zever compile --out ./generated <files...>` | Generate backend output. |
-| `zever check-boundaries <files...>` | Report cross-module violations (relation, RPC return type, or permission resource reaching into another module). |
-| `zever tinker` | Dev-only Go REPL against a live container. It warns on stderr, so never point it at production data. |
+| `zever check-boundaries <files...>` | Report cross-module violations (relations, RPC return types, permission resources). |
+| `zever tinker` | Dev-only Go REPL (stderr warning). Never production data. |
 
-All commands: [CLI reference](../../../reference/cli/).
+Commands: [CLI reference](../../../reference/cli/).
 
 ## Regenerate grammars
 
-After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate`; `tools/gengrammar` renders the `editors/nvim` and `editors/vscode` grammars, and `editors/parity_test.go` diffs them, so skipping it fails the build.
+After touching `token.Keywords`/`resolver.ScalarTypeNames`, run `make generate` (`tools/gengrammar` renders `editors/nvim`+`editors/vscode`). `editors/parity_test.go` diffs them, skipping fails the build.
 
-## Know what the server supports
+## Server support
 
 | Area | Methods |
 |---|---|
 | Sync | `didOpen`, `didChange` (full), `didSave`, `didClose`, `didChangeWatchedFiles` |
-| Diagnostics | `publishDiagnostics` (debounced per file; clean files return an empty array) |
+| Diagnostics | `publishDiagnostics` (debounced. Empty when clean) |
 | Symbols | `documentSymbol`, `workspace/symbol` |
 | Navigation | `definition`, `references`, `documentHighlight`, `foldingRange` |
-| Completion and hover | `completion` (triggers `@`, `:`, space), `completionItem/resolve`, `hover`, `signatureHelp` (triggers `(`, `,`) |
+| Completion/hover | `completion` (`@`, `:`, space), `completionItem/resolve`, `hover`, `signatureHelp` (`(`, `,`) |
 | Editing | `formatting`, `rangeFormatting`, `codeAction` (unknown scalars, relation targets) |
 | Rename | `prepareRename`, `rename` (entities, fields, jobs, services, RPCs) |
 | Semantic tokens | `semanticTokens/full` |
-| Inlay hints | `inlayHint` plus resolve (implicit module, `errors:` case annotations) |
+| Inlay hints | `inlayHint` + resolve (implicit module, `errors:` cases) |
 
-The server compiles in-process with the compiler's resolver, so editor and build cannot disagree. It shares the lockstep version (`tools/zever-lsp/vX.Y.Z`).
+In-process compiler-resolver compilation keeps editor/build in agreement. Lockstep `tools/zever-lsp/vX.Y.Z`.
 
 ## Troubleshooting
 
 <details>
 <summary>`zever-lsp: command not found`</summary>
 
-Cause: the binary is not on `PATH`. Fix: re-run `go install`, add `$(go env GOPATH)/bin`.
+Off `PATH`: re-run `go install`, add `$(go env GOPATH)/bin`.
 </details>
 
 <details>
-<summary>No diagnostics appear</summary>
+<summary>No diagnostics</summary>
 
-Cause: the client did not attach, or the wrong root was opened. Fix: check `:LspInfo`/Output and reopen the `initialize` root.
+Detached client/wrong root: check `:LspInfo`/Output, reopen at `initialize` root.
 </details>
 
 <details>
 <summary>Garbled responses</summary>
 
-Cause: something writes to the server's stdout. Fix: remove wrappers that merge the streams; logging goes to stderr.
+Server-stdout writes: drop stream-merging wrappers. Logs to stderr.
 </details>
 
 <details>
-<summary>Grammars drift after a keyword change</summary>
+<summary>Grammar drift</summary>
 
-Cause: `make generate` was skipped. Fix: run it and commit the regenerated grammars.
+Skipped `make generate`: run it and commit.
 </details>
 
 ## Related

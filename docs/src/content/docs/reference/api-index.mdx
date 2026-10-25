@@ -3,11 +3,11 @@ title: API index
 description: Package entry points with container accessors for every service.
 ---
 
-Battery interfaces live in `core/<b>` with typed `Options` and a `DefaultRef`, each adapter lives in its own module at `adapters/<b>/<a>` exposing a `New` constructor wired with `container.Provide`, and SDK-free helpers live in `shared/*`. Import the `core` interface plus the adapter modules you need and resolve through `container`. The `dsl/*` packages are internal-only: runtime code must not import the compiler.
+Batteries live in `core/<b>` (`Options`, `DefaultRef`). Adapters in `adapters/<b>/<a>` (`New`, wired via `container.Provide`). Helpers in `shared/*`. Import `core` plus adapters, resolve via `container`. `dsl/*` is internal-only.
 
 ## Construct and resolve
 
-Construction is always config plus container. Each service resolves on first use and caches the result; on error the cached state clears so the next call retries.
+Construction is config plus container. Services resolve on first use and cache. Errors clear the cache for retry.
 
 ```go
 import (
@@ -30,9 +30,9 @@ if err != nil {
 }
 ```
 
-`container.New(nil)` is valid: an untouched container closes cleanly without opening anything. `Job()` has no registry of its own; it builds a `*job.Dispatcher` over the already-resolved `Queue`. `Scheduler()` injects that dispatcher, so the scheduler shares the same `Queue` connection instead of opening a redundant one. Resolving `Scheduler()` therefore resolves `Job()` and, transitively, `Queue` as a side effect.
+`container.New(nil)` is valid: untouched containers close without opening. `Job()` builds a `*job.Dispatcher` over `Queue` (no registry). `Scheduler()` injects it, sharing `Queue`. Resolving `Scheduler()` resolves `Job()` and `Queue`.
 
-`GRPCClient(target, opts...)` builds `*grpc.ClientConn` connections through the `shared/grpcclient` helper (round-robin LB, retry policy, TLS, static resolver) and caches one conn per target string; the conns close with the container.
+`GRPCClient(target, opts...)` builds `*grpc.ClientConn` via `shared/grpcclient` (round-robin LB, retry, TLS, static resolver), one cached conn per target, closed with the container.
 
 ## Close
 
@@ -48,7 +48,7 @@ if err := c.Close(ctx); err != nil {
 }
 ```
 
-Close shuts down only resolved services, dependents first, joining per-service close failures via `errors.Join`.
+Close shuts down only resolved services, dependents first, joining failures via `errors.Join`.
 
 ## Core packages
 
@@ -61,7 +61,7 @@ Close shuts down only resolved services, dependents first, joining per-service c
 | `core/middleware` | shared HTTP middleware (own module) |
 | `cmd/zever` | flags-only toolkit shell (own module) |
 | `shared/*` | SDK-free helpers (`codec`, `redisclient`, `redisopt`, `s3opts`, `retry`, `lrucache`, ...), one module each |
-| `shared/grpcclient` | gRPC client constructor (`New(ctx, target, opts...)`: LB, retry, TLS, static resolver); no registry, resolved via `GRPCClient(target, opts...)` |
+| `shared/grpcclient` | gRPC client constructor (`New(ctx, target, opts...)`: LB, retry, TLS, static resolver), no registry, resolved via `GRPCClient(target, opts...)` |
 
 ## Service packages and accessors
 
@@ -117,7 +117,7 @@ Close shuts down only resolved services, dependents first, joining per-service c
 | `Close()` | lightweight handles, iterators, statements, instant-close in-memory adapters (`auth`, `queue`, `session`, `payment`, `eventbus.Pusher`, `ratelimit.Limiter`, `db.Rows`, `db.Stmt`) | instant close |
 | `Stop()` | scheduler only | cron lifecycle stop |
 
-Probing (`closeAny`) tries `Close(context.Context) error`, then `Close() error`, then `Stop() error`, then `Shutdown(context.Context) error` (observability providers flush buffered spans/metrics), then no-op nil (`*job.Dispatcher` has no shutdown method). Crypto, log, password, permission, and router declare no Close/Stop/Shutdown and probe as no-op nil. Callers never guess: the probe picks the shape.
+Probing (`closeAny`) tries `Close(ctx)`, `Close()`, `Stop()`, `Shutdown(ctx)` (observability flush), then no-op. `*job.Dispatcher` has no shutdown method, and neither do crypto, log, password, permission, or router. The probe picks the shape.
 
 Close order:
 
@@ -130,21 +130,21 @@ grpcServer            independent GracefulStop/Stop, bounded by ctx
 grpc clients          independent, one conn per target, closed with the container
 ```
 
-Per-service bound is 5s only when the parent context carries no deadline; otherwise the parent deadline bounds each wait. Shared instances close once (pointer-identity dedup with a `keepAlive` set for the duration). Failures join via `errors.Join`; panics become `*ClosePanicError`, timeouts become `*CloseTimeoutError`. Error values name the service only, never resolved values. `Close` never opens anything: untouched services stay untouched.
+Per-service bound is 5s only when the parent has no deadline, else the parent bounds each wait. Shared instances close once (pointer-identity dedup with a `keepAlive` set for the duration of Close). Failures join via `errors.Join`, panics become `*ClosePanicError`, timeouts `*CloseTimeoutError`. Errors name the service only, never resolved values. `Close` never opens anything.
 
 ## Production notes
 
-- Start from `config.Default()` + `container.New`, then per-service accessors; no globals, no `init()` wiring.
-- Keep to documented interfaces; new behavior means new interfaces, never new methods on public ones.
-- Pass a parent deadline to `Close` in servers so shutdown is bounded end to end; inspect `CloseTimeoutError` / `ClosePanicError` with `errors.As`.
-- Goroutine-safe types document their exit path; resolve the in-memory subset and `Close` it in tests so `goleak` stays clean.
+- Start from `config.Default()` + `container.New`, then per-service accessors. No globals, no `init()`.
+- Keep to documented interfaces. New behavior means new interfaces, never new methods.
+- Pass a parent deadline to `Close` so shutdown is bounded end to end. Inspect `CloseTimeoutError` / `ClosePanicError` with `errors.As`.
+- Document exit paths on goroutine-safe types. Resolve the in-memory subset and `Close` it in tests for clean `goleak`.
 
 ## Troubleshooting
 
-- **Close hangs**: parent context has no deadline and a service blocks; pass a timeout context (per-service bound is 5s only without one).
-- **Close reports `CloseTimeoutError`**: a service outlived its bound. Check which service is named, then its backing store health.
-- **Close reports `ClosePanicError`**: a service panicked during shutdown. Fix the service; the panic value is captured, not re-thrown.
-- **Accessor keeps failing**: cached state clears on error, so each call retries fresh. Persistent failure means config or backend, not the container; check `Validate` and connectivity.
+- **Close hangs**: parent has no deadline and a service blocks. Pass a timeout context (5s bound applies only without one).
+- **Close reports `CloseTimeoutError`**: a service outlived its bound. Check the named service and its store.
+- **Close reports `ClosePanicError`**: a service panicked during shutdown. The value is captured, not re-thrown.
+- **Accessor keeps failing**: each call retries fresh, so persistent failure is config or backend. Check `Validate` and connectivity.
 
 ## Related
 

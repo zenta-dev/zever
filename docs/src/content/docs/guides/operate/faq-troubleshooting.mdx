@@ -5,56 +5,56 @@ description: Quick answers to the questions that come up most, and a symptom-to-
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Short answers first, then a symptom-to-fix list. Every battery guide also ends with its own troubleshooting section; this page covers the cross-cutting problems.
+Short answers, then cross-cutting symptom fixes.
 
 ## FAQ
 
 <details>
 <summary>Does Zever write my business logic?</summary>
 
-No. It compiles `.zen` schemas into infrastructure only: database access, caching, queues, routing, and the other batteries. Your handlers, services, and rules are plain Go you own. See [Customizing and leaving](../../extend/customizing-and-leaving/) for how to step off the generated code.
+No: it compiles `.zen` schemas into infrastructure (database access, caching, queues, routing, other batteries). Handlers, services, and rules are plain Go. See [Customizing and leaving](../../extend/customizing-and-leaving/).
 </details>
 
 <details>
 <summary>How do I swap an adapter, say sqlite for postgres?</summary>
 
-Change adapter via `zever add db/postgres`, then rebuild. `zever add` does the `go.mod` require, the wiring.go `container.Provide` entry, and the `.env.example` option keys; nothing else changes. No code that uses the `db.DB` interface changes. See [Choosing batteries](../../extend/choosing-batteries/).
+Change adapters via `zever add db/postgres`, then rebuild: `zever add` handles the `go.mod` require, wiring.go `container.Provide` entry, `.env.example` keys. The `db.DB` interface is untouched. See [Choosing batteries](../../extend/choosing-batteries/).
 </details>
 
 <details>
 <summary>What is the difference between the queue, the event bus, and the outbox?</summary>
 
-The queue is durable work for one consumer to pop, ack, and retry. The event bus is live fan-out with no durability for offline handlers. The outbox records an event inside your database transaction and delivers it at least once. See the [background jobs overview](../../background/overview/).
+The queue is durable work for one consumer (pop, ack, retry). The event bus is live fan-out with no durability for offline handlers. The outbox records an event inside your database transaction and delivers it at least once. See [background jobs overview](../../background/overview/).
 </details>
 
 <details>
 <summary>Do I need Redis?</summary>
 
-Not to start. The `memory` and `sqlite` defaults need nothing. You need a shared backend (Redis, or the `db` adapters on your database) once more than one process must see the same cache, queue, session, lock, or rate-limit state.
+Not to start: `memory` and `sqlite` defaults need nothing. Shared backends (Redis, `db` adapters) matter once processes share cache, queue, session, lock, rate-limit state.
 </details>
 
 <details>
 <summary>Is it safe to run <code>zever tinker</code> against production?</summary>
 
-No. `tinker` evaluates arbitrary Go against a live container, is development-only, and prints a warning to stderr before it runs. Never point it at production data.
+No: `tinker` evaluates Go against a live container. Development-only, with a stderr warning. Never point it at production data.
 </details>
 
 <details>
 <summary>Can I run Zever without the CLI?</summary>
 
-Yes. The runtime packages (`config`, `container`, `core/*`, `adapters/*`) do not import the compiler. The CLI is for scaffolding, compiling schemas, and operating projects; generated code and the runtime build with plain `go build`.
+Yes. Runtime packages (`config`, `container`, `core/*`, `adapters/*`) never import the compiler. The CLI scaffolds, compiles, and operates. Generated code and the runtime build with plain `go build`.
 </details>
 
 <details>
 <summary>How do I turn on shell completion?</summary>
 
-`zever completion bash|zsh|fish|powershell` prints the script; see [Shell completion](../../../reference/cli/#shell-completion-and-generated-docs). It completes `.zen` files, `generate` kinds, `--backend`, `--profile`, and `--adapters`.
+`zever completion bash|zsh|fish|powershell` prints the script. See [Shell completion](../../../reference/cli/#shell-completion-and-generated-docs). It completes `.zen` files, `generate` kinds, `--backend`, `--profile`, `--adapters`.
 </details>
 
 <details>
 <summary>How do I get a heap or CPU profile from a running server?</summary>
 
-Start the generated server with `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`); it is off by default and loopback-only. See [Profiling with pprof](../observability/#profiling-with-pprof).
+Profile via `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`): off by default, loopback-only. See [Profiling with pprof](../observability/#profiling-with-pprof).
 </details>
 
 ## Troubleshooting
@@ -64,25 +64,25 @@ Start the generated server with `--pprof-addr 127.0.0.1:6060` (or `PPROF_ADDR`);
 <details>
 <summary>Startup fails with "unknown field" or "unknown service"</summary>
 
-The env key is close to a known field, so it is a typo and fails fast with a did-you-mean hint (`config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`). Check the spelling against the [config reference](../../../reference/config/) and `zever config show`.
+The env key is close to a known field: a typo failing fast with a did-you-mean hint (`config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`). Check spelling against the [config reference](../../../reference/config/) and `zever config show`.
 </details>
 
 <details>
 <summary>An environment variable has no effect</summary>
 
-Env matching is ambient-safe by design: a variable that matches no field of its service is ignored, so a noisy environment cannot break startup. A key close to a known field still fails with a did-you-mean hint (a typo), and a value that matches but cannot be parsed is an error. Unknown service heads (`PATH`, `FOO_BAR`) and bare names (`DB`) are ignored. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired service prefix. Names have no prefix and follow `<SERVICE>_<FIELD>`, for example `DB_MAX_CONNS=20` or `AUTH_JWT_SECRET=...`; case and underscores inside the field are ignored. Layering is `defaults < .env < .env.local < process env`.
+Env matching is ambient-safe: variables matching no field are ignored, so noise cannot break startup. Near-miss keys still fail with a did-you-mean hint (typos). Unparsable values error. Unknown service heads (`PATH`, `FOO_BAR`) and bare names (`DB`) are ignored. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired service prefix. Names follow `<SERVICE>_<FIELD>` (e.g. `DB_MAX_CONNS=20`, `AUTH_JWT_SECRET=...`), ignoring case and underscores. Layering: `defaults < .env < .env.local < process env`.
 </details>
 
 <details>
 <summary>It connects to sqlite even though I configured postgres</summary>
 
-The variable never reached the service. Env names are uppercase and unprefixed: `DB_DSN=...` sets the connection string (backends have no env key -- a `*_ADAPTER` variable fails resolution). A named instance (`DB__REPORTING__DSN`) only applies to a matching named Ref, not to the default `db` service.
+Uppercase unprefixed env names: `DB_DSN=...` sets the connection string (backends have no env key. A `*_ADAPTER` variable fails resolution). A named instance (`DB__REPORTING__DSN`) applies to a matching Ref only, not the default `db` service.
 </details>
 
 <details>
 <summary>Auth fails to open with a short or missing JWT secret</summary>
 
-The `jwt` adapter needs a secret of at least 32 bytes and `config.Default()` ships none. Set `AUTH_JWT_SECRET`. The default dev crypto key is public and deterministic: never ship it.
+The `jwt` adapter needs a 32-byte secret. `config.Default()` ships none. Set `AUTH_JWT_SECRET`. The default dev crypto key is public and deterministic: never ship it.
 </details>
 
 ### Adapters and the container
@@ -90,19 +90,19 @@ The `jwt` adapter needs a secret of at least 32 bytes and `config.Default()` shi
 <details>
 <summary>A missing backend (`NotWiredError`) at startup</summary>
 
-The adapter's package was never imported and no `container.Provide` entry covers it. `zever add <battery>/<adapter>` wires both the import and the `Provide` entry. The generated server validates every enabled battery at boot and reports the missing ones with did-you-mean hints; `zever doctor` shows the same per battery.
+The adapter's package was never imported and no `container.Provide` entry covers it. `zever add <battery>/<adapter>` wires the import and entry. The generated server validates every enabled battery at boot, reporting the missing ones with did-you-mean hints. `zever doctor` shows the same per battery.
 </details>
 
 <details>
 <summary><code>zever doctor</code> reports FAIL for one battery</summary>
 
-The battery is enabled but cannot resolve from the current config: a missing secret, an unreachable DSN, or a backend with no `container.Provide` entry in the process running the check. Read the error text, fix the option, and re-run. Doctor only checks batteries your project enables.
+The battery is enabled but cannot resolve from the current config: a missing secret, an unreachable DSN, or no `container.Provide` entry in the running process. Read the error, fix the option, re-run. Doctor checks only enabled batteries.
 </details>
 
 <details>
 <summary>A test leaves goroutines running</summary>
 
-Close the container: `c.Close(ctx)` stops only the services you resolved, in dependency order. In tests use `t.Cleanup`, or [`zevertest.NewTestContainer`](../testing-your-app/) which does it for you. Note that `t.Context()` is already canceled inside cleanups, so close with a fresh bounded context.
+Close the container: `c.Close(ctx)` stops only resolved services, in dependency order. In tests use `t.Cleanup` or [`zevertest.NewTestContainer`](../testing-your-app/). `t.Context()` is already canceled inside cleanups, so close with a fresh bounded context.
 </details>
 
 ### Schemas and codegen
@@ -110,13 +110,13 @@ Close the container: `c.Close(ctx)` stops only the services you resolved, in dep
 <details>
 <summary><code>zever compile --check</code> fails with drift</summary>
 
-The committed output no longer matches the schema. Regenerate with `zever compile` and commit the result. A differing CLI version in the stamp alone is only a note, not drift.
+The committed output no longer matches the schema. Regenerate with `zever compile` and commit. A differing CLI version in the stamp is only a note, not drift.
 </details>
 
 <details>
 <summary>The formatter refuses my file</summary>
 
-`zever fmt` will not rewrite a file with lexical errors (an unterminated string, for example). Fix the error first; `zever check` reports it with a position.
+`zever fmt` will not rewrite a file with lexical errors (e.g. an unterminated string). Fix the error. `zever check` reports it with a position.
 </details>
 
 ### Background work
@@ -124,27 +124,27 @@ The committed output no longer matches the schema. Regenerate with `zever compil
 <details>
 <summary>A dispatched job never runs</summary>
 
-Almost always a topic mismatch between the job's priority and the topics the worker polls, or a `memory` queue split across processes. See [Scheduler and jobs](../../background/scheduler-jobs/#troubleshooting).
+Usually a topic mismatch between the job's priority and polled topics, or a `memory` queue split across processes. See [Scheduler and jobs](../../background/scheduler-jobs/#troubleshooting).
 </details>
 
 <details>
 <summary><code>Pop</code> returns an empty error</summary>
 
-`queue.ErrEmpty` means the topic has nothing ready; it is not a failure. Handle it and poll again.
+`queue.ErrEmpty` means the topic has nothing ready: handle it and poll again.
 </details>
 
 <details>
 <summary>Messages are processed twice</summary>
 
-Queues and the outbox deliver at least once, and an un-acked message reappears after the visibility timeout. Make the consumer idempotent with the [idempotency](../../security/lock-idempotency/) battery or the outbox `Inbox`, and ack promptly.
+Queues and the outbox deliver at least once. An un-acked message reappears after the visibility timeout. Make the consumer idempotent (see [idempotency](../../security/lock-idempotency/) or the outbox `Inbox`), and ack promptly.
 </details>
 
 ## Still stuck?
 
-Run `zever doctor` and `zever config show` (secrets are redacted), then open an issue with the output. Keep raw option maps out of logs and bug reports: print only what `config.RedactedServices` returns.
+Run `zever doctor` and `zever config show` (secrets redacted), then open an issue. Keep raw option maps out of logs and reports: print only `config.RedactedServices`.
 
 <CardGrid>
-  <LinkCard title="Configuration" href="../configuration/" description="Layering, env names, and validation." />
-  <LinkCard title="Deployment" href="../deployment/" description="Build, secrets, shutdown, and health probes." />
-  <LinkCard title="Background jobs overview" href="../../background/overview/" description="How the pieces fit." />
+  <LinkCard title="Configuration" href="../configuration/" description="Layering, env names, validation." />
+  <LinkCard title="Deployment" href="../deployment/" description="Build, secrets, shutdown, health probes." />
+  <LinkCard title="Background jobs overview" href="../../background/overview/" description="Job system overview." />
 </CardGrid>

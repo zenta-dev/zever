@@ -3,13 +3,13 @@ title: .zen syntax
 description: "Reference for the Zever schema language: entities, relations, services, RPCs, jobs, schedules, sagas, types, and attributes."
 ---
 
-`.zen` files describe services once, in a proto-inspired syntax. The compiler turns the schema into database access, routing, and queue plumbing, never business logic. Format with `zever fmt`, validate with `zever check`, generate with `zever compile` (see the [CLI reference](../cli/)).
+`.zen` files describe services once, proto-inspired. The compiler emits DB access, routing, and queue plumbing, never business logic. Format with `zever fmt`, check with `zever check`, compile with `zever compile` ([CLI](../cli/)).
 
 ## Files and modules
 
-The module name comes from the immediate subdirectory, not the file name: `schema/app/app.zen` is module `app`. A directory such as `schema/v1/iam/` also gives the module a version (`v1`), and a warning flags RPC paths not starting with `/v1/`.
+Module is the immediate subdirectory: `schema/app/app.zen` is `app`. `schema/v1/iam/` also sets `v1`, warning on RPC paths missing the `/v1/` prefix.
 
-Types in the same module reference each other by bare name, with no import. Cross-module references use the module path, and `zever check-boundaries` reports relations, RPC return types, and permission resources that cross modules. Sagas may reference RPCs across modules by design.
+Same-module types use bare names. Cross-module refs use the module path. `zever check-boundaries` flags cross-module relations, RPC returns, permission resources. Sagas may span modules by design.
 
 ## Declarations
 
@@ -24,7 +24,7 @@ Types in the same module reference each other by bare name, with no import. Cros
 | `schedule` | `schedule Name { cron: "..."  dispatch: Job() }` | Cron trigger for a job. |
 | `saga` | `saga Name { step s { execute: Svc.Rpc } }` | Compensatable RPC sequence. |
 
-Reserved words: `entity`, `service`, `job`, `schedule`, `rpc`, `index`, `enum`, `has_many`, `has_one`, `belongs_to`, `many_to_many`, `message`, `true`, `false`. Type names, option labels (`http`, `auth`, `queue`, ...), HTTP verbs, `saga`, `step`, and `join_table` are contextual, not reserved. Comments start with `//`, and a comment directly above a declaration becomes its doc comment.
+Reserved: `entity`, `service`, `job`, `schedule`, `rpc`, `index`, `enum`, `has_many`, `has_one`, `belongs_to`, `many_to_many`, `message`, `true`, `false`. Type names, option labels, HTTP verbs, `saga`, `step`, `join_table` are contextual. `//` comments. One above a declaration is its doc comment.
 
 ## Types
 
@@ -54,7 +54,7 @@ entity Account {
 }
 ```
 
-A named `enum` needs at least one value and unique values, and its name cannot collide with an entity. A `message` carries fields but is never persisted.
+A named `enum` needs at least one unique value, never colliding with an entity. A `message` carries fields, never persisted.
 
 ## Entities
 
@@ -77,7 +77,7 @@ entity Order {
 }
 ```
 
-Declare both sides of a relation with the same `@foreign_key`.
+Declare both sides with the same `@foreign_key`.
 
 ### Field attributes
 
@@ -85,7 +85,7 @@ Declare both sides of a relation with the same `@foreign_key`.
 |---|---|---|
 | `@primary` | field | Primary key. |
 | `@unique` | field | Unique constraint. |
-| `@default(x)` | field, message field | Default. `now()` only on `timestamp`; an enum default names a declared value; a literal must match the scalar family. `@default(true)` and `@default(false)` do not parse today because `true` and `false` are reserved words. |
+| `@default(x)` | field, message field | Default. `now()` only on `timestamp`, an enum default names a declared value, a literal must match the scalar family. `@default(true)` and `@default(false)` do not parse today because `true` and `false` are reserved words. |
 | `@validate(...)` | field, RPC param, message field | Validation rules (below). |
 | `@renamed_from("old")` | field | Previous column name, so `zever db migrate` emits a rename not a drop and add. The old name must not still be declared. |
 
@@ -97,9 +97,9 @@ Declare both sides of a relation with the same `@foreign_key`.
 | `min_len`, `max_len` | `string` | Integer length. |
 | `gt`, `gte`, `lt`, `lte` | numeric scalars | Numeric literal. |
 
-Combine rules: `@validate(min_len: 1, max_len: 100)`. `@validate` is rejected on a field or param whose type is an entity or message; put it on that type's fields instead.
+Combine: `@validate(min_len: 1, max_len: 100)`. `@validate` is rejected on entity/message-typed fields or params. Put it on that type's fields.
 
-Every field of an entity or message used as an RPC parameter must carry at least one applicable `@validate` rule. Return-only types are exempt, as are fields with no applicable rule (`uuid`, `bool`, `timestamp`, `date`, `bytes`, `json`, enums).
+Every field of an entity or message used as an RPC param needs an applicable `@validate` rule. Return-only types are exempt, as are fields with no applicable rule (`uuid`, `bool`, `timestamp`, `date`, `bytes`, `json`, enums).
 
 ### Entity attributes
 
@@ -123,7 +123,7 @@ Every field of an entity or message used as an RPC parameter must carry at least
 
 ### Indexes
 
-`index(a, b)` declares a secondary index over one or more fields. Index attributes follow the closing parenthesis.
+`index(a, b)` declares a secondary index over one or more fields. Attributes follow the closing parenthesis.
 
 ## Grammar summary
 
@@ -166,12 +166,12 @@ service UserService {
 | Option | Value | Effect |
 |---|---|---|
 | `http:` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, then `"/path/{param}"` | HTTP binding. Every `{param}` needs a same-named RPC input. |
-| `auth:` | `required` or `none` | Authentication. Every RPC must declare `auth:` or `permission:`; an RPC with neither fails to resolve (secure by default), so write `auth: none` for a public route. Generated gRPC servers are fail-closed: `auth: none` operations are listed with an explicit empty policy, and any unlisted method is denied. |
+| `auth:` | `required` or `none` | Authentication. Every RPC must declare `auth:` or `permission:`, an RPC with neither fails to resolve (secure by default), so write `auth: none` for a public route. Generated gRPC servers are fail-closed: `auth: none` operations are listed with an explicit empty policy, and any unlisted method is denied. |
 | `permission:` | `check("action", resource: Entity, owner_field: field)` | Authorization. `resource` must be an entity, `owner_field` one of its fields. |
 | `errors:` | `{ code, code("message") }` | Declared error codes (table below). Duplicates are rejected. |
 | `paginated:` | `true` or `false` | `true` adds `cursor`/`limit` request fields and a `<Op>Response` page (`items`, `next_cursor`) to one RPC, on both HTTP and gRPC. |
 
-Every RPC gets a gRPC transport. Repeating `http:`, `auth:`, `permission:`, or `paginated:` silently keeps the last value.
+Every RPC gets gRPC. Repeating `http:`, `auth:`, `permission:`, or `paginated:` silently keeps the last.
 
 ### Error codes
 
@@ -224,11 +224,11 @@ saga PlaceOrder {
 | `compensate:` | saga step | `Service.Rpc` that undoes the step when a later step fails. |
 | `pivot:` | saga step | `true` rolls failures after this step forward instead of compensating. At most one per saga. |
 
-Step names are unique within a saga. Durations use literals such as `30s`.
+Step names are unique per saga. Durations use literals like `30s`.
 
 ## Diagnostics
 
-The parser never panics. Malformed input yields best-effort output plus positioned diagnostics, and the formatter refuses input that fails lexing.
+The parser never panics: malformed input yields best-effort output plus positioned diagnostics. The formatter refuses unlexable input.
 
 | Symptom | Cause |
 |---|---|

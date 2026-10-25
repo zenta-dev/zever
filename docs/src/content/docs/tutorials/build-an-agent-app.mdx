@@ -5,21 +5,21 @@ description: Wire an agent loop, RAG grounding, and an MCP server into a working
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-You will build a support assistant that answers from your docs (RAG), calls tools in an agent loop, and exposes your schema to coding agents over MCP. You need an `AI_API_KEY` for generation and embeddings; retrieval and MCP run locally. Run commands from the repository root.
+Build a support assistant answering from docs (RAG), calling tools in an agent loop, exposing the schema to coding agents over MCP. Requires `AI_API_KEY`. Retrieval and MCP run locally. Run from repo root.
 
 ## Resolve the backends
 
-Every agent app starts from the container. `Agent()` builds a tool-calling loop over the shared `AI` backend, and `RAG()` builds a retrieval engine over `AI` plus `VectorStore`:
+`Agent()` builds a tool-calling loop over shared `AI`. `RAG()` builds retrieval over `AI` + `VectorStore`:
 
 ```sh
 AI_API_KEY=sk-... zever doctor --json | head -5
 ```
 
-The AI backend (`aianthropic.New` by default) is wired in `internal/app/wiring.go`; only the key comes from env.
+AI backend (`aianthropic.New` default) is wired in `internal/app/wiring.go`. Only the key comes from env.
 
 ## Index your docs
 
-Ingest documents once, then retrieve top-K context per question. Chunking, batch embedding, and upserting are one call:
+Ingest once, retrieve top-K per question. Chunking, batch embedding, upserting are one call:
 
 ```sh
 # Conceptually: engine.Ingest(ctx, docs) then engine.Answer(ctx, query, 5)
@@ -28,7 +28,7 @@ Ingest documents once, then retrieve top-K context per question. Chunking, batch
 
 ## Run the loop with tools
 
-Register domain tools, then run. Unknown tools fail closed, and handler errors return to the model as tool turns so it can self-correct:
+Register domain tools, then run. Unknown tools fail closed. Handler errors return as tool turns so the model self-corrects:
 
 ```sh
 # Conceptually: agent.New(client, agent.Options{Model: "gpt-4o", Tools: tools})
@@ -37,7 +37,7 @@ Register domain tools, then run. Unknown tools fail closed, and handler errors r
 
 ## Stream progress and fan out
 
-Long runs stream deltas, tool calls, and results as events. Independent tool calls in one step run concurrently with `MaxParallel`, and results keep their order:
+Long runs stream deltas, tool calls, results as events. Independent calls in one step run concurrently with `MaxParallel`. Results keep order:
 
 ```sh
 # Conceptually: loop.RunStream(ctx, messages) then range over events.
@@ -46,18 +46,18 @@ Long runs stream deltas, tool calls, and results as events. Independent tool cal
 
 ## Serve your API as agent tools
 
-Compile the schema with the `mcp` backend. It writes one tool manifest per module (`generated/mcp/<module>/mcp.json`), a merged `generated/mcp/mcp.json`, and a runnable stdio server with handler stubs you fill in (`generated/mcp/<module>/mcpserver/main.go`):
+Compile with the `mcp` backend: one manifest per module (`generated/mcp/<module>/mcp.json`), merged `generated/mcp/mcp.json`, runnable stdio server with stubs (`generated/mcp/<module>/mcpserver/main.go`):
 
 ```sh
 zever compile schema/app.zen --backend=mcp --out ./generated
 go run ./generated/mcp/<module>/mcpserver
 ```
 
-Separately, `go run ./tools/zever-mcp` starts a stdio server that gives coding agents the compiler itself as tools (`zever_compile`, `zever_schema`, `zever_explain`).
+Separately, `go run ./tools/zever-mcp` gives coding agents the compiler as tools (`zever_compile`, `zever_schema`, `zever_explain`).
 
 ## Score answers with evals
 
-Pin quality with a dataset and scorers before you ship prompt changes:
+Pin quality with a dataset and scorers before shipping prompt changes:
 
 ```sh
 # Conceptually: eval.RunSuite(ctx, run, cases, eval.ContainsScorer).
@@ -66,22 +66,22 @@ Pin quality with a dataset and scorers before you ship prompt changes:
 
 ## What you built
 
-- `container.Agent()` and `container.RAG()` lazy accessors over shared backends
-- `core/agent` loops: run, stream, parallel fan-out, sub-agent tools
-- `core/rag` ingest, retrieve, hybrid retrieval, grounded answers
-- `dsl/backend/mcp` manifests plus a generated stdio server, and `tools/zever-mcp` for compiler tools
+- `container.Agent()` / `container.RAG()` over shared backends
+- `core/agent`: run, stream, parallel fan-out, sub-agent tools
+- `core/rag`: ingest, retrieve, hybrid retrieval, grounded answers
+- `dsl/backend/mcp` manifests + generated stdio server. `tools/zever-mcp` compiler tools
 - `core/eval` datasets and scorers
 
 <details>
 <summary>`Agent()` fails with an auth error</summary>
 
-Cause: no API key, and the loop needs a real backend. Fix: set `AI_API_KEY`. Retrieval-only paths work with any embedder.
+No API key. Loop needs a real backend. Fix: set `AI_API_KEY`. Retrieval-only paths work with any embedder.
 </details>
 
 <details>
 <summary>Hybrid retrieval returns nothing</summary>
 
-Cause: hybrid engines index chunks into the keyword backend on ingest. Fix: re-ingest after switching from `rag.New` to `rag.NewHybrid`.
+Hybrid engines index chunks into the keyword backend on ingest. Fix: re-ingest after switching `rag.New` → `rag.NewHybrid`.
 </details>
 
 ## Next steps

@@ -3,27 +3,27 @@ title: Benchmarks
 description: Point-in-time micro-benchmarks for router, ORM, queue, and other hot paths, plus how to reproduce them.
 ---
 
-Measured numbers for router, ORM, and queue hot paths, plus how to re-run them. All benchmarks are deterministic (no network, no timing assertions) and live in `*_bench_test.go` files next to the code they measure. In-process backends (sqlite `:memory:`, miniredis) keep them offline; their absolute numbers are dominated by the backend's own parsing, so compare shapes (allocs/op) and relative deltas, not raw ns.
+Router, ORM, and queue hot-path numbers plus repro commands. All benches are deterministic (no network, no timing assertions) in `*_bench_test.go` beside the code. In-process backends (sqlite `:memory:`, miniredis) keep them offline. Absolute ns is backend-dominated, so compare allocs/op and relative deltas.
 
-Numbers are a point-in-time snapshot, not a performance contract: they depend on machine, CPU load, and Go version. Re-run locally before drawing conclusions, and treat committed numbers older than a few weeks as stale.
+Point-in-time snapshot, not a contract. Depends on machine, load, Go version. Re-run locally. Treat numbers older than a few weeks as stale.
 
 ## Conventions
 
-Every benchmark lives in a `*_bench_test.go` file next to the code it measures and follows these rules:
+Every benchmark lives beside the code it measures and follows these rules:
 
-- **Deterministic:** no network, no `time.Sleep` sync, no unseeded randomness, no timing assertions. In-process backends only (sqlite `:memory:`).
-- **Allocation visibility:** `b.ReportAllocs()` on every benchmark.
-- **Setup excluded:** `b.ResetTimer()` after warmup/setup; `b.Cleanup` for teardown (Open/Close).
-- **Context:** `b.Context()` (or `b.Parallel`'s implicit context), never a stored context.
-- **Concurrent types:** a `b.RunParallel` variant alongside the sequential one, with balanced work per iteration so memory stays flat.
-- **Naming:** `Benchmark<Thing>` for the hot path, `Benchmark<Thing>Parallel` for the concurrent variant, `Benchmark<Thing>Before`/`After` only when documenting an optimization.
-- **Target:** the operation the module exists to perform (for example `cache` Get/Set, `queue` Push/Pop, `codec` encode/decode, `orm` query build, `dsl` lex/parse).
+- Deterministic: no network, `time.Sleep` sync, unseeded randomness, or timing assertions. In-process backends only.
+- `b.ReportAllocs()` on every benchmark.
+- Setup excluded: `b.ResetTimer()` after warmup, `b.Cleanup` for teardown.
+- Context: `b.Context()` (or `b.Parallel`'s implicit context), never a stored context.
+- Concurrent types: a `b.RunParallel` variant with balanced per-iteration work.
+- Naming: `Benchmark<Thing>`, `Benchmark<Thing>Parallel`, `Before`/`After` only for optimizations.
+- Target: the module's core operation (`cache` Get/Set, `queue` Push/Pop, `codec` encode/decode, `orm` query build, `dsl` lex/parse).
 
-Run all benchmarks with `make bench` (`go test -bench=. -benchmem ./...`) or per module with `go -C <dir> test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem`.
+All benches: `make bench` (`go test -bench=. -benchmem ./...`). Per module: `go -C <dir> test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem`.
 
 ## Results (2026-10-03)
 
-Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`). `ServeHTTP` now runs the adaptor over a pooled `*httptest.ResponseRecorder` (`recorderPool`); `BenchmarkServeHTTPAdaptor` isolates the adaptor wrapping with a no-op handler. "before" is the pre-pool `httptest.NewRecorder()` path.
+Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`). `ServeHTTP` uses a pooled `*httptest.ResponseRecorder` (`recorderPool`). `BenchmarkServeHTTPAdaptor` isolates adaptor wrapping with a no-op handler. "before" is pre-pool `httptest.NewRecorder()`.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -35,11 +35,11 @@ Router (`adapters/router/fiber`, sequential vs concurrent `ServeHTTP`). `ServeHT
 | BenchmarkServeHTTPParallel (cpu=1) | 8,483 | 11,195 | 65 |
 | BenchmarkServeHTTPParallel (cpu=4) | 4,001 | 11,219 | 65 |
 
-The pool removes the recorder's struct/map/buffer allocations from the hot path: `ServeHTTP` drops 5 allocs/op and ~576 B/op. `BenchmarkServeHTTPAdaptor` shows the adaptor wrapping alone costs ~45 allocs/op (the pooled recorder is 3 of them).
+The pool drops 5 allocs/op and ~576 B/op from `ServeHTTP`. Adaptor wrapping alone is ~45 allocs/op (3 from the pooled recorder).
 
 ### Router re-measurement (2026-10-14) and stdhttp default
 
-Re-ran the fiber benches on the same machine class after the `newHTTPHandler` rework (which mirrors `gofiber/adaptor.FiberApp` while skipping its unconditional body buffering and `RemoteAddr` resolution), plus the `stdhttp` benches for comparison. Medians of 3 runs, `-benchtime 1s`:
+Re-ran fiber benches on the same machine class after the `newHTTPHandler` rework (mirrors `gofiber/adaptor.FiberApp` minus body buffering and `RemoteAddr` resolution), plus `stdhttp` for comparison. Medians of 3 runs, `-benchtime 1s`:
 
 | Benchmark | ns/op (cpu=1) | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -52,8 +52,8 @@ Re-ran the fiber benches on the same machine class after the `newHTTPHandler` re
 
 Takeaways:
 
-- `stdhttp` is the recommended default router (and the `zever new` scaffold default): the param path costs 17 allocs/op against fiber's 46 (~2.7x fewer), and is ~3x faster per request on this machine. The gap is the `fasthttpadaptor` net/http conversion plus header/status/body merge-back, which every fiber request pays regardless of handler logic.
-- The older "45-55 allocs/op adaptor cost" note above is stale for the isolated adaptor: it now measures 35 allocs/op. The 45-55 range still brackets the full fiber `ServeHTTP` (46) through concurrent (55) paths.
+- `stdhttp` is the default (and `zever new` scaffold default): param path is 17 vs 46 allocs/op (~2.7x fewer), ~3x faster here. The gap is the `fasthttpadaptor` conversion plus header/status/body merge-back paid by every fiber request.
+- The old "45-55 allocs/op adaptor cost" is stale for the isolated adaptor (now 35). 45-55 still brackets full `ServeHTTP` (46) through concurrent (55).
 
 Reproduce:
 
@@ -62,7 +62,7 @@ go test -run=NONE -bench='BenchmarkServeHTTP$|BenchmarkServeHTTPAdaptor|Benchmar
 go test -run=NONE -bench='BenchmarkServeHTTPParam|BenchmarkServeHTTPStatic|BenchmarkServeHTTPParallel' -benchtime=1s -cpu=1,4 -benchmem ./adapters/router/stdhttp/
 ```
 
-ORM render (`orm`, sqlite `:memory:`). `escapeLike` and `flattenGroupTerms` were hoisted to a package-level replacer / a lazy dedup (linear scan for few leaves, map for many). "before" is the per-call `strings.NewReplacer` / always-map path.
+ORM render (`orm`, sqlite `:memory:`). `escapeLike`/`flattenGroupTerms` were hoisted to a package replacer / lazy dedup (linear scan for few leaves, map for many). "before" is per-call `strings.NewReplacer` / always-map.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -75,9 +75,9 @@ ORM render (`orm`, sqlite `:memory:`). `escapeLike` and `flattenGroupTerms` were
 | BenchmarkFlattenGroupTermsRollup (cpu=1) | 499 | 560 | 3 |
 | BenchmarkFlattenGroupTermsMany (cpu=1) | 7,729 | 21,272 | 75 |
 
-The hoisted replacer cuts `escapeLike` from 8 allocs to 1 (the result string). The lazy dedup cuts `flattenGroupTerms` for a few leaves from 7 allocs to 3 and is also faster (354 vs 434 ns); past the linear-scan threshold (`linearDedupMaxLeaves` = 8) it falls back to the map (`...Many`), the faster shape for many leaves.
+Hoisting cuts `escapeLike` 8 to 1 allocs (the result string). Lazy dedup cuts `flattenGroupTerms` 7 to 3 allocs (354 vs 434 ns), falling back past `linearDedupMaxLeaves` = 8 to the map (`...Many`).
 
-Queue (`adapters/queue/db`, stale-claim sweep over sqlite). The sweep is one SELECT plus one set-based UPDATE for the whole batch: the database computes `attempt = attempt + 1` itself (new orm expression assignment, `orm.SetExpr(col, orm.Add(col.Expr(), 1))`), under the same lease guard (`claimed_by != '' AND claimed_until <= now AND id IN (...)`), so a row settled between the SELECT and the UPDATE is skipped instead of double-bumped. "before" is the old N+1 loop (one guarded UPDATE per row).
+Queue (`adapters/queue/db`, stale-claim sweep over sqlite). One SELECT plus one set-based UPDATE per batch: the database computes `attempt + 1` itself (`orm.SetExpr(col, orm.Add(col.Expr(), 1))`) under the same lease guard, so rows settled mid-sweep are skipped, not double-bumped. "before" is the N+1 loop (one guarded UPDATE per row).
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -86,18 +86,18 @@ Queue (`adapters/queue/db`, stale-claim sweep over sqlite). The sweep is one SEL
 | BenchmarkReclaimStale before (cpu=4) | 4,869,046 | 331,997 | 5,685 |
 | BenchmarkReclaimStale after (cpu=4) | 631,722 | 109,574 | 3,210 |
 
-The single set-based UPDATE cuts the sweep ~7.4x (4.75M ns/op to 645K ns/op at cpu=1): the N per-row round trips and per-row commit overhead collapse into one statement, and the attempt bump moves into the database. B/op drops ~3x (331 KB to 109 KB) and allocs/op ~1.8x (5,690 to 3,208) with it. A second run confirmed the after numbers within noise (646,554 / 637,319 ns/op).
+One UPDATE cuts the sweep ~7.4x (4.75M to 645K ns/op at cpu=1): N round trips and per-row commits collapse into one statement. B/op ~3x (331 to 109 KB), allocs/op ~1.8x (5,690 to 3,208). Confirmed within noise (646,554 / 637,319 ns/op).
 
-Queue second pass (`adapters/queue/db`, stale-claim sweep over sqlite). The sweep collapsed from two statements to one: the batch is selected and released by a single set-based UPDATE whose `IN` subquery projects the same stale-claim set the standalone SELECT read (same lease guard, same id order, same batch LIMIT), so the ids slice, the per-row `msgRow` scan, and the SELECT-to-UPDATE window are gone. "before" is the two-statement sweep at commit 8a7f3d9. Medians of 10 runs (`-count=10`), benchstat p=0.000.
+Queue second pass (`adapters/queue/db`, stale-claim sweep over sqlite). Two statements collapsed to one: a single UPDATE whose `IN` subquery projects the same stale-claim set (same guard, order, LIMIT). Ids slice, per-row scan, and SELECT-to-UPDATE window are gone. "before" is the two-statement sweep at 8a7f3d9. Medians of 10 runs (`-count=10`), benchstat p=0.000.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
 | BenchmarkReclaimStale before (cpu=12) | 898,500 | 109,534 | 3,204 |
 | BenchmarkReclaimStale after (cpu=12) | 405,700 | 10,834 | 130 |
 
-The single set-based UPDATE cuts the sweep a further ~2.2x (898.5µs to 405.7µs): the SELECT's per-row driver work and the ids slice disappear, and the subquery plus outer guard evaluate atomically, so a row settled mid-sweep is still skipped rather than double-bumped. B/op drops ~10x and allocs/op ~24x (3,204 to 130). One tradeoff: an idle sweep now issues a 0-row UPDATE instead of skipping the write entirely (~52µs per sweep at the 250ms gate, ~0.2% CPU).
+One UPDATE cuts a further ~2.2x (898.5 to 405.7µs): per-row driver work and ids slice disappear. Subquery plus guard evaluate atomically. B/op ~10x, allocs/op ~24x (3,204 to 130). Tradeoff: idle sweeps issue a 0-row UPDATE (~52µs at the 250ms gate, ~0.2% CPU).
 
-Rate limiter (`adapters/ratelimit/memory`, striped lock table). The bucket map was sharded into 64 stripes (`DefaultStripeCount`) keyed by an FNV-1a hash of the limiter key, each with its own `sync.RWMutex`. The global `MaxEntries` bound is preserved exactly: new-key admission takes a short `admitMu` to reserve a slot under the bound (evicting idle-first, then least-recently-used, across stripes) before inserting into the stripe, so existing-key calls never touch `admitMu`. "before" is the single `sync.RWMutex` table at commit 9e3a0d0. Medians of 3 runs, `-benchtime 2s`.
+Rate limiter (`adapters/ratelimit/memory`, striped lock table). Buckets sharded into 64 stripes (`DefaultStripeCount`) by FNV-1a hash, each with its own `sync.RWMutex`. `MaxEntries` preserved exactly: new keys reserve via short `admitMu` (idle-first, then LRU eviction). Existing keys never touch it. "before" is the single-lock table at 9e3a0d0. Medians of 3 runs, `-benchtime 2s`.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ Rate limiter (`adapters/ratelimit/memory`, striped lock table). The bucket map w
 | BenchmarkAllowParallelHotKey before (cpu=4) | 112.4 | 0 | 0 |
 | BenchmarkAllowParallelHotKey after (cpu=4) | 114.6 | 0 | 0 |
 
-Sharding cuts the many-keys parallel path ~3x at cpu=4 (122.2 to 40.70 ns/op): before, every `Allow` serialized on one lock and cpu=4 was slower than cpu=1. The single-key benchmark is unchanged (75.00 to 76.21 ns/op at cpu=1) because one key still serializes on its stripe; sharding helps key parallelism, not same-key throughput. Allocations stay at 0 B/op, 0 allocs/op on every row.
+Sharding cuts many-keys parallel ~3x at cpu=4 (122.2 to 40.70 ns/op). Before, one lock made cpu=4 slower than cpu=1. Single-key is unchanged (75.00 to 76.21 ns/op): one key still serializes on its stripe. All rows stay 0 B/op, 0 allocs/op.
 
 Reproduce:
 
@@ -118,7 +118,7 @@ Reproduce:
 go test -run '^$' -bench 'BenchmarkAllowParallel' -benchtime 2s -cpu 1,4 -count 3 ./adapters/ratelimit/memory/
 ```
 
-Idempotency (`adapters/idempotency/redis`, miniredis). `Begin` and `Complete` are now one Lua script each (1 RTT) instead of two client calls. Absolute numbers are dominated by miniredis's in-process command parsing.
+Idempotency (`adapters/idempotency/redis`, miniredis). `Begin`/`Complete` are one Lua script each (1 RTT), not two calls. Absolute numbers are miniredis parsing-dominated.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ Idempotency (`adapters/idempotency/redis`, miniredis). `Begin` and `Complete` ar
 | BenchmarkComplete (cpu=1) | 162,142 | 198,666 | 793 |
 | BenchmarkComplete (cpu=4) | 133,553 | 198,746 | 793 |
 
-Shared Redis registry (`shared/redisclient`, offline, 2026-10-04). `Shared` now returns a refcounted client keyed by the resolved addr+DB+TLS/password identity, so every Redis-backed battery on the same Redis shares one client/pool. `BenchmarkSharedAcquireRelease` is a warm registry hit against a pre-seeded entry; `BenchmarkPrivateClientBuild` is the per-battery `goredis.NewClient` the registry avoids on every borrower after the first (idle-conn warming disabled to stay offline). Medians of 3 runs, `-benchtime 1s`.
+Shared Redis registry (`shared/redisclient`, offline, 2026-10-04). `Shared` returns a refcounted client keyed by addr+DB+TLS/password, so co-located batteries share one pool. `BenchmarkSharedAcquireRelease` is a warm hit. `BenchmarkPrivateClientBuild` is the avoided per-battery `goredis.NewClient` (idle warming disabled). Medians of 3 runs, `-benchtime 1s`.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -136,9 +136,9 @@ Shared Redis registry (`shared/redisclient`, offline, 2026-10-04). `Shared` now 
 | BenchmarkPrivateClientBuild (cpu=1) | 10,155 | 8,786 | 71 |
 | BenchmarkPrivateClientBuild (cpu=4) | 9,853 | 18,215 | 71 |
 
-A shared hit is ~30x faster and ~14x fewer allocs than building a private client (343 vs 10,155 ns/op, 5 vs 71 allocs/op at cpu=1): later borrowers skip the client/pool construction entirely. The shared hit still allocates its own `*goredis.Options` and key string per call, dwarfed by the pool build they replace.
+A shared hit is ~30x faster, ~14x fewer allocs than a private build (343 vs 10,155 ns/op, 5 vs 71 at cpu=1). Later borrowers skip pool construction. The hit still allocates one `*goredis.Options` plus key, dwarfed by the build.
 
-Job worker (`core/job`, empty-poll backoff). `runLoop` used to call `time.After(wait)` on every empty poll, allocating a fresh timer each time; it now creates one `*time.Timer` for the run and `Reset`s it per poll, stopping it on exit. "before" is the `time.After` path. Medians of 5 runs.
+Job worker (`core/job`, empty-poll backoff). `runLoop` used `time.After(wait)` per empty poll. Now one `*time.Timer` per run, `Reset` per poll, stopped on exit. "before" is `time.After`. Medians of 5 runs.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -147,27 +147,27 @@ Job worker (`core/job`, empty-poll backoff). `runLoop` used to call `time.After(
 | BenchmarkWorkerEmptyPoll before (cpu=4) | 335.0 | 248 | 3 |
 | BenchmarkWorkerEmptyPoll after (cpu=4) | 237.8 | 0 | 0 |
 
-Reusing the timer removes the 3 allocs/op (timer, channel, runtime timer) and 248 B/op from every idle poll, and cuts the wait path ~1.6x at cpu=1 (379.0 to 241.7 ns/op). Backoff values are unchanged: the first poll in a run waits 0, then 1ms, 2ms, 4ms, ..., capped at `DefaultMaxPollWait`.
+One timer removes 3 allocs/op and 248 B/op per idle poll, ~1.6x faster at cpu=1 (379.0 to 241.7 ns/op). Backoff unchanged: 0, 1ms, 2ms, 4ms, ... capped at `DefaultMaxPollWait`.
 
-ORM render group dedup (`orm/render`, sqlite). `dedupGroupLeaves`'s map fallback keyed on a formatted `string` per leaf; it now keys on a comparable `groupLeafKey{fn, col}` struct, removing the per-leaf key allocation. Medians of 3 runs, cpu=12.
+ORM group dedup (`orm/render`, sqlite). `dedupGroupLeaves` map fallback keyed per-leaf formatted `string`. Now a comparable `groupLeafKey{fn, col}` struct, no per-leaf key alloc. Medians of 3 runs, cpu=12.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
 | BenchmarkFlattenGroupTermsMany before | 6,164 | 21,272 | 75 |
 | BenchmarkFlattenGroupTermsMany after | 5,598 | 22,168 | 11 |
 
-The struct key drops 64 allocs/op (one per leaf) on a 64-leaf GROUP BY and cuts ns/op ~9%; B/op rises slightly (keys stored inline) but total allocation count, and thus GC pressure, falls sharply.
+Struct keys drop 64 allocs/op on a 64-leaf GROUP BY, ~9% faster. B/op rises slightly (inline keys) but GC pressure falls.
 
-Container resolve/close (`container`, sqlite shared-pool open+close). The shutdown-critical subset (`DB`, `Cache`, `Queue`, `Scheduler`, `Job`) is resolved from a cold container and closed. `Close` now reuses one buffered result channel across successful closes (reallocating only after a timeout abandons a goroutine), runs the shutdown body as a top-level `closeAsync` (no closure per `go`), and dedups with a local plain map created lazily. `logOpen` also drops its intermediate `[...]` string concatenation. Medians of 5 runs, cpu=12.
+Container resolve/close (`container`, sqlite shared-pool open+close). Shutdown-critical subset (`DB`, `Cache`, `Queue`, `Scheduler`, `Job`) resolved cold, then closed. `Close` reuses one buffered channel (reallocating only after timeout-abandoned goroutines), runs shutdown as top-level `closeAsync` (no per-`go` closure), dedups via a lazily created local map. `logOpen` drops one string concat. Medians of 5 runs, cpu=12.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
 | BenchmarkContainer_ResolveSubset before | 11,090 | 11,157 | 57 |
 | BenchmarkContainer_ResolveSubset after | 10,884 | 10,289 | 37 |
 
-The close-path rework drops 20 allocs/op (~35%): the per-service result channel and goroutine closure disappear, `sync.Map`'s per-key entry nodes are replaced by one small map, and the pool log line skips a string concat. ns/op is dominated by `config.Default()` and the fresh `Container`, so the delta is modest; B/op falls ~870 bytes/op.
+Close rework drops 20 allocs/op (~35%): no per-service channel/closure, one small map instead of `sync.Map` nodes, no log-line concat. ns/op is `config.Default()`-dominated, so modest. B/op falls ~870 bytes/op.
 
-SMTP `buildMIME` (`adapters/mailer/smtp`). The header block now writes precomputed strings through `buf.Write`/`WriteString` and grows once via `estimateSize` (was `fmt.Fprintf` per header, unbounded growth). `writeBase64` encodes into a preallocated `[]byte` and writes the line and CRLF separately (was `encoded[i:end]+"\r\n"` per 76-byte line). `joinAddresses` builds into a `strings.Builder` (single-address fast path) instead of a `[]string` plus `strings.Join`. The generated MIME bytes are unchanged. Medians of 10 runs, cpu=12.
+SMTP `buildMIME` (`adapters/mailer/smtp`). Headers write precomputed strings with one `estimateSize` growth (was per-header `fmt.Fprintf`, unbounded). `writeBase64` uses a preallocated `[]byte`, writing line plus CRLF separately. `joinAddresses` uses `strings.Builder` with a single-address fast path. Output bytes unchanged. Medians of 10 runs, cpu=12.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -176,9 +176,9 @@ SMTP `buildMIME` (`adapters/mailer/smtp`). The header block now writes precomput
 | BenchmarkBuildMIMEAttachments before | 11,812 | 9,799 | 155 |
 | BenchmarkBuildMIMEAttachments after | 9,332 | 6,933 | 135 |
 
-The rework cuts allocs/op ~12% (102 to 90, 155 to 135) and ns/op ~19-21%. B/op rises ~530 bytes/op on `BenchmarkBuildMIME` (the `estimateSize` hint over-reserves header slack, still one buffer allocation) and falls ~2.9 KB/op on `BenchmarkBuildMIMEAttachments` (the old growth path reallocated the buffer ~7 times; the encoded attachment now lives in one preallocated slice).
+Rework cuts allocs/op ~12% (102 to 90, 155 to 135), ns/op ~19-21%. B/op rises ~530 bytes/op on plain (hint over-reserves, still one buffer) and falls ~2.9 KB/op on attachments (old path reallocated ~7x).
 
-Mailer log (`adapters/mailer/log`, `io.Discard`, 2026-10-05). `Send` reuses one `logMessage` (with its address/attachment slices) across calls under the existing mutex, encodes into a reused `bytes.Buffer` via `json.MarshalWrite` (struct passed by pointer so `encoding/json/v2` skips its `reflect.New` shallow copy and `bytes.Clone` result copy), and writes the buffer plus the newline byte in a single `Write`. `mailer.Address.Validate` now splits on `@` and scans domain labels with `strings.IndexByte` instead of `strings.SplitN`/`strings.Split`, dropping its per-call slices. The checker constructor allocates reusable scratch state once (288 B); the per-send path no longer allocates. "before" is the `json.Marshal` + `append(data, '\n')` path. Medians of 10 runs.
+Mailer log (`adapters/mailer/log`, `io.Discard`, 2026-10-05). `Send` reuses one `logMessage` plus a `bytes.Buffer` via `json.MarshalWrite` (pointer struct skips `reflect.New`/`Clone` copies), single `Write` with newline. `Address.Validate` splits on `@` with `strings.IndexByte` instead of `SplitN`/`Split`. Checker allocates 288 B scratch once. Per-send path allocates nothing. "before" is `json.Marshal` + append-newline. Medians of 10 runs.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -187,7 +187,7 @@ Mailer log (`adapters/mailer/log`, `io.Discard`, 2026-10-05). `Send` reuses one 
 | BenchmarkSendParallel before (cpu=1) | 2,280 | 1,090 | 12 |
 | BenchmarkSendParallel after (cpu=1) | 1,599 | 0 | 0 |
 
-`Send` drops 12 allocs/op to 0 and ~1 KiB/op to 0, and is ~28% faster at cpu=1 (2,034 to 1,462 ns/op); the concurrent variant tracks it. The per-call work was six allocs from `Address.Validate` (`SplitN`+`Split` per recipient), two address slices, one attachment slice, and the codec's `reflect.New` + `bytes.Clone` + `append` growth. All are now reused or eliminated; output bytes are unchanged.
+`Send` drops 12 to 0 allocs/op, ~1 KiB/op to 0, ~28% faster at cpu=1 (2,034 to 1,462 ns/op). Concurrent tracks it. Per-call `SplitN`/`Split`, address/attachment slices, and codec copies are reused or gone. Output unchanged.
 
 Reproduce:
 
@@ -195,7 +195,7 @@ Reproduce:
 go test -run '^$' -bench=. -benchmem -count=10 ./adapters/mailer/log/
 ```
 
-TUI closest matcher (`cmd/zever`, 2026-10-05). `closest` used to allocate a full `(la+1)x(lb+1)` DP matrix per candidate (21 top-level commands), and `damerauLevenshtein` allocated the same matrix per call. The kernel now keeps three rolling rows in one scratch buffer (`damerauLevenshteinScratch`) that `closest` sizes to the longest candidate and reuses across the whole scan; `damerauLevenshtein` delegates with a nil scratch. Distances, the chosen match, and ordering are unchanged. Medians of 10 runs, cpu=12.
+TUI closest matcher (`cmd/zever`, 2026-10-05). `closest` allocated a full DP matrix per candidate (21 commands). The kernel now keeps three rolling rows in one scratch buffer reused across the scan, `damerauLevenshtein` delegates with nil scratch. Distances, match, and ordering unchanged. Medians of 10 runs, cpu=12.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -204,9 +204,9 @@ TUI closest matcher (`cmd/zever`, 2026-10-05). `closest` used to allocate a full
 | BenchmarkDamerauLevenshtein before | 597 | 832 | 9 |
 | BenchmarkDamerauLevenshtein after | 413 | 240 | 1 |
 
-The scratch rows cut `BenchmarkClosest` from 176 to 1 alloc/op (-99.4%) and 14,008 to 416 B/op (-97.0%), and ~37% faster (8.6µs to 5.4µs); the standalone kernel drops 9 to 1 allocs/op, ns/op within noise. The remaining alloc is the single scratch slice per `closest` call.
+Scratch rows cut `BenchmarkClosest` 176 to 1 allocs/op (-99.4%), 14,008 to 416 B/op (-97.0%), ~37% faster (8.6 to 5.4µs). Kernel drops 9 to 1 allocs (ns/op noise). One alloc remains: the scratch slice.
 
-Search (`adapters/search/db`, sqlite file-backed, 2026-10-05). `IndexBatch` now writes the whole batch as one multi-row `INSERT ... ON CONFLICT (id, idx) DO UPDATE SET content = excluded.content, metadata = excluded.metadata` (both dialects expose the proposed row as `excluded`), instead of one typed upsert per document, through the `db.Preparer` probe so repeated batch shapes reuse the cached statement. `Search` preallocates the hits slice at `limit` capacity and aliases the count query's arg slice to the hits args' prefix. "before" is the per-document orm loop / append-grown hits path. Medians of 10 runs.
+Search (`adapters/search/db`, sqlite file-backed, 2026-10-05). `IndexBatch` is one multi-row upsert (`ON CONFLICT DO UPDATE` from `excluded`) via the `db.Preparer` probe, not one upsert per document. `Search` preallocates hits at `limit` and aliases count args to the hits prefix. "before" is per-document orm loop / grown hits. Medians of 10 runs.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -215,18 +215,18 @@ Search (`adapters/search/db`, sqlite file-backed, 2026-10-05). `IndexBatch` now 
 | BenchmarkSearch before | 379,700 | 11,170 | 253 |
 | BenchmarkSearch after | 372,400 | 10,378 | 244 |
 
-The multi-row upsert cuts `IndexBatch` ~4.7x (630 to 133 ns/op): the eight per-document orm chains collapse into one statement, and allocs/op drop 67% (553 to 182) with B/op down 69% (28.0 to 8.7 KiB). The remaining per-document work is the metadata map clone plus JSON encode. `Search` drops 9 allocs/op (253 to 244) and ~790 B/op; its ns/op is dominated by the two FTS5 queries and the per-hit JSON metadata decode, so the time delta is within noise.
+Multi-row upsert cuts `IndexBatch` ~4.7x (630 to 133 ns/op): eight orm chains become one statement. Allocs/op down 67% (553 to 182), B/op down 69%. Remainder is metadata clone plus JSON encode. `Search` drops 9 allocs/op. Ns/op is FTS5- and decode-dominated, so time delta is noise.
 
-Vectorstore brute-force query (`adapters/vectorstore/db`, sqlite leg, 2026-10-05). 256-row scan with topK=10. `decodeRow` used to JSON-decode metadata for every scanned row, but only the topK survivors leave the bounded heap (~246 wasted decodes per query). The heap item now carries the raw metadata blob, `heapToSorted` decodes metadata for the topK survivors only, and the heap is preallocated with a bounded constant capacity. "before" is the per-row decode path. Medians of 10 runs, cpu=12.
+Vectorstore query (`adapters/vectorstore/db`, sqlite leg, 2026-10-05). 256-row scan, topK=10. `decodeRow` decoded metadata per scanned row though only topK survivors leave the heap (~246 wasted decodes). Heap items now carry the raw blob. Only survivors decode. "before" is per-row decode. Medians of 10 runs, cpu=12.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
 | BenchmarkQuery before | 506,500 | 181,030 | 4,919 |
 | BenchmarkQuery after | 260,500 | 84,930 | 3,439 |
 
-Lazy decode cuts allocs/op ~30% (4,919 to 3,439) and ns/op ~49% (506.5µs to 260.5µs): each skipped decode was a `map[string]any` plus a JSON parse, and the decode dominated the scan. B/op falls ~53% (176.8 KiB to 82.9 KiB). Semantic note: corrupt metadata in a row that does not survive topK no longer fails the query (`TestEdgeQuery_corruptMetadataBelowTopK` documents this); a surviving row with corrupt metadata still fails.
+Lazy decode cuts allocs/op ~30% (4,919 to 3,439), ns/op ~49% (506.5 to 260.5µs). B/op down ~53%. Corrupt metadata below topK no longer fails the query (`TestEdgeQuery_corruptMetadataBelowTopK`). Surviving corrupt rows still fail.
 
-Config redaction + env overlay (`config`, 2026-10-05). Three semantics-preserving changes. (1) `isSensitiveKey` no longer allocates a `strings.ToLower` copy per key: already-lowercase ASCII keys match directly, mixed-case ASCII keys fold in place (`asciiContainsFold`/`asciiEqualFold`), and only non-ASCII keys fall back to `strings.ToLower`. (2) `Redact` merges the deep copy and the reclamation walk into a single pass (`redactCopyMap`); the public contract (fresh copy, caller map never mutated) is unchanged. (3) `RedactedServices` redacts the freshly built `serviceToMap` output in place via `redactMap`. Separately, `applyEnv` matches the head case-insensitively against the 34 known service names without allocation (`matchService`, first-byte candidate groups) and lowers the rest only on a match, and `findField` compares normalized field names without allocation (`normEqualFold`). Redaction output is byte-identical to the old implementation. Medians of 10 runs, cpu=12.
+Config redaction + env overlay (`config`, 2026-10-05). Three semantics-preserving changes: (1) `isSensitiveKey` avoids per-key `ToLower` (direct match for lowercase ASCII, in-place fold for mixed case, fallback only for non-ASCII). (2) `Redact` merges copy plus reclamation into one pass (fresh-copy contract unchanged). (3) `RedactedServices` redacts in place. `applyEnv` matches heads allocation-free (`matchService`). `findField` compares allocation-free (`normEqualFold`). Output byte-identical. Medians of 10 runs, cpu=12.
 
 | Benchmark | ns/op before | ns/op after | allocs/op before | allocs/op after |
 | --- | --- | --- | --- | --- |
@@ -235,9 +235,9 @@ Config redaction + env overlay (`config`, 2026-10-05). Three semantics-preservin
 | BenchmarkApplyEnv | 27,335 | 5,419 | 374 | 2 |
 | BenchmarkRedact | 1,783 | 1,239 | 12 | 10 |
 
-`ApplyEnv` drops 374 allocs/op to 2 (the `os.Environ` slice and the one lowered field name) and is ~5x faster; `LoadFile` inherits most of that (572 to 202 allocs/op, ~39% faster). `RedactedServices` is ~34% faster; its remaining allocs/op are the JSON marshal/unmarshal bridge in `serviceToMap`, kept marshal-based on purpose to preserve each package's json-tag semantics. `Redact` drops 2 allocs/op and ~31% ns/op from the merged pass.
+`ApplyEnv` drops 374 to 2 allocs/op (~5x faster). `LoadFile` inherits most (572 to 202, ~39% faster). `RedactedServices` is ~34% faster. Remainder is the marshal/unmarshal bridge preserving json-tag semantics. `Redact` drops 2 allocs/op, ~31% ns/op.
 
-DSL lexer (`dsl/lexer`, 2026-10-05). `scanIllegal` builds the diagnostic message and the ILLEGAL token literal into one stack buffer and materializes them as a single string. The rune to `(msg, lit)` string is a pure function, so it is now memoized in a per-Lexer cache (`illegalCache`, 8 entries): repeated illegal runes share one backing array, cutting the per-rune string alloc to zero on hits. The `diag.Diagnostic` alloc is unavoidable (each is retained in `Lexer.errs`). Other token literals (ident, number, comment text) are at floor: each needs its own `string`. Medians of 10 runs, `-count=10`.
+DSL lexer (`dsl/lexer`, 2026-10-05). `scanIllegal` builds message plus ILLEGAL literal in one stack buffer as a single string. The rune-to-string function is memoized per Lexer (`illegalCache`, 8 entries), so repeat runes share one backing array (zero alloc on hits). The retained `Diagnostic` alloc is unavoidable. Other literals are at floor. Medians of 10 runs, `-count=10`.
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | --- | --- | --- |
@@ -246,7 +246,7 @@ DSL lexer (`dsl/lexer`, 2026-10-05). `scanIllegal` builds the diagnostic message
 | BenchmarkLexAstral before (cpu=12) | 84,848 | 75,405 | 1,015 |
 | BenchmarkLexAstral after (cpu=12) | 38,682 | 59,437 | 516 |
 
-The memoization cuts `BenchmarkLexIllegal` ~2.6x (1.89M to 733K ns/op) and ~50% of allocs/op (18,019 to 9,022, the remaining 9,000 being the retained `Diagnostic` structs); `BenchmarkLexAstral` tracks it (1,015 to 516 allocs/op, ~55% faster). Token output is byte-identical: same tokens, diagnostics, and positions (golden fixtures under `dsl/compile/testdata` unchanged).
+Memoization cuts `BenchmarkLexIllegal` ~2.6x (1.89M to 733K ns/op), allocs/op ~50% (18,019 to 9,022. Remainder is retained `Diagnostic`s). `BenchmarkLexAstral` tracks it. Output byte-identical (goldens under `dsl/compile/testdata` unchanged).
 
 Reproduce:
 
@@ -260,7 +260,7 @@ go test -run '^$' -bench='BenchmarkLexIllegal|BenchmarkLexAstral' -benchmem -cou
 
 ## Commands
 
-Router and queue are fast, so they run 1s per bench; ORM runs 100 iterations per bench:
+Router/queue run 1s per bench. ORM runs 100 iterations per bench:
 
 ```sh
 go test -run=NONE -bench=. -benchtime=1s -cpu=1,4 -benchmem ./adapters/router/fiber/
@@ -274,7 +274,7 @@ go test -run=NONE -bench=BenchmarkContainer_ResolveSubset -benchtime=200ms -coun
 go test -run=NONE -bench=. -benchtime=100x -cpu=1,4 -benchmem ./orm/
 ```
 
-Each path is its own Go module; run from the repo root with the `go.work` workspace active (or `go -C <dir> test ...` from inside the module). `-run=NONE` skips functional tests so only benchmarks execute.
+Each path is its own module. Run from the repo root with `go.work` active (or `go -C <dir> test ...`). `-run=NONE` runs benches only.
 
 ## Machine
 
@@ -286,12 +286,12 @@ Each path is its own Go module; run from the repo root with the `go.work` worksp
 ## Repro
 
 1. Check out the same commit and ensure `go.work` resolves (`go env GOWORK`).
-2. Run the commands above; each prints `goos`/`goarch`/`cpu` lines identifying the machine.
-3. Compare with `benchstat` across runs (`-count=5`) before claiming a regression or win; single-run ns/op differences under ~5% are noise.
+2. Run the commands above, each prints `goos`/`goarch`/`cpu` lines identifying the machine.
+3. Compare with `benchstat` across runs (`-count=5`) before claiming a regression or win, single-run ns/op differences under ~5% are noise.
 
 ## Bench inventory
 
-Concurrent-load (`b.RunParallel`) coverage:
+Concurrent-load (`b.RunParallel`):
 
 - Router: `BenchmarkServeHTTPParallel` (`adapters/router/fiber/fiber_bench_test.go`).
 - ORM: `BenchmarkPreloadConcurrent` (`orm/preload_bench_test.go`).
@@ -299,11 +299,11 @@ Concurrent-load (`b.RunParallel`) coverage:
 - Rate limiter: `BenchmarkAllowParallel` / `BenchmarkAllowParallelHotKey` (`adapters/ratelimit/memory/memory_bench_test.go`).
 - Mailer log: `BenchmarkSendParallel` (`adapters/mailer/log/log_bench_test.go`).
 
-Adaptor-isolation coverage:
+Adaptor-isolation:
 
 - Router: `BenchmarkServeHTTPAdaptor` (`adapters/router/fiber/fiber_bench_test.go`).
 
-Round-trip coverage (in-process backends):
+Round-trip (in-process backends):
 
 - Queue: `BenchmarkReclaimStale` (`adapters/queue/db/queue_bench_test.go`).
 - Idempotency: `BenchmarkBegin` / `BenchmarkComplete` (`adapters/idempotency/redis/redis_bench_test.go`).
@@ -311,36 +311,36 @@ Round-trip coverage (in-process backends):
 - Job worker: `BenchmarkWorkerEmptyPoll` (`core/job/worker_bench_test.go`).
 - Vectorstore: `BenchmarkQuery` (`adapters/vectorstore/db/pgvector_bench_test.go`).
 
-Render-coverage (ORM):
+Render (ORM):
 
 - `BenchmarkEscapeLike` (`orm/column_bench_test.go`).
 - `BenchmarkFlattenGroupTermsFew` / `...Rollup` / `...Many` (`orm/render/agg_bench_test.go`).
 
-Startup-coverage (CLI):
+Startup (CLI):
 
 - `BenchmarkHelpStartup` (`cmd/zever/bench_test.go`), budget `TestHelpStartupBudget` (200ms) + `TestHelpStartupAllocs` (1500 allocs) in `cmd/zever/cli_perf_test.go`.
 
-Benchmarks use `b.Context()`; helpers assert `t.Helper` where applicable.
+Benches use `b.Context()`. Helpers assert `t.Helper`.
 
 ## Cold start & binary size (2026-10-14)
 
-Release-style build (`go build ./cmd/zever`, Go 1.27.2, linux/amd64): **309 MB** on disk. Process cold start (`--help` to exit): **~420 ms first run** (page cache cold), **~60-90 ms warm**; in-process `--help` (`BenchmarkHelpStartup`) is **~99 µs/op, 69 KB/op, 625 allocs/op**: binary load and package `init` dominate, not Cobra dispatch. `GODEBUG=inittrace=1` shows ~700 init functions but negligible init clock time; the bulk of wall time before `main` is mapping the binary.
+Release build (`go build ./cmd/zever`, Go 1.27.2, linux/amd64): **309 MB**. Cold start (`--help` to exit): **~420 ms cold**, **~60-90 ms warm**. In-process `--help` is **~99 µs/op, 69 KB/op, 625 allocs/op** (binary load plus `init` dominate, not dispatch). `GODEBUG=inittrace=1` shows ~700 inits with negligible clock time. Wall time is binary mapping.
 
-`go tool nm -size` top contributors by symbol size: third-party adapter/UI dependencies (`github.com/...` group, ~60 MB: charm UI stack, sqlite driver via `modernc.org/...`), Go FIPS crypto tables (~33 MB `crypto/internal/fips140/drbg`), and codegen/grpc (`google.golang.org/...`, `go/types`). The CLI already links only the zero-infra adapter set (`cmd/zever/adapters.go`: memory/log/noop/stdhttp); the weight is transitive (embedded sqlite, TUI, telemetry), not registered adapters.
+`go tool nm -size` leaders: third-party adapter/UI deps (`github.com/...`, ~60 MB: charm UI, sqlite via `modernc.org/...`), FIPS crypto tables (~33 MB), codegen/grpc (`google.golang.org/...`, `go/types`). The CLI wires every default adapter through `cliProviders` (`cmd/zever/adapters.go`). Weight is transitive (sqlite, TUI, telemetry), not the adapter list.
 
 Repro: `go build -o /tmp/zever ./cmd/zever && ls -lh /tmp/zever`, `GODEBUG=inittrace=1 /tmp/zever --help 2>&1 | grep '^init ' | wc -l`, `go tool nm -size /tmp/zever | awk 'NF==4 {m[$4]+=$2} END {for (p in m) printf "%d %s\n", m[p], p}' | sort -rn | head`.
 
 ## Slim CLI (`zever build --adapters`, 2026-10-14)
 
-`zever build --adapters=a,b` compiles a slim CLI registering only the selected adapters (bare battery = every known adapter for it, `battery/adapter` = one pin; empty = full CLI). Unselected adapter packages leave the binary via a `go build -overlay` of the central registration list (`cmd/zever/adapters.go`), so no build-tagged source variants are committed: explicit list filtering, not tags. Unknown names fail listing the choices. The `doctor` adapters meta-check is scoped to the project's enabled batteries, so a slim binary passes its own `doctor` for its project (smoke-check with `<out> doctor`).
+`zever build --adapters=a,b` compiles a slim CLI with only selected adapters (bare battery = all its adapters, `battery/adapter` = one pin, empty = full CLI). Unselected packages leave via a `go build -overlay` of `cmd/zever/adapters.go`. No build-tagged variants. Unknown names list the choices. The `doctor` meta-check scopes to enabled batteries, so a slim binary passes its own `doctor` (smoke-check with `<out> doctor`).
 
-Measured on this machine (Go 1.27.2, linux/amd64, warm page cache, medians of 5 `--help` process spawns per session; wall time varies with load, so ranges across two sessions):
+Measured here (Go 1.27.2, linux/amd64, warm cache, medians of 5 `--help` spawns. Wall time varies, ranges across two sessions):
 
 | Binary | Size | Warm `--help` |
 | --- | --- | --- |
 | Full CLI (`go build ./cmd/zever`) | 309.7 MB | ~40-56 ms |
 | Slim floor (`--adapters=log,router`: 4 log + 2 router adapters) | 63.3 MB | ~27-38 ms |
 
-The floor build is ~80% smaller (~5x) and ~32% faster to start; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs). In-process `--help` (`BenchmarkHelpStartup`, ~99 µs/op) is unchanged. The delta is binary mapping and package init, not dispatch.
+Floor is ~80% smaller (~5x), ~32% faster to start. Savings are excluded transitive deps (pgx, go-redis, fasthttp, otel, cloud SDKs). In-process `--help` (~99 µs/op) is unchanged. The delta is mapping plus init, not dispatch.
 
 Repro: `go build -o /tmp/zever-full ./cmd/zever && /tmp/zever-full build --adapters=log,router --out /tmp/zever-slim && ls -lh /tmp/zever-full /tmp/zever-slim`, then `printf 'LOG_MIN_LEVEL=1\n' > /tmp/slimdemo/.env && /tmp/zever-slim doctor` (exit 0, all OK).

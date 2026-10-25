@@ -5,7 +5,7 @@ description: Push, pop, ack, and nack durable jobs on memory, Redis, or a databa
 
 import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`queue.Queue` is the durable transport behind `job.Dispatcher` and the scheduler. Use it when work must outlive the request, survive a restart, retry with backoff, or fan out to workers. Messages carry UUIDv7 ids.
+`queue.Queue` is the durable transport behind `job.Dispatcher` and the scheduler: work that must outlive the request, survive restart, retry, or fan out. Messages carry UUIDv7 ids.
 
 ## Quick start
 
@@ -43,17 +43,17 @@ func main() {
 }
 ```
 
-Output: `popped and acked <id>`. `Ack` on success; on failure call `Nack(ctx, msg, true)` to requeue at once with the attempt count incremented, or `Nack(ctx, msg, false)` to drop it. A message that is never acked or nacked reappears after `visibility_timeout`. `Pop` returns `ErrEmpty` on an empty topic, which you must handle. `Length` and `IsEmpty` are autoscaling signals, not pop control flow; `Name()` reports the adapter for health output.
+Output: `popped and acked <id>`. `Ack` on success, `Nack(ctx, msg, true)` requeues at once (attempts +1), `Nack(ctx, msg, false)` drops. Unacked messages reappear after `visibility_timeout`. `Pop` returns `ErrEmpty` on empty. `Length`/`IsEmpty` are autoscaling signals, `Name()` reports the adapter.
 
 ## Choose an adapter
 
 | Adapter | Package | Use when |
 |---|---|---|
-| `memory` | `adapters/queue/memory` | Default. One process: tests, local dev, a single-binary worker. No infra. |
-| `redis` | `adapters/queue/redis` | More than one worker process, or split web and worker tiers. Keyed by `prefix`. |
-| `db` | `adapters/queue/db` | Shared queue without Redis, on a postgres or sqlite table you already run. |
+| `memory` | `adapters/queue/memory` | Default, one process, no infra. |
+| `redis` | `adapters/queue/redis` | Multiple workers or split web/worker tiers, keyed by `prefix`. |
+| `db` | `adapters/queue/db` | Shared queue on postgres/sqlite you already run. |
 
-Only `redis` and `db` let another host pop. `db` is polling, not Kafka or SQS: `Pop` polls every `poll_interval` (10ms by default, adapter-code only, not an env key), claims serialize on the topic head, and stale claims recover on a sweep. Expect low thousands of jobs per second per topic; use a separate queue database, 3 to 5 connections per worker, and `dedicated_pool: true` under load. The queue is not an event log or pub/sub bus (per-topic pop with ack, no broadcast replay); for live fan-out use the [event bus](../events/).
+Only `redis` and `db` share across hosts. `db` is polling, not Kafka/SQS: `Pop` polls every `poll_interval` (10ms default, adapter code only, not an env key), claims serialize on the topic head, stale claims recover on sweep. Do not copy `OUTBOX_POLL_INTERVAL` (1s) here, that key belongs to the outbox relay only. Expect low thousands of jobs/s/topic, use a separate queue DB, 3-5 connections per worker, and `dedicated_pool: true` under load. Not an event log or pub/sub bus, for live fan-out use the [event bus](../events/).
 
 ## Share a queue across instances
 
@@ -73,52 +73,32 @@ QUEUE_TABLE=queue_messages
   </TabItem>
 </Tabs>
 
-Wire the redis backend in `internal/app/wiring.go` (`container.Provide(Queue, queueredis.New)`), then point it at Redis:
+Wire via `container.Provide(Queue, queueredis.New)`:
 
 ```sh
 QUEUE_ADDR=localhost:6379 QUEUE_VISIBILITY_TIMEOUT=30s
 ```
 
-Env keys are strict snake_case and durations take Go strings (`"30s"`). An empty `dsn` selects a private in-memory-style database. The backend itself is compiled in, never selected by env. `visibility_timeout` is how long a popped message stays invisible before reclaim; `poll_timeout` is how long `Pop` waits before returning empty; `buffer` caps buffered ready messages per topic. db-backed batteries share one pool per exact DSN only when wired to share via `NewFromDB` (first opener's `max_conns` wins; a differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
+Env keys are strict snake_case, durations take Go strings (`"30s"`). Empty `dsn` selects a private in-memory-style database, the backend is compiled in. `visibility_timeout`: how long a popped message stays invisible, `poll_timeout`: how long `Pop` waits before empty, `buffer`: caps buffered ready messages per topic. db-backed batteries share one pool per exact DSN via `NewFromDB` (first opener's `max_conns` wins, differing nonzero cap warns). All keys: [queue config reference](../../../reference/config/#queue).
 
 ## Resolve the queue from the container
 
-`c.Queue()` resolves lazily, caches, and retries on error; `c.Job()` builds a `*job.Dispatcher` over the same queue. `Close() error` takes no context, and the queue closes last, after scheduler and job; container `Close(ctx)` never opens an untouched queue. See [the container](../../../concepts/container/).
+`c.Queue()` resolves lazily, caches, and retries on error, `c.Job()` builds a `*job.Dispatcher` over it. `Close() error` takes no context, the queue closes last, after scheduler and job, and container `Close(ctx)` never opens an untouched queue. See [the container](../../../concepts/container/).
 
 ## Production checklist
 
-- Redelivery, not exactly-once: make handlers idempotent or guard with `lock` or `idempotency` keys.
-- Keep `visibility_timeout` above the slowest handler (bookings webhook: 30s against a 10s timeout).
-- Low `poll_timeout` for request-scoped pops, higher for workers.
-- No cross-topic ordering; priority is poll order (`default` before `low`).
-- Small, versioned JSON payloads. Never log PII; log ids and topics, display config via `config.RedactedServices`.
-- Close order: scheduler and job, then snapshots, then `queue` and `cache`.
+- At-least-once redelivery: idempotent handlers or `lock`/`idempotency` guards.
+- `visibility_timeout` above slowest handler, low `poll_timeout` for request pops, higher for workers.
+- No cross-topic ordering, priority is poll order. Small versioned JSON payloads, no PII, `config.RedactedServices` for config.
 
 ## Troubleshooting
 
-<details>
-<summary>The same job runs twice within seconds</summary>
-
-`visibility_timeout` is shorter than handler runtime, so the message is reclaimed mid-run. Raise it above p99 handler latency plus retry backoff, or move slow I/O behind a second dispatch.
-</details>
-
-<details>
-<summary>Pop spins hot and ErrEmpty floods the logs</summary>
-
-A tight poll loop with near-zero `poll_timeout` on an idle topic. Raise `poll_timeout` (workers commonly use 1s) and back off after consecutive empties.
-</details>
-
-<details>
-<summary>A worker on host B never sees pushes from host A</summary>
-
-The `memory` adapter in a scaled deploy; each process owns a private buffer. Use `redis` with a shared `addr`, `db`, and `prefix`, or `db` on one shared database (lower throughput).
-</details>
-
-<details>
-<summary>Strict file load rejects visibilitytimeout</summary>
-
-The flat pre-rename spelling. Rename to `visibility_timeout` and `poll_timeout` with integer nanoseconds. Env still accepts `QUEUE_VISIBILITYTIMEOUT` because `_` is ignored.
-</details>
+| Symptom | Fix |
+|---|---|
+| Same job runs twice in seconds | `visibility_timeout` < runtime, raise above p99 + backoff or defer slow I/O |
+| Hot poll, `ErrEmpty` floods logs | Raise `poll_timeout` (workers 1s), back off after consecutive empties |
+| Host B never sees host A pushes | `memory` is per-process, use `redis` (shared `addr`/`db`/`prefix`) or `db` |
+| Strict load rejects `visibilitytimeout` | Pre-rename spelling, use `visibility_timeout`/`poll_timeout` (integer ns). Env ignores `_` |
 
 ## Related
 

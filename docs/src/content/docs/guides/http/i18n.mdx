@@ -5,7 +5,7 @@ description: Translate user-facing strings with an embedded catalog locally and 
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`i18n` resolves user-facing strings per locale. Development embeds the catalog in the binary, and production can pull from a remote service through the same interface. Use it for every visible string (confirmations, emails, error explanations), and never concatenate translated fragments: translators need full sentences with placeholders.
+Localize every visible string per locale: embed the catalog for development, pull from a remote service in production. Never concatenate translated fragments, translators need full sentences with placeholders.
 
 ## Quick start
 
@@ -14,17 +14,17 @@ I18N_EMBED_DIR=locales
 I18N_EMBED_FALLBACK=en
 ```
 
-The default wiring already embeds the catalog (`i18nembed.New` in `internal/app/wiring.go`); `remote` is a wiring change, not an env key.
+The default wiring embeds the catalog (`i18nembed.New` in `internal/app/wiring.go`), `remote` is a wiring change, not an env key.
 
-Switch to `remote` for a shared catalog service:
+Switch to `remote` for shared catalogs:
 
 ```sh
 I18N_REMOTE_ENDPOINT=https://i18n.internal:8080
 ```
 
-The `remote` adapter takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, `allow_insecure`, and `allow_private` (see the [Config reference](../../../reference/config/#i18n)). Outbound requests dial only globally routable addresses and never follow redirects; a local catalog sidecar needs `allow_private: true`, which logs a line at startup. `DefaultTimeout` is 30s for remote fetches. The embed filesystem cannot come from env, so set `Embed.FS` in code as shown below; without it the embed adapter fails with `embed fs is required`.
+The `remote` adapter takes `endpoint`, `api_key`, `timeout`, `max_in_flight`, `allow_insecure`, and `allow_private` (see the [Config reference](../../../reference/config/#i18n)). Outbound requests dial only globally routable addresses and never follow redirects, a local sidecar needs `allow_private: true` (logged at startup). `DefaultTimeout` is 30s. Set `Embed.FS` in code (env cannot provide filesystems), without it the embed adapter fails with `embed fs is required`.
 
-Catalogs are JSON per locale. A message is plain text or a Go `text/template` string with `{{.name}}` placeholders:
+Catalogs are JSON per locale, messages are plain text or `text/template` strings with placeholders:
 
 ```json title="locales/en.json"
 {"welcome": "Welcome back!", "hello": "Hello, {{.name}}!"}
@@ -63,11 +63,11 @@ Bonjour, Ada!
 Welcome back!
 ```
 
-A key missing in `fr` falls back to `en`; a key missing everywhere returns `i18n.KeyNotFoundError`, never an empty string. Templates use `missingkey=error`, so a missing argument fails the lookup instead of rendering silently. `I18n()` resolves lazily and caches, and `c.Close(ctx)` shuts it down.
+Missing keys fall back through the chain, exhausted keys return `i18n.KeyNotFoundError`, never empty. Templates use `missingkey=error`, so missing arguments fail loudly. `I18n()` is lazy and cached, `c.Close(ctx)` shuts it down.
 
-## Resolve the locale in one place
+## Resolve the locale
 
-Resolve in this order: user preference, then `Accept-Language`, then the configured default. Keep it in one helper or middleware so every handler reads the same value.
+Resolve user preference, then `Accept-Language`, then the configured default, in one helper or middleware.
 
 ```go
 func localeOf(r *http.Request, user *User) string {
@@ -81,46 +81,46 @@ func localeOf(r *http.Request, user *User) string {
 }
 ```
 
-The lookup chain for `fr-CA` is `fr-CA`, then `fr`, then the fallback; `i18n.BaseLocale` and `i18n.LocaleChain` expose both steps. Pass structured args (`map[string]string`), not pre-formatted strings, because word order differs across languages.
+Lookup falls back `fr-CA` to `fr` to the default (`i18n.BaseLocale`, `i18n.LocaleChain`). Pass structured args (`map[string]string`), word order differs across languages.
 
-## Use the API
+## API
 
-The interface has `Translate(ctx, locale, key, args)` and `Locales(ctx)`; `i18n.Open(adapter, opts)` and `i18n.Register(adapter, factory)` open or extend an adapter without the container. `EmbedOptions{FS, Dir, Fallback}` configures the compiled-in catalog and `RemoteOptions{Endpoint, APIKey, Timeout, MaxInFlight, AllowInsecure}` the shared service; `Options.Validate()` rejects bad settings at startup. Treat catalogs as data: version them with the schema, diff them in review, and deploy them beside the binary (embed) or behind the remote endpoint.
+The interface has `Translate(ctx, locale, key, args)` and `Locales(ctx)`, `i18n.Open(adapter, opts)` and `i18n.Register(adapter, factory)` bypass the container. `EmbedOptions{FS, Dir, Fallback}` and `RemoteOptions{Endpoint, APIKey, Timeout, MaxInFlight, AllowInsecure}` configure each side, `Options.Validate()` rejects bad settings at startup. Treat catalogs as data: version with the schema, diff in review, deploy beside the binary or behind the remote endpoint.
 
-## Test the fallback chain
+## Test fallbacks
 
-Assert fallbacks, not specific copy, since translators change text without code review. Test with embed: no network, no timing assertions. Call `Translate` with a missing key and check you get the fallback locale's text.
+Assert fallbacks, not copy (copy changes without review), test with embed using a missing key.
 
-## Production checklist
+## Checklist
 
-- Always set `fallback` to your source locale so a missing translation degrades to readable text.
-- Pass `r.Context()` so slow remote catalogs cannot hang requests, and cache hot keys in front of `remote`.
-- Option maps can carry endpoint credentials. Display config only through `config.RedactedServices`.
+- Always set `fallback` to your source locale.
+- Pass `r.Context()` and cache hot keys in front of `remote`.
+- Options can carry credentials, display config only through `config.RedactedServices`.
 
 ## Troubleshooting
 
 <details>
-<summary>Blank strings in one locale</summary>
+<summary>Blanks in one locale</summary>
 
-No fallback is configured, or your helper returns empty on a miss. Set `fallback` and test the chain.
+No `fallback`, or the helper returns empty, set `fallback` and test.
 </details>
 
 <details>
-<summary>The wrong language is served</summary>
+<summary>Wrong language served</summary>
 
-Two resolution points disagree. Centralize `localeOf` and log the resolved locale at debug level.
+Resolution points disagree, centralize `localeOf` and log at debug level.
 </details>
 
 <details>
-<summary>The remote catalog hangs requests</summary>
+<summary>Remote catalog hangs requests</summary>
 
-The fetch ignores the request context, or no timeout is set. Pass `r.Context()` to `Translate` and keep the timeout bounded.
+Pass `r.Context()` to `Translate` and bound the timeout.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Sessions" href="../sessions/" description="Store locale preference per user." />
-  <LinkCard title="Validation" href="../validation/" description="Field-named errors worth translating." />
-  <LinkCard title="Configuration" href="../../operate/configuration/" description="Env layering for wired backends." />
+  <LinkCard title="Sessions" href="../sessions/" description="Store locale preference." />
+  <LinkCard title="Validation" href="../validation/" description="Field-named errors." />
+  <LinkCard title="Configuration" href="../../operate/configuration/" description="Env layering." />
 </CardGrid>

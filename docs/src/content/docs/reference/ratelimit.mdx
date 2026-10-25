@@ -3,7 +3,7 @@ title: Ratelimit reference
 description: Rate-limiter adapters, config keys, options, defaults, and error index for the ratelimit battery.
 ---
 
-Token-bucket rate limiting. `ratelimit` allows or denies keyed requests through `Limiter`, with `Decision` values carrying `Allowed`, `RetryAfter`, and `Remaining`. It is not HTTP middleware: callers map denials to 429 and choose fail-open behavior on error. Full how-to: [Ratelimit guide](../../guides/security/ratelimit/).
+Token-bucket limiting via `Limiter`. `Decision` carries `Allowed`, `RetryAfter`, `Remaining`. Not HTTP middleware: map denials to 429 and choose fail-open on error. Full how-to: [Ratelimit guide](../../guides/security/ratelimit/).
 
 ## Adapters
 
@@ -12,7 +12,7 @@ Token-bucket rate limiting. `ratelimit` allows or denies keyed requests through 
 | `memory` | `github.com/zenta-dev/zever/adapters/ratelimit/memory` | `memory.New` | Yes |
 | `redis` | `github.com/zenta-dev/zever/adapters/ratelimit/redis` | `redis.New` | No |
 
-Resolve through the container with `c.RateLimit()`. Use `redis` when limits must be shared across replicas; a `memory` limiter is per-instance. Swapping backends is a wiring change: swap the `container.Provide` entry and rebuild.
+Resolve via `c.RateLimit()`. Use `redis` across replicas, `memory` is per-instance. Swap backends via `container.Provide` and rebuild.
 
 ## Configuration
 
@@ -23,44 +23,41 @@ RATELIMIT_RATE=100
 RATELIMIT_BURST=200
 ```
 
-```sh
-```
-
-Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix (for example `RATELIMIT_RATE`). A non-empty `options` block replaces the default options wholesale, so repeat `rate` and `burst`; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
+Env rule: `RATELIMIT_<FIELD>=value`, uppercase, no prefix. Non-empty `options` replace defaults wholesale, so repeat `rate` and `burst`. Env vars overlay one field at a time. Layering: [Config reference](../config/).
 
 ## Options
 
-Authority for types and defaults: [Config reference](../config/#ratelimit).
+Authority: [Config reference](../config/#ratelimit).
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `rate` | number | `10` (config default) | Token refill rate per second; must be > 0 and finite |
-| `burst` | integer | `20` (config default) | Maximum bucket size; must be > 0 |
-| `idle_ttl` | duration | `10m` | Idle entry TTL; zero means the adapter default, negative fails |
-| `sweep_interval` | duration | `1m` | Idle-entry sweep interval; zero means the adapter default, negative fails |
-| `max_entries` | integer | `1000` | Bucket-table bound in the memory adapter before LRU eviction; non-positive means the default |
-| `trusted_proxies` | list of string | `[]` | CIDRs (or bare IPs) of proxies whose `X-Forwarded-For` headers are honored; empty trusts none |
+| `rate` | number | `10` (config default) | Token refill rate per second, must be > 0 and finite |
+| `burst` | integer | `20` (config default) | Maximum bucket size, must be > 0 |
+| `idle_ttl` | duration | `10m` | Idle entry TTL, zero means the adapter default, negative fails |
+| `sweep_interval` | duration | `1m` | Idle-entry sweep interval, zero means the adapter default, negative fails |
+| `max_entries` | integer | `1000` | Bucket-table bound in the memory adapter before LRU eviction, non-positive means the default |
+| `trusted_proxies` | list of string | `[]` | CIDRs (or bare IPs) of proxies whose `X-Forwarded-For` headers are honored, empty trusts none |
 | `redis.prefix` | string | `""` | Key prefix for Redis ratelimit data |
 | `redis.url` | string | `""` | Reserved and currently ignored |
 
-Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](../config/#redis-connection-options).
+Plus shared `redis.*` keys (`addr`, `password`, `db`, `tls`, pooling): [Redis connection options](../config/#redis-connection-options).
 
-Keys are validated for shape and length (`ValidateKey`: 1..256 bytes, no control characters, `CR`/`LF`/`DEL` rejected). Key errors never echo the key itself, since keys may be IPs. Costs are validated with `ValidateCost`: tokens and burst must be > 0 and finite; a cost above burst is capped, not an error.
+Keys must be 1..256 bytes with no control chars (`ValidateKey`). Key errors carry length only, since keys may be IPs. Costs must be positive and finite (`ValidateCost`). Cost above burst is capped.
 
 ## Errors
 
-Every sentinel below is a package-level `ErrXxx` in `core/ratelimit` (see `errors.go`). Branch with `errors.Is`, never by message text.
+Package-level `ErrXxx` in `core/ratelimit` (`errors.go`). Branch with `errors.Is`.
 
 | Sentinel | Cause | Fix |
 |---|---|---|
-| `ErrClosed` | Limiter used after close | Open a new limiter; do not reuse the closed one |
-| `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
-| `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
+| `ErrClosed` | Limiter used after close | Open a new limiter, do not reuse the closed one |
+| `ErrNilFactory` | kept for compatibility, the registry is gone | Unused: `New` takes no factory |
+| `ErrDuplicateAdapter` | kept for compatibility, duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once, duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | kept for compatibility; the registry is gone | Backends are chosen by import with `container.Provide` (for example `memory.New`), never parsed from a name |
-| `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
-| `ErrInvalidOptions` | `Options.Validate` failed (bad `rate`/`burst`, negative TTLs, bad Redis address or prefix, bad `trusted_proxies` entry) | Fix the named field; blank or unparsable proxy entries name the entry |
-| `ErrInvalidKey` | Rate-limit key empty, over 256 bytes, or containing control characters | Fix the key; the error carries the length only, never the key |
+| `ErrUnknownAdapter` | kept for compatibility, the registry is gone | Backends are chosen by import with `container.Provide` (for example `memory.New`), never parsed from a name |
+| `ErrInvalidAdapter` | kept for compatibility, `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
+| `ErrInvalidOptions` | `Options.Validate` failed (bad `rate`/`burst`, negative TTLs, bad Redis address or prefix, bad `trusted_proxies` entry) | Fix the named field, blank or unparsable proxy entries name the entry |
+| `ErrInvalidKey` | Rate-limit key empty, over 256 bytes, or containing control characters | Fix the key, the error carries the length only, never the key |
 | `ErrInvalidCost` | Token cost or burst not > 0 or not finite | Pass a positive finite cost |
 
 ## Related

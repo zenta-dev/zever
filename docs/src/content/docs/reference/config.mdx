@@ -3,7 +3,7 @@ title: Config reference
 description: Every Zever config service, adapter, option key, default, and environment variable, plus the layering and strictness rules.
 ---
 
-Zever config is one options block per service. This page lists all 37 services and every option each one accepts. Backends are wired in code with `container.Provide` in `internal/app/wiring.go`; the environment only tunes options, never selects backends.
+One options block per service. All 37 services and every option. Backends are wired with `container.Provide` in `internal/app/wiring.go`. The environment tunes options, never backends.
 
 ## Layering and rules
 
@@ -11,13 +11,13 @@ Zever config is one options block per service. This page lists all 37 services a
 |---|---|
 | Layers | `defaults < .env < .env.local < process env`. Later layers win. |
 | Defaults | `config.Default()` selects zero-infrastructure adapters (memory, local, sqlite, log, noop). The only dev secret is the crypto key, which is deterministic and must never ship to production. |
-| Env | `config.FromEnv()` reads `.env`, then `.env.local`, from the working directory and overlays the real process environment; `config.Resolve(env)` turns that map into the typed `Config`. `config.LoadEnv(files...)` parses explicit dotenv files only (no discovery, no process environment). Env names are uppercase and carry no prefix. The default instance is `<SERVICE>_<FIELD>` (e.g. `DB_MAX_CONNS=20`); a named instance is `<SERVICE>__<NAME>__<FIELD>` (e.g. `DB__REPORTING__DSN=postgres://...`) and only reaches the container through a matching named Ref such as `db.Ref("reporting")`. `<SERVICE>_ADAPTER` and `<SERVICE>__<NAME>__ADAPTER` are rejected: backends are wired in code, never env. Matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`. No config file is read: `zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never looked for, so a stale one in the working directory contributes no keys. |
-| Env strictness | The source of truth is `.env`, `.env.local`, and the process environment only; no config file is read, so every key that reaches `Resolve` comes from one of those three. Ambient-safe, and strict about the keys it understands. An unknown key under a wired service prefix fails `Resolve` with an `UnknownFieldError` and a did-you-mean hint **when it is close to a known field** (`DB_MAXCONN` → `did you mean "max_conns"?`); a key close to no known field is an unrelated ambient variable (`AI_AGENT`, `LOG_LEVEL`, `DB_URL`, `CACHE_DIR`) and is ignored, so a noisy process environment cannot break startup. An unknown service head (`PATH`, `FOO_BAR`) and a bare name (`DB`) are ignored too. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired prefix instead. A value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
+| Env | `config.FromEnv()` reads `.env`, then `.env.local`, from the working directory and overlays the real process environment, `config.Resolve(env)` turns that map into the typed `Config`. `config.LoadEnv(files...)` parses explicit dotenv files only (no discovery, no process environment). Env names are uppercase and carry no prefix. The default instance is `<SERVICE>_<FIELD>` (e.g. `DB_MAX_CONNS=20`), a named instance is `<SERVICE>__<NAME>__<FIELD>` (e.g. `DB__REPORTING__DSN=postgres://...`) and only reaches the container through a matching named Ref such as `db.Ref("reporting")`. `<SERVICE>_ADAPTER` and `<SERVICE>__<NAME>__ADAPTER` are rejected: backends are wired in code, never env. Matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`. No config file is read: `zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never looked for, so a stale one in the working directory contributes no keys. |
+| Env strictness | The source of truth is `.env`, `.env.local`, and the process environment only, no config file is read, so every key that reaches `Resolve` comes from one of those three. Ambient-safe, and strict about the keys it understands. An unknown key under a wired service prefix fails `Resolve` with an `UnknownFieldError` and a did-you-mean hint **when it is close to a known field** (`DB_MAXCONN` → `did you mean "max_conns"?`), a key close to no known field is an unrelated ambient variable (`AI_AGENT`, `LOG_LEVEL`, `DB_URL`, `CACHE_DIR`) and is ignored, so a noisy process environment cannot break startup. An unknown service head (`PATH`, `FOO_BAR`) and a bare name (`DB`) are ignored too. Set `ZEVER_CONFIG_STRICT=1` to reject every unknown key under a wired prefix instead. A value that fails to parse for a resolved field returns `InvalidOptionsError` (the value is never echoed). |
 | Durations | In env, a Go duration string such as `5s` or `5m`. |
 | Options replace defaults | Env variables overlay one field at a time and do not replace the block. |
 | Unset values | A zero value (`0`, `""`, `false`) means unset: the adapter applies its own default, shown in the Default column when known. |
 | Redaction | Raw option maps can hold secrets. Log only through `RedactedServices` or `Redact`. Error text names services and fields, never values. |
-| Plugins | A top-level `plugins` map holds third-party services as raw `options` maps. The options pass through untouched and the plugin validates them itself; plugins have no env overlay and no adapter key. |
+| Plugins | A top-level `plugins` map holds third-party services as raw `options` maps. The options pass through untouched and the plugin validates them itself, plugins have no env overlay and no adapter key. |
 | Exceptions | The `secrets` env adapter reads secrets with a non-empty `prefix` (default `ZEVER`, so `ZEVER_FOO` is secret `FOO`). CLI switches use `ZEVER_INTERACTIVE` and `ZEVER_NO_HINT`. |
 
 ```sh
@@ -25,8 +25,8 @@ DB_DSN=postgres://app:secret@db:5432/app
 DB_MAX_CONNS=20
 ```
 
-A named instance uses the double-underscore form and needs a matching named
-Ref (`db.Ref("reporting")`) wired through `container.Provide`:
+A named instance uses the double-underscore form plus a matching named
+Ref (`db.Ref("reporting")`) via `container.Provide`:
 
 ```sh
 DB__REPORTING__DSN=postgres://app:secret@db:5432/reporting
@@ -39,9 +39,8 @@ DB_MAX_CONNS=20 DB_MAX_CONN_LIFETIME=5m AUTH_JWT_SECRET=prod-secret-at-least-32-
 
 ## Unknown keys and ambient variables
 
-The env namespace is flat (`<SERVICE>_<FIELD>`), so it shares the process
-environment with every other program. An unknown key under a wired service
-prefix has three outcomes:
+The env namespace is flat (`<SERVICE>_<FIELD>`), shared with every other
+program. An unknown key under a wired prefix has three outcomes:
 
 | Key | Outcome |
 |---|---|
@@ -49,18 +48,15 @@ prefix has three outcomes:
 | Close to a field (a typo) | Fails with `config: unknown field "MAXCONN" for service "db" (did you mean "max_conns"?)`. |
 | Close to no field | Ignored: an unrelated ambient variable (`AI_AGENT`, `LOG_LEVEL`, `DB_URL`, `CACHE_DIR`). It lands on no field. |
 
-"Close" means edit distance ≤ 2 (≤ 3 for names longer than six characters),
-the same threshold the did-you-mean hint uses.
+"Close" is edit distance ≤ 2 (≤ 3 above six chars), matching the hint threshold.
 
-To reject every unknown key under a wired prefix instead (the v0.8
-behavior), set the strict switch:
+To reject every unknown key under a wired prefix instead (v0.8 behavior):
 
 ```sh
 ZEVER_CONFIG_STRICT=1 zever serve
 ```
 
-The switch is read from the environment map `config.Resolve` and
-`config.ApplyEnv` are given, so it needs no CLI flag. Keys whose head names
+The switch comes from the environment map passed to `config.Resolve`/`config.ApplyEnv`. No CLI flag. Heads naming
 no service (`PATH`, `FOO_BAR`) stay ignored in every mode.
 
 ## Services at a glance
@@ -105,13 +101,13 @@ no service (`PATH`, `FOO_BAR`) stay ignored in every mode.
 | [`webhook`](#webhook) | **http**, queue | `c.Webhook()` | [Webhooks](../../guides/background/webhooks/) |
 | [`workflow`](#workflow) | **memory**, db | `c.Workflow()` | [Workflows](../../guides/background/workflows/) |
 
-The bold adapter is the wired default: the constructor the scaffold puts in `internal/app/wiring.go`. The `search`, `vectorstore`, and `workflow` services take `db` as their DB-backed adapter (empty DSN selects embedded sqlite, a postgres URL selects postgres). The older `postgres`, `sqlite`, and `pgvector` names for those services are gone; use `db`.
+Bold is the wired default from the scaffold in `internal/app/wiring.go`. `search`, `vectorstore`, and `workflow` take `db` as the DB-backed adapter (empty DSN: embedded sqlite. Postgres URL: postgres). Older `postgres`/`sqlite`/`pgvector` names are gone. Use `db`.
 
 ## Shared option groups
 
 ### Redis connection options
 
-Services with a Redis adapter embed the same connection keys. Flat services (`cache`, `lock`, `queue`) take them directly. Services with a `redis` block (`eventbus`, `idempotency`, `ratelimit`, `resilience`, `session`) take them under `redis.`.
+Redis adapters share one key set. Flat services (`cache`, `lock`, `queue`) take them directly. `redis`-block services (`eventbus`, `idempotency`, `ratelimit`, `resilience`, `session`) take them under `redis.`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -126,11 +122,11 @@ Services with a Redis adapter embed the same connection keys. Flat services (`ca
 | `max_conn_idle_time` | duration | go-redis default | Idle time before a connection may close. |
 | `max_conn_lifetime` | duration | unbounded | Maximum reuse time for a connection. |
 
-`lock` and `queue` accept only `addr`, `password`, `db`, `tls`, and `require_tls` from this group. `cache` and `queue` also accept a top-level `url` that takes precedence over `addr`. Under `redis.`, `url` is reserved and ignored.
+`lock`/`queue` accept only `addr`, `password`, `db`, `tls`, `require_tls`. `cache`/`queue` also accept top-level `url` over `addr`. Under `redis.`, `url` is reserved and ignored.
 
 ### Retry policy
 
-`outbox` and `resilience` take a `retry` block. Its keys are snake_case, matched case-insensitively.
+`outbox` and `resilience` take a `retry` block: snake_case keys, matched case-insensitively.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -145,10 +141,10 @@ Services with a Redis adapter embed the same connection keys. Flat services (`ca
 
 ### Pool sharing
 
-DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, `workflow`, `scheduler`, `vectorstore`, `outbox`) share one pool per exact DSN only when wired to share: point their `NewFromDB` constructors at the same open `db.DB` via `container.Provide`. Matching is on the trimmed DSN string, so a URL with and without a query string are different pools. SQLite shares by cleaned file path, and `:memory:` never shares.
+DB-backed services (`db`, `cache`, `queue`, `search`, `session`, `idempotency`, `workflow`, `scheduler`, `vectorstore`, `outbox`) share one pool per exact DSN only when wired to share: point `NewFromDB` constructors at the same `db.DB` via `container.Provide`. Match is on the trimmed DSN string (query string matters). SQLite shares by cleaned path. `:memory:` never shares.
 
-- Every borrower holds the same pool and never closes it; the borrower that opened it owns Close. The shared pool takes the first opener's pool settings, and a differing nonzero `max_conns` logs a warning without DSN content.
-- Set `dedicated_pool: true` to open a private pool. Use it with a separate database for `queue`, `workflow`, and `scheduler` under sustained load.
+- Borrowers share the pool and never close it. The opener owns Close. Settings come from the first opener. Differing nonzero `max_conns` logs a warning without DSN content.
+- `dedicated_pool: true` opens a private pool. Use a separate database for `queue`/`workflow`/`scheduler` under load.
 - `dedicated_pool` is ignored on `db` itself, which owns the pool.
 - Env: `SEARCH_DEDICATED_POOL=true`, `QUEUE_DSN=...`, `SESSION_DSN=...`.
 - Old binaries reject `dedicated_pool` and `dsn` under strict decoding, so drop those keys before a downgrade.
@@ -160,11 +156,11 @@ SEARCH_DEDICATED_POOL=false
 
 ## Service reference
 
-Each service lists its adapters, accessor, and every option key. Options form a union across adapters: an adapter reads only the keys it needs and ignores the rest. Keys such as `jwt.secret` are nested under `options`. The backend is not an option key and has no env form: it is the `container.Provide` entry (plus import) in `internal/app/wiring.go`, and named instances share the default instance's wiring.
+Each service lists adapters, accessor, and every option key. Options union across adapters: each reads what it needs, ignores the rest. Keys like `jwt.secret` nest under `options`. The backend has no env form: it is the `container.Provide` entry (plus import) in `internal/app/wiring.go`. Named instances share the default wiring.
 
 ### `ai`
 
-LLM completions, chat, and embeddings. Every backend needs a key, so there is no zero-infra adapter.
+Completions, chat, embeddings. Every backend needs a key, so no zero-infra adapter.
 
 | | |
 |---|---|
@@ -191,7 +187,7 @@ AI_TIMEOUT=30s
 
 ### `analytics`
 
-Event tracking, identify, and group calls.
+Event tracking, identify, group calls.
 
 | | |
 |---|---|
@@ -216,7 +212,7 @@ ANALYTICS_GROUP_TYPE=organization
 
 ### `auth`
 
-Token and identity verification. Options nest under the adapter name (`jwt`, `session`, `oidc`).
+Token/identity verification. Options nest under the adapter name.
 
 | | |
 |---|---|
@@ -227,9 +223,9 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `jwt.secret` | string | `""` | HMAC signing secret; also verifies kid-less (legacy) tokens |
-| `jwt.keys` | array | `[]` | Rotatable `{kid, secret}` keys; signed tokens carry the `kid` header |
-| `jwt.active_kid` | string | `""` | Signing key ID within `keys`; empty defaults to the first entry |
+| `jwt.secret` | string | `""` | HMAC signing secret, also verifies kid-less (legacy) tokens |
+| `jwt.keys` | array | `[]` | Rotatable `{kid, secret}` keys, signed tokens carry the `kid` header |
+| `jwt.active_kid` | string | `""` | Signing key ID within `keys`, empty defaults to the first entry |
 | `jwt.issuer` | string | `""` | Token issuer |
 | `jwt.audience` | string | `""` | Intended token audience |
 | `jwt.max_ttl` | duration | `0` | Caps token lifetimes |
@@ -239,7 +235,7 @@ Token and identity verification. Options nest under the adapter name (`jwt`, `se
 | `oidc.timeout` | duration | `30s` | Operation timeout |
 | `oidc.allow_insecure` | boolean | `false` | Permits an http:// issuer (and a private-address issuer) for testing |
 
-The `session` adapter has no env-settable options: its `session.Store` is injected from Go.
+The `session` adapter has no env options: `session.Store` is injected from Go.
 
 ```sh
 AUTH_JWT_SECRET=change-me-to-at-least-32-bytes
@@ -249,7 +245,7 @@ AUTH_JWT_MAX_TTL=1h
 
 ### `billing`
 
-Customers, subscriptions, and invoices through a billing provider.
+Customers, subscriptions, invoices.
 
 | | |
 |---|---|
@@ -271,7 +267,7 @@ BILLING_SECRET_KEY=sk_live_...
 
 ### `cache`
 
-Key/value cache with TTL. `db` selects postgres or sqlite by DSN.
+Key/value cache with TTL. `db` picks postgres or sqlite by DSN.
 
 | | |
 |---|---|
@@ -290,9 +286,9 @@ Key/value cache with TTL. `db` selects postgres or sqlite by DSN.
 | `max_entries` | integer | `1000` | Bounds the number of stored entries before eviction (memory adapter) |
 | `url` | string | `""` | Redis connection URL |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`, `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, `max_conn_lifetime`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `addr`, `password`, `db`, `tls`, `require_tls`, `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, `max_conn_lifetime`.
 
-The `db` adapter's table, key prefix, and TTL are set from Go, not from config. The backend is not one of the options and has no env form: `zever config show --json` renders options only (`{"options": {...}}`).
+The `db` adapter's table, prefix, and TTL come from Go, not config. `zever config show --json` renders options only (`{"options": {...}}`).
 
 ```sh
 CACHE_ADDR=localhost:6379
@@ -301,7 +297,7 @@ CACHE_REQUIRE_TLS=true
 
 ### `cdn`
 
-Invalidates cached content at the edge. `noop` discards purges (default); `cloudflare` calls the Cloudflare cache-purge API.
+Edge cache invalidation. `noop` discards purges, `cloudflare` calls the purge API.
 
 | | |
 |---|---|
@@ -323,7 +319,7 @@ CDN_ZONE_ID=CLOUDFLARE_ZONE_ID
 
 ### `crypto`
 
-Symmetric encryption and signing. The default config ships a deterministic dev key that must never reach production.
+Symmetric encryption/signing. The default dev key must never reach production.
 
 | | |
 |---|---|
@@ -341,9 +337,9 @@ Symmetric encryption and signing. The default config ships a deterministic dev k
 | `region` | string | `""` | KMS region (for example an AWS region) |
 | `endpoint` | string | `""` | Overrides the KMS endpoint (custom KMS, tests, VPC endpoints) |
 | `use_envelope` | boolean | `false` | Selects KMS envelope encryption |
-| `allow_dev_key` | boolean | `false` | Permits the deterministic public dev key for local development; when false, the local adapter rejects that key unless `ZEVER_ENV` is `dev`, `test`, or `development` |
+| `allow_dev_key` | boolean | `false` | Permits the deterministic public dev key for local development, when false, the local adapter rejects that key unless `ZEVER_ENV` is `dev`, `test`, or `development` |
 
-The `kms` adapter fails closed from config: it needs a real KMS client injected from Go, because its dev stub is not an option. Use `local` for file-only setups.
+The `kms` adapter fails closed from config: inject a real KMS client from Go. Use `local` for file-only setups.
 
 ```sh
 CRYPTO_KEY=<base64-32-bytes>
@@ -352,7 +348,7 @@ CRYPTO_SIGN_KEY=<base64-64-bytes>
 
 ### `db`
 
-SQL connection pool. Other db-backed services borrow this pool when their DSN matches.
+SQL pool. Other db-backed services borrow it on DSN match.
 
 | | |
 |---|---|
@@ -379,7 +375,7 @@ DB__PRIMARY__MAX_CONN_LIFETIME=5m
 
 ### `document`
 
-Render documents to PDF or images locally, through a remote service, or with LaTeX.
+Render PDFs/images locally, remote, or with LaTeX.
 
 | | |
 |---|---|
@@ -412,7 +408,7 @@ DOCUMENT_TIMEOUT=1m
 
 ### `eventbus`
 
-In-process or Redis publish/subscribe.
+In-process or Redis pub/sub.
 
 | | |
 |---|---|
@@ -430,7 +426,7 @@ In-process or Redis publish/subscribe.
 | `redis.url` | string | `""` | Reserved and currently ignored |
 | `redis.prefix` | string | `""` | Key prefix for Redis eventbus data |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
 EVENTBUS_REDIS_ADDR=localhost:6379
@@ -439,7 +435,7 @@ EVENTBUS_REDIS_PREFIX=events
 
 ### `flag`
 
-Feature flags from a static file or Firebase. Options nest under the adapter name.
+Static-file or Firebase flags. Options nest under the adapter name.
 
 | | |
 |---|---|
@@ -517,7 +513,7 @@ I18N_EMBED_FALLBACK=en
 
 ### `idempotency`
 
-Reserve-then-commit store that makes retried requests safe.
+Reserve-then-commit store for safe retries.
 
 | | |
 |---|---|
@@ -535,7 +531,7 @@ Reserve-then-commit store that makes retried requests safe.
 | `redis.prefix` | string | `""` | Key prefix for Redis idempotency data |
 | `max_entries` | integer | `1000` | Bounds the number of stored records in the memory adapter before least-recently-used eviction |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
 IDEMPOTENCY_TTL=24h
@@ -544,7 +540,7 @@ IDEMPOTENCY_REDIS_ADDR=localhost:6379
 
 ### `lock`
 
-Distributed leases with a TTL.
+Distributed leases with TTL.
 
 | | |
 |---|---|
@@ -561,7 +557,7 @@ Distributed leases with a TTL.
 | `retry_interval` | duration | `50ms` | How long Acquire waits between attempts |
 | `max_entries` | integer | `1000` | Bounds the number of stored leases before LRU eviction (memory adapter) |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `addr`, `password`, `db`, `tls`, `require_tls`.
 
 ```sh
 LOCK_ADDR=localhost:6379
@@ -570,7 +566,7 @@ LOCK_TTL=30s
 
 ### `log`
 
-Structured logging. Only the minimum level is configurable here.
+Structured logging. Only the minimum level is configurable.
 
 | | |
 |---|---|
@@ -589,7 +585,7 @@ LOG_MIN_LEVEL=1
 
 ### `mailer`
 
-Outbound email. `host` and `port` are required by validation, so the default `log` adapter keeps a dummy `localhost:25`.
+Outbound email. `host`/`port` are required, so default `log` keeps dummy `localhost:25`.
 
 | | |
 |---|---|
@@ -618,7 +614,7 @@ MAILER_ENCRYPTION=starttls
 
 ### `media`
 
-Image and video storage and derivation, locally or on S3.
+Image/video storage and derivation, local or S3.
 
 | | |
 |---|---|
@@ -653,7 +649,7 @@ MEDIA_SECRET_ACCESS_KEY=...
 
 ### `notification`
 
-SMS and push notifications. Twilio and FCM options nest under their names.
+SMS/push. Twilio and FCM options nest under their names.
 
 | | |
 |---|---|
@@ -679,7 +675,7 @@ NOTIFICATION_TWILIO_FROM_NUMBER=+15551234567
 
 ### `observability`
 
-Traces and metrics, to stdout or an OTLP collector.
+Traces/metrics to stdout or OTLP.
 
 | | |
 |---|---|
@@ -692,7 +688,7 @@ Traces and metrics, to stdout or an OTLP collector.
 |---|---|---|---|
 | `endpoint` | string | `""` | Collector address as host:port |
 | `service_name` | string | `zever (config default)` | Identifies the service emitting telemetry |
-| `insecure` | boolean | `false` | Disables TLS; only allowed for loopback endpoints |
+| `insecure` | boolean | `false` | Disables TLS, only allowed for loopback endpoints |
 | `set_globals` | boolean | `false` | Registers the provider as the global default |
 | `verbose` | boolean | `false` | Enables debug logging |
 | `ca_file` | string | `""` | Path to a PEM-encoded CA bundle |
@@ -700,7 +696,7 @@ Traces and metrics, to stdout or an OTLP collector.
 | `key_file` | string | `""` | Path to a PEM-encoded client key |
 | `headers` | map | none | Outbound request headers |
 | `sample_ratio` | number | `0` | Trace sampling probability in [0,1] |
-| `attr_value_limit` | integer | `0` | Caps string attribute values; 0 selects the default |
+| `attr_value_limit` | integer | `0` | Caps string attribute values, 0 selects the default |
 
 ```sh
 OBSERVABILITY_ENDPOINT=collector:4317
@@ -710,7 +706,7 @@ OBSERVABILITY_SAMPLE_RATIO=0.1
 
 ### `outbox`
 
-Transactional outbox and inbox with a polling relay, or postgres logical-replication capture (`cdc`).
+Transactional outbox/inbox with polling relay, or postgres logical replication (`cdc`).
 
 | | |
 |---|---|
@@ -745,7 +741,7 @@ OUTBOX_PUBLISHER=eventbus
 
 ### `password`
 
-Argon2id password hashing. All five parameters are range-validated.
+Argon2id hashing. All five parameters are range-validated.
 
 | | |
 |---|---|
@@ -772,7 +768,7 @@ PASSWORD_KEY_LENGTH=32
 
 ### `payment`
 
-Payment intents and webhooks. The `stub` adapter performs no webhook verification and holds no funds.
+Payment intents/webhooks. `stub` verifies nothing and holds no funds.
 
 | | |
 |---|---|
@@ -791,7 +787,7 @@ Payment intents and webhooks. The `stub` adapter performs no webhook verificatio
 | `auto_approve` | boolean | `false` | Marks new payments as succeeded instead of pending |
 | `max_webhook_bytes` | integer | `1 MiB` | Bounds the webhook payload size |
 
-The refund idempotency store (`Idempotency`) is injected from Go and is not an option.
+Refund idempotency store (`Idempotency`) is injected from Go, not an option.
 
 ```sh
 PAYMENT_SECRET_KEY=sk_live_...
@@ -800,7 +796,7 @@ PAYMENT_WEBHOOK_SECRET=whsec_...
 
 ### `permission`
 
-Authorization checks from inline rules, RBAC roles, or Casbin files.
+Inline, RBAC, or Casbin authorization checks.
 
 | | |
 |---|---|
@@ -816,7 +812,7 @@ Authorization checks from inline rules, RBAC roles, or Casbin files.
 | `roles` | map of lists | none | Subject-ID to allowed-roles allowlist gating privilege escalation: a subject may only be granted a role (asserted via Subject.Roles at check time) that appears in its list here |
 | `rules` | list of objects | `[]` | Authorization rules. See below. |
 
-**`rules` entries** use the exported Go field names verbatim (capitalized), unlike every other key.
+**`rules` entries** use exported Go field names verbatim (capitalized), unlike other keys.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -834,7 +830,7 @@ PERMISSION_ROLES_EFFECT=allow
 
 ### `queue`
 
-Message queue with visibility timeouts.
+Queue with visibility timeouts.
 
 | | |
 |---|---|
@@ -854,7 +850,7 @@ Message queue with visibility timeouts.
 | `table` | string | `""` | Queue-messages table name |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `addr`, `password`, `db`, `tls`, `require_tls`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `addr`, `password`, `db`, `tls`, `require_tls`.
 
 ```sh
 QUEUE_ADDR=localhost:6379
@@ -863,7 +859,7 @@ QUEUE_VISIBILITY_TIMEOUT=30s
 
 ### `ratelimit`
 
-Token-bucket rate limiting. `rate` and `burst` are required.
+Token-bucket limiting. `rate` and `burst` required.
 
 | | |
 |---|---|
@@ -882,7 +878,7 @@ Token-bucket rate limiting. `rate` and `burst` are required.
 | `redis.url` | string | `""` | Reserved and currently ignored |
 | `redis.prefix` | string | `""` | Key prefix for Redis ratelimit data |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
 RATELIMIT_RATE=100
@@ -891,7 +887,7 @@ RATELIMIT_BURST=200
 
 ### `resilience`
 
-Retry, timeout, circuit breaker, and bulkhead policies.
+Retry, timeout, breaker, bulkhead policies.
 
 | | |
 |---|---|
@@ -907,19 +903,19 @@ Retry, timeout, circuit breaker, and bulkhead policies.
 | `breaker.enabled` | boolean | `false` | Turns the circuit breaker on |
 | `breaker.max_requests` | integer | `1` | Number of probes allowed while half-open |
 | `breaker.interval` | duration | `30s` | Closed-state window before counts reset |
-| `breaker.bucket_period` | duration | `10s` | Rolling-window bucket width; Interval becomes a multiple of it |
+| `breaker.bucket_period` | duration | `10s` | Rolling-window bucket width, Interval becomes a multiple of it |
 | `breaker.timeout` | duration | `30s` | Open-state duration before the breaker half-opens |
 | `breaker.min_requests` | integer | `10` | Minimum request count before the failure ratio applies |
 | `breaker.failure_ratio` | number | `0.5` | Failure ratio in [0,1] that trips the breaker |
 | `breaker.consecutive_failures` | integer | `5` | Trips the breaker after this many consecutive failures |
 | `bulkhead.max_concurrent` | integer | `100` | Number of concurrent executions admitted |
-| `bulkhead.max_queue` | integer | `100` | Bounds the number of waiters; 0 or less is unbounded |
-| `bulkhead.max_wait` | duration | `1s` | Bounds how long a caller waits for a slot; 0 or less waits indefinitely |
+| `bulkhead.max_queue` | integer | `100` | Bounds the number of waiters, 0 or less is unbounded |
+| `bulkhead.max_wait` | duration | `1s` | Bounds how long a caller waits for a slot, 0 or less waits indefinitely |
 | `redis.url` | string | `""` | Reserved and currently ignored |
 | `redis.prefix` | string | `resilience` | Key namespace for Redis resilience data |
 | `retry` | object |  | Backoff policy. Keys are listed in [Retry policy](#retry-policy). |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
 RESILIENCE_TIMEOUT=5s
@@ -929,7 +925,7 @@ RESILIENCE_BREAKER_CONSECUTIVE_FAILURES=5
 
 ### `router`
 
-HTTP router adapter.
+HTTP router.
 
 | | |
 |---|---|
@@ -948,7 +944,7 @@ ROUTER_APP_NAME=my-app
 
 ### `scheduler`
 
-Cron-style scheduler. It resolves the job dispatcher, so it shares the process-wide queue.
+Cron scheduler. Resolves the dispatcher, sharing the process-wide queue.
 
 | | |
 |---|---|
@@ -963,7 +959,7 @@ Cron-style scheduler. It resolves the job dispatcher, so it shares the process-w
 | `dsn` | string | `""` | Postgres connection string or sqlite path for the postgres adapter |
 | `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing |
 
-`scheduler.Options.Dispatcher` is required and is injected in code: it carries the `json:"-"` tag, so no env key sets it, and `scheduler.Options.Validate` fails with `dispatcher_is_required` when it is missing. Set the remaining keys with env instead: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
+`scheduler.Options.Dispatcher` is required from code with no env key (`json:"-"`), and a missing one fails `dispatcher_is_required`. Rest via env: `SCHEDULER_CLOSETIMEOUT=3s`, `SCHEDULER_DSN=...`.
 
 ```sh
 ```
@@ -994,7 +990,7 @@ SEARCH_API_KEY=...
 
 ### `secrets`
 
-Secret lookup from the environment or Vault. `prefix` is required.
+Environment or Vault secret lookup. `prefix` required.
 
 | | |
 |---|---|
@@ -1024,7 +1020,7 @@ SECRETS_MOUNT=secret
 
 ### `session`
 
-Server-side session store.
+Server-side sessions.
 
 | | |
 |---|---|
@@ -1041,7 +1037,7 @@ Server-side session store.
 | `redis.url` | string | `""` | Reserved and currently ignored |
 | `redis.prefix` | string | `""` | Key prefix for Redis session data |
 
-Redis connection keys, documented in [Redis connection options](#redis-connection-options): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
+Shared `redis.*` keys ([Redis connection options](#redis-connection-options)): `redis.addr`, `redis.password`, `redis.db`, `redis.tls`, `redis.require_tls`, `redis.pool_size`, `redis.min_idle_conns`, `redis.pool_timeout`, `redis.max_conn_idle_time`, `redis.max_conn_lifetime`.
 
 ```sh
 SESSION_TTL=15m
@@ -1050,7 +1046,7 @@ SESSION_REDIS_ADDR=localhost:6379
 
 ### `storage`
 
-Object storage with presigned URLs and an optional access policy.
+Object storage with presigned URLs and optional policy.
 
 | | |
 |---|---|
@@ -1074,7 +1070,7 @@ Object storage with presigned URLs and an optional access policy.
 | `account_id` | string | `""` | Cloudflare account ID |
 | `policy` | object |  | Typed access policy. See below. |
 
-**`policy`** is a flat map: the `Default` key is the fallback policy for unlisted buckets, and every other key is a bucket name. A nil policy means legacy private mode.
+**`policy`** is a flat map: `Default` is the fallback. Other keys are buckets. Nil means legacy private mode.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -1093,7 +1089,7 @@ STORAGE_SECRET_ACCESS_KEY=...
 
 ### `tenant`
 
-Tenant resolution from a fixed ID, a header, or a subdomain.
+Tenant resolution by fixed ID, header, or subdomain.
 
 | | |
 |---|---|
@@ -1114,7 +1110,7 @@ TENANT_HEADER=X-Tenant-ID
 
 ### `vectorstore`
 
-Embedding storage and similarity search. `db` is the only DB-backed name.
+Embedding storage/similarity search. `db` is the only DB-backed name.
 
 | | |
 |---|---|
@@ -1140,7 +1136,7 @@ VECTORSTORE_DIMENSION=1536
 
 ### `webhook`
 
-Signed webhook delivery with retries, directly over HTTP or through the queue.
+Signed webhook delivery with retries, over HTTP or queue.
 
 | | |
 |---|---|
@@ -1159,9 +1155,9 @@ Signed webhook delivery with retries, directly over HTTP or through the queue.
 | `replay_tolerance` | duration | `5m` | Bounds how far a signature's embedded timestamp may drift from the verifier's clock before verification rejects it as expired or replayed, on top of the HMAC check itself |
 | `queue_opts` | object |  | Queue settings for the `queue` adapter. See below. |
 
-**`queue_opts`** carries the queue settings for the `queue` adapter. It accepts every [queue](#queue) option (`visibility_timeout`, `poll_timeout`, `buffer`, `addr`, `url`, `prefix`, `dsn`, `table`, `dedicated_pool`, and the Redis connection keys) under the `queue_opts.` prefix.
+**`queue_opts`** carries `queue`-adapter settings: every [queue](#queue) option under `queue_opts.`.
 
-`Logger` is injected from Go and is not an option.
+`Logger` is injected from Go, not an option.
 
 ```sh
 WEBHOOK_TIMEOUT=10s
@@ -1170,7 +1166,7 @@ WEBHOOK_MAX_RETRIES=5
 
 ### `workflow`
 
-Durable workflow runs. An empty DSN selects sqlite, a postgres URL selects postgres.
+Durable runs. Empty DSN selects sqlite, postgres URL selects postgres.
 
 | | |
 |---|---|

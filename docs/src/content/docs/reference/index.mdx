@@ -10,53 +10,53 @@ import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
 <HeroBanner
   eyebrow="Reference"
   title="Look it up. <em>Then get back to building.</em>"
-  lede="Exact commands, config keys, adapters, and package entry points. These pages are for lookup. If you are learning Zever for the first time, start with the guides."
+  lede="Exact commands, config keys, adapters, entry points. New to Zever? Start with guides."
 />
 
 ## Pick a reference
 
 <CardGrid>
   <FeatureCard title="CLI" href="./cli/">
-    Every command group: scaffolding, inspection, runtime, and database, with flags and exit codes.
+    Command groups, flags, and exit codes.
   </FeatureCard>
   <FeatureCard title="Config reference" href="./config/">
-    Every service key, option, default, and environment variable in the layered config.
+    Service keys, options, defaults, and env vars.
   </FeatureCard>
   <FeatureCard title="Flag" href="./flag/">
-    Flag adapters, config keys, options, and the error index, pinned to code by drift tests.
+    Flag adapters, config keys, and errors.
   </FeatureCard>
   <FeatureCard title="Ratelimit" href="./ratelimit/">
-    Ratelimit adapters, config keys, options, and the error index, pinned to code by drift tests.
+    Ratelimit adapters, config keys, and errors.
   </FeatureCard>
   <FeatureCard title="Session" href="./session/">
-    Session adapters, config keys, options, and the error index, pinned to code by drift tests.
+    Session adapters, config keys, and errors.
   </FeatureCard>
   <FeatureCard title="Adapters matrix" href="./adapters-matrix/">
-    Every service, adapter, package, and container accessor in one table.
+    Service, adapter, package, and accessor table.
   </FeatureCard>
   <FeatureCard title="API index" href="./api-index/">
-    Package entry points with the container accessor for each service.
+    Package entry points and container accessors.
   </FeatureCard>
   <FeatureCard title="Errors" href="./errors/">
-    The repo error conventions: message format, sentinels, wrapping, and branching.
+    Message format, sentinels, wrapping, branching.
   </FeatureCard>
   <FeatureCard title="Benchmarks" href="./benchmarks/">
-    Point-in-time hot-path numbers for router, ORM, queue, and more, with repro commands.
+    Hot-path numbers with repro commands.
   </FeatureCard>
   <FeatureCard title="Minimal profile" href="./minimal-profile/">
-    What the db/orm/router/config/log floor costs versus the full CLI, with repro commands.
+    Floor cost versus full CLI with repro.
   </FeatureCard>
   <FeatureCard title="Compatibility matrix" href="./compatibility-matrix/">
-    Which Core modules the API gates protect, and what may break per release type.
+    Gated modules per release type.
   </FeatureCard>
   <FeatureCard title="Agent skill" href="../guides/extend/agent-skill/">
-    Install and use the Zever skill so Claude Code knows the commands and safe workflows.
+    Zever skill commands and workflows.
   </FeatureCard>
 </CardGrid>
 
-## Looking for something else?
+## More
 
 <CardGrid>
-  <LinkCard title="New to Zever?" description="Install the toolchain and run your first build." href="../start/installation/" />
-  <LinkCard title="Schema language" description="Entities, services, RPCs, and attributes in .zen." href="./zen-syntax/" />
+  <LinkCard title="New to Zever?" description="Install and run your first build." href="../start/installation/" />
+  <LinkCard title="Schema language" description="Entities, services, RPCs, attributes." href="./zen-syntax/" />
 </CardGrid>

@@ -5,11 +5,11 @@ description: Geocode addresses, reverse geocode coordinates, and compute distanc
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-One `Geo` interface covers `Geocode`, `ReverseGeocode`, and `Distance` (meters), so callers stay fixed while the backend changes.
+`Geo` covers `Geocode`, `ReverseGeocode`, `Distance` (meters) with fixed callers.
 
 ## Quick start
 
-`static` (the default) serves a file-backed list from memory, offline and deterministic; `path` points at a JSON fixture.
+`static` (default): file-backed in-memory list, `path` points at a JSON fixture.
 
 ```sh
 GEO_PATH=data/cities.json
@@ -46,13 +46,11 @@ func main() {
 877676.52...
 ```
 
-The `1` assumes the fixture lists Berlin; `Distance` is haversine over a 6371 km sphere, in meters.
+`1` assumes Berlin, `Distance` is haversine (6371 km sphere, meters) and `ValidCoord` checks WGS84 range and finiteness. Bookings wires `static` at `testdata/cities.json`.
 
-The bookings example wires the `static` backend; its tests point `cfg.Geo.Options.Path` at `testdata/cities.json`. `ValidCoord` checks WGS84 range and finiteness before coordinates reach a provider.
+## OSM and Google
 
-## Use OSM or Google in production
-
-`osm` is free OpenStreetMap geocoding when Google-grade accuracy is not needed; it requires a `user_agent` per Nominatim policy. `google` is for accuracy with an API key budget.
+`osm` is free (OpenStreetMap), `google` is paid accuracy.
 
 ```sh
 GEO_ENDPOINT=https://nominatim.openstreetmap.org
@@ -64,7 +62,7 @@ GEO_API_KEY=your-key
 GEO_BASE_URL=https://maps.googleapis.com
 ```
 
-`Validate` rejects a negative `timeout` or `max_response_body`, and any `base_url` or `endpoint` that is not `https` unless `allow_insecure`. Outbound requests dial only globally routable addresses and never follow redirects; a local tile/mock endpoint needs `allow_private: true`, which logs a line at startup. Env vars mirror the keys. See the [geo config reference](../../../reference/config/#geo).
+`Validate` rejects negative `timeout`/`max_response_body` and non-`https` `base_url`/`endpoint` unless `allow_insecure`. Outbound dials: only globally routable addresses, no redirects. Local endpoints need `allow_private: true` (logged). See [geo config reference](../../../reference/config/#geo).
 
 | Adapter | Package | Notes |
 |---|---|---|
@@ -74,28 +72,28 @@ GEO_BASE_URL=https://maps.googleapis.com
 
 ## Production checklist
 
-- `Geo.Close() error` takes no context; the container closes resolved services in dependency order and joins errors with `errors.Join`.
-- `static` is per-process, so every replica needs the same fixture; `osm` and `google` are remote and slow, so cache or job them.
-- `api_key` is secret; never log raw option maps (use `cfg.RedactedServices()`).
+- `Close() error` takes no context, container closes in dependency order, joining errors.
+- `static` is per-process, cache/job remote `osm`/`google`.
+- `api_key` is secret, never log raw options, use `cfg.RedactedServices()`.
 
 ## Troubleshooting
 
 <details>
 <summary>`zever doctor` reports FAIL on geo</summary>
 
-Cause: zero-infra defaults read `cities.json` from the working directory, so a missing fixture fails. Fix: seed the fixture or point `path` at committed test data. It is a fixture gap, not a framework bug.
+Zero-infra defaults read `cities.json` from the working dir, seed the fixture or point `path` at committed test data.
 </details>
 
 <details>
-<summary>`base_url must use https` error</summary>
+<summary>`base_url must use https`</summary>
 
-Cause: external adapters require `https`. Fix: set a valid `https` URL; `allow_insecure` is only for `httptest` tests.
+External adapters require a valid `https` URL (`allow_insecure` is test-only).
 </details>
 
 <details>
 <summary>OSM rejects requests</summary>
 
-Cause: the `user_agent` is missing or generic. Fix: set a real app-identifying `User-Agent` per Nominatim policy, and cache results to stay inside usage limits.
+`user_agent` missing or generic, set an app-identifying `User-Agent` per Nominatim policy and cache results.
 </details>
 
 ## Related

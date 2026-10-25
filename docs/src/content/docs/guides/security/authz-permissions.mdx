@@ -3,17 +3,11 @@ title: Authorization
 description: Guard routes and RPCs with allow or deny checks using noop, RBAC, or Casbin.
 ---
 
-`permission` answers what a caller may do through `Can(subject, action, resource)`, returning `allow`, `implicit_deny`, or `explicit_deny`. Adapters: `noop` (`permission/noop`, default, denies all), `rbac` (`permission/rbac`), `casbin` (`permission/casbin`); identity comes from [Authentication](../auth/).
+`permission` answers what a caller may do via `Can(subject, action, resource)`: `allow`, `implicit_deny`, `explicit_deny`, with `noop` (`permission/noop`, default, denies all), `rbac` (`permission/rbac`), `casbin` (`permission/casbin`). Identity comes from [Authentication](../auth/).
 
 ## Quick start
 
-The default `noop` denies every check with `implicit_deny`: a placeholder until real policies exist, never for a protected deployment.
-
-```sh
-```
-
-```sh
-```
+Default `noop` denies every check (`implicit_deny`), placeholder only.
 
 ```go title="main.go"
 p, err := c.Permission()
@@ -22,11 +16,11 @@ if err != nil {
 }
 ```
 
-`rbac` does in-memory role checks from `rules` (`role`, `action`, `effect`, `owned_only`) and `roles`; `casbin` reads `model_path` and `policy_path` (set together, and `rules` must then be empty) ([reference](../../../reference/config/#permission)).
+`rbac` checks in-memory `rules` (`role`, `action`, `effect`, `owned_only`) and `roles`. `casbin` reads `model_path` plus `policy_path` together, `rules` must then be empty. See [reference](../../../reference/config/#permission).
 
-## Guard an HTTP route or gRPC call
+## Guard HTTP and gRPC
 
-`authz` has no container accessor; it composes `Auth()` and `Permission()`. HTTP takes a `Policy` and a resource-ID extractor, gRPC a method-policy map.
+`authz` has no container accessor, it composes `Auth()` and `Permission()`: HTTP takes a `Policy` plus resource-ID extractor, gRPC a method-policy map.
 
 ```go title="guard.go"
 authn, err := c.Auth()
@@ -49,7 +43,7 @@ policies := map[string]authz.Policy{
 guardedUnary := authz.UnaryServerInterceptor(authn, checker, policies)
 ```
 
-Valid-token, matching-grant requests reach the handler; others are denied. A `Can` error means the system failed, so treat it as a denial. gRPC reads the resource id from `ResourceIDer`; `GetId` (not `GetID`) matches the `protoc-gen-go` getter, so generated request types satisfy it:
+Matching grants reach the handler, others denied. Treat a `Can` error as denial. gRPC reads resource id from `ResourceIDer`, `GetId` (not `GetID`) matches the `protoc-gen-go` getter:
 
 ```go
 type ResourceIDer interface {
@@ -57,39 +51,39 @@ type ResourceIDer interface {
 }
 ```
 
-Decisions are `allow`, `implicit_deny` (no rule matched), or `explicit_deny` (a rule refused); the last two, plus unknown roles and missing policies, fail closed. `model_path` and `policy_path` reject `..` and must exist at `Open`.
+Decisions: `allow`, `implicit_deny` (no rule matched), `explicit_deny` (rule refused). Denials, unknown roles, and missing policies fail closed. `model_path` and `policy_path` reject `..` and must exist at `Open`.
 
 ## Production checklist
 
-- Replace `noop` before any protected deployment and audit the adapter value.
-- Deny on unknown answers and checker errors too.
-- Never add a method to the public `Checker` interface; add a smaller one.
-- Keep policy files in version control and sync them across instances.
+- Replace `noop` before any protected deployment, audit the value.
+- Deny unknown answers and checker errors.
+- Never add a method to public `Checker`, add a smaller interface.
+- Version policy files and sync across instances.
 
 ## Troubleshooting
 
 <details>
 <summary>Every request is denied</summary>
 
-The default backend is `noop`. Wire `rbac` (or `casbin`) with a `container.Provide` entry in `internal/app/wiring.go` and rebuild.
+Default backend is `noop`. Wire `rbac`/`casbin` in `internal/app/wiring.go` and rebuild.
 </details>
 
 <details>
 <summary>`Open` fails on policy paths</summary>
 
-The path uses `..` or does not exist; use a repo-relative path that exists at startup.
+Path uses `..` or is missing. Use a repo-relative path.
 </details>
 
 <details>
 <summary>Denials for valid roles</summary>
 
-The role or resource differs from the policy (case, prefix, plural); compare exact `Can` arguments with the policy file.
+Role or resource differs from policy (case, prefix, plural). Compare exact `Can` arguments.
 </details>
 
 <details>
 <summary>`Can` errors under load</summary>
 
-The backing store is unreachable; treat it as a denial and check connectivity.
+Store unreachable. Treat as denial, check connectivity.
 </details>
 
 ## Related
