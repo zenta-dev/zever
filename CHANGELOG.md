@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v0.8.0] - 2026-10-18
+## [v0.8.0] - 2026-10-25
+- docs: concise rewrite of all 93 Astro docs pages, 61,733 to 47,830 prose words, with audit-found facts restored and lint, audit, check-links, check-legacy-config, and build green.
+
 - **Breaking:** `config`, `container`, `core/*`, `cmd/zever`: removed `*_ADAPTER` from `.env` and config. `config.Service[T]` carries only `Options`; any `SERVICE_ADAPTER` or `SERVICE__NAME__ADAPTER` key (including legacy `DB_ADAPTER`, `CACHE_ADAPTER`, `QUEUE_ADAPTER`) fails `Resolve`/`ApplyEnv` with an "adapter selection removed" error naming the code-wiring fix. There is no adapter registry anymore: each `core/<battery>` package keeps its interface, `Options`, and `DefaultRef`, while `Register`/`Open`/`ParseAdapter`/`RegisteredAdapters` and the `Adapter` string types are gone. Affected batteries include `auth`, `cache`, `crypto`, `db`, `password`, `queue`, `router`, `secrets`, `session` (and every other `core/*` registry the same way).
 - **Breaking:** `container`: accessors resolve only through explicit providers. `container.New(cfg, container.Provide(ref, factory)...)` is the wiring; an unwired service fails with `NotWiredError` ("pass container.Provide(...)") instead of falling back to a registered adapter. `ValidateAdapters`, `RegisteredAdapters`, and the implicit shared-pool opener are gone; db-backed batteries share a pool only when the app wires `NewFromDB` over one `db.DB`.
 - feat(cli): `zever new` and `zever add` never write `*_ADAPTER` keys. The battery picker chooses which adapter import and `container.Provide` entry to scaffold into `internal/app/wiring.go`; changing an adapter means editing that file and rebuilding. `zever doctor` checks every battery with the CLI's compiled-in defaults, `zever explain` reports the code-wired driver per service, and `zever generate adapter` scaffolds a stub plus options with a `container.Provide` wiring snippet instead of a `register.go`.
