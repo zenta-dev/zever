@@ -1,1 +1,0 @@
-- fix(tools): `apidiff` now treats the top changelog section as the pending release while its version has no git tag yet, so a cut-but-untagged release (like the current `## [v0.8.0]`) satisfies the breaking-change gate without a spurious `## [Unreleased]` section; the API-diff baseline still moves only on existing tags.

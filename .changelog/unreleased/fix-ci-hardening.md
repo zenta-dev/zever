@@ -1,3 +1,0 @@
-- ci(common): add `.github/actions/setup-go-download` composite action (setup-go plus the standard 3-attempt `make -s download-all` retry loop) as scaffolding for future migration; no existing job is rewired to it yet.
-- ci(common): fix under-indented `make -s download-all` / `go mod download` retry lines in `ci.yml` (whitespace only) and print `tail -n 20` of each failed benchmark file in the non-gating `bench` job.
-- ci(common): clarify in the `sbom` job that `MODULES` overrides `SHARD_*` per the Makefile `$(if $(MODULES),$(MODULES),$(SHARD_MODULES))` selector, and add `make check-workflows` to fail when a workflow-referenced make target has no Makefile rule.

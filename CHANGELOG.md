@@ -8,6 +8,232 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ## [v0.8.0] - 2026-10-18
+- **Breaking:** `config`, `container`, `core/*`, `cmd/zever`: removed `*_ADAPTER` from `.env` and config. `config.Service[T]` carries only `Options`; any `SERVICE_ADAPTER` or `SERVICE__NAME__ADAPTER` key (including legacy `DB_ADAPTER`, `CACHE_ADAPTER`, `QUEUE_ADAPTER`) fails `Resolve`/`ApplyEnv` with an "adapter selection removed" error naming the code-wiring fix. There is no adapter registry anymore: each `core/<battery>` package keeps its interface, `Options`, and `DefaultRef`, while `Register`/`Open`/`ParseAdapter`/`RegisteredAdapters` and the `Adapter` string types are gone. Affected batteries include `auth`, `cache`, `crypto`, `db`, `password`, `queue`, `router`, `secrets`, `session` (and every other `core/*` registry the same way).
+- **Breaking:** `container`: accessors resolve only through explicit providers. `container.New(cfg, container.Provide(ref, factory)...)` is the wiring; an unwired service fails with `NotWiredError` ("pass container.Provide(...)") instead of falling back to a registered adapter. `ValidateAdapters`, `RegisteredAdapters`, and the implicit shared-pool opener are gone; db-backed batteries share a pool only when the app wires `NewFromDB` over one `db.DB`.
+- feat(cli): `zever new` and `zever add` never write `*_ADAPTER` keys. The battery picker chooses which adapter import and `container.Provide` entry to scaffold into `internal/app/wiring.go`; changing an adapter means editing that file and rebuilding. `zever doctor` checks every battery with the CLI's compiled-in defaults, `zever explain` reports the code-wired driver per service, and `zever generate adapter` scaffolds a stub plus options with a `container.Provide` wiring snippet instead of a `register.go`.
+
+- chore(examples): drop the dead `zever.yaml` files from `bookings`, `demoapp`, `showcase`, and `todo`. Service config has been env-only since v0.8.0, so the framework ignores those files entirely; each example ships a `.env.example` instead.
+
+- chore(docs): update README, docs logo, favicon, and OG/icon PNGs to the new brand mark (`.github/zever.svg`); remove superseded `.github/zever.jpg`.
+
+- ci: matrix jobs (`lint`, `test`, `test-race`, `bench`, `sbom`) now fail fast: the first failing matrix leg cancels the remaining legs in that job instead of running every group to completion, so a red PR stops burning runner minutes.
+- ci: PR vs main behavior is unchanged — PRs still run the race fast-gate without coverage plus the shuffle order-dependence gate, main/tags still run race with coverage upload and the coverage floor, and `bench` stays non-gating (`continue-on-error`, absent from `ci-gate` needs).
+
+- fix(cli): `zever doctor` now prints a fix line under every failing battery, naming the exact env key to set (for example `AUTH_JWT_SECRET`) instead of only a generic "check service env" footer.
+- fix(cli): an unknown env key now names the key to fix and the service's real keys (`"DB_HOST" is not a db option — unset it, or use one of: DB_ADAPTER, DB_DSN, ...` under `ZEVER_CONFIG_STRICT=1`), and the same hint now reaches `zever explain` and `zever outbox`, which resolved the service config without it.
+- fix(cli): `zever config`, `zever db`, and `zever generate` now print the unknown-subcommand error first and the hint after it, instead of burying the error under a full usage block.
+- fix(cli): `zever add` with a wrong argument count now prints a three-line usage block instead of the full forty-line reference.
+- fix(cli): `zever explain` now says how to find the right name when a service or an operation does not match.
+- fix(cli): `zever db migrate` without `--dsn` now prints the exact command to re-run, after the error instead of before it.
+- fix(cli): `ZEVER_NO_HINT=1` now silences the unknown-env-key hint too, like every other hint.
+
+- refactor(cli): route `cmd/zever` JSON through `shared/codec` (v2 backend); generated tinker shims, worker entrypoints, and the `new` hello service now import `shared/codec`/`encoding/json/jsontext` instead of `encoding/json`, and the tinker REPL prelude binds `codec`.
+
+- fix(cli): `zever add ci` now scaffolds `runs-on: ubuntu-24.04` instead of `ubuntu-latest`, so generated projects get the same pinned, non-migrating runner image the zever repo uses rather than inheriting the `ubuntu-latest` migration to Ubuntu 26.
+
+- fix(cli): `zever new` now derives the local-checkout replace block from the framework's own module graph, so a scaffolded project replaces every sibling module the graph reaches (`core/agent`, `core/authz`, `core/eval`, `core/job`, `core/middleware`, `core/rag` and the `dsl` compiler module were missing) and resolves them against the checkout instead of the module proxy.
+
+- **Breaking:** `dsl` gogen/mcp backends: generated `router.go` and MCP stdio servers now import `github.com/zenta-dev/zever/shared/codec` (encoding/json/v2 dialect) instead of `encoding/json`; regenerate committed output with `zever compile`.
+- refactor(dsl): openapi and mcp manifests now marshal through `shared/codec` with deterministic key order; `paginated`, `isError`, `nullable`, `exclusiveMinimum`/`exclusiveMaximum` render via `omitzero` (v2 `omitempty` no longer omits `false`).
+
+- **Breaking:** `dsl/diag`: `Diagnostic` carries a new `Related []RelatedInfo` field (related locations, e.g. the first declaration of a duplicate), so `Diagnostic` values are no longer comparable with `==` and cannot be used as map keys. Compare field-by-field or with `reflect.DeepEqual`.
+- feat(dsl,lsp): duplicate diagnostics (duplicate top-level declarations, enum values, error codes, saga steps) now carry the first declaration as a structured related location, surfaced as LSP `relatedInformation` by `zever-lsp`.
+
+- feat(lsp): new `workspace/executeCommand` commands `zever.validate` (force a recompile and republish diagnostics for one document) and `zever.fixAll` (collect every quickfix for one document into a single `WorkspaceEdit`).
+- feat(lsp): quickfixes now dispatch on the diagnostic `code` (`zen-001` scalar, `zen-002` relation) first, falling back to message matching when no code is present; `prepareRename` answers a placeholder carrying the identifier text.
+- feat(editors): VS Code palette commands `Zever: Validate Current File` and `Zever: Fix All Issues in Current File` for the active `.zen` file.
+
+- feat(lsp): entity/message/enum hover cards now show a `` `defined in <relpath>` `` line and a capped "Referenced by" list (e.g. `` `Order.user_id` ``, `` `dispatch: SyncOrders` ``) reusing the rename/reference walkers.
+- feat(lsp): new opt-in `zever.inlayHints.paramNames` setting (default `false`) annotating positional `dispatch: Job(...)` arguments with `name:` labels, with rust-analyzer-style noise heuristics (already-named arguments and same-name single-argument calls are skipped).
+- feat(lsp): semantic-token legend gains the `definition` modifier, emitted on declaration identifiers (decl names and field names at declaration); references carry no modifier bit.
+
+- fix(shared/redisopt): a rejected Redis address or key prefix now names the offending value (with any embedded password masked) and says what shape the value must have, instead of a bare `redis: addr must be host:port`.
+- fix(shared/redisopt): a refused plaintext connection now names the address and the two ways to turn TLS on (`set tls`, or a `rediss://` address).
+- fix(shared/redisopt): `redis: invalid address` now masks the credentials of the rejected address, so a `redis://user:pass@host` URL can no longer leak its password into an error message.
+- fix(adapters/db/postgres): a missing `dsn` now says which option is missing and how to set it (`set <SERVICE>_DSN to a postgres:// URL`), instead of only `option "dsn" is required`.
+- fix(adapters/db/sqlite): a failed startup ping now reports `sqlite: ping:` instead of the misleading `sqlite: configure:`.
+- fix(adapters/webhook/http): a failed delivery now names the event and the target (`http: deliver event "invoice.paid" to "https://…" failed after 3 attempts`), and a bad status names the target that answered it.
+- fix(adapters/webhook/http): a target URL echoed in an error message now masks any userinfo credentials, so a webhook URL carrying a password can no longer leak it.
+- fix(shared/codec): an encode or decode failure now names the value's type and stays on one line (`codec: decode into main.User failed: …`), so a single-line consumer (the `zever doctor` note) keeps the cause.
+- fix(shared/s3opts): a missing bucket or credential now names the option and the env key that carries it (`set <SERVICE>_ACCESS_KEY_ID`), instead of a blanket `credentials are required`.
+
+- **Breaking:** `core/search`: removed the `search.Postgres` and `search.SQLite` adapter constants and their registrations. The DB-backed search adapter has one name now, `search.DB` ("db"), and it picks PostgreSQL tsvector/GIN or embedded SQLite FTS5 from the DSN. Use `SEARCH_ADAPTER=db`.
+- **Breaking:** `core/vectorstore`: removed the `vectorstore.PGVector` and `vectorstore.SQLite` adapter constants and their registrations. The DB-backed vectorstore adapter has one name now, `vectorstore.DB` ("db"), and it picks PostgreSQL pgvector or embedded SQLite from the DSN. Use `VECTORSTORE_ADAPTER=db`.
+- **Breaking:** `core/workflow`: removed the `workflow.Postgres` adapter constant and its registration. The DB-backed workflow adapter has one name now, `workflow.DB` ("db"), and it picks PostgreSQL or embedded SQLite from the DSN. Use `WORKFLOW_ADAPTER=db`.
+- fix(core): the db-backed search, vectorstore, and workflow adapters now register under one name each ("db"). The removed "postgres", "sqlite", and "pgvector" names no longer resolve, so a configured alias fails with `unknown adapter` instead of quietly naming a backend it never selected.
+
+- ci(common): add `.github/actions/setup-go-download` composite action (setup-go plus the standard 3-attempt `make -s download-all` retry loop) as scaffolding for future migration; no existing job is rewired to it yet.
+- ci(common): fix under-indented `make -s download-all` / `go mod download` retry lines in `ci.yml` (whitespace only) and print `tail -n 20` of each failed benchmark file in the non-gating `bench` job.
+- ci(common): clarify in the `sbom` job that `MODULES` overrides `SHARD_*` per the Makefile `$(if $(MODULES),$(MODULES),$(SHARD_MODULES))` selector, and add `make check-workflows` to fail when a workflow-referenced make target has no Makefile rule.
+
+- **Breaking:** `cli`: the scaffolder offers only the canonical adapter names now. `zever new --with vectorstore=pgvector` (and the `postgres`/`sqlite` names of `search`, `vectorstore` and `workflow`) fail closed with the canonical name in the message. The scaffold no longer writes a project whose own `VECTORSTORE_ADAPTER=pgvector` does not resolve at runtime.
+- fix(cli): the battery picker's adapter list, the adapter module mapping and the generated compose rules carry the canonical adapter names only. The db-backed batteries (`search`, `vectorstore`, `workflow`) have one adapter, `db`: the backend follows the DSN.
+- fix(container): the `Search()`, `VectorStore()` and `Workflow()` doc comments no longer name the removed per-backend adapter names.
+- docs: `STABILITY.md` and the `config` and `cmd/zever` READMEs list the canonical adapter names only.
+
+- fix(cli): `zever generate adapter --help` and `zever generate worker --help` no longer tell you to select an adapter in a config file. They name the env key that selects it (`CACHE_ADAPTER=redis`, `QUEUE_ADAPTER=redis`) and the `.env` file at the project root it belongs in, and the scaffolded adapter package comment and the scaffolded worker `main.go` say the same.
+- fix(cli): `zever generate worker --help` names the `ZEVER_WORKER_ENTRY` env key as the way to move the worker entrypoint (it named a project stanza that v0.8.0 does not read), and `zever new --help` says the new project is configured from `.env` alone.
+- fix(cli): the CLI no longer names a pre-v0.8.0 config file anywhere: the help text, the project-layout comments and the scaffolded templates all point at the environment, and a test fails the build if the name comes back.
+
+- fix(cli): `zever new --help` and `zever add --help` list every flag the parsers accept (`--with`, `--yes`, `--list-batteries`, `--no-tidy`, `--name`, `--uses`, `--diff`), and `zever compile --help` lists `--strict`; the `add` help text names `internal/app/wiring.go` and `.env.example` instead of the removed `zever.yaml` stanza.
+
+- fix(cli): the six project layout keys (`ZEVER_SCHEMA_DIR`, `ZEVER_GENERATED_DIR`, `ZEVER_SERVER_ENTRY`, `ZEVER_WORKER_ENTRY`, `ZEVER_TINKER_ENTRY`, `ZEVER_SEED_ENTRY`) resolve from the `.env` and the `.env.local` at the project root as well as from the process environment, so they follow the framework's precedence: defaults < `.env` < `.env.local` < process environment. They were read from the process environment only, so a key in the `.env` did nothing.
+- fix(cli): a malformed `.env` or `.env.local` now fails the command that resolves the project layout, naming the file and the line, instead of silently resolving to the defaults.
+- fix(cli): every help text that names a layout key now says where the key belongs: the `.env` at the project root, or the process environment.
+
+- fix(cli): `zever serve --help`, `zever worker --help`, `zever queue:work --help` and `zever db seed --help` name the env key that moves the entrypoint (`ZEVER_SERVER_ENTRY`, `ZEVER_WORKER_ENTRY`, `ZEVER_SEED_ENTRY`). They named a project-layout key v0.8.0 no longer reads, so following the help steered nothing.
+- fix(cli): `zever generate server --help`, `zever generate seed --help`, `zever generate tinker --help` and `zever extract --help` name the env key of the layout knob they document (`ZEVER_SERVER_ENTRY`, `ZEVER_SEED_ENTRY`, `ZEVER_TINKER_ENTRY`, `ZEVER_SCHEMA_DIR`).
+- fix(cli): a test fails the build when a source file of the CLI package names a removed project-layout key again.
+
+- fix(cli): the scaffolded `cmd/server/main.go` reports a bad `-addr` value with the `server: ` prefix (`server: -addr "x" names no port`), like every other error the framework reports.
+
+- fix(config): an unknown adapter now reports the `config: ` prefix once (`config: unknown adapter "memmory" for service "cache"`), so the `zever doctor` adapters row no longer reads `config: config: unknown adapter ...`. The failure still matches `config.ErrUnknownAdapter` through `errors.Is`.
+
+- **Breaking:** `config`: the legacy config-file probe is gone. `config.FromEnv()` no longer looks for a leftover `zever.yaml`/`zever.yml`/`zever.json`/`zever.toml` in the working directory and no longer prints the one-line warning it used to emit for one. Service configuration comes only from `.env`, `.env.local` and the process environment, so a leftover legacy file is now completely inert: translate its stanzas into `.env` (the migration guide in `config/README.md` shows the mechanical mapping) and delete the file.
+- fix(config): the config package no longer names the legacy config files anywhere — a guard test fails the build if it does — so the framework can neither stat such a file nor warn about it.
+
+- **Breaking:** `config`: the `zever config show --json` envelope now spells every option key in snake_case. The `retry` policy of the `outbox` and `resilience` services renders `base_delay`, `max_delay`, `multiplier`, `linear`, `jitter`, `jitter_mode`, `jitter_max` and `max_attempts` instead of the Go field names (`BaseDelay`, `MaxDelay`, ...), and the Go-API-only `payment` idempotency store handle and `webhook` logger handle are dropped from the wire instead of rendering as `"Idempotency": null` and `"Logger": null`. The env keys are unchanged (`OUTBOX_RETRY_BASE_DELAY` still sets the base delay).
+- fix(retry): `retry.Policy` carries snake_case json tags, so the config envelope shows the retry policy with the same key style as every other option. The Go-API-only `OnRetry` hook stays off the wire with `json:"-"`.
+- fix(payment): the Go-API-only `Idempotency` store handle is tagged `json:"-"`, so it stays off the config envelope.
+- fix(webhook): the Go-API-only `Logger` handle is tagged `json:"-"`, so it stays off the config envelope.
+- fix(tagcheck): the golden generator can pin a wire struct that only became a wire type after the v0.7.2 baseline release, so a struct that gains its json tags later is pinned at the commit that established its wire contract.
+
+- fix(docs): the container README no longer shows a yaml block shaped like the retired config file. The shared-pool example shows the env form (`SEARCH_ADAPTER`, `SEARCH_DSN`, `SEARCH_DEDICATEDPOOL`) instead, so the page cannot be read as an instruction to configure through a file.
+
+- fix(config): `config.Resolve`/`config.ApplyEnv` stop rejecting unrelated ambient environment variables (the flat `<SERVICE>_<FIELD>` namespace collided with `AI_AGENT`, `LOG_LEVEL`, `DB_URL` and `CACHE_DIR`, so `zever` refused to start in a noisy environment).
+- feat(config): add `config.UnresolvedKeys`, which lists the env keys that were ignored so a caller (for example `zever doctor`) can report them; a key with a non-empty `Suggestion` is a near-miss typo.
+
+- fix(config): `zever config show --json` now renders a duration option as its canonical string form (`"30s"`, the form the env layer parses) instead of dropping it. `encoding/json/v2` has no default representation for `time.Duration`, so every service carrying a timeout (`ai`, `db`, `cache`, `queue`, ...) used to report an empty `options` object, and the named instances (`db/REPORTING`) reported the raw nanosecond count.
+- fix(config): the JSON codec renders a `time.Duration` as its canonical string form, so a config envelope shows the effective timeout instead of failing to encode.
+- fix(retry): `retry.Policy.OnRetry` is a Go-API-only hook and is now tagged `json:"-"`, so a config envelope renders the rest of the policy instead of failing to encode.
+
+- fix(container): the container README no longer promises a warning about a config file left over from an older release. Service configuration comes only from `.env`, `.env.local` and the process environment, and a leftover config file is inert: the framework never looks for it and never reports it.
+- fix(container): the container package no longer names the legacy config files anywhere — a guard test fails the build if it does — so the framework can neither stat such a file nor warn about it.
+
+- fix(cli): `zever db migrate --help` no longer says an unset `--lock-timeout`/`--statement-timeout` falls back to the timeout settings "from the config file". v0.8.0 is env-only: the fallback reads the `DB_LOCK_TIMEOUT` and `DB_STATEMENT_TIMEOUT` env keys, so the help now names both keys and the `.env` file at the project root they belong in.
+- fix(mcp): the `zever-mcp` `debug-doctor` prompt no longer asks for "config-file" fixes. The doctor rows can only be fixed in the environment, so the prompt asks for environment fixes.
+- fix: the framework no longer calls an environment-sourced value a config file. The battery package docs (`core/<battery>/doc.go`), the `Go-API-only` option markers, the SIGHUP reload note in `container`, the storage bucket-policy JSON shape and the outbox message type now name the environment instead.
+- fix(docs): the AI integration guide and the todo example no longer call a local `.env` a config file: the guide says to keep keys in the environment, and the example names the `.env` file that holds its two secrets.
+
+- fix(cli): `zever new` writes the sqlite path into the generated `.env` and `.env.example` (`DB_PATH=data/app.db`), so the database `zever db migrate --dsn=data/app.db` creates is the one the server opens. Before, the server fell back to the adapter's own default (`app.db` in the project root) and served an empty database next to the migrated one.
+- fix(cli): the scaffolded `cmd/server/main.go` accepts the `--doctor` argument, so `zever doctor` checks the project in its own container (the batteries it wires) instead of falling back to the CLI registry, which reported batteries the project never wired as failures. `zever generate server` (and the `zever dev` flow, which regenerates the entrypoint) writes the same guard, so the doctor keeps working after a dev run. `serve.Doctor` now covers the wired batteries only, for the same reason.
+- fix(cli): the generated `.env.example` header states that the secrets live in `.env` (which `zever new` writes with per-project dev secrets) instead of telling the developer to copy the file over it and lose the generated secrets.
+- fix(cli): the generated README names the real env keys (the adapter selector of every wired battery, the database path and the secrets in `.env`), the same database the schema comment and the CLI hint name, and adds `zever doctor` to the quickstart. The `zever new` summary lists the same quickstart steps as the README.
+- fix(docs): the shipped examples' `.env.example` files carry the header the generator writes (the key spelling rule) and document `CRYPTO_KEY`, which every entrypoint needs outside a dev `ZEVER_ENV`.
+- fix(examples): `examples/todo` and `examples/multidb` wire the batteries `serve` resolves at boot (ratelimit, observability), so their servers start; `examples/multidb` gained the `data/` directory its sqlite paths need and a README with the runbook. `examples/showcase`, `examples/bookings` and `examples/demoapp` hand the embed i18n adapter its catalogs in the wiring (an `fs.FS` cannot come from the environment), so the i18n service resolves at boot; `examples/bookings` also points the geo adapter at its `examples/bookings/data/cities.json` fixture.
+- fix(serve): the plaintext-on-a-public-interface warning names the env keys to set (`ROUTER_TLS_CERT` / `ROUTER_TLS_KEY`) instead of the option names.
+- fix(docs): `zever new --help` describes the tree the scaffold writes (no worker or seed entrypoint: those are `zever add` recipes).
+- chore(repo): `.env` and `.env.local` are git-ignored repo-wide, so a copied example template with local secrets cannot be committed.
+
+- fix(container): share one `grpcClientCache` pointer so concurrent `GRPCClient` builds no longer race on the target map; builds run outside the lock with a double-checked insert (duplicate build closes its conn). Steady-state cached hit stays at ~65ns/op with zero allocs.
+
+- fix(payment): `LimitDecode` decode failures now carry the `payment:` prefix (`payment: decode webhook payload: ...`).
+
+- fix(config): restore the JSON struct tags dropped by the v0.8.0 env-only migration; wire keys in `adapters/ai/ollama`, `adapters/auth/oidc`, `config`, `core/*` and `tools/zever-mcp` keep their pre-migration spellings again.
+- ci: add `make check-tags`, an AST guard that fails on empty struct tags, on `yaml:`/`toml:` tags, and on JSON wire structs whose exported fields lack a `json` tag.
+
+- fix(ci): the `sbom` job now resolves a module's dependency graph through the local intra-repo closure while the pinned siblings are unpublished, so every module ships an SBOM instead of silently dropping the ones that failed to resolve; the published resolution stays the primary path, so the released SBOM is unchanged.
+
+- fix(cli): `zever new` and `zever add` write env keys named after the option's serialized name (its `json` tag), not the Go field name: `PASSWORD_SALT_LENGTH`, `PASSWORD_KEY_LENGTH`, `ROUTER_TLS_CERT`, `ROUTER_TLS_KEY` and `ROUTER_TLS_CLIENT_CA` now resolve, where the Go-name spellings (`PASSWORD_SALTLEN`, `ROUTER_TLSCERTFILE`) named no option and broke the config of a fresh project. The generated `.env.example` no longer writes a second, empty `<SERVICE>_ADAPTER` key that overrode the selected adapter, so copying it to `.env` resolves.
+- fix(config): a nested env path whose segment carries an `_` of its own now resolves (`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`): the nesting split is resolved by matching instead of being fixed at the first underscore.
+
+## Type Safety + DX (Track D)
+
+### Type Safety
+
+- **Eliminated all `forcetypeassert` linter suppressions in non-test code** (28 sites across 6 files):
+  - `shared/lrucache` (15): strengthened nolint comments to document container invariants
+  - `orm/option.go` (9): replaced forced assertions with safe comma-ok checks + `errors.New` for internal errors
+  - `orm/inchunks.go` (2): replaced forced assertions with safe comma-ok checks + `errors.New`
+  - `adapters/crypto/kms` + `local` (2): strengthened nolint comments to cite stdlib guarantee
+- **Added compile-time interface satisfaction asserts** (`var _ Interface = (*Type)(nil)`) to 52 adapters that were missing them, catching interface drift at build time.
+
+### DX Hardening
+
+- **Verified error suggestion consistency**: `ParseAdapter` (permissive for custom adapters) + `config.ValidateAdapters` (registry-backed with did-you-mean) work as designed; no asymmetries found.
+- **Confirmed doctor/CLI hint texts** cover all 36 batteries via `serviceEnvFields` (derived from `config.DefaultOptions`).
+- **Added `docs/bench/README.md`** documenting the benchmark story: what has benchmarks, what doesn't (and why), how to run `benchstat` A/B comparisons locally, and anti-patterns to avoid.
+
+### Linter Status
+
+- `forcetypeassert`: clean (0 issues in non-test code)
+- `perfsprint`: fixed 4 issues in `orm` package by using `errors.New` for internal errors
+
+- feat(lsp): serve `textDocument/rangesFormatting` (advertised via `rangesSupport` on the range-formatting capability) as the union of the per-range `formatDocument` edits.
+- feat(lsp): send Markdown diagnostic messages with a `` [`zen-###`](doc) `` link when the client advertises `textDocument.diagnostic.markupMessageSupport`; plain strings otherwise.
+- feat(lsp): `zever.fixAll` attaches `needsConfirmation` change annotations to foreign-file edits when the client supports `workspace.workspaceEdit.changeAnnotationSupport`, falling back to plain edits otherwise; `codeAction/resolve` still rebuilds plain edits.
+
+- feat(serve): add benchmarks for middleware fold, maxBodyHandler, mergeGRPCPolicies
+- feat(core/cdn): add benchmarks for Open, Purge (URLs/Tags/All), Close, RegisteredAdapters
+- feat(core/eval): add benchmarks for ExactScorer, ContainsScorer, ClampScore, RunSuite
+- feat(shared/mcpclient): add benchmarks for New, Encode/Decode, DispatchRequest, DialStdioRetry logic
+- feat(shared/prompt): add benchmarks for all prompt builders (SystemPrompt, GroundContext, JSONRepair, etc.)
+- feat(shared/ref): add benchmarks for Default, Named, WithName, String, RefAsMapKey, RefEquality
+- feat(tools/apidiff): add benchmarks for GoModPath, IsInternalPackage, SameVersion, Backticked, EntryCovers, SectionHeaders, PendingHeaders, BreakingEntries
+- feat(tools/tagcheck): add benchmarks for LoadGolden, LoadGoldenFields, LoadExceptions, LoadAllowlist, EachDataLine, SkipDir, CheckLegacyConfigNames, WireFieldState/Key, StructTagLookup, CheckConfigParserImports
+- feat(tools/vulngate): add benchmarks for ParseFindings, ParseAllowlist, Evaluate, ValidDate, JSONUnmarshal, SortExpired
+- feat(dsl/gengrammar): add benchmarks for Keywords, ScalarTypes, VimSyntax, TmLanguage, Files, string joins, sprintf
+- feat(dsl/backend/mcp): add benchmarks for RenderService, RenderOperation, ParamSchema, FieldSchema, TypeRefSchema, EntitySchema, MessageSchema, Qualify, ScalarJSONType, ModuleLabel, OwnerModule
+- feat(adapters/cdn/noop): add benchmarks for New, Purge (URLs/Tags/All/Empty/Single), Close, Name, parallel purge
+- build: add `make bench-baseline` (count=10 run into .bench/baseline.txt) and `make bench-ab BASELINE=...` (benchstat compare)
+- ci: extend .github/workflows/bench.yml to rotating daily module-group schedule (7 groups, deterministic via day-of-week) with benchstat comparison per group
+
+- perf(container): `container.New` no longer snapshots the process environment up front. The environment is read once, on the first provider build, so a container on the config-based path starts without reading `.env` files or the process environment (the constructor dropped from ~21 us to ~1.4 us and from 45 to 7 allocations on a 220-variable environment).
+- fix(container): the lazy environment read no longer comes with a config-file warning: v0.8.0 is env-only, so `config.FromEnv()` never looks for a leftover config file and never reports one. The read parses `.env`, `.env.local` and the process environment, nothing else.
+
+- perf(core/middleware): CORS `Vary` handling no longer allocates a dedup map per response. Empty `Vary` takes a direct join; a pre-set `Vary` dedups with a case-insensitive linear scan over stack-backed parts.
+
+- perf(core/job): worker no longer allocates an empty headers map for headerless messages; the retry path allocates lazily instead. Headerless `process` drops from 3 to 2 allocs/op (112 to 64 B/op).
+
+- refactor(jsonv2): final sweep removes every `encoding/json` v1 import; tests and remaining call sites go through the `shared/codec` facade (`Marshal`/`Unmarshal`/`MarshalLine`/`UnmarshalRead`/`IsValid`, `jsontext.Value` for raw payloads), and the `main` depguard list now denies v1 repo-wide (exact match; `encoding/json/v2` and `encoding/json/jsontext` stay allowed for the facade).
+- Behavior notes (intended v2 semantics, now pinned by tests): nil slices/marshals render as `[]` instead of `null` (a missing flag decoded into a nil-slice fallback yields an empty slice), duplicate object keys are rejected instead of last-wins, and field matching is case-sensitive.
+
+- fix(release): `tools/tag-release.sh` now creates the bare `vX.Y.Z` release tag — the tag `.github/workflows/release.yml` fires on — and publishes it in the same atomic push as the per-module tags, so a release ships its binaries, SBOMs and attestation instead of nothing.
+- fix(changelog): `make changelog-compile` now folds the pending fragments into the changelog's pending section (`## [Unreleased]`, or the top `## [vX.Y.Z]` release section while its version carries no git tag yet) instead of failing with "no ## [Unreleased] section in CHANGELOG.md".
+- fix(modgraph): `tools/modgraph` no longer counts a module living in a nested git worktree as a repo module, so the module-graph and version-pin gates stay green with worktrees present.
+- fix(docs): the zever-lsp README carries the current release version again, and the version-pin gate checks that file from now on.
+
+## Security Deepening
+
+### GOSEC Gate
+- Added curated gosec rule subset to `.golangci.yml` as enforcing gate
+- Enabled rules: G101, G102, G106, G107, G108, G201, G202, G203, G303, G305, G307, G401, G403, G501-G505, G601
+- Excluded false-positive-heavy rules: G103 (generated protobuf), G104 (unhandled errors), G109-G114 (strconv), G115 (integer overflow), G204 (subprocess), G301/G302/G306 (file perms), G402 (TLS testing), G404 (jitter), G703 (taint)
+- Fixed 14 issues: directory permissions (0o750), chmod nolint directives, symlink TOCTOU nolint, unhandled error nolint
+
+### Fuzz Coverage
+- **adapters/webhook/queue**: Added `FuzzVerifySignatureHeader`, `FuzzParseSignatureHeader`, `FuzzBuildSignatureHeader` for HMAC-SHA256 envelope verification
+- **adapters/storage/local**: Added `FuzzTraversal`, `FuzzPresignKeyValidation`, `FuzzSymlinkContainment` for adversarial path traversal testing
+- **adapters/payment/stripe/paddle**: Existing `FuzzWebhookEvent` targets retained
+- Registered all new targets in CI `fuzz-smoke` job (20s each)
+
+### Security Bench Matrix
+- **adapters/webhook/queue**: `BenchmarkVerifySignatureHeader`, `BenchmarkBuildSignatureHeader` (constant-time HMAC risk signals)
+- **adapters/payment/stripe/paddle**: `BenchmarkWebhookEvent` (webhook verification hot path)
+- **adapters/auth/jwt**: `BenchmarkVerify`, `BenchmarkVerifyParallel` (token verification)
+- **adapters/storage/local**: `BenchmarkHandlerPutTraversal`, `BenchmarkHandlerGetTraversal` (adversarial path handling)
+- Delivered `.bench/sec-report.md` with risk lexicon covering 7 Go security classes
+
+### Internal Hardening
+- Directory permissions tightened from 0o755 to 0o750 in `tools/gengrammar`, `cmd/zever/skill.go`, `cmd/zever/docs_cmd.go`
+- Added explicit `t.Helper()` / `b.Helper()` calls to test helper functions
+- Removed unused `#nolint:gosec` directives for excluded rules
+
+- fix(security): the Go toolchain floor moves to `go 1.27.3` in `go.work` and in every module's `go.mod`. The stdlib advisory `GO-2026-6809` (`crypto/x509` distrusts compromised intermediate certificates) is fixed in go1.27.3, and the `govulncheck` gate scans the workspace with the toolchain the `go` directive selects, so the workspace pin is what clears it.
+- **Breaking:** the minimum Go version for consumers of the published modules moves from 1.27.2 to 1.27.3. A `go` directive is the minimum toolchain a module may be built with, so a consumer whose own `go.mod` still says `go 1.27.2` is refused ("requires go >= 1.27.3") until it moves to 1.27.3; the go command fetches that toolchain on its own with the default `GOTOOLCHAIN=auto`. The language version is unchanged (still Go 1.27), so no source change is needed. `zever new` scaffolds `go 1.27.3` from now on, and `zever upgrade` keeps an existing project's `go` directive untouched — bump it to 1.27.3 yourself.
+- fix(ci): the `deps-sync` workflow no longer pins `GOTOOLCHAIN: local`. With `local` the go command refuses a workspace whose `go` directive is newer than the runner's toolchain ("go.work requires go >= 1.27.3") instead of resolving it, so a floor bump broke the job; `auto` (the Go default) keeps it working, and every other workflow already resolves its toolchain from `go.work` via `go-version-file`.
+
+- fix(tools): `apidiff` now treats the top changelog section as the pending release while its version has no git tag yet, so a cut-but-untagged release (like the current `## [v0.8.0]`) satisfies the breaking-change gate without a spurious `## [Unreleased]` section; the API-diff baseline still moves only on existing tags.
+
+- fix(tools): `tools/gotidy.sh` now tidies every module offline. It injects temporary local replaces for the whole intra-repo closure, not only for the modules that commit no replaces, so `go mod tidy` never asks the module proxy for a sibling version whose tag does not exist yet.
+- fix(build): the stale intra-repo `go.sum` hashes are gone from `serve`, `examples/multidb`, `zevertest`, `docs/examples` and `examples/external-sms`. The committed `go.mod` files still require the published sibling versions, so consumers keep resolving them from the proxy.
+
+- fix(cli): `zever generate adapter` no longer emits `toml:`/`yaml:` tags in the scaffolded `Options` struct — it emits the `json:` tag only, matching the v0.8.0 env-only config migration (see `config/env.go`).
+
+- **Breaking:** `container`: the "found in working directory: ignored" warning about a leftover config file is gone. The container never read a legacy config file, but it statted one to warn about it; it does neither any more. Service configuration comes from `.env`, `.env.local` and the process environment (or from the `*config.Config` you hand `container.New`), so a leftover legacy config file is now completely inert: nothing opens it and nothing reports it. Translate its stanzas into `.env` and delete the file (the mapping is in `config/README.md`) — the framework will no longer remind you that it is there.
+- **Breaking:** `config`: the decode error API that came with the file-based loader is gone with it. `config.DecodeError`, `config.ErrDecode` and `config.ErrUnsupportedFormat` are removed, so `errors.Is(err, config.ErrDecode)` no longer compiles. Env-sourced options report their problems with `config.ErrInvalidValue` (the environment spelled a value the option cannot take), `config.ErrUnknownField` (an unknown key under a wired service prefix) and `config.ErrInvalidOptions` (an option set the env layer could not apply).
+- **Breaking:** `cli`: the `project` stanza of a legacy config file is no longer read. v0.7.x honored `schema_dir`, `generated_dir`, `server_entry`, `worker_entry`, `tinker_entry` and `seed_entry` from it; the CLI now resolves the project layout from the environment only, so move those six values to `ZEVER_SCHEMA_DIR`, `ZEVER_GENERATED_DIR`, `ZEVER_SERVER_ENTRY`, `ZEVER_WORKER_ENTRY`, `ZEVER_TINKER_ENTRY` and `ZEVER_SEED_ENTRY` before you upgrade — otherwise `zever serve`, `zever worker`, `zever db seed` and `zever tinker` silently fall back to the default layout (`schema`, `generated`, `cmd/server`, `cmd/worker`, `cmd/tinker-shim`, `db/seed`).
+
 - ci(gates): v0.8.0 friction regression tests — headless 3-command quickstart journey (`zever new` → `zever dev` boot + readiness probe → curl) with wall-clock budget, scaffold `go vet`/`go test`/`golangci-lint` legs, compile-fail fixtures gate (typed-Ref misuse must not build), 60s `.env` fuzz smoke, and a non-gating benchstat 5% regression signal for `orm` + `container` hot paths.
 
 - **Breaking:** `cli`: removed the `--config` file flag from `doctor`, `config show`, and `outbox` (service config is env-only: `.env`/`.env.local` discovery plus the process environment). Pointing `--config` at a file is now an unknown-flag error (exit 2).

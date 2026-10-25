@@ -1,2 +1,0 @@
-- fix(container): the container README no longer promises a warning about a config file left over from an older release. Service configuration comes only from `.env`, `.env.local` and the process environment, and a leftover config file is inert: the framework never looks for it and never reports it.
-- fix(container): the container package no longer names the legacy config files anywhere — a guard test fails the build if it does — so the framework can neither stat such a file nor warn about it.

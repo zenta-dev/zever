@@ -1,9 +1,0 @@
-- fix(shared/redisopt): a rejected Redis address or key prefix now names the offending value (with any embedded password masked) and says what shape the value must have, instead of a bare `redis: addr must be host:port`.
-- fix(shared/redisopt): a refused plaintext connection now names the address and the two ways to turn TLS on (`set tls`, or a `rediss://` address).
-- fix(shared/redisopt): `redis: invalid address` now masks the credentials of the rejected address, so a `redis://user:pass@host` URL can no longer leak its password into an error message.
-- fix(adapters/db/postgres): a missing `dsn` now says which option is missing and how to set it (`set <SERVICE>_DSN to a postgres:// URL`), instead of only `option "dsn" is required`.
-- fix(adapters/db/sqlite): a failed startup ping now reports `sqlite: ping:` instead of the misleading `sqlite: configure:`.
-- fix(adapters/webhook/http): a failed delivery now names the event and the target (`http: deliver event "invoice.paid" to "https://…" failed after 3 attempts`), and a bad status names the target that answered it.
-- fix(adapters/webhook/http): a target URL echoed in an error message now masks any userinfo credentials, so a webhook URL carrying a password can no longer leak it.
-- fix(shared/codec): an encode or decode failure now names the value's type and stays on one line (`codec: decode into main.User failed: …`), so a single-line consumer (the `zever doctor` note) keeps the cause.
-- fix(shared/s3opts): a missing bucket or credential now names the option and the env key that carries it (`set <SERVICE>_ACCESS_KEY_ID`), instead of a blanket `credentials are required`.

@@ -1,2 +1,0 @@
-- ci: matrix jobs (`lint`, `test`, `test-race`, `bench`, `sbom`) now fail fast: the first failing matrix leg cancels the remaining legs in that job instead of running every group to completion, so a red PR stops burning runner minutes.
-- ci: PR vs main behavior is unchanged — PRs still run the race fast-gate without coverage plus the shuffle order-dependence gate, main/tags still run race with coverage upload and the coverage floor, and `bench` stays non-gating (`continue-on-error`, absent from `ci-gate` needs).
