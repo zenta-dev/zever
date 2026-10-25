@@ -5,11 +5,11 @@ description: Switch cache, queue, session, lock, and rate limit services from me
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Most stateful services default to an in-memory adapter with a Redis twin: develop with no server, then switch configuration (not code) in production. Use Redis for any service two or more instances must share.
+Most stateful services default to memory with a Redis twin: develop server-free, switch configuration (not code) in production. Use Redis for anything shared across instances.
 
 ## Quick start
 
-Point each shared service at the same `addr`. `cache`, `queue`, and `lock` read flat keys; `session`, `ratelimit`, `eventbus`, and `idempotency` nest a `redis` block.
+Point each shared service at the same `addr`. `cache`, `queue`, `lock` use flat keys, `session`, `ratelimit`, `eventbus`, `idempotency` nest a `redis` block.
 
 ```sh
 CACHE_ADDR=redis:6379
@@ -32,17 +32,19 @@ go run ./cmd/myapp
 server listening on :8080 (cache=redis queue=redis)
 ```
 
-Env keys follow `<SERVICE>_<FIELD>`, matching ignores case and `_`, and on the flat services a `url` wins over `addr`. `session`, `ratelimit`, `eventbus`, and `idempotency` reject a malformed `redis.addr` in `Options.Validate()`; `cache`, `queue`, and `lock` ping Redis (3s limit) when first resolved, so a bad address fails on the first accessor call. Keep `memory` in tests: no Docker, and it passes `goleak.VerifyTestMain`. See each service in the [config reference](../../../reference/config/#cache).
+Env keys follow `<SERVICE>_<FIELD>` (matching ignores case and `_`), on flat services `url` wins over `addr`. `session`, `ratelimit`, `eventbus`, `idempotency` reject a malformed `redis.addr` in `Options.Validate()`, `cache`, `queue`, `lock` ping Redis (3s limit) on first resolve, so a bad address fails on the first accessor call. Keep `memory` in tests: no Docker, and it passes `goleak.VerifyTestMain`. See [config reference](../../../reference/config/#cache).
 
 ## Resolve the services
 
 ```go title="main.go"
 import (
+    cacheredis "github.com/zenta-dev/zever/adapters/cache/redis"
     "github.com/zenta-dev/zever/config"
     "github.com/zenta-dev/zever/container"
+    "github.com/zenta-dev/zever/core/cache"
 )
 
-c := container.New(config.Default())
+c := container.New(config.Default(), container.Provide(cache.DefaultRef(), cacheredis.New))
 defer c.Close(ctx)
 
 cache, err := c.Cache()
@@ -52,11 +54,11 @@ sess, err := c.Session()
 limiter, err := c.RateLimit()
 ```
 
-Wire each adapter with a `container.Provide` entry first (for example `container.Provide(Cache, cacheredis.New)`), and check `err` after each call; accessors resolve lazily, cache, and retry after an error. `c.Job()` dispatches over the resolved `Queue`, and `c.Scheduler()` shares it.
+Wire each adapter with `container.Provide` first (`adapters/cache/redis` exposes `New`). Accessors resolve lazily, cache, retry, check `err` per call. `c.Job()` dispatches over `Queue`, `c.Scheduler()` shares it.
 
 ## Decide which services use Redis
 
-Switch per service; one service on Redis never drags the rest along.
+Switch per service, one service on Redis never drags the rest along.
 
 | Service | Memory adapter | Redis role |
 |---|---|---|
@@ -68,48 +70,48 @@ Switch per service; one service on Redis never drags the rest along.
 | `idempotency` | `memory` | Reserve-then-complete store |
 | `eventbus` | `memory` (fan-out) | Cross-process publish/subscribe |
 
-One instance may stay on `memory`; with two or more, use Redis for `session`, `lock`, `ratelimit`, and `queue`, or users stick to one instance, leases split, counters diverge, and jobs duplicate.
+With two or more instances use Redis for `session`, `lock`, `ratelimit`, `queue`, on `memory`, users stick to one instance, leases split, counters diverge, jobs duplicate.
 
-## Understand client ownership and behavior
+## Client ownership and behavior
 
-- Each adapter `New` owns its client; `Close` closes only that one, and `c.Close(ctx)` dedups shared instances by pointer.
-- `queue/redis` sweeps due and stale claims (`promoteDue`, `reclaimStale`) at most every 250ms, adding up to 250ms recovery latency.
-- `ratelimit` denials return 429 JSON with a ceiled-seconds `Retry-After`; limiter errors fail open; keys must be non-empty, bounded, control-byte-free, and never echoed in errors.
-- `eventbus` keeps the memory envelope (`id`, `payload`, `headers`); `SubscribeChan` buffers each subscriber, and slow consumers drop the newest message.
-- `cache/redis` and `session/redis` share typed codecs, so keys and TTLs match the memory twins; Redis leases are distributed, memory locks process-local.
-- Size `pool_size` and `min_idle_conns` for peak concurrency, and pass request contexts into cache, queue, and lock calls so Redis round trips observe deadlines.
-- Open without the container via `cache.Open`, `queue.Open`, or `lock.Open`; `Options.Validate()` on the nested-`redis` services rejects negative TTLs and oversize prefixes.
+- Each adapter `New` owns its client, `Close` closes only that one, `c.Close(ctx)` dedups shared instances by pointer.
+- `queue/redis` sweeps due/stale claims (`promoteDue`, `reclaimStale`) at most every 250ms (≤250ms recovery latency).
+- `ratelimit` denials return 429 JSON with ceiled-seconds `Retry-After`, errors fail open, keys must be non-empty, bounded, control-byte-free, never echoed.
+- `eventbus` keeps the memory envelope (`id`, `payload`, `headers`), `SubscribeChan` buffers per subscriber, slow consumers drop newest.
+- `cache/redis` and `session/redis` share typed codecs with the memory twins. Redis leases are distributed, memory locks process-local.
+- Size `pool_size`/`min_idle_conns` for peak concurrency, pass request contexts so round trips observe deadlines.
+- Open directly via `cache.Open`, `queue.Open`, `lock.Open`. `Options.Validate()` rejects negative TTLs and oversize prefixes.
 
 ## Troubleshooting
 
 <details>
 <summary>Two instances serve different sessions</summary>
 
-Cause: both run `memory` sessions. Fix: point both at the same Redis `addr`.
+Both run `memory`. Point both at the same Redis `addr`.
 </details>
 
 <details>
 <summary>Rate limits diverge across replicas</summary>
 
-Cause: `memory` token buckets are per process. Fix: wire the `redis` backend (with a shared `RATELIMIT_REDIS_ADDR`) and rebuild.
+`memory` buckets are per process. Wire `redis` with shared `RATELIMIT_REDIS_ADDR`.
 </details>
 
 <details>
 <summary>Jobs run twice after a crash</summary>
 
-Cause: the Redis sweep reclaims stale claims within ~250ms. Fix: make handlers idempotent, keyed by job ID.
+Redis sweep reclaims stale claims within ~250ms. Make handlers idempotent, keyed by job ID.
 </details>
 
 <details>
 <summary>Startup rejects the address</summary>
 
-Cause: `session`, `ratelimit`, `eventbus`, or `idempotency` found a malformed `redis.addr` (a scheme or path), or `cache`, `queue`, or `lock` could not ping Redis. Fix: use `host:port`; on the flat services `url` wins over `addr`.
+Malformed `redis.addr` or ping failure. Use `host:port`, on flat services `url` wins.
 </details>
 
 <details>
 <summary>Shutdown hangs on Redis clients</summary>
 
-Cause: the parent context has no deadline and a client blocks (each service then gets a 5s bound). Fix: pass a timeout context to `c.Close(ctx)`; overruns report `CloseTimeoutError`, panics `ClosePanicError`, and failures join with `errors.Join`.
+No parent deadline. Without one each service close is bounded at 5s (`container.DefaultCloseTimeout`). Pass a timeout to `c.Close(ctx)`, overruns report `CloseTimeoutError`, panics `ClosePanicError`, failures join via `errors.Join`.
 </details>
 
 ## Related

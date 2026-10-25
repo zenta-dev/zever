@@ -5,11 +5,11 @@ description: Emit traces and metrics from noop to stdout to an OTLP collector wi
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`observability` gives traces and metrics in every environment. One `Provider` hands out scoped `Tracer` and `Meter` handles with typed `Attr` values (`String`, `Int`, `Int64`, `Float64`, `Bool`). It never wires a global SDK behind your back: `set_globals` stays opt-in. Switching backends is a config change, not a rewrite of `Span` or `Attr` calls.
+`observability` gives traces and metrics in every environment. One `Provider` hands out scoped `Tracer`/`Meter` handles with typed `Attr` values (`String`, `Int`, `Int64`, `Float64`, `Bool`). `set_globals` stays opt-in. Backend switches need no `Span`/`Attr` rewrites.
 
 ## Quick start
 
-`stdout` (the default) prints spans and metrics locally. Register the adapter, then trace an operation:
+With `stdout` (default), register the adapter, then trace:
 
 ```go title="main.go"
 import (
@@ -33,11 +33,11 @@ span.End()
 p.Meter("bookings").Counter(ctx, "bookings_created", 1)
 ```
 
-Expected output: span lines in human-readable form.
+Output: human-readable span lines.
 
 ## Export to a collector
 
-Use `otlp` to reach a real collector. Replicas all funnel into one collector keyed by `service_name`.
+Use `otlp` for a real collector. Replicas share one collector keyed by `service_name`.
 
 ```sh
 OBSERVABILITY_SERVICE_NAME=bookings
@@ -46,17 +46,17 @@ OBSERVABILITY_SAMPLE_RATIO=0.1
 OBSERVABILITY_HEADERS_X-TENANT=acme
 ```
 
-Env names follow the usual scheme: `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`. The backend (`stdout` default, `otlp` for a collector) is wired in code, not env.
+Env names: `OBSERVABILITY_SERVICENAME`, `OBSERVABILITY_ENDPOINT`, `OBSERVABILITY_SAMPLERATIO`, `OBSERVABILITY_ATTRVALUELIMIT`. Backend selection is code, not env.
 
-`Validate` requires `service_name` of 1 to 128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. Adapters are `noop` for tests, `stdout` (default) for local visibility, and `otlp` for production. See the [observability config reference](../../../reference/config/#observability).
+`Validate` requires `service_name` of 1-128 characters with no control characters, `endpoint` as `host:port`, `insecure` only for loopback, `cert_file` and `key_file` together, at most 32 headers, and `sample_ratio` in [0,1]. `insecure` plus an `authorization` header is rejected. Other keys: `set_globals`, `verbose`, `ca_file`. Adapters `noop`, `stdout` (default), `otlp` (production). See [observability config reference](../../../reference/config/#observability).
 
 ## Metrics
 
-Zever does not serve a Prometheus `/metrics` endpoint. Metrics (for example the `outbox.*` relay counters) leave the process over OTLP together with the traces, so run a collector and let it expose or forward them: the OpenTelemetry Collector's `prometheus` exporter gives Prometheus a scrape target, and `prometheusremotewrite` pushes instead. See the [outbox operations guide](../../background/outbox-ops/) for the metric names and alert rules.
+No Prometheus `/metrics` endpoint is served. Metrics (e.g. the `outbox.*` relay counters) leave the process over OTLP, so run a collector to expose or forward them: the OpenTelemetry Collector's `prometheus` exporter gives Prometheus a scrape target, `prometheusremotewrite` pushes instead. See the [outbox operations guide](../../background/outbox-ops/) for metric names and alert rules.
 
 ## Profiling with pprof
 
-The generated server can serve Go runtime profiles, off by default. Set `--pprof-addr` (or `PPROF_ADDR`) to turn it on:
+Go runtime profiles are opt-in: set `--pprof-addr` (or `PPROF_ADDR`):
 
 ```sh
 PPROF_ADDR=127.0.0.1:6060 ./server        # or: ./server --pprof-addr 127.0.0.1:6060
@@ -64,18 +64,18 @@ go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 curl -o cpu.pb.gz 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
 ```
 
-Profiles are served on their own listener, never on the public router, and the address must be loopback (`127.0.0.1:PORT` or `localhost:PORT`); a wildcard or public host fails startup. Reach it from outside the host through an SSH tunnel or `kubectl port-forward pod/<name> 6060`. The server logs a warning when it is on. Endpoints: the index, any named runtime profile (`heap`, `goroutine`, `allocs`, `block`, `mutex`, `threadcreate`, with `?debug=1` for text), `profile` (CPU) and `trace` (both take `?seconds=N`, 1 to 300). `cmdline` is not served because argv can hold secrets.
+Profiles are served on their own listener, never the public router, and the address must be loopback (`127.0.0.1:PORT` or `localhost:PORT`). A wildcard or public host fails startup. Reach it from outside the host through an SSH tunnel or `kubectl port-forward pod/<name> 6060`. The server logs a warning when it is on. Endpoints: the index, named runtime profiles (`heap`, `goroutine`, `allocs`, `block`, `mutex`, `threadcreate`. `?debug=1` for text), `profile` (CPU), `trace` (both take `?seconds=N`, 1 to 300). `cmdline` is not served: argv can hold secrets.
 
-Code that builds its own server can use `container.StartPprof(addr, logger)` directly; the handler uses a private mux and never registers on `http.DefaultServeMux`.
+Custom servers can use `container.StartPprof(addr, logger)`. The handler uses a private mux, never `http.DefaultServeMux`.
 
 ## Bound and redact attributes
 
-Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValueLen`), and spans at 32 attributes (`MaxAttrs`). `attr_value_limit` tunes the value cap (0 means default, otherwise 256 to 16384). Sensitive keys (password, secret, token, api_key, auth, cookie, session, private_key) export as `[redacted]`, but never attach a secret to a span at all. Name spans after the operation (`queue.dispatch`), not the adapter, and keep high-cardinality values such as user IDs out of metric labels.
+Caps: keys 256 bytes (`MaxKeyLen`), string values 4096 by default (`MaxValueLen`), 32 attributes per span (`MaxAttrs`). `attr_value_limit` tunes the value cap (0 means default, otherwise 256 to 16384). Sensitive keys (password, secret, token, api_key, auth, cookie, session, private_key) export as `[redacted]`, but never attach a secret to a span. Name spans after the operation (`queue.dispatch`), not the adapter. Keep high-cardinality values out of metric labels.
 
 ## Production checklist
 
 - Providers declare `Shutdown(ctx)`, not `Close`. `c.Close(ctx)` probes it so buffered spans flush. Always shut down with a timeout-bearing context.
-- Wire the `otlp` backend in production; the default `stdout` keeps traces on the box.
+- Wire `otlp` in production. Default `stdout` keeps traces on the box.
 - Never log raw option maps. Use `cfg.RedactedServices()`.
 
 ## Troubleshooting
@@ -83,26 +83,26 @@ Keys cap at 256 bytes (`MaxKeyLen`), string values at 4096 by default (`MaxValue
 <details>
 <summary>`service_name must be 1-128 characters`</summary>
 
-The name is empty or too long. Set a short stable name such as `bookings`; it keys every dashboard.
+Empty or too long. Set a short stable name such as `bookings`, which keys every dashboard.
 </details>
 
 <details>
 <summary>`insecure requires a loopback endpoint`</summary>
 
-`insecure: true` points at a non-loopback collector. Use TLS, or point at localhost for local collectors only.
+`insecure: true` points at a non-loopback collector. Use TLS, or localhost for local collectors.
 </details>
 
 <details>
 <summary>Attributes are silently truncated</summary>
 
-A string over `attr_value_limit` (default 4096) or more than 32 attributes per span is cut by design. Send IDs and counts, not blobs.
+Strings over `attr_value_limit` (default 4096) and spans over 32 attributes are cut by design: send IDs and counts, not blobs.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" description="Spans around job runs." />
-  <LinkCard title="Tenants" href="../tenants/" description="Tenant as a span attribute." />
-  <LinkCard title="Cache" href="../../data/cache/" description="Cache hit counters as metrics." />
-  <LinkCard title="Cross-Service Tracing" href="../cross-service-tracing/" description="Inbound extraction, outbound injection, baggage, semconv names." />
+  <LinkCard title="Scheduler and jobs" href="../../background/scheduler-jobs/" description="Job-run spans." />
+  <LinkCard title="Tenants" href="../tenants/" description="Tenant span attribute." />
+  <LinkCard title="Cache" href="../../data/cache/" description="Cache hit counters." />
+  <LinkCard title="Cross-Service Tracing" href="../cross-service-tracing/" description="Propagation, baggage, semconv names." />
 </CardGrid>

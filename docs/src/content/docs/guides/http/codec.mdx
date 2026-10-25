@@ -5,11 +5,11 @@ description: Serialize typed values to bytes with composable Encoder and Decoder
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`codec` turns a typed Go value into bytes and back, so `cache`, `queue`, `session`, and webhook code never hand-roll `json.Marshal`. Use it with typed wrappers over byte stores, or when defining a wire format for a new adapter. Write a custom codec only when JSON is the wrong format.
+Serialize typed values to bytes for `cache`, `queue`, `session`, and webhooks, write custom codecs only when JSON is wrong.
 
 ## Quick start
 
-`codec` has no YAML, no env, and no container accessor (there is no `c.Codec()`). Construct it directly:
+No YAML, env, or container accessor (no `c.Codec()`), construct it directly:
 
 ```go title="main.go" check
 package main
@@ -38,11 +38,11 @@ func main() {
 u_1 Ada
 ```
 
-`JSONCodec[V]` is the only implementation Zever ships. Its output is deterministic, so snapshots and exact-byte assertions stay stable. A codec does no I/O and holds no connections, so it is safe to share. The interfaces are `Encoder[V]` (`Encode`), `Decoder[V]` (`Decode`), and `Codec[V]` (both); `cache.NewTyped` applies a `Codec[V]` to cache `Get` and `Set`.
+Only `JSONCodec[V]` ships, with deterministic output for snapshots and byte assertions. Codecs do no I/O and hold no connections, share them. Interfaces: `Encoder[V]` (`Encode`), `Decoder[V]` (`Decode`), `Codec[V]` (both), `cache.NewTyped` applies one to cache `Get`/`Set`.
 
-## Store typed values in the cache
+## Store typed values
 
-Resolve the byte store from the container and pass the codec to the typed layer on top:
+Resolve the byte store, then wrap it:
 
 ```go
 // imports: config, container, cachememory ("github.com/zenta-dev/zever/adapters/cache/memory"),
@@ -60,11 +60,11 @@ fmt.Println(got.Name)
 Ada
 ```
 
-Use one `Codec[V]` per stored type, shared by writer and reader. Queue and session paths follow the same shape: bytes on the wire, typed values in handlers. Resolve those with `c.Queue()` and `c.Session()`.
+One `Codec[V]` per stored type, shared by writer and reader, queue and session paths share the shape (resolve with `c.Queue()` and `c.Session()`).
 
-## Write your own codec
+## Custom codecs
 
-Implement `Codec[V]` for a binary, compressed, or third-party format:
+Implement `Codec[V]` for other formats:
 
 ```go
 type gobCodec[V any] struct{}
@@ -75,41 +75,41 @@ func (gobCodec[V]) Decode(data []byte) (V, error) { /* ... */ }
 var _ codec.Codec[MyPayload] = gobCodec[MyPayload]{}
 ```
 
-Keep it symmetric: whatever `Encode` writes, `Decode` must read back, including after a version adds a field. `JSONCodec` ignores unknown fields and defaults missing ones.
+Keep `Encode`/`Decode` symmetric, `JSONCodec` ignores unknown fields and defaults missing ones.
 
-## Production checklist
+## Checklist
 
-- Never log encoded bytes at info level. Log IDs and sizes.
-- Keep payloads small: IDs and flags in sessions, not full records.
-- Use `JSONCodec` for any data you snapshot or hash.
+- Never log encoded bytes, log IDs/sizes.
+- Keep payloads small.
+- Use `JSONCodec` for snapshots and hashes.
 
 ## JSON engine
 
-All JSON goes through `shared/codec`, built on `encoding/json/v2` (Go 1.27). Import the facade, never the engine directly. Defaults are Deterministic key order plus the Duration string form (`"30s"`, the shape the env layer parses). Reach for `UnmarshalStrict` when a format must fail closed on unknown fields, and `MarshalIndentCompat` only for stamp output whose bytes must stay stable.
+All JSON goes through `shared/codec` (`encoding/json/v2`, Go 1.27): import the facade, never the engine. Defaults are deterministic key order and Duration strings (`"30s"`, as env parses). `UnmarshalStrict` fails closed on unknown fields, `MarshalIndentCompat` is for stable stamp output only.
 
 ## Troubleshooting
 
 <details>
-<summary>Decode fails after adding a field</summary>
+<summary>Added field breaks decode</summary>
 
-Added keys default fine, so the cause is a changed type. Keep JSON types stable or add a versioned wrapper type.
+Added keys default fine, a changed type is the culprit. Keep JSON types stable or version the wrapper.
 </details>
 
 <details>
 <summary>Cache reads return zero values</summary>
 
-Writer and reader use different codecs. Build both sides from one `Codec[V]`.
+Different codecs on writer and reader, build both from one `Codec[V]`.
 </details>
 
 <details>
 <summary>Snapshot tests flap</summary>
 
-Use `JSONCodec` for snapshotted data, or sort keys in `Encode`.
+Use `JSONCodec`, or sort keys in `Encode`.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Sessions" href="../sessions/" description="Server-side rows behind a cookie." />
-  <LinkCard title="Redis" href="../../data/redis/" description="The shared byte store codecs write through." />
+  <LinkCard title="Sessions" href="../sessions/" description="Server-side rows." />
+  <LinkCard title="Redis" href="../../data/redis/" description="Shared byte store." />
 </CardGrid>

@@ -5,24 +5,24 @@ description: How small interfaces, typed providers, and the container make backe
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every backend concern is one small interface with several adapters, resolved only by the container. Changing `sqlite` to `postgres` or `memory` to `redis` stays a wiring and env edit, never a handler rewrite.
+Each backend concern is one small interface with several adapters, resolved only by the container: swaps stay wiring-plus-env edits, never handler rewrites.
 
 ## The mental model
 
 | Role | Rule |
 |---|---|
-| Interface | Stays small. Never add methods (it breaks implementers); add a new interface instead. |
-| Adapter | One subdirectory per backend, bound to a `Ref` by `container.Provide`. |
-| Container | Sole resolver; owns construction, caching, retry, and close. |
-| Config | Feeds the options (`DB_MAX_CONNS=20`). There is no adapter key: the backend is the wired constructor. |
+| Interface | Stays small: never add methods, add an interface instead. |
+| Adapter | One subdirectory per backend, `Provide`-bound to a `Ref`. |
+| Container | Sole resolver: construction, caching, retry, close. |
+| Config | Feeds options only. No adapter key, the backend is the wired constructor. |
 
-Application code speaks the interface; the container speaks the typed providers:
+In handlers:
 
 ```go
 conn, err := c.DB() // the wired db instance, built once and cached
 ```
 
-Each battery keeps one small interface plus typed `Options` and a `DefaultRef`. Adapters are plain constructors wired with `container.Provide`:
+Each battery is one interface plus typed `Options` and a `DefaultRef`. Adapters are plain constructors bound by `container.Provide`:
 
 ```go
 // Package db: one small interface.
@@ -50,13 +50,13 @@ func Providers() []container.Provider {
 
 ## Swap an adapter
 
-Development uses zero infrastructure; production changes the wiring and the env, never the call sites:
+Dev stays zero-infra. Production changes wiring and env:
 
 ```sh
 zever add cache/redis
 ```
 
-That edits `internal/app/wiring.go`: the `cache` `Ref` binds the redis adapter now, and `.env.example` gains the keys the new adapter reads. The env then carries that adapter's options:
+That edits `internal/app/wiring.go` (the `cache` `Ref` now binds redis. `.env.example` gains its keys). The env carries that adapter's options:
 
 ```sh
 DB_DSN=postgres://app:secret@db:5432/app
@@ -64,16 +64,16 @@ DB_MAX_CONNS=20
 CACHE_ADDR=redis:6379
 ```
 
-Env names carry no prefix: the default instance reads `<SERVICE>_<FIELD>` (`DB_MAX_CONNS=20`), and a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAX_CONNS=20`) but only reaches the container through a matching named Ref such as `db.Ref("primary")`. Every instance opens the adapter its `container.Provide` call binds. Handlers keep calling `c.DB()` and `c.Cache()`. `zever doctor` reports per-service health. Under zero-infra defaults, the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not framework bugs.
+Env names carry no prefix. The default instance reads `<SERVICE>_<FIELD>` (`DB_MAX_CONNS=20`), a named instance reads `<SERVICE>__<NAME>__<FIELD>` (`DB__PRIMARY__MAX_CONNS=20`) and only resolves through a matching named Ref such as `db.Ref("primary")`. Each instance opens the adapter its `container.Provide` call binds while handlers keep calling `c.DB()` and `c.Cache()`. `zever doctor` reports per-service health. Under zero-infra defaults the bookings example documents expected FAILs (missing API key, JWT secret, cities file, embed FS): config gaps, not bugs.
 
-Most swaps are invisible to handlers: placeholders stay `?` on both `db` drivers (postgres rewrites to `$n` before pgx) and route params read through `router.Param`. Where backends differ, the adapter fails fast or documents the gap. Two known gaps:
+Placeholders stay `?` on both `db` drivers (postgres rewrites to `$n` before pgx). Route params read through `router.Param`. Two known gaps:
 
 - `MinConns` is a pool minimum on postgres but `SetMaxIdleConns` on sqlite.
 - Regex route constraints exist on fiber but not stdhttp.
 
-## Pick from the adapter matrix
+## Adapter matrix
 
-An excerpt follows. The full table covers all 37 services from `ai` to `workflow`, each with a default adapter (zero-infra except `ai`): see the [adapters matrix](../../reference/adapters-matrix/).
+Excerpt. The full table covers all 37 services, each zero-infra by default except `ai`: [adapters matrix](../../reference/adapters-matrix/).
 
 | Service | Adapters | Default |
 |---|---|---|
@@ -90,59 +90,59 @@ An excerpt follows. The full table covers all 37 services from `ai` to `workflow
 | `log` | `noop`, `zerolog`, `slog`, `pretty` | `slog` |
 | `secrets` | `env`, `vault` | `env` with `ZEVER` prefix |
 
-The `search`, `vectorstore`, and `workflow` services take `db` as their DB-backed adapter: the DSN decides the backend, so an empty or sqlite DSN selects the embedded SQLite one and a postgres URL selects PostgreSQL. The older `postgres`, `sqlite`, and `pgvector` names for those services are gone.
+`search`, `vectorstore`, and `workflow` use `db` as their DB-backed adapter, so the DSN picks the backend: empty or sqlite selects embedded SQLite, a postgres URL selects PostgreSQL. The old `postgres`/`sqlite`/`pgvector` names for those services are gone.
 
 ## Add a new adapter
 
-1. Implement the existing interface exactly: no extra exported methods on the facade.
-2. Parse options with typed readers and return `InvalidOptionsError` on unparsable values.
-3. Never log raw option maps; expose redaction through `Redact` / `RedactedServices`.
-4. Make shutdown cheap and idempotent: implement `Close(ctx)`, `Close()`, or `Stop()` so the container's probing finds it.
-5. Keep tests hermetic (sqlite `:memory:`, in-memory fakes) and gate live tests behind env such as `POSTGRES_DSN`.
+1. Implement the interface exactly: no extra exported methods on the facade.
+2. Parse options with typed readers. Return `InvalidOptionsError` on unparsable values.
+3. Never log raw option maps. Redact via `Redact` / `RedactedServices`.
+4. Make shutdown cheap and idempotent: implement `Close(ctx)`, `Close()`, or `Stop()` for the container's probing.
+5. Keep tests hermetic (sqlite `:memory:`, in-memory fakes). Gate live tests behind env such as `POSTGRES_DSN`.
 
-Unexported adapter structs are named `driver` with receiver `d`; timeouts are `time.Duration` with `Default*Timeout` constants.
+Unexported adapters are named `driver` (receiver `d`). Timeouts are `time.Duration` with `Default*Timeout` constants.
 
 ## Design decisions and trade-offs
 
-- **Close shape is a provider contract.** See [Container](../container/#close-services-in-order) for which signature each adapter takes.
-- **Fail closed.** Unsupported ORM features return `dialect.ErrUnsupportedByDialect` (prefixed `orm:`) instead of wrong SQL, strict config rejects unknown keys at load, and redaction masks secrets everywhere.
+- **Close shape is contractual.** See [Container](../container/#close-services-in-order) for each adapter's signature.
+- **Fail closed.** Unsupported ORM features return `dialect.ErrUnsupportedByDialect` (prefixed `orm:`), strict config rejects unknown keys at load, redaction masks secrets everywhere.
 
 ## Troubleshooting
 
 <details>
 <summary>The swap changes nothing at runtime</summary>
 
-Cause: the wiring still binds the old adapter. Fix: check the `container.Provide` line in `internal/app/wiring.go` and rebuild; remove any leftover `*_ADAPTER` key from `.env` (the resolver rejects it).
+The wiring still binds the old adapter. Check the `container.Provide` line in `internal/app/wiring.go` and rebuild. Drop any leftover `*_ADAPTER` key from `.env`.
 </details>
 
 <details>
 <summary>An accessor fails with `NotWiredError`</summary>
 
-Cause: no `container.Provide` entry covers the service. Fix: add the import plus the `Provide` line in `internal/app/wiring.go` and rebuild; remove any leftover `*_ADAPTER` key from `.env`.
+No `container.Provide` entry covers the service. Add the import and `Provide` line in `internal/app/wiring.go` and rebuild. Drop leftover `*_ADAPTER` keys.
 </details>
 
 <details>
 <summary>A handler sees different SQL on postgres</summary>
 
-Cause: a misunderstanding of the placeholder rewrite. Fix: keep writing `?`; the postgres driver rewrites to `$n` before pgx.
+Keep writing `?`. The postgres driver rewrites to `$n` before pgx.
 </details>
 
 <details>
 <summary>A fiber-only route constraint breaks stdhttp</summary>
 
-Cause: regex constraints exist on fiber only. Fix: restructure the route using constructs both drivers share, or pin `fiber`.
+Regex constraints exist on fiber only. Restructure the route with constructs both drivers share, or pin `fiber`.
 </details>
 
 <details>
 <summary>A live adapter test fails in CI</summary>
 
-Cause: the test needs a real backend but no DSN is set. Fix: gate it behind env (`POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable'`).
+The test needs a real backend with no DSN set. Gate it behind env (`POSTGRES_DSN='postgres://user:pass@localhost:5432/test?sslmode=disable'`).
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Container" description="Sole-resolver mechanics and accessor table." href="../container/" />
+  <LinkCard title="Container" description="Sole-resolver mechanics, accessor table." href="../container/" />
   <LinkCard title="Lifecycle" description="When resolution and close run." href="../lifecycle/" />
   <LinkCard title="Compiler boundary" description="Why providers never import the compiler." href="../compiler-boundary/" />
   <LinkCard title="Query builder" description="Dialect gating over db.DB." href="../../guides/data/query-builder/" />

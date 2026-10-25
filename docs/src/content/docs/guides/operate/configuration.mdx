@@ -5,14 +5,14 @@ description: Service configuration via environment variables (no config files)
 
 import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever reads all service configuration from **environment variables only**. There are **no config files**: `zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read, so a stale one in the working directory contributes nothing.
+Zever reads all service configuration from **environment variables only**. `zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are never read.
 
 ## Quick start
 
 Layers (later wins): `defaults < .env < .env.local < process environment`.
 
-- **defaults**: `config.Default()`, which uses zero-infra adapters (sqlite, slog, stdhttp, memory caches, etc.)
-- **`.env`**: project-committed example + local overrides (gitignored)
+- **defaults**: `config.Default()` with zero-infra adapters (sqlite, slog, stdhttp, memory caches)
+- **`.env`**: committed example plus local overrides (gitignored)
 - **`.env.local`**: machine-local overrides (gitignored, higher priority)
 - **process environment**: highest priority, no file I/O
 
@@ -31,10 +31,7 @@ resolved, err := config.Resolve(env) // typed Config
 container.New(resolved, app.Providers()...)
 ```
 
-`config.LoadEnv(files...)` is the explicit-file variant of `FromEnv`: it
-parses the dotenv files you name (no `.env`/`.env.local` discovery, no
-process environment) and returns an `Env` map, so it feeds `config.Resolve`
-the same way.
+`config.LoadEnv(files...)` is the explicit-file variant of `FromEnv`: it parses only the dotenv files you name (no `.env`/`.env.local` discovery, no process environment) and returns an `Env` map for `config.Resolve`.
 
 ## Map environment variables to keys
 
@@ -44,16 +41,14 @@ Env names carry no prefix: `<SERVICE>_<FIELD>`, uppercased.
 - Named instance: `SERVICE__NAME__FIELD` (e.g., `DB__ANALYTICS__DSN=...`)
 
 A named instance only reaches the container through a matching named Ref
-(`db.Ref("analytics")`) wired with `container.Provide`; the default instance
+(`db.Ref("analytics")`) wired with `container.Provide`. The default instance
 reads the flat `SERVICE_FIELD` namespace.
 
-Matching ignores case and `_`, so `MAX_RETRIES` matches `MaxRetries` and
-`DB_MAX_CONNS` matches `DB_MAXCONNS`. One nesting level is supported
-(`AUTH_JWT_SECRET` sets `Options.JWT.Secret`); the split point is resolved by
-matching, not by counting underscores, so a segment that carries an `_` of its
-own works too (`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`).
+Matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`. One nesting level is supported
+(`AUTH_JWT_SECRET` sets `Options.JWT.Secret`). The split point resolves by
+matching, not underscore counting, so a segment with its own `_` still works (`WEBHOOK_QUEUE_OPTS_BUFFER` sets `Options.QueueOpts.Buffer`).
 
-Durations accept `"5s"` strings in env; there is no integer form.
+Durations accept `"5s"` strings in env, there is no integer form.
 
 ## Wired defaults (zero-infra)
 
@@ -66,12 +61,11 @@ Durations accept `"5s"` strings in env; there is no integer form.
 | router | stdhttp |
 | ... | (see the `container.Provide` entries in `internal/app/wiring.go`) |
 
-Backends are compiled in: changing a default means changing the wired import plus its `Provide` entry and rebuilding. There is no adapter key in `.env` -- any `*_ADAPTER` key fails resolution.
+Backends are compiled in: changing a default means changing the wired import plus its `Provide` entry and rebuilding. No adapter key exists in `.env`. Any `*_ADAPTER` key fails resolution.
 
 ## Migration from v0.7
 
-The map below is the upgrade path, not a runtime fallback: v0.8 reads `.env`,
-`.env.local`, and the process environment, and nothing else.
+v0.8 reads `.env`, `.env.local`, and the process environment, nothing else.
 
 > Adapter selection moved out of config after v0.8: any `*_ADAPTER` key now
 > fails resolution. Wire the backend in `internal/app/wiring.go` with an
@@ -81,33 +75,30 @@ The map below is the upgrade path, not a runtime fallback: v0.8 reads `.env`,
 |------|------|
 | `zever.yaml` | `.env` + `wiring.go` |
 | `config.Load("")` | `config.FromEnv()` + `config.Resolve(env)` |
-| `ServiceConfig.Adapter` | `<SERVICE>_ADAPTER` (v0.8 only; removed afterwards -- see below) |
+| `ServiceConfig.Adapter` | `<SERVICE>_ADAPTER` (v0.8 only, removed afterwards -- see below) |
 | `DB_MAXCONNS` | `DB_MAXCONNS` (same) |
 | `DB__ANALYTICS__DSN` | `DB__ANALYTICS__DSN` (same format) |
 | `zever doctor --config` | `zever doctor` (no flag) |
 
-Backends have no env form at all: any `*_ADAPTER` key (including the old `<SERVICE>_ADAPTER` shape) fails `config.Resolve`. The container binds the adapter implementation per instance in `wiring.go` with `container.Provide`; see the [Container concept page](../../../concepts/container/).
+Backends have no env form: any `*_ADAPTER` key fails `config.Resolve`. The container binds the adapter per instance in `wiring.go` with `container.Provide`. See the [Container concept page](../../../concepts/container/).
 
 ## Legacy config files
 
-`zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are **never read**.
-The framework does not look for them: no probe, no discovery step, no warning.
-A stale file in the working directory is simply ignored, so the values in it are
-lost without a word.
+`zever.yaml`, `zever.yml`, `zever.json`, and `zever.toml` are **never read**: no probe, no warning. A stale file is ignored and its values are lost.
 
 Upgrading from v0.7? Move every stanza into `.env` (or the process environment)
-and into the typed `container.Provide` wiring yourself, then delete the file.
+and the typed `container.Provide` wiring, then delete the file.
 The [migration guide](../migration/) carries the key-by-key map.
 
 ## Generated env template
 
-`zever new` and `zever add` generate `.env.example` with every env key, default value, and comment. This is the authoritative source for what env vars each service accepts.
+`zever new` and `zever add` generate `.env.example` with every env key, default value, and comment: the authoritative source for service env vars.
 
 ## Redact config before printing
 
-Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: error text names services and fields only, and `zever config show` prints one `<service>  driver=<x>` header per service plus its masked options, then a `<service>/<NAME>` section per named instance. The driver names the code-wired constructor from `internal/app/wiring.go`; the config carries options only.
+Raw option maps may hold secrets. `(*Config).RedactedServices` (built on `Redact`) is the sole display path: `zever config show` prints one `<service>  driver=<x>` header per service plus masked options, then a `<service>/<NAME>` section per named instance. The driver names the code-wired constructor from `internal/app/wiring.go`.
 
-Duration options (`DB_MAX_CONN_LIFETIME`, `AI_TIMEOUT`, ...) print in the same string form the env layer parses (`30s`, `5m`), in the human table and the `--json` envelope alike, never as a raw nanosecond count.
+Duration options (`DB_MAX_CONN_LIFETIME`, `AI_TIMEOUT`, ...) print as the env string form (`30s`, `5m`) in the human table and `--json` alike, never as nanoseconds.
 
 ```go title="main.go"
 for name, sc := range cfg.RedactedServices() {
@@ -121,34 +112,30 @@ for name, sc := range cfg.RedactedServices() {
 
 ## Know the defaults
 
-Defaults pick the zero-infra adapter per service (`db` sqlite, `cache`/`queue`/`session` memory, `storage` local, `log` slog, `observability` stdout, `payment`/`billing` stub, `secrets` env with prefix `ZEVER`). Two need keys: `ai` defaults to `anthropic` and requires an API key, and `mailer` defaults to `log` with a dummy `localhost:25`. The full table is the [adapters matrix](../../../reference/adapters-matrix/).
+Defaults pick the zero-infra adapter per service (`db` sqlite, `cache`/`queue`/`session` memory, `storage` local, `log` slog, `observability` stdout, `payment`/`billing` stub, `secrets` env). Two need keys: `ai` defaults to `anthropic` and needs an API key. `mailer` defaults to `log`. Full table: [adapters matrix](../../../reference/adapters-matrix/).
 
 ## Troubleshooting
 
 <details>
 <summary>Unknown field error</summary>
 
-The variable's field name matches no option, so `config.Resolve` fails with a did-you-mean hint. Env matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`; a real typo such as `DB_MAXCONNX` is the failure case.
+The field matches no option, so `config.Resolve` fails with a did-you-mean hint. Matching ignores case and `_`, so `DB_MAXCONNS` and `DB_MAX_CONNS` both set `MaxConns`. `DB_MAXCONNX` is the failure case.
 </details>
 
 <details>
 <summary>Unknown field under a wired service prefix</summary>
 
-`config.Resolve` fails when the key is close to a known field: it is a typo, and the error carries a did-you-mean hint (`DB_MAXCONN` → `did you mean "max_conns"?`). Check the service's options struct.
+`config.Resolve` fails when the key is close to a known field (a typo). The error carries a did-you-mean hint (`DB_MAXCONN` → `did you mean "max_conns"?`).
 </details>
 
 <details>
 <summary>`DB_MAX_CONNS=abc` returns `InvalidOptionsError`</summary>
 
-A resolved field failed to parse. Set an integer. Unset variables are ignored, bad values are not.
+A resolved field failed to parse. Set an integer. Unset variables are ignored. Bad values error.
 </details>
 
 <details>
 <summary>`AUTH_TOKEN` fails at startup</summary>
 
-`AUTH_TOKEN` names no field of the `auth` service, and it is close to none of them, so it is treated as an unrelated ambient variable and ignored, which is usually a mistake. Set the real key: `AUTH_JWT_SECRET` (or `AUTH_OIDC_ISSUER`, `AUTH_SESSION_SECRET`). To make such keys fail loudly instead, run with `ZEVER_CONFIG_STRICT=1`, or use a near-miss spelling such as `AUTH_JWT_SECRT`, which is reported as a typo with a did-you-mean hint.
+`AUTH_TOKEN` names no `auth` field and is close to none, so it is ignored as unrelated ambient noise (usually a mistake). Set `AUTH_JWT_SECRET` (or `AUTH_OIDC_ISSUER`, `AUTH_SESSION_SECRET`). Run with `ZEVER_CONFIG_STRICT=1` to fail loudly, or use a near-miss spelling such as `AUTH_JWT_SECRT`, which reports a typo hint.
 </details>
-
-<Aside type="danger" title="Dev-only keys">
-`Default()` belongs in local dev and tests: its crypto key is deterministic and public. Supply `AUTH_JWT_SECRET`, the crypto key, and provider keys from env or a mounted file in production.
-</Aside>

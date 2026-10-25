@@ -5,7 +5,7 @@ description: Run multi-step operations with pivot roll-forward and reverse compe
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Use a saga for multi-resource operations you cannot fit in one database transaction (reserve a seat, charge a card, issue a ticket). Each `SagaStep` has a forward `Execute` and optional reverse `Compensate`; on failure the runner compensates executed steps in reverse, or rolls forward with retries after a pivot step. A crash resumes from the persisted position, and a step never re-executes after its progress is persisted. Sagas ride the `workflow` battery; there is no separate saga config entry.
+A saga fits multi-resource operations that don't fit one transaction (reserve a seat, charge a card, issue a ticket). Each `SagaStep` has forward `Execute` plus optional reverse `Compensate`, on failure the runner compensates executed steps in reverse, or rolls forward with retries after a pivot. Crashes resume from persisted position, a persisted step never re-executes. Sagas ride the `workflow` battery, no separate saga config.
 
 ## Quick start
 
@@ -48,20 +48,20 @@ func main() {
 b-1 completed
 ```
 
-If `charge-card` fails, the run prints only `released seat-7` (the failed step itself is not compensated) and the status is `failed`. With `Pivot: true` on `reserve-seat`, a later failure rolls forward with retries and never compensates. Type-assert the resolved workflow to `workflow.SagaRegistrar`, `SagaRunner`, and `SagaInspector`; both `memory` and `db` implement all three, and engines without saga support are unaffected.
+If `charge-card` fails, the run prints only `released seat-7` (the failed step itself is never compensated) with status `failed`. `Pivot: true` on `reserve-seat` rolls forward with retries instead. Type-assert the resolved workflow to `workflow.SagaRegistrar`/`SagaRunner`/`SagaInspector`, both `memory` and `db` implement all three.
 
 ## Understand steps, pivots, and replay
 
-- `SagaStep{Name, Execute, Compensate, Pivot}`: forward action plus optional rollback (nil `Compensate` means none). Input and output must be JSON-marshalable.
-- `SagaRegistrar.RegisterSaga(name, steps)`: registers or replaces the definition. Definitions are in-memory (steps are funcs); only run progress is durable.
-- `SagaRunner.RunSaga(ctx, name, input, workflowID)`: starts or resumes. Empty `workflowID` generates one; a matching ID resumes that run (terminal runs return their ID unchanged, others continue from the persisted `current_step`).
-- `SagaInspector.SagaStatus(ctx, runID)`: returns `Status`, `CurrentStep`, `FailedStep`, and `Err`.
+- `SagaStep{Name, Execute, Compensate, Pivot}`: forward action + optional rollback (nil = none). Input/output must be JSON-marshalable.
+- `RegisterSaga(name, steps)`: registers/replaces the definition. Definitions are in-memory (steps are funcs), only run progress is durable.
+- `RunSaga(ctx, name, input, workflowID)`: starts or resumes. Empty `workflowID` generates one, a matching ID resumes (terminal runs return unchanged, others continue from persisted `current_step`).
+- `SagaStatus(ctx, runID)`: returns `Status`, `CurrentStep`, `FailedStep`, `Err`.
 
 Statuses: `pending`, `running`, `completed`, `compensating`, `failed`, `compensation_failed`.
 
-**Pivot.** When a step fails and an earlier executed step has `Pivot=true`, the saga commits to completing: it retries remaining steps forward with backoff and never compensates. Otherwise it compensates executed steps in reverse, skipping nil `Compensate` and (on db) steps already compensated before a crash. A failed compensation marks the run `compensation_failed` and may need manual intervention.
+**Pivot.** A failed step with an earlier executed `Pivot=true` step commits to completing: retries remaining steps forward, never compensates. Otherwise compensates executed steps in reverse, skipping nil `Compensate` and (on db) already-compensated steps. Failed compensation marks the run `compensation_failed`, may need manual fix.
 
-**Replay.** `RunSaga` with the same `workflowID` never re-executes a completed step. On db, the run row's `current_step` and the `run_id:step_index` guard make replay safe once progress is persisted; on memory, the `executed` index does the same.
+**Replay.** Same `workflowID` never re-executes a completed step: on db via persisted `current_step` + `run_id:step_index` guard, on memory via the `executed` index.
 
 ## Declare a saga in .zen
 
@@ -81,7 +81,7 @@ saga CheckoutSaga {
 }
 ```
 
-`execute` is required per `step`; `compensate` and `pivot` are optional (`pivot` defaults to `false`). Step names are unique within a saga, and at most one step may set `pivot: true`. Both `execute` and `compensate` reference `<Service>.<RPC>` and resolve against every service in the schema, so a saga may compose RPCs across modules.
+`execute` is required per `step`, `compensate`/`pivot` optional (`pivot` defaults `false`). Step names are unique per saga, at most one step sets `pivot: true`. `execute`/`compensate` reference `<Service>.<RPC>` across every schema service, so sagas compose RPCs across modules.
 
 For each module with a saga, the `gogen` backend emits `<module>/saga.go` with per-step typed input/output structs, a `SagaCaller` interface, and `RegisterSagas`:
 
@@ -127,11 +127,11 @@ func RegisterSagas(reg workflow.TypedSagaRegistrar, caller SagaCaller) {
 
 ## Wire generated sagas at boot
 
-`SagaCaller` is the one seam the host supplies; `RegisterSagas` is deliberately not called from `RegisterModule`, so wiring stays explicit. Implement one method per step with [`shared/grpcclient`](../grpc-client/) (dial, marshal `in`, invoke `<Service>/<Method>`, unmarshal into `out`) or an in-process dispatcher, which needs no gRPC because the generated file depends only on `core/workflow`. Resolve `c.Workflow()`, type-assert it to `workflow.TypedSagaRegistrar` (both `memory` and `db` implement it alongside `SagaRegistrar`), and call `app.RegisterSagas(reg, caller)` once at boot. Step inputs/outputs convert across step boundaries with encoding/json inside `workflow.NewTypedStep`, so keep every generated struct JSON-marshalable.
+`SagaCaller` is the one seam the host supplies, `RegisterSagas` is deliberately not called from `RegisterModule`. Implement one method per step with [`shared/grpcclient`](../grpc-client/) (dial, marshal `in`, invoke `<Service>/<Method>`, unmarshal `out`) or an in-process dispatcher (no gRPC, generated file depends only on `core/workflow`). Resolve `c.Workflow()`, assert to `workflow.TypedSagaRegistrar` (both `memory`/`db` implement it), call `app.RegisterSagas(reg, caller)` once at boot. `workflow.NewTypedStep` converts inputs/outputs via encoding/json, keep structs JSON-marshalable.
 
 ## Recover crashed runs
 
-Use `db` for anything durable: it persists `current_step` after each successful step in `workflow_saga_runs`, extends a lease while running, and creates `workflow_saga_runs` and `workflow_saga_compensations` when missing. Recovery is explicit and caller-driven, with no background goroutine. Call `RecoverStuckSagas` through a local interface to resume runs stuck in `running` or `compensating` whose lease expired:
+Use `db` for durability: persists `current_step` after each successful step in `workflow_saga_runs`, extends a lease while running, creates `workflow_saga_runs`/`workflow_saga_compensations` when missing. Recovery is explicit and caller-driven (no background goroutine), call `RecoverStuckSagas` to resume `running`/`compensating` runs with expired leases:
 
 ```go title="recover.go"
 type sagaRecoverer interface {
@@ -150,46 +150,24 @@ if ok {
 | `memory` | `adapters/workflow/memory` | Default. In-process saga state, non-durable. A restart loses all runs. |
 | `db` | `adapters/workflow/db` | Durable runs, lease-based crash recovery, `RecoverStuckSagas`. |
 
-Switching `memory` to `db` needs no call-site change, only a different `container.Provide` entry. The db adapter can share one pool with the other batteries on its DSN via `NewFromDB` (first opener's `max_conns` wins); use `dedicated_pool: true` with a separate database under load. Keys: [workflow config reference](../../../reference/config/#workflow).
+Switching `memory` to `db` needs no call-site change, only a different `container.Provide`. The db adapter shares one pool per DSN via `NewFromDB` (first opener's `max_conns` wins), use `dedicated_pool: true` with a separate database under load. Keys: [workflow config reference](../../../reference/config/#workflow).
 
 ## Production checklist
 
-- Make every step idempotent (locks plus idempotency keys for money-moving steps). Replicas on `memory` each see only their own runs.
-- Compensation is best-effort: make it idempotent and retryable. db retries each with bounded backoff and records attempts in `workflow_saga_compensations`.
-- Input and results become persisted state. Keep secrets and PII out, pass references, and never log raw option maps (use `config.RedactedServices`).
-- `Workflow.Close() error` takes no context. The container joins close errors via `errors.Join`; panics become `*ClosePanicError`.
+- Every step idempotent (locks + idempotency keys for money-moving steps). `memory` replicas each see only their own runs.
+- Compensation is best-effort: idempotent and retryable. db retries with bounded backoff, recording attempts in `workflow_saga_compensations`.
+- Inputs/results become persisted state: no secrets/PII, pass references, never log raw option maps (`config.RedactedServices`).
+- `Workflow.Close() error` takes no context, container joins errors via `errors.Join`, panics become `*ClosePanicError`.
 
 ## Troubleshooting
 
-<details>
-<summary>ErrUnknownSaga</summary>
-
-The name was never registered on this adapter instance (definitions are in-memory). Register the same definitions on every replica at boot, or `RecoverStuckSagas` skips those runs.
-</details>
-
-<details>
-<summary>A step re-runs after a crash</summary>
-
-The step was not idempotent. Gate side-effecting steps behind `lock` singletons and idempotency keys, and persist progress before the side effect where the adapter allows it.
-</details>
-
-<details>
-<summary>Runs stay in running after a crash</summary>
-
-Nobody called `RecoverStuckSagas`. Call it at worker boot with a lease window longer than the worst-case step latency.
-</details>
-
-<details>
-<summary>compensation_failed status</summary>
-
-A compensation itself failed. Inspect `workflow_saga_compensations` for the attempt count and last error, fix the cause, and re-drive the compensation manually.
-</details>
-
-<details>
-<summary>SagaStatus returns ErrSagaNotFound</summary>
-
-Unknown run ID, or the `memory` adapter restarted. Use `db` for anything that must survive a restart.
-</details>
+| Symptom | Fix |
+|---|---|
+| `ErrUnknownSaga` | Definitions are in-memory, register the same ones on every replica at boot or `RecoverStuckSagas` skips those runs |
+| Step re-runs after crash | Step not idempotent, gate side effects behind `lock` + idempotency keys |
+| Runs stay `running` after crash | Nobody called `RecoverStuckSagas`, call at worker boot with a lease window above worst-case step latency |
+| `compensation_failed` | A compensation failed, inspect `workflow_saga_compensations`, fix cause, re-drive manually |
+| `ErrSagaNotFound` | Unknown run ID, or `memory` restarted, use `db` for durability |
 
 ## Related
 

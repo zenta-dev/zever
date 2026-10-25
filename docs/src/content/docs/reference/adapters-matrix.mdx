@@ -3,11 +3,11 @@ title: Adapters matrix
 description: Every service, adapter, package, and container accessor in one table.
 ---
 
-Each `core/<b>` package holds one interface plus its `Options` and `DefaultRef`, each adapter is its own Go module at `adapters/<b>/<a>` exposing a `New` constructor, and the container resolves only what is Provided. This matrix maps service to adapter module, constructor, and accessor. Prefer a new interface over adding methods, which break implementers.
+Each `core/<b>` holds one interface plus `Options` and `DefaultRef`. Each adapter is a module at `adapters/<b>/<a>` exposing `New`. The container resolves only Provided entries. Prefer new interfaces over new methods.
 
 ## Swap an adapter in code
 
-Backends are compiled in: changing one means changing the import and the `container.Provide` entry in `internal/app/wiring.go`, then rebuilding. There is no adapter env key.
+Backends are compiled in: change the import plus `container.Provide` in `internal/app/wiring.go`, rebuild. No adapter env key.
 
 ```go
 import (
@@ -26,7 +26,7 @@ func Providers() []container.Provider {
 }
 ```
 
-Options still come from the environment (`CACHE_ADDR=redis:6379`, `DB_DSN=...`); only the backend choice lives in code.
+Options come from the environment (`CACHE_ADDR=redis:6379`, `DB_DSN=...`). Only the backend choice lives in code.
 
 ## Resolve through the container
 
@@ -42,15 +42,15 @@ if err != nil {
 }
 ```
 
-`New(nil)` is valid; untouched services close cleanly without opening. Accessors resolve lazily and retry on the next call after an error. `Job()` builds over the resolved `Queue`; `Scheduler()` shares both, so resolving `Scheduler()` resolves `Job()` and `Queue` as a side effect. An unwired service fails with `NotWiredError` naming the missing `container.Provide` entry.
+`New(nil)` is valid. Untouched services close without opening. Accessors resolve lazily, retrying after errors. `Job()` builds over `Queue`. `Scheduler()` shares both. Unwired services fail `NotWiredError` naming the missing `Provide`.
 
-All defaults (memory/local/sqlite/log/noop) fit single-process dev. Move shared state to redis/postgres for multi-instance staging by swapping the wired constructors, then rebuilding.
+Defaults (memory/local/sqlite/log/noop) fit single-process dev. Share state via redis/postgres for multi-instance staging.
 
 ## Adapter reference
 
-Each row is `| service | adapter | module | constructor | accessor |`. The container wires nothing itself: every adapter resolves only after its `container.Provide` entry runs, and only imported adapters link into the binary. `none (no backend)` marks the `job` dispatcher, which builds over the resolved queue instead of opening a backend.
+Rows are `| service | adapter | module | constructor | accessor |`. Nothing resolves without `container.Provide`. Only imported adapters link in. `none (no backend)` is the `job` dispatcher over `Queue`.
 
-Install every adapter module you resolve (replace `vX.Y.Z` with the lockstep release version):
+Install each resolved adapter module (`vX.Y.Z` = lockstep release):
 
 ```sh
 go get github.com/zenta-dev/zever/adapters/cache/redis@vX.Y.Z
@@ -175,17 +175,17 @@ container.Provide(Cache, cacheredis.New)
 
 ## Production notes
 
-- `Close(ctx)` closes only resolved services, dependents first; see [API index](../api-index/) for order and close shapes.
-- `grpc` has a lazy `*grpc.Server` singleton accessor (`GRPC(opts...)`) with no registry; `EventBus()` keeps an `Eventbus()` alias and `RateLimit()` a `Ratelimit()` alias.
-- Do not add methods to public interfaces; prefer new interfaces so external implementers keep compiling.
-- Shared redis/postgres endpoints become critical path: monitor, pool (`max_conns`), and bound timeouts per service.
+- `Close(ctx)` closes only resolved services, dependents first. See [API index](../api-index/) for order and shapes.
+- `grpc` is a lazy `*grpc.Server` singleton (`GRPC(opts...)`) with no registry. `Eventbus()` aliases `EventBus()`, `Ratelimit()` aliases `RateLimit()`.
+- Never add methods to public interfaces. Prefer new interfaces.
+- Shared redis/postgres endpoints are critical path: monitor, pool (`max_conns`), and bound per-service timeouts.
 
 ## Troubleshooting
 
-- **State differs per instance**: a `memory` adapter is still in the mix (cache, queue, session, lock). Move each shared-state service to `redis`.
-- **Logins lost on restart**: `session` on `memory` does not survive restarts. Use a shared session store for anything beyond local dev.
-- **Jobs run twice or not at all**: workers each resolved an isolated `memory` queue. Point all workers at the same shared queue (`redis`, or `db` on one database).
-- **Swap did not take effect**: the wiring still binds the old adapter. Check the `container.Provide` line in `internal/app/wiring.go`, rebuild, and make sure no leftover `*_ADAPTER` key sits in `.env` (the resolver rejects it).
+- **State differs per instance**: a `memory` adapter is still wired (cache, queue, session, lock). Move shared state to `redis`.
+- **Logins lost on restart**: `session` on `memory` is ephemeral. Use a shared store beyond local dev.
+- **Jobs run twice or not at all**: workers resolved isolated `memory` queues. Point them at one shared queue (`redis`, or `db` on one database).
+- **Swap did not apply**: wiring still binds the old adapter. Check `container.Provide` in `internal/app/wiring.go`, rebuild, and drop stale `*_ADAPTER` keys from `.env` (rejected by the resolver).
 
 ## Related
 

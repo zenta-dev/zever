@@ -5,11 +5,11 @@ description: Upload, probe, transform, and serve images and video with bounded s
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`media.Media` bundles the upload pipeline behind `Upload`, `Download`, `DownloadRange`, `Stat`, `Probe`, `Transform`, and `Delete`. It validates IDs, caps decode size, and probes format. For plain blobs, see [Storage and media](../storage-media/).
+`media.Media` bundles the upload pipeline: `Upload`, `Download`, `DownloadRange`, `Stat`, `Probe`, `Transform`, `Delete`. It validates IDs, caps decode size, probes format. For plain blobs, see [Storage and media](../storage-media/).
 
 ## Quick start
 
-`local` (default, `adapters/media/local`) writes under `root` and suits single instances and tests. `s3` (`adapters/media/s3`) needs `bucket`, `region`, and credentials. Transforms call the configured `ffmpeg` and `ffprobe` binaries.
+`local` (`adapters/media/local`, default) writes under `root` for single instances/tests. `s3` (`adapters/media/s3`) needs `bucket`, `region`, credentials. Transforms call `ffmpeg`/`ffprobe`.
 
 ```sh
 MEDIA_ROOT=/var/media
@@ -18,11 +18,11 @@ MEDIA_MAX_PIXELS=50000000
 MEDIA_PRESIGN_TTL=1h
 ```
 
-Defaults: `root` `/tmp/media`, `base_url` `/media`, `ffmpeg` and `ffprobe` on `PATH`, `max_download_bytes` 64 MiB, `max_pixels` 52428800, `derived_ttl` 10m, `presign_ttl` 1h (max 7 days), `max_duration` unlimited, `region` `us-east-1`. Durations are nanoseconds; env accepts `"1h"`. `Validate` rejects negative bounds. See the [media options](../../../reference/config/#media).
+Defaults: `root` `/tmp/media`, `base_url` `/media`, `ffmpeg`/`ffprobe` on `PATH`, `max_download_bytes` 64 MiB, `max_pixels` 52428800, `derived_ttl` 10m, `presign_ttl` 1h (max 7 days), `max_duration` unlimited, `region` `us-east-1`. Durations are nanoseconds, env accepts `"1h"`. See [media options](../../../reference/config/#media).
 
 ## Upload and probe an asset
 
-`Upload` generates the asset ID, so use `asset.ID` (not your path) for later calls. Register the adapter first; the container wires nothing. `Media()` resolves lazily, caches, and retries.
+`Upload` generates the ID: use `asset.ID` afterwards. Register the adapter first (container wires nothing). `Media()` is lazy, cached, retried.
 
 ```go title="main.go" check
 package main
@@ -67,33 +67,34 @@ func main() {
 size: 48210
 ```
 
-Values vary with your file. `Transform` takes `media.TransformOps` (`Width`, `Height`, `Format`, `Quality`, `Bitrate`, `CRF`, `Offset`) and returns the derived asset URL plus an error.
+`Transform` takes `media.TransformOps` (`Width`, `Height`, `Format`, `Quality`, `Bitrate`, `CRF`, `Offset`), returns derived URL plus error. The storage adapter does not affect this.
 
 ## Production checklist
 
-- `ValidID` accepts only ASCII letters, digits, hyphens, and underscores; it rejects empty, `.`, `..`, and anything containing `..`, blocking path traversal. Never build a storage key from a raw caller ID.
-- Decoded images are capped at `max_pixels` and downloads at `max_download_bytes`, so a crafted image cannot exhaust memory.
-- A `presign_ttl` over 7 days fails `Validate()` with `InvalidOptionsError`. It is rejected, not clamped.
-- Pin `ffmpeg` and `ffprobe` paths in config; `access_key_id` and `secret_access_key` never appear in logs.
+- `ValidID` accepts only ASCII letters/digits/hyphens/underscores, rejects empty, `.`, `..`, anything containing `..`. Never build a storage key from a raw caller ID.
+- Decoded images capped at `max_pixels`, downloads at `max_download_bytes`: crafted images cannot exhaust memory.
+- `presign_ttl` over 7 days fails `Validate()` with `InvalidOptionsError` (rejected, not clamped).
+- `Validate` rejects negative bounds on `max_download_bytes`, `max_pixels`, `derived_ttl`, `max_duration`, and `presign_ttl`, each must be `>= 0`.
+- Pin `ffmpeg`/`ffprobe` paths, `access_key_id`/`secret_access_key` never logged.
 
 ## Troubleshooting
 
 <details>
-<summary>`Stat` or `Download` fails on an ID you just uploaded</summary>
+<summary>`Stat` or `Download` fails on an ID you uploaded</summary>
 
-Cause: the ID failed `ValidID`, usually your own path instead of `asset.ID`. Fix: use the ID `Upload` returned; sanitize caller input.
+Bad ID (usually your path, not `asset.ID`). Use the returned ID.
 </details>
 
 <details>
 <summary>Transforms fail with "binary not found"</summary>
 
-Cause: `ffmpeg` or `ffprobe` is missing. Fix: install them or set absolute paths in config. The storage adapter does not affect this.
+`ffmpeg`/`ffprobe` missing. Install or set absolute paths in config.
 </details>
 
 <details>
 <summary>Startup fails with `InvalidOptionsError` on `presign_ttl`</summary>
 
-Cause: the TTL exceeds 7 days. Fix: lower it. The limit is enforced, not clamped.
+TTL exceeds 7 days. Lower it, the limit is enforced, not clamped.
 </details>
 
 ## Related

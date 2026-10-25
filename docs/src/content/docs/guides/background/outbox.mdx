@@ -5,9 +5,7 @@ description: Record events in the same transaction as your data and deliver them
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Use `outbox` to fix the dual-write hazard: a booking row and its `booking.created` event are two writes, and the row can commit while the event is lost. `Store.Record(ctx, tx, msg)` persists the message inside the caller's `db.Tx`, so both commit or neither does. A relay then publishes it at-least-once, and `Inbox` makes consumers idempotent.
-
-Use it for domain events, webhook fan-out, cache invalidation, and audit trails. Delivery is at-least-once, so pair it with `Inbox` (or your own idempotency key) on the consumer.
+Use `outbox` to fix dual-write: booking row + `booking.created` event are two writes, and the row can commit while the event is lost. `Store.Record(ctx, tx, msg)` persists inside the caller's `db.Tx`, so both commit or neither does. A relay publishes at-least-once, `Inbox` makes consumers idempotent. For domain events, webhook fan-out, cache invalidation, audit trails.
 
 ## Record an event and consume it once
 
@@ -86,18 +84,18 @@ inbox: <nil>
 
 The relay is not started here. `Start` publishes stored messages through the same `Publisher`.
 
-`Record` inserts in the caller's transaction (a nil `tx` fails with `ErrTxRequired`) and injects trace context from `ctx` into the stored headers, so the consumer continues the trace.
+`Record` inserts in the caller's transaction (nil `tx` fails with `ErrTxRequired`) and injects trace context from `ctx` into stored headers.
 
-`Inbox.Process` records `eventID` in the caller's transaction and runs the side effect only when the ID is new (`INSERT ... ON CONFLICT DO NOTHING`), so at-least-once delivery applies side effects once.
+`Inbox.Process` records `eventID` in the caller's transaction and runs the side effect only when the ID is new (`INSERT ... ON CONFLICT DO NOTHING`).
 
 ## Understand relay delivery and failure
 
-- The relay claims a batch with an atomic `UPDATE ... RETURNING` (postgres adds `FOR UPDATE SKIP LOCKED`, sqlite serializes on a process-local mutex), publishes each message through the `Publisher`, marks successes `processed`, and retries failures with `shared/retry` backoff.
-- Messages that exhaust `max_attempts` are marked `failed`: that is the dead-letter queue, left for inspection and repair through `outbox.Admin` (`List`/`Requeue`/`Purge`, plus `Deleter` on the `db` adapter), driven by the `zever outbox` CLI.
+- Relay claims a batch atomically (`UPDATE ... RETURNING`, postgres adds `FOR UPDATE SKIP LOCKED`, sqlite serializes on a process-local mutex), publishes via `Publisher`, marks successes `processed`, retries failures with `shared/retry` backoff.
+- Rows exhausting `max_attempts` are marked `failed`: the dead-letter queue, repaired via `outbox.Admin` (`List`/`Requeue`/`Purge`, plus `Deleter` on `db`), driven by `zever outbox` CLI.
 - Processed rows older than `retention` are deleted.
-- `Status()` reports `Pending`, `Processed`, `Failed`, `LastError`, and `Stalled` (oldest pending waits too long).
-- Any number of replicas can relay one table without double-publishing. If a replica crashes mid-publish, the row returns to pending when its `lock_seconds` lease expires.
-- When an observability provider is wired (`Options.Provider`, which `container.Outbox()` injects), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans (see [Outbox Ops](../outbox-ops/)).
+- `Status()` reports `Pending`, `Processed`, `Failed`, `LastError`, `Stalled` (oldest pending waits too long).
+- Any replica count relays one table without double-publish. A crash mid-publish returns the row to pending when its `lock_seconds` lease expires.
+- With observability wired (`Options.Provider`, injected by `container.Outbox()`), the relay emits `outbox.*` metrics and `outbox.publish`/`outbox.consume` spans (see [Outbox Ops](../outbox-ops/)).
 
 ## Configure the outbox
 
@@ -119,9 +117,9 @@ OUTBOX_DSN=postgres://app:secret@db:5432/app
 OUTBOX_POLL_INTERVAL=1s
 ```
 
-Keys are strict snake_case and durations take Go strings (`"30s"`, `"168h"`). Zero means the adapter default. `Validate` rejects negative intervals or budgets, unsafe table names, and a `publisher` outside `{eventbus, queue, ""}`. All keys: [outbox config reference](../../../reference/config/#outbox).
+Keys are strict snake_case, durations take Go strings (`"30s"`, `"168h"`). Zero means adapter default. `Validate` rejects negative intervals/budgets, unsafe table names, and `publisher` outside `{eventbus, queue, ""}`. All keys: [outbox config reference](../../../reference/config/#outbox).
 
-Core never imports `eventbus` or `queue`. Your wiring bridges a transport to the `Publisher` interface, and `Options.Publisher` only records which one.
+Core never imports `eventbus` or `queue`. Your wiring bridges a transport to `Publisher`, `Options.Publisher` only records which.
 
 ## Choose an adapter
 
@@ -129,9 +127,9 @@ Core never imports `eventbus` or `queue`. Your wiring bridges a transport to the
 |---|---|---|
 | `db` | `adapters/outbox/db` | Default. Durable sqlite or postgres polling relay, DLQ, retention. Also implements `Inbox`. |
 | `memory` | `adapters/outbox/memory` | Dev and tests. Publishes synchronously and keeps nothing, so a crash between `Record` and the publisher's ack loses the event. |
-| `cdc` | `adapters/outbox/cdc` | Postgres logical replication via `pg_logical_emit_message`. No polling loop. Needs `wal_level=logical`. |
+| `cdc` | `adapters/outbox/cdc` | Postgres logical replication via `pg_logical_emit_message`. No polling. Needs `wal_level=logical`. |
 
-The cdc adapter emits inside the caller's transaction, so a rollback drops the event. Its consumer tails the WAL through a replication slot and acknowledges the LSN only after a successful publish.
+The cdc adapter emits inside the caller's transaction, so rollback drops the event. Its consumer tails the WAL via a replication slot and acks the LSN after successful publish.
 
 ```sh
 OUTBOX_DSN=postgres://app:secret@db:5432/app
@@ -161,55 +159,23 @@ func openStore() error {
 }
 ```
 
-`Outbox()` resolves lazily and caches; on error the cache clears so the next call retries. It also injects the resolved `observability.Provider` into `Options.Provider`, so a container-opened store emits the relay metrics and spans described in [Outbox Ops](../outbox-ops/) without extra wiring. The container-opened store records messages but cannot `Start` its relay, because core `Options` carry no `Publisher`. Wire one through the adapter constructor (`OpenFromDB` in `adapters/outbox/db`, `New` in `adapters/outbox/cdc` and `adapters/outbox/memory`), as above.
+`Outbox()` resolves lazily and caches, on error the cache clears. It injects the resolved `observability.Provider` into `Options.Provider`, so a container-opened store emits relay metrics/spans from [Outbox Ops](../outbox-ops/) with no extra wiring. A container-opened store records but cannot `Start` its relay (core `Options` carry no `Publisher`), wire one via the adapter constructor (`OpenFromDB` in `adapters/outbox/db`, `New` in `cdc`/`memory`), as above.
 
 ## Production checklist
 
-- `Store.Close() error` takes no context. The container joins close errors via `errors.Join`, and panics become `*ClosePanicError`.
-- The `db` adapter shares one pool per exact DSN (first opener's `max_conns` wins). Use `dedicated_pool: true` under sustained load.
-- Payloads can carry PII: keep them small and reference-backed, and never log raw option maps (use `config.RedactedServices`).
+- `Store.Close() error` takes no context. Container joins close errors via `errors.Join`, panics become `*ClosePanicError`.
+- The `db` adapter shares one pool per exact DSN (first opener's `max_conns` wins). `dedicated_pool: true` under sustained load.
+- Payloads can carry PII: keep them small and reference-backed, never log raw option maps (`config.RedactedServices`).
 
 ## Troubleshooting
 
-<details>
-<summary>Start fails with "publisher is nil"</summary>
-
-Cause: the store was opened through the container or registry path, which carries no `Publisher`.
-
-Fix: wire one through the adapter constructor (`OpenFromDB` or `New`) as in the example.
-</details>
-
-<details>
-<summary>Messages sit pending forever</summary>
-
-Cause: the relay is not running (`Start` never called), or `Status().Stalled` is true.
-
-Fix: call `Start`, and check `LastError` for the claim or publish error.
-</details>
-
-<details>
-<summary>Failed rows accumulate</summary>
-
-Cause: the destination rejects the payload, or the `Publisher` errors. `max_attempts` (default 5) bounds retries.
-
-Fix: inspect `last_error` on the row, fix the cause, and re-drive the row.
-</details>
-
-<details>
-<summary>Consumers apply duplicate side effects</summary>
-
-Cause: the consumer is not idempotent.
-
-Fix: give every message a stable `ID` and dedupe through `Inbox.Process` (or your own idempotency key) in the same transaction as the side effect.
-</details>
-
-<details>
-<summary>The cdc adapter fails to start</summary>
-
-Cause: the server lacks `wal_level=logical`, or the publication and slot names do not match the configured values.
-
-Fix: set `wal_level=logical` and align the names. Live tests run with `POSTGRES_DSN` set.
-</details>
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Start` fails: "publisher is nil" | Opened via container/registry, which carries no `Publisher` | Wire one via adapter constructor (`OpenFromDB`/`New`) |
+| Messages sit pending | Relay not running, or `Status().Stalled` | Call `Start`, check `LastError` |
+| Failed rows accumulate | Destination rejects payload or `Publisher` errors (`max_attempts` default 5) | Inspect row `last_error`, fix cause, re-drive |
+| Duplicate side effects | Consumer not idempotent | Stable `ID` + `Inbox.Process` (or own key) in same txn as side effect |
+| cdc fails to start | No `wal_level=logical`, or publication/slot name mismatch | Set `wal_level=logical`, align names (`POSTGRES_DSN` for live tests) |
 
 ## Related
 

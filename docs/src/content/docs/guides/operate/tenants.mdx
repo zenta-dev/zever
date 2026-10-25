@@ -5,11 +5,11 @@ description: Resolve which tenant owns a request, from single-tenant to header-b
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`tenant` answers "which customer owns this request" without tenant parsing in every handler. `Resolve` maps request metadata to a tenant ID, and `Scoped` carries it on the context. It resolves ownership but is not an access gate: pair it with [Authorization](../../security/authz-permissions/) for allow and deny.
+`tenant` answers "which customer owns this request": `Resolve` maps request metadata to a tenant ID, `Scoped` carries it on the context. Ownership only, never authorization. Pair it with [Authorization](../../security/authz-permissions/).
 
 ## Quick start
 
-`single` (the default) gives every request one hardcoded ID (`id`, default `"default"`). Stay there until a second customer exists.
+`single` (default) gives every request one hardcoded ID (`id`, default `"default"`).
 
 ```go title="main.go"
 import (
@@ -32,7 +32,7 @@ scoped, err := t.Scoped(ctx, id)
 fmt.Println(scoped != nil, err)
 ```
 
-Expected output:
+Output:
 
 ```text
 default <nil>
@@ -41,52 +41,47 @@ true <nil>
 
 ## Resolve tenants from a header or subdomain
 
-Use `header` for multi-tenant SaaS APIs where a gateway or client sets a per-call header (default `X-Tenant-ID`, `DefaultHeader`). With `X-Tenant-ID: acme` metadata, `Resolve` returns `acme`. The header wins; otherwise `subdomain_regex` matches the first capture group against the lowercased `Host` metadata. With neither, `Resolve` returns `tenant.ErrNotFound`. Meta keys match case-insensitively, and patterns prone to catastrophic backtracking are rejected at `Open`. Strip or overwrite the tenant header at your edge, since the adapter trusts it.
+Use `header` for multi-tenant SaaS APIs where a gateway or client sets a header (default `X-Tenant-ID`, `DefaultHeader`). With `X-Tenant-ID: acme` metadata, `Resolve` returns `acme`. The header wins. Otherwise `subdomain_regex` matches the first capture group against the lowercased `Host` metadata. With neither, `Resolve` returns `tenant.ErrNotFound`. Meta keys match case-insensitively. ReDoS-prone patterns are rejected at `Open`. Strip or overwrite the tenant header at your edge. The adapter trusts it.
 
 ```sh
 TENANT_HEADER=X-Tenant-ID
 TENANT_SUBDOMAIN_REGEX=^(?P<tenant>[a-z0-9-]+)\.example\.com$
-```
-
-```sh
-TENANT_HEADER=X-Tenant-ID
-TENANT_SUBDOMAIN_REGEX=^([a-z0-9-]+)\.example\.com$
 TENANT_ID=default
 ```
 
-`Validate` rejects an invalid `header` key (printable ASCII, no whitespace, colon, or DEL) and any `subdomain_regex` over 500 characters (`MaxRegexLength`, a ReDoS bound). An empty `header` means the default. Adapters are `single` (one fixed ID, constant-time lookup) and `header` (request header plus optional subdomain regex). See the [tenant config reference](../../../reference/config/#tenant).
+`Validate` rejects a non-printable or overlong `header` and any `subdomain_regex` over 500 characters (`MaxRegexLength`, a ReDoS bound). Empty `header` means the default. Adapters: `single` (fixed ID), `header` (header plus optional subdomain regex). See [tenant config reference](../../../reference/config/#tenant).
 
 ## Production checklist
 
-- Resolve once at the middleware edge and propagate through the `tenant/context.go` helpers. Never re-derive deeper, where an unvalidated value could slip in.
-- Fail closed on an unknown tenant. Mapping it to a default turns one typo into a cross-tenant data leak.
-- Both adapters are stateless, so replicas agree when they share config. `Tenant.Close() error` takes no context.
-- Tenant IDs are customer data. Document the header name and validation rule for API clients, since it is public contract. Never log raw option maps.
+- Resolve once at the middleware edge. Propagate through the `tenant/context.go` helpers. Never re-derive deeper, where an unvalidated value could slip in.
+- Fail closed on an unknown tenant: mapping it to a default turns one typo into a cross-tenant leak.
+- Both adapters are stateless: replicas agree when they share config. `Tenant.Close() error` takes no context.
+- Tenant IDs are customer data. Document the header name and validation rule for API clients since it is public contract. Never log raw option maps.
 
 ## Troubleshooting
 
 <details>
 <summary>Every request lands on `default` after switching to `header`</summary>
 
-The gateway is not sending the configured header, or the app reads a different name. Confirm `TENANT_HEADER` matches what the client sends (`X-Tenant-ID` vs `X-Tenant`) and that proxies forward it.
+The gateway is not sending the configured header, or the app reads a different name. Confirm `TENANT_HEADER` matches the client (`X-Tenant-ID` vs `X-Tenant`). Proxies must forward it.
 </details>
 
 <details>
 <summary>`header must be a valid header key`</summary>
 
-The name contains whitespace, a colon, or non-ASCII characters. Fix the name. Empty is allowed (it means the default), garbage is not.
+The name holds whitespace, a colon, DEL, or non-printable ASCII. Empty means the default. Anything else must be a valid key.
 </details>
 
 <details>
 <summary>`subdomain_regex exceeds max length`</summary>
 
-The pattern is over 500 characters. Shorten it, or split matching into a regex plus code.
+The pattern tops 500 characters. Shorten it, or split matching into regex plus code.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Feature flags" href="../flags/" description="Per-tenant targeting signals." />
+  <LinkCard title="Feature flags" href="../flags/" description="Per-tenant signals." />
   <LinkCard title="Rate limiting" href="../../security/ratelimit/" description="Per-tenant buckets." />
-  <LinkCard title="Observability" href="../observability/" description="Tenant as a span attribute." />
+  <LinkCard title="Observability" href="../observability/" description="Tenant span attribute." />
 </CardGrid>

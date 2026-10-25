@@ -5,11 +5,11 @@ description: Store files behind policy-gated presigned URLs, locally or on S3 an
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`storage.Storage` hands out presigned upload and download URLs for opaque objects such as receipts and photos, gated by one policy. `media` adds the transform and serve pipeline: [Media processing](../media/).
+`storage.Storage` hands out presigned upload/download URLs for opaque objects, gated by one policy. `media` adds the transform pipeline: [Media processing](../media/).
 
 ## Quick start
 
-Pick `local` for a single instance: it writes under `root` and needs no infra. Pick `s3` or `r2` when instances must share files.
+`local` for one instance (under `root`, no infra), `s3`/`r2` to share files.
 
 <Tabs>
   <TabItem label="local">
@@ -32,11 +32,11 @@ STORAGE_URL_BASE=https://files.example.com
   </TabItem>
 </Tabs>
 
-Env vars: `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, `STORAGE_URL_BASE` (the backend is wired in code, not env). `policy_sync` is `manual` or `auto`; `sync_fail` is `warn` or `require`. `endpoint` needs a scheme and host, and a custom `endpoint` also requires `url_base`. `r2` needs `account_id`. `local` defaults `root` to `/tmp/storage`; without `secret` it uses an ephemeral key (presigned URLs break on restart) and refuses to start under `ZEVER_ENV=production` or `prod`. See the [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
+Backend is wired in code. `policy_sync` is `manual`/`auto`, `sync_fail` `warn`/`require`. `endpoint` needs scheme + host, custom `endpoint` also requires `url_base`. `r2` needs `account_id`. `local` defaults `root` to `/tmp/storage`, without `secret` it uses an ephemeral key (URLs break on restart) and refuses to start under `ZEVER_ENV=production`/`prod`. See [storage options](../../../reference/config/#storage) and [media options](../../../reference/config/#media).
 
 ## Mint a presigned URL
 
-Storage addresses objects by `bucket` and `key`. Resolve with `c.Storage()` (lazy, cached, retried) or open the adapter directly:
+Objects use `bucket` + `key`. Use `c.Storage()` (lazy, cached, retried) or open directly:
 
 ```go title="main.go" check
 package main
@@ -77,11 +77,11 @@ func main() {
 }
 ```
 
-The interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a missing source reports `ErrNotFound`), `Name`, and `Close(ctx)`. Call the interface, not adapter internals, so the policy check runs.
+Also: `Exists`, `Delete`, `Move` (overwrites, missing source → `ErrNotFound`), `Name`, `Close(ctx)`. Call the interface so the policy check runs.
 
 ## Gate access with a policy
 
-`policy` is a flat map: `default` covers unlisted buckets, every other key is a bucket. Each bucket sets `read`, `write`, `update`, and `delete` rules with `public`, `allow`, and `deny` (deny wins). `*` matches any authenticated subject, `anonymous` matches everyone.
+`policy` is a flat map: `default` covers unlisted buckets, other keys are buckets. Each sets `read`/`write`/`update`/`delete` with `public`/`allow`/`deny` (deny wins). `*` = any authenticated subject, `anonymous` = everyone.
 
 ```sh
 # STORAGE_POLICY_DEFAULT_READ: no string form in env; set it in Go with container.WithOptions
@@ -89,33 +89,33 @@ The interface also has `Exists`, `Delete`, `Move` (overwrites the destination; a
 # STORAGE_POLICY_RECEIPTS_WRITE: no string form in env; set it in Go with container.WithOptions
 ```
 
-Storage and media adapters are independent; keep them aligned to avoid cross-store copies. See the [adapters matrix](../../../reference/adapters-matrix/).
+Storage/media adapters are independent, keep aligned to avoid cross-store copies. See the [adapters matrix](../../../reference/adapters-matrix/).
 
 ## Production checklist
 
-- Cap media: `max_download_bytes` (64 MiB), `max_pixels` (about 50 MP), `max_duration`, `presign_ttl` (1h default, 7-day ceiling). Details: [Media processing](../media/).
-- Never log credentials: `access_key_id` and `secret_access_key` ride file or env; display goes through `config.RedactedServices`.
-- Close order: both are snapshot services, closed ahead of leaf `cache` and `queue`; only resolved services close.
-- Skip quietly at the job layer when no source file exists, rather than failing the booking flow.
+- Cap media: `max_download_bytes` (64 MiB), `max_pixels` (~50 MP), `max_duration`, `presign_ttl` (1h, 7-day max). See [Media processing](../media/).
+- Never log credentials, display via `config.RedactedServices`.
+- Snapshot services: closed ahead of leaf `cache`/`queue`, only resolved services close.
+- Skip quietly at the job layer when no source file exists.
 
 ## Troubleshooting
 
 <details>
 <summary>`presign_ttl must be >= 0 and <= 7 days`</summary>
 
-Cause: the window exceeds the 7-day ceiling, often `720h` copied from a sample. Fix: at most `604800000000000` ns in YAML or `"168h"` in env.
+Over 7-day ceiling (often `720h` from a sample). Use ≤ `604800000000000` ns in YAML or `"168h"` in env.
 </details>
 
 <details>
 <summary>S3 works locally but fails in deploy with endpoint errors</summary>
 
-Cause: `endpoint` lacks a scheme, or `region` is empty. Fix: set a full URL like `https://s3.us-east-1.amazonaws.com` and pin `region`.
+`endpoint` lacks scheme or `region` empty. Set full URL (`https://s3.us-east-1.amazonaws.com`), pin `region`.
 </details>
 
 <details>
 <summary>A second instance returns 404 for a fresh upload</summary>
 
-Cause: `local` with two hosts, each with a private filesystem. Fix: move both to `s3` or `r2` with a shared bucket and re-upload.
+`local` across two hosts (private filesystems). Move both to `s3`/`r2` with a shared bucket.
 </details>
 
 ## Related

@@ -5,11 +5,11 @@ description: Decode JSON bodies, read params and headers, paginate lists, and wr
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Handlers stay close to `net/http`: decode the request, run your logic, encode a JSON envelope. No magic binding or config block.
+Stay close to `net/http`: decode, run logic, encode JSON, no binding or config.
 
-## Handle a request
+## Handle
 
-Container is for services, not I/O:
+Container: services, not I/O:
 
 ```go title="main.go"
 c := container.New(config.Default())
@@ -56,31 +56,31 @@ curl -s -X POST localhost:8080/v1/users -H 'Content-Type: application/json' -d '
 {"email":"a@example.com"}
 ```
 
-Success returns the resource (`200`/`201`); errors use `{"error": "<stable message>"}`. Set `Content-Type` before `WriteHeader`.
+Success returns the resource (`200`/`201`), failures use a stable `{"error": "..."}`. Set `Content-Type` before `WriteHeader`.
 
-## Read the request
+## Read
 
 | Source | How |
 |---|---|
-| Path params | `router.Param(req, name)`, `router.ParamNames(req)` |
+| Path | `router.Param(req, name)`, `router.ParamNames(req)` |
 | Query | `r.URL.Query().Get(key)` |
 | Headers | `r.Header.Get(key)` |
-| JSON body | `json.NewDecoder(r.Body).Decode(&v)` |
-| Body cap | `http.MaxBytesReader(w, r.Body, n)` |
-| Test params | `router.WithParams(ctx, params)` |
-| Cancellation | `r.Context()`, into DB, cache, queue calls |
+| Body | `json.NewDecoder(r.Body).Decode(&v)` |
+| Cap | `http.MaxBytesReader(w, r.Body, n)` |
+| Tests | `router.WithParams(ctx, params)` |
+| Cancellation | `r.Context()` into DB/cache/queue |
 
-Cap public bodies (413) and pass `r.Context()` downstream for `middleware.Timeout`.
+Cap public bodies (413), thread `r.Context()` downstream.
 
-## Paginate lists
+## Paginate
 
-`.zen` RPCs flagged `paginated: true` generate cursor scaffolding; expose cursors, not offsets:
+`paginated: true` RPCs expose cursors, not offsets:
 
 ```sh
 GET /v1/orders?cursor=eyJpZCI6NDJ9&limit=50
 ```
 
-The synthesized request message carries `cursor` and `limit` fields (so gRPC clients paginate too, and a paginated RPC may not declare params of those names). The generated service method takes the opaque `cursor string` plus `limit int32`. Both transports apply the same bounds before the service runs: zero becomes the default (20), a limit above the max (100) is clamped, and a negative limit is `InvalidArgument`. The response is the protobuf `<Op>Response` message (`items` plus `next_cursor`, empty when last).
+Synthesized requests carry both fields (gRPC included), RPCs never declare them. Service methods: opaque `cursor string`, `limit int32`. Transports bound: zero means 20, over 100 clamps, negatives fail `InvalidArgument`. Response `<Op>Response` holds `items` and `next_cursor` (empty when last).
 
 ```go
 key := orm.NewCursorKey(UserID, lastSeenID)
@@ -90,44 +90,44 @@ users, err := orm.NextPage(
 ).Limit(50).All(ctx, conn)
 ```
 
-`orm.OffsetPage(q, page, size)` applies a 1-based `LIMIT`/`OFFSET` and returns `(Query, error)`. For keyset paging, `CursorKey.Encode()` and `orm.DecodeCursor(token, col)` round-trip the cursor, and `orm.AfterTuple` builds multi-column predicates.
+`orm.OffsetPage(q, page, size)` applies 1-based `LIMIT`/`OFFSET`, returning `(Query, error)`, `CursorKey.Encode()`, `orm.DecodeCursor(token, col)`, and `orm.AfterTuple` cover keyset cursors and multi-column predicates.
 
 ## Troubleshooting
 
 <details>
-<summary>An empty body decodes without error</summary>
+<summary>Empty body, no error</summary>
 
-`r.Body` was consumed or nil. Use `httptest.NewRequest` with a `strings.Reader`.
+`r.Body` consumed or nil, use `httptest.NewRequest` with `strings.Reader`.
 </details>
 
 <details>
-<summary>Params are always empty under test</summary>
+<summary>Empty params under test</summary>
 
-Plain test requests carry no driver context. Seed with `router.WithParams`.
-</details>
-
-<details>
-<summary>The client sees `Content-Type: text/plain`</summary>
-
-`WriteHeader` ran before the header. Set `Content-Type`, then status, then body.
+Test requests lack context, seed with `router.WithParams`.
 </details>
 
 <details>
 <summary>Huge uploads exhaust memory</summary>
 
-No `MaxBytesReader`: wrap `r.Body`, return 413.
+Cap with `MaxBytesReader` (413).
 </details>
 
 <details>
-<summary>Deadline middleware has no effect</summary>
+<summary>JSON arrives without a content type</summary>
 
-A handler or ORM call uses `context.Background()`. Thread `r.Context()` through.
+Set `Content-Type` before `WriteHeader` since headers written after are dropped.
+</details>
+
+<details>
+<summary>Deadlines have no effect</summary>
+
+Thread `r.Context()` everywhere downstream.
 </details>
 
 ## Related
 
 <CardGrid>
   <LinkCard title="Routing" href="../routing/" description="Register routes." />
-  <LinkCard title="Validation" href="../validation/" description="Field checks that pick 400 or 422." />
+  <LinkCard title="Validation" href="../validation/" description="400 or 422." />
   <LinkCard title="Middleware" href="../middleware/" description="Logging and timeouts." />
 </CardGrid>

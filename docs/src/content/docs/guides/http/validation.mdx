@@ -5,11 +5,11 @@ description: Validate input with .zen rules and handler checks, and fail with pr
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Validation is `@validate` rules in `.zen` (shape/format) plus Go checks in handlers (transport/business). Both fail with field-named errors, never silent coercion; there is no config block or accessor.
+`.zen` shape rules plus handler checks, failing with field-named errors, never silent coercion. No config.
 
-## Validate a request
+## Validate
 
-Declare shape rules in the schema ([Zen syntax](../../../reference/zen-syntax/)):
+Shape rules ([Zen syntax](../../../reference/zen-syntax/)):
 
 ```zen
 rpc CreateUser(email: string @validate(format: "email")) -> User {
@@ -21,9 +21,9 @@ rpc CreateUser(email: string @validate(format: "email")) -> User {
 title: string @validate(min_len: 1, max_len: 200)
 ```
 
-The resolver checks each expression at compile time; `zever check` reports bad rules with positions, and `@validate` reaches generated code and OpenAPI.
+The resolver checks every expression at compile time, `@validate` reaches generated code and OpenAPI.
 
-Then parse, validate, and only then call `db`, `queue`, or payment; failed validation must never open a transaction or cause a side effect.
+Parse and validate before `db`, `queue`, or payment, failures never open transactions or side effects.
 
 ```go title="handlers.go"
 func createUser(w http.ResponseWriter, r *http.Request) {
@@ -55,59 +55,51 @@ curl -s -X POST localhost:8080/v1/users -d '{"email":"a@example.com","name":"Ada
 {"email":"a@example.com"}
 ```
 
-Invalid input answers `422`. `writeJSON`/`writeError` come from [Requests and responses](../requests-responses/).
+Invalid input is 422 (`writeJSON`/`writeError`: [Requests and responses](../requests-responses/)).
 
-| Status | When |
-|---|---|
-| `400` | Malformed input. |
-| `422` | Well-formed but invalid. |
-| `409` | `already_exists` (RPC `errors:`). |
+## Split rules
 
-## Split rules between schema and handler
-
-| Rule kind | Owner | Example |
+| Kind | Owner | Example |
 |---|---|---|
-| Shape/format | `.zen` `@validate` | `email`, `title` length |
-| Transport | Handler | JSON, headers |
-| Business state | Handler/store | Email not registered (409) |
-| Config sanity | Startup `Validate` | Options, DSN |
+| Shape | `.zen` `@validate` | `email`, lengths |
+| Transport | Handler | JSON/headers |
+| Business | Handler/store | unregistered (409) |
+| Config | Startup `Validate` | Options/DSN |
 
-Bookings keeps format rules on entities (`User.email`, `Space.title`) and flow rules in `internal/api`; a `core/flag` gate returns 404, `ErrConflict` maps to 409. OpenAPI covers only the schema.
+Bookings: format rules on entities (`User.email`, `Space.title`), flow rules in `internal/api`, `core/flag` gates 404, `ErrConflict` -> 409, OpenAPI covers schema only.
 
-## Validate config at startup
+## Config
 
-`config.Resolve(env)` validates strictly, so an unknown key under a wired service prefix fails fast with a did-you-mean hint. An unparsable env value returns `InvalidOptionsError` (e.g. `DB_MAX_CONNS=abc`) naming the service and field, never the secret; an unknown service head and a bare name are ignored.
+`config.Resolve(env)` is strict: unknown keys under wired prefixes fail fast with did-you-mean hints, unparsable values return `InvalidOptionsError` naming service/field, never the secret. Unknown service heads and bare names are ignored.
 
-## Production checklist
+## Checklist
 
-- Name the field and rule, never the rejected secret.
-- Validate before I/O: no deadline, nothing to drain on close.
-- RPC error-set changes are API changes (`breaking`).
+- Name field/rule, never rejected secret, validate before I/O, RPC error-set changes are API changes (`breaking`).
 
 ## Troubleshooting
 
 <details>
 <summary>`zever check` rejects a rule the handler accepts</summary>
 
-The schema expression has a typo or unsupported constraint; the resolver is the authority.
+Typo or unsupported constraint, the resolver is authoritative and `zever check` reports each bad rule with its file position.
 </details>
 
 <details>
-<summary>Clients get 400 for business errors</summary>
+<summary>400 for business errors</summary>
 
-Return 400 only for unparsable bodies, 422 for well-formed invalid values.
+400 is unparsable, 422 is invalid.
 </details>
 
 <details>
-<summary>409 never fires on duplicates</summary>
+<summary>Missing 409s</summary>
 
-The RPC lacks `errors: { already_exists }`, or the handler misses the conflict.
+RPC lacks `errors: { already_exists }`, or handler misses conflict.
 </details>
 
 <details>
-<summary>Boot fails on a config typo</summary>
+<summary>Boot fails on a typo</summary>
 
-Strict decoding rejects unknown file fields. Use the snake_case key (`max_conns`, not `maxconns`).
+Strict decoding rejects unknown fields, use snake_case (`max_conns`).
 </details>
 
 ## Related

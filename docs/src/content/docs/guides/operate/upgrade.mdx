@@ -5,30 +5,30 @@ description: Bump a pre-1.0 Zever version safely, migrate the v0.8.0 config brea
 
 import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever is pre-1.0, so `0.x` releases may break, and every break ships with a documented fix. Undocumented breaks are bugs: open an issue.
+Zever is pre-1.0: `0.x` releases may break. Undocumented breaks are bugs: open an issue.
 
 | Range | Guarantee |
 |---|---|
 | `0.x` patch or minor | May break. Breaks are listed under `Changed` in `CHANGELOG.md` with a `**Breaking:**` prefix. |
 | `1.0+` (future) | SemVer: majors break, minors add, patches fix. |
 
-Public API changes (new exports, config struct or default changes, serialization changes) get explicit maintainer review and arrive with migration notes.
+Public API changes (exports, config structs or defaults, serialization) get maintainer review with migration notes.
 
 ## Bump a version
 
 <Steps>
-1. Read `CHANGELOG.md` (`## [Unreleased]` plus the target section) for every `**Breaking:**` line.
-2. Bump each Zever module you require, then tidy:
+1. Read `CHANGELOG.md` (`## [Unreleased]`, target) for `**Breaking:**`.
+2. Bump each required Zever module, then tidy:
 
    ```sh
    go get github.com/zenta-dev/zever/config@v0.8.0 github.com/zenta-dev/zever/container@v0.8.0
    go mod tidy
    ```
 
-   Then upgrade the CLI itself with `zever upgrade` (or re-run the [installer](../../../start/installation/)).
+   Upgrade the CLI (`zever upgrade`) or re-run the [installer](../../../start/installation/).
 
-3. Run the gate: `make check` (download, fmt, then per module vet, tidy-check, test, build, plus module-graph check, dependabot check, lint, vulncheck), and `make test-race` separately.
-4. Run a smoke test that resolves services:
+3. Run `make check` (fmt, vet, tidy-check, test, build, module-graph, dependabot, lint, vulncheck) plus `make test-race`.
+4. Smoke-test resolution:
 
    ```go title="main.go"
    c := container.New(config.Default())
@@ -43,46 +43,46 @@ Public API changes (new exports, config struct or default changes, serialization
    fmt.Println("upgrade ok:", db != nil && q != nil)
    ```
 
-   Expected output: `upgrade ok: true`. Container construction is stable across bumps (`container.New(nil)` stays valid, and `Close(ctx)` closes only resolved services in dependency order), so if this breaks the changelog names the fix.
-5. Re-validate production configuration. Env resolution is strict about the keys it understands, so renames turn into loud failures, which is the desired fail-closed path before rollout. Re-check redaction (`cfg.RedactedServices()`) and close wiring (`Close(ctx)` with a timeout parent).
+   Output: `upgrade ok: true`. Container construction is stable across bumps (`container.New(nil)` valid, `Close(ctx)` closes only resolved services). The changelog names any fix.
+5. Re-validate production config: env resolution is strict about known keys. Renames fail loudly before rollout. Re-check redaction and close wiring (`cfg.RedactedServices()`, `Close(ctx)` with a timeout parent).
 </Steps>
 
-Pin the CLI to the bumped version so `zever compile`, `migrate`, and `doctor` match backend behavior and the TUI does not skew from the backend.
+Pin the CLI to the bumped version so `zever compile`, `migrate`, `doctor` match backend behavior.
 
 ## Upgrade to v0.8.0
 
 **v0.8.0 is env-only: configuration moved from a config file to `.env`.**
 
-A v0.7.x project keeps its service configuration in `zever.yaml` (or `.yml`, `.json`, `.toml`). v0.8.0 does not read that file: there is no probe, no discovery step, and no warning. A leftover file is inert, so every service falls back to its built-in default adapter and the old values are gone without a word. Translate them by hand and delete the file.
+A v0.7.x project keeps service configuration in `zever.yaml` (or `.yml`, `.json`, `.toml`). v0.8.0 never reads that file: no probe, discovery, or warning. A leftover file is inert: services fall back to built-in defaults, old values gone without a word. Translate by hand and delete the file.
 
 | v0.7.x | v0.8.0 |
 |---|---|
-| `zever.yaml` (or `.yml`, `.json`, `.toml`) | `.env`, `.env.local`, or the process environment |
+| `zever.yaml` (or `.yml`, `.json`, `.toml`) | `.env`, `.env.local`, process environment |
 | `config.Load("zever.yaml")` | `config.FromEnv()` then `config.Resolve(env)` |
 | `project.server_entry` | `ZEVER_SERVER_ENTRY` |
 | `project.worker_entry` | `ZEVER_WORKER_ENTRY` |
 | `project.generated_dir` | `ZEVER_GENERATED_DIR` |
 | `project.tinker_entry` | `ZEVER_TINKER_ENTRY` |
 | `project.seed_entry` | `ZEVER_SEED_ENTRY` |
-| `search.Postgres`, `search.SQLite` | `db` (the DSN picks postgres or sqlite) |
-| `vectorstore.PGVector`, `vectorstore.SQLite` | `db` (the DSN picks postgres or sqlite) |
-| `workflow.Postgres` | `db` (the DSN picks postgres or sqlite) |
-| the `--config` file flag | gone from every command |
+| `search.Postgres`, `search.SQLite` | `db` (DSN picks postgres or sqlite) |
+| `vectorstore.PGVector`, `vectorstore.SQLite` | `db` (DSN picks postgres or sqlite) |
+| `workflow.Postgres` | `db` (DSN picks postgres or sqlite) |
+| `--config` file flag | gone from every command |
 
-Env keys carry no prefix: `<SERVICE>_<FIELD>` for the default instance, `<SERVICE>__<NAME>__<FIELD>` for a named one. So `db.options.dsn` becomes `DB_DSN`, `ai.options.api_key` becomes `AI_API_KEY`, and `auth.options.jwt.secret` becomes `AUTH_JWT_SECRET`. (Adapter selection was an env key in v0.8 and moved to `internal/app/wiring.go` afterwards; see the migration guide.)
+Env keys carry no prefix: `<SERVICE>_<FIELD>` (default), `<SERVICE>__<NAME>__<FIELD>` (named): `db.options.dsn` becomes `DB_DSN`, `ai.options.api_key` `AI_API_KEY`, `auth.options.jwt.secret` `AUTH_JWT_SECRET`. (Adapter selection was a v0.8 env key, now `internal/app/wiring.go`. See the migration guide.)
 
-Two commands prove the migration is done: `zever config show` prints the resolved values per service, and `zever doctor` resolves every wired battery and exits non-zero when one fails. A wrong value is loud: a removed adapter alias fails with `unknown adapter`, and a misspelled key fails with a did-you-mean hint. The [migration guide](../migration/) has the key-by-key map, a before and after example, and the exact messages a wrong value produces.
+Two commands prove the migration: `zever config show` prints resolved values per service. `zever doctor` resolves every wired battery, exiting non-zero on failure. A wrong value is loud: removed adapter aliases fail with `unknown adapter`, misspellings with a did-you-mean hint. The [migration guide](../migration/) has the key-by-key map, a before-and-after example, and the exact errors.
 
 ## Fix known breaking changes
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The app boots but your old values are gone | A leftover v0.7.x file is never read by v0.8.0, and nothing warns about it. | Translate every stanza into `.env`, then delete the file. See [Upgrade to v0.8.0](#upgrade-to-v080). |
-| `Load` rejects a previously valid key | Config rename in the bump (`maxconns`, `apikey`, `secretkey`). | Rename to `max_conns`, `api_key`, `secret_key`. Env names are unaffected. See [Configuration](../configuration/) for the full rename table. |
-| `CreateCustomer` no longer compiles | `billing.Billing.CreateCustomer` gained a required idempotency key. | Pass `""` for the old non-idempotent behavior, or a real key for safe retries. |
-| `zen/migrate` import fails | The migration engine moved to `orm/migrate`. | Import `github.com/zenta-dev/zever/orm/migrate`. |
-| Custom `search` or `vectorstore` adapter fails to compile | `search.Search` and `vectorstore.VectorStore` gained batch methods (`IndexBatch`, `UpsertBatch`). | Implement them. Bundled adapters already have them. Compilation failure is the signal, not a runtime surprise. |
-| Editor highlighting misses new keywords | Grammars derive from `token.Keywords` and `resolver.ScalarTypeNames`. | Run `make generate` (`go run ./tools/gengrammar`) and commit the regenerated files. |
+| App boots but old values are gone | Leftover v0.7.x file never read. | Translate every stanza into `.env`, then delete it (see [Upgrade to v0.8.0](#upgrade-to-v080)). |
+| `Load` rejects a previously valid key | Renamed in the bump (`maxconns`, `apikey`, `secretkey`). | Rename to `max_conns`, `api_key`, `secret_key` (env names unaffected). See [Configuration](../configuration/). |
+| `CreateCustomer` no longer compiles | `billing.Billing.CreateCustomer` gained a required idempotency key. | Pass `""` for non-idempotent behavior, or a real key for safe retries. |
+| `zen/migrate` import fails | Engine moved to `orm/migrate`. | Import `github.com/zenta-dev/zever/orm/migrate`. |
+| Custom `search` or `vectorstore` adapter fails to compile | `search.Search` and `vectorstore.VectorStore` gained batch methods (`IndexBatch`, `UpsertBatch`). | Implement them. Bundled adapters already do. |
+| Editor highlighting misses new keywords | Grammars derive from `token.Keywords`, `resolver.ScalarTypeNames`. | Run `make generate` (`go run ./tools/gengrammar`). Commit the regenerated files. |
 
 ```go
 // Before
@@ -91,9 +91,9 @@ cust, err := b.CreateCustomer(ctx, name, email)
 cust, err := b.CreateCustomer(ctx, "Ada", "ada@example.com", "")
 ```
 
-For the multi-module import changes see [Migrate from v0.7 to v0.8](../migration/).
+Import changes: see [Migrate from v0.7 to v0.8](../migration/).
 
-## Know what each gate catches
+## What each gate catches
 
 | Step | Command | Catches |
 |---|---|---|
@@ -104,18 +104,18 @@ For the multi-module import changes see [Migrate from v0.7 to v0.8](../migration
 | Vulnerability scan | `make vulncheck` (`govulncheck` v1.8.0) | Known dependency CVEs. |
 | Grammars | `make generate` | Stale editor grammars. |
 
-`go test` runs with `-vet=off -count=1` (vet is a separate step). PRs run the race detector without coverage (`test-race-fast`); the coverage run (`test-race-all`) runs only on pushes to main and tags. `make check` has no race pass, so run `make test-race` locally before pushing a bump. Keep timeout tests short (parent about 100ms, block about 500ms) so `goleak.VerifyTestMain` stays green.
+`go test` runs `-vet=off -count=1` (vet is separate). PRs run `test-race-fast` (no coverage). `test-race-all` (coverage) only on pushes to main and tags. `make check` has no race pass, so run `make test-race` locally before pushing. Keep timeout tests short (parent about 100ms, block about 500ms) so `goleak.VerifyTestMain` stays green.
 
 ## Release process (maintainers)
 
-Releases bump every version pin together (the file list is in the `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` creates one `<module-path>/vX.Y.Z` tag per module in dependency order, plus the bare `vX.Y.Z` release tag the release workflow fires on. Both are published in one atomic push, so the workflow starts only once every module tag is on origin. `dsl` carries no release version (schema `v1` and `v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` with every PR, one logical change per commit, using Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
+Releases bump every version pin together (file list: `.github/CONTRIBUTING.md` release checklist), then `tools/tag-release.sh vX.Y.Z` tags one `<module-path>/vX.Y.Z` per module in dependency order, plus the bare `vX.Y.Z` release tag the workflow fires on. Both publish in one atomic push. The workflow starts once all module tags are on origin. `dsl` carries no release version (schema `v1`/`v2` are API versions). Add user-facing changes to `CHANGELOG.md` under `## [Unreleased]` per PR: one logical change per commit, Conventional Commits (`feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `ci`, `build`).
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Migrate from v0.7 to v0.8" href="../migration/" description="Config file to .env, adapter wiring, and the new server entrypoint." />
-  <LinkCard title="Configuration" href="../configuration/" description="Env layering, precedence, and the fail-closed rules." />
-  <LinkCard title="Deployment" href="../deployment/" description="Roll a bumped binary to production." />
-  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Interface stability rules." />
+  <LinkCard title="Migrate from v0.7 to v0.8" href="../migration/" description="Config file to .env, adapter wiring, new server entrypoint." />
+  <LinkCard title="Configuration" href="../configuration/" description="Env layering and fail-closed rules." />
+  <LinkCard title="Deployment" href="../deployment/" description="Roll a bump." />
+  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="Interface stability." />
   <LinkCard title="Compiler boundary" href="../../../concepts/compiler-boundary/" description="What bumps never move into runtime." />
 </CardGrid>

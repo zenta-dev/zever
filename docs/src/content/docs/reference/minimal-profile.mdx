@@ -3,20 +3,20 @@ title: Minimal runtime profile
 description: What the db/orm/router/config/log floor costs versus the full CLI, and how to reproduce the numbers.
 ---
 
-The minimal runtime profile is the smallest dependency set a data-backed service needs: `config` (layered typed config), `core/db` (SQL facade), `orm` (typed builder over `db.DB`), `core/router` (HTTP facade), and `core/log` (logging facade). Adapters resolve by `Register` plus config, so anything outside this set leaves the binary. It is not the same as `zever new --profile minimal`, which is a scaffold preset (bootable floor plus auth/observability/permission/ratelimit); see [Customizing and leaving](../../guides/extend/customizing-and-leaving/) for the scaffold counts.
+Minimal profile = smallest data-backed set (`config`, `core/db`, `orm`, `core/router`, `core/log`). Anything else leaves the binary. Not `zever new --profile minimal` (floor plus auth/observability/permission/ratelimit). Counts: [Customizing and leaving](../../guides/extend/customizing-and-leaving/).
 
-## Numbers (2026-10-16, Go 1.27.2, linux/amd64)
+## Numbers (2026-10-16)
 
 | Profile | `go list -test -deps` packages | Third-party packages | Binary |
 |---|---|---|---|
-| Minimal (`config`, `orm`, `core/db`, `core/router`, `core/log`) | 419 | 185 | above the 63.3 MB floor (embeds the sqlite driver) |
+| Minimal (`config`, `orm`, `core/db`, `core/router`, `core/log`) | 419 | 185 | above 63.3 MB floor (sqlite driver) |
 | Full CLI (`cmd/zever` module) | 1706 | 1396 | 309.7 MB |
 
-Package counts were measured in this repo; binary sizes are cited from [Benchmarks](../benchmarks/) (2026-10-14, same toolchain and arch): full CLI 309.7 MB, slim floor (`--adapters=log,router`) 63.3 MB. The slim floor links only log plus router adapters, so it is the lower bound for the minimal profile: adding the sqlite-backed `db` and `orm` pulls in the embedded sqlite driver and the query builder, landing between the floor and the full CLI. The full CLI is ~4x the minimal package count and ~76% third-party; the saving is the excluded adapters' transitive dependencies (pgx, go-redis, fasthttp, otel, cloud SDKs).
+Counts in this repo. Binaries from [Benchmarks](../benchmarks/) (2026-10-14): full CLI 309.7 MB, slim floor (`--adapters=log,router`) 63.3 MB. The floor (log+router only) lower-bounds the profile: sqlite-backed `db` plus `orm` add the embedded driver and query builder, landing between floor and full CLI. Full CLI is ~4x the package count, ~76% third-party. Savings are excluded transitive deps (pgx, go-redis, fasthttp, otel, cloud SDKs).
 
 ## Method
 
-Package counts include stdlib and test dependencies (`-test`), matching the scaffold table's method:
+Counts include stdlib and test deps (`-test`):
 
 ```sh
 # Minimal profile transitive closure (workspace root, sorts and dedups first)
@@ -48,4 +48,4 @@ _ = db
 _ = err
 ```
 
-`container.New` is lazy: services never touched are never opened and never weigh on startup. `Close` drains only resolved services in dependency order, so a minimal process shuts down exactly what it started.
+`container.New` is lazy: untouched services never open. `Close` drains only resolved services, dependents first.

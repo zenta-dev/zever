@@ -5,16 +5,16 @@ description: Compose logging, recovery, rate limiting, tracing, and timeouts ove
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-The `middleware` package builds plain HTTP middleware and gRPC unary interceptors over services you already resolved (`log`, `ratelimit`, `observability`). There is no registry and no adapter: call the constructors once while wiring the server. Use it when every request needs one log line, panic safety, abuse protection, and a trace span.
+Build plain HTTP middleware and gRPC unary interceptors over resolved services (`log`, `ratelimit`, `observability`), no registry or adapter. Construct once while wiring.
 
 ## Quick start
 
-Middleware has no config block of its own (only [CORS](../cors/) takes an `Options` value). Configure the services it wraps:
+No config block (only [CORS](../cors/) takes `Options`), configure the wrapped services:
 
 ```sh
 ```
 
-Defaults from `config.Default()` run with no external services. Options: [Config reference](../../../reference/config/#ratelimit).
+Defaults from `config.Default()` need no external services. Options: [Config reference](../../../reference/config/#ratelimit).
 
 ```go title="main.go" check
 package main
@@ -72,106 +72,99 @@ curl -s localhost:8080/hello
 {"ok":true}
 ```
 
-Each accessor resolves lazily and caches (a failed call retries). Middleware holds no state, so `c.Close(ctx)` closes only the underlying services. See [the container](../../../concepts/container/).
+Accessors resolve lazily and cache (failed calls retry), `c.Close(ctx)` closes only underlying services. See [the container](../../../concepts/container/).
 
 ## Order the chain
 
-Wrap from the outside in:
+Wrap outside in:
 
-1. `CORS` outermost, so preflights short-circuit before logging or rate limiting.
-2. `RequestLogger`, so a recovered panic still logs its 500.
-3. `Recover` innermost, closest to the handler, so it catches panics from inner middleware too.
+1. `CORS` outermost, preflights short-circuit logging and rate limiting.
+2. `RequestLogger` next, so recovered panics still log 500.
+3. `Recover` innermost, catching panics from inner middleware too.
 
-`Timeout` goes inside `Recover` and outside `RateLimit`, so a denied request never starts the timer.
+`Timeout` sits inside `Recover` and outside `RateLimit`, denied requests skip the timer.
 
-## Choose a constructor
+## Constructors
 
 | Constructor | Behavior |
 |---|---|
-| `RequestLogger(logger)` | One line per request: method, path, status, `duration_ms` (fractional milliseconds), plus `request_id` when present. |
-| `Recover(logger)` | Recovers panics, logs value and stack, responds 500 `{"error":"internal error"}`. Logs only if the handler already committed. |
-| `RateLimit(limiter, keyFunc, opts...)` | Denies with 429 JSON and `Retry-After` (ceiled seconds). Key func defaults to `RemoteAddrKey` (client IP). |
-| `Tracing(provider)` | Span per request named by path, `http.request.method`/`url.path` attributes, `http.response.status_code` set on completion, span error on 5xx; `http.request` counter tagged by `http.request.method`/`http.response.status_code`. |
-| `Timeout(d)` | Bounds a handler to `d` and cancels its context. Responds 504 with the standard error envelope. |
+| `RequestLogger(logger)` | One line per request with method, path, status, and `duration_ms` as fractional milliseconds in float form, plus `request_id` when present. |
+| `Recover(logger)` | Recovers panics (logs value/stack, responds 500), logs only committed handlers. |
+| `RateLimit(limiter, keyFunc, opts...)` | Denies with 429 JSON and `Retry-After` (ceiled seconds), key defaults to `RemoteAddrKey`. |
+| `Tracing(provider)` | Span per request named by path (`http.request.method`, `url.path`, `http.response.status_code` on completion, error on 5xx), `http.request` counter tagged by method/status. |
+| `Timeout(d)` | Bounds handlers to `d` and cancels context, responds 504 with the standard envelope. |
 | `CORS(opts)` | Strict cross-origin headers. See [CORS](../cors/). |
 
-The status recorder is reused through the chain and exposes `Unwrap`, so `http.ResponseController` still reaches `Flush` and `Hijack`.
+The reused recorder exposes `Unwrap`, so `http.ResponseController` still reaches `Flush`/`Hijack`.
 
 ### Tracing attributes
 
-Both tracing constructors emit OpenTelemetry semantic-convention
-attribute names: `http.request.method`, `url.path`, and
-`http.response.status_code` for HTTP; `rpc.system`, `rpc.service`,
-`rpc.method`, and `rpc.grpc.status_code` for gRPC. The pre-migration
-names were **removed**, not aliased, so a query on an old attribute
-returns nothing after upgrading rather than failing loudly.
-[Cross-Service Tracing](../../operate/cross-service-tracing/) has the
-full old-to-new table.
+Both tracing constructors emit OpenTelemetry semantic-convention names (`http.request.method`, `url.path`, `http.response.status_code`, gRPC: `rpc.system`, `rpc.service`, `rpc.method`, `rpc.grpc.status_code`). Pre-migration names were removed, not aliased, so old-attribute queries return nothing. [Cross-Service Tracing](../../operate/cross-service-tracing/) maps old to new.
 
-Limiter errors fail open by default, so a Redis blip does not take the site down. Pass `middleware.WithFailMode(middleware.FailClosed)` on sensitive endpoints to answer 429 on a limiter error instead.
+Limiter errors fail open by default. Pass `middleware.WithFailMode(middleware.FailClosed)` on sensitive endpoints to answer 429 instead.
 
-## Add timeouts
+## Timeouts
 
 ```go
 handler := middleware.Timeout(5 * time.Second)(mux)
 ```
 
-Pass `r.Context()` into every DB, cache, and queue call so the deadline cancels downstream work.
+Thread `r.Context()` through every DB, cache, and queue call.
 
-## Use the gRPC interceptors
+## gRPC interceptors
 
 | HTTP | gRPC | Mapping |
 |---|---|---|
 | `Recover` | `RecoverUnaryServerInterceptor` | Panic becomes `Internal`. |
-| `RateLimit` | `RateLimitUnaryServerInterceptor` | Deny becomes `ResourceExhausted`; key via `PeerAddrKey`. |
-| `Tracing` | `TracingUnaryServerInterceptor` | Span per `FullMethod` carrying `rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`; `rpc.request` counter tagged by `rpc.service`/`rpc.method`/`rpc.grpc.status_code`. |
-| `Timeout` | `TimeoutUnaryServerInterceptor` | Cuts slow handlers off at `d`. |
+| `RateLimit` | `RateLimitUnaryServerInterceptor` | Deny becomes `ResourceExhausted` via `PeerAddrKey`. |
+| `Tracing` | `TracingUnaryServerInterceptor` | Span per `FullMethod` (`rpc.system`/`rpc.service`/`rpc.method`/`rpc.grpc.status_code`), `rpc.request` counter by `rpc.service`/`rpc.method`/`rpc.grpc.status_code`. |
+| `Timeout` | `TimeoutUnaryServerInterceptor` | Caps handlers at `d`. |
 
-CORS has no gRPC twin because gRPC has no preflight. Put the recovery interceptor last so other interceptors see recovered state.
+No CORS twin (no gRPC preflight), put recovery last so interceptors see recovered state.
 
-## Production checklist
+## Checklist
 
-- Set server `ReadHeaderTimeout`, `ReadTimeout`, and `WriteTimeout` (bookings uses 5s, 15s, 15s) plus a per-route `Timeout` for slow endpoints.
-- Never add headers, bodies, or option maps to `RequestLogger` fields. Display config only via `config.RedactedServices`.
-- Alert on limiter errors, since they fail open.
+- Set server `ReadHeaderTimeout` (5s), `ReadTimeout` (15s), and `WriteTimeout` (15s), plus per-route `Timeout` for slow endpoints.
+- Never log headers, bodies, or option maps, display config via `config.RedactedServices`.
+- Alert on limiter errors.
 
 ## Troubleshooting
 
 <details>
 <summary>Panics return empty 200s</summary>
 
-`Recover` is missing or sits outside `RequestLogger`. Order the chain as above, with `Recover` closest to the mux.
+`Recover` is missing or ordered wrong, keep it closest to the mux.
 </details>
 
 <details>
-<summary>429s that look like a Redis outage</summary>
+<summary>429s during a Redis outage</summary>
 
-Limiter errors fail open, so steady 429s mean real quota exhaustion. Raise the rate or burst, or scope keys more narrowly than `RemoteAddrKey`.
+Limiter errors fail open, so steady 429s mean real quota exhaustion, raise rate/burst or narrow the key.
 </details>
 
 <details>
 <summary>SSE or hijacked connections break</summary>
 
-A custom wrapper hides the real writer. Forward `Unwrap` so `http.ResponseController` can reach `Flush` and `Hijack`.
+Custom wrappers hide the writer, forward `Unwrap` for `Flush`/`Hijack`.
 </details>
 
 <details>
 <summary>Traces are missing</summary>
 
-The provider is probably `noop`. Wire `stdout` (or OTLP) in `internal/app/wiring.go` and check for spans named by path with `http.response.status_code`.
+The provider is probably `noop`, wire `stdout` (or OTLP) and check for path-named spans with `http.response.status_code`.
 </details>
 
 <details>
-<summary>Timeouts do not stop work</summary>
+<summary>Timeouts ignored</summary>
 
-The handler ignores `r.Context()`. Thread it into every downstream call.
+Thread `r.Context()` into every downstream call.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Routing" href="../routing/" description="Where the wrapped mux and groups come from." />
-  <LinkCard title="CORS" href="../cors/" description="Strict cross-origin headers." />
-  <LinkCard title="Errors" href="../errors/" description="Typed errors and status mapping." />
-  <LinkCard title="Logging" href="../../operate/logging/" description="The logger behind RequestLogger and Recover." />
+  <LinkCard title="Routing" href="../routing/" description="Wrapped mux and groups." />
+  <LinkCard title="CORS" href="../cors/" description="Chain order." />
+  <LinkCard title="Errors" href="../errors/" description="Status mapping." />
+  <LinkCard title="Logging" href="../../operate/logging/" description="Logger behind RequestLogger." />
 </CardGrid>

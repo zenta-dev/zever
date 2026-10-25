@@ -5,11 +5,11 @@ description: Issue and verify caller identity with JWT, session, or OIDC behind 
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`auth` answers who is calling, never what they may do. It covers `jwt` (`auth/jwt`), `session` (`auth/session`), and `oidc` (`auth/oidc`); see [Password hashing](../password-hashing/) and [Authorization](../authz-permissions/).
+`auth` answers who is calling, never what they may do, via `jwt` (`auth/jwt`), `session` (`auth/session`), `oidc` (`auth/oidc`). See [Password hashing](../password-hashing/) and [Authorization](../authz-permissions/).
 
 ## Quick start
 
-Set a 32+ byte JWT secret, then resolve the service; `Open` refuses shorter secrets and `config.Default()` ships none.
+Set a 32+ byte JWT secret, then resolve, `Open` refuses shorter, `config.Default()` ships none.
 
 <Tabs>
   <TabItem label="YAML">
@@ -32,24 +32,24 @@ if err != nil {
 }
 ```
 
-`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Keys: `AUTH_JWT_ISSUER`, `AUTH_JWT_AUDIENCE`, `AUTH_JWT_MAX_TTL`, `AUTH_JWT_LEEWAY`, `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_TIMEOUT`, `AUTH_OIDC_ALLOW_INSECURE`. See the [auth config reference](../../../reference/config/#auth).
+`AUTH_JWT_SECRET` maps to `options.jwt.secret` (env splits at the first underscore). Full key list: `AUTH_JWT_ISSUER`, `AUTH_JWT_AUDIENCE`, `AUTH_JWT_MAX_TTL`, `AUTH_JWT_LEEWAY`, `AUTH_OIDC_ISSUER`, `AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_TIMEOUT`, `AUTH_OIDC_ALLOW_INSECURE`. See [auth config reference](../../../reference/config/#auth).
 
 ## Key rotation
 
-List every accepted key with a `kid` and point `active_kid` at the signer. New tokens carry the `kid` header; verification selects the key by `kid` and still accepts kid-less tokens signed with the legacy `secret`, so old clients keep working through the overlap. Unknown kids fail closed. Keep a retired key listed until every token signed with it has expired, then remove it. HS256 only; asymmetric algorithms (`EdDSA`/`RS256`) are not supported. Use a custom auth adapter if you need them. `alg: none` tokens are rejected.
+List accepted keys by `kid`, `active_kid` signs. New tokens carry `kid`, verification selects by `kid`, still accepting kid-less tokens signed with legacy `secret`. Unknown kids fail closed, keep retired keys until expiry. HS256 only, asymmetric needs custom adapter, `alg: none` rejected.
 
 ```sh
 AUTH_JWT_SECRET=previous-secret-at-least-32-bytes-long
 AUTH_JWT_LEEWAY=30s
 ```
 
-The key set itself (`jwt.keys`) is a list, which has no string form, so it is wired in Go through `auth.Options.JWT.Keys` (or `container.WithOptions`). `AUTH_JWT_ACTIVE_KID` then points at the signer, and it is rejected when no keys are configured.
+`jwt.keys` has no string form, wire it in Go via `auth.Options.JWT.Keys` or `container.WithOptions`. `AUTH_JWT_ACTIVE_KID` is rejected without keys.
 
-Tokens carrying a future `nbf` (not-before) claim are rejected; `exp` is always required. Both honor `leeway`, which defaults to `0` (strict).
+Future `nbf` rejected, `exp` required. Both honor `leeway` (default `0`, strict).
 
 ## Log in and call with a bearer token
 
-Log in, then send the token on every other route:
+Log in, then reuse the token:
 
 ```sh
 curl -s -X POST localhost:8080/api/login \
@@ -58,14 +58,14 @@ curl -s -X POST localhost:8080/api/login \
 curl -s localhost:8080/api/spaces -H "Authorization: Bearer $TOKEN"
 ```
 
-Login returns `200` with a signed JWT in `token`; register `201`; missing or invalid tokens `401`. `Issue` mints, `Verify` checks per request, `Revoke` invalidates a token (`jwt` keeps revoked `jti`s in a per-process store; `session` uses its store). `Verify` returns distinct `ErrInvalidToken` and `ErrTokenExpired` errors; map both to one generic `401` so responses leak nothing. Log details server-side, never token values.
+Login returns `200` with JWT in `token`, register `201`, missing/invalid `401`. `Issue` mints, `Verify` checks, `Revoke` invalidates. `jwt` keeps revoked `jti`s per-process, `session` uses its store. `Verify` returns `ErrInvalidToken` vs `ErrTokenExpired`, map both to one `401`. Log details server-side, never token values.
 
 ## Production checklist
 
-- CSPRNG secret (32+ bytes) in env or a mounted file, never source. See [Secrets](../secrets/).
-- Rotate with overlap: add the new key to `jwt.keys`, flip `jwt.active_kid`, and only remove the old key after its tokens have expired.
-- Prefer `session` for immediate revocation across instances; JWT revocation is per-process by default (the memory store dies with the process and is invisible to other instances), so multi-instance deployments must inject the shared `revocation/redis` store via `auth.JWTOptions.RevocationStore`; otherwise revoked tokens stay valid on sibling instances until TTL.
-- Rate-limit login; hashing cost is not an attempt limit. See [Rate limiting](../ratelimit/).
+- CSPRNG secret (32+ bytes) in env or mounted file, never source. See [Secrets](../secrets/).
+- Rotate with overlap: add key, flip `jwt.active_kid`, remove old key after expiry.
+- Prefer `session` for cross-instance revocation. JWT revocation is per-process by default, multi-instance must inject the shared `revocation/redis` store via `auth.JWTOptions.RevocationStore`.
+- Rate-limit login, hashing cost is not an attempt limit. See [Rate limiting](../ratelimit/).
 - Display config only via `cfg.RedactedServices()` or `config.Redact`.
 
 ## Troubleshooting
@@ -77,21 +77,21 @@ Shorter than 32 bytes (`MinSecretLen`). Set a longer `AUTH_JWT_SECRET`.
 </details>
 
 <details>
-<summary>All logins return 401 after rotation</summary>
+<summary>Logins return 401 after rotation</summary>
 
-Old-secret tokens no longer verify: either the retired `kid` was removed from `jwt.keys` before its tokens expired, or `active_kid` points at a key ID with no matching entry. Restore the old key (or fix `active_kid`), or log in again for a fresh token.
+Old-secret tokens fail: retired `kid` left `jwt.keys` early, or `active_kid` points at missing key. Restore old key, fix `active_kid`, or log in again.
 </details>
 
 <details>
-<summary>The session adapter fails at startup</summary>
+<summary>Session adapter fails at startup</summary>
 
-It needs an injected `session.Store` (Go-only, not config). Wire a shared store for multiple instances.
+Needs injected `session.Store` (Go-only, not config). Wire a shared store for multiple instances.
 </details>
 
 <details>
 <summary>OIDC login loops</summary>
 
-The provider redirect URL and the callback disagree. Align the app registration with the deployed callback URL.
+Redirect URL and callback disagree. Align app registration with deployed callback URL.
 </details>
 
 ## Related

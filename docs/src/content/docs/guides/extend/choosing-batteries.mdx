@@ -1,64 +1,53 @@
 ---
 title: Choosing batteries and adapters
-description: A decision guide for picking the adapter behind each battery, from zero-infrastructure defaults to production backends.
+description: Pick adapters by stage and deployment.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every battery is one small interface with several adapters, and switching adapters is a code change, not a config change: the question is never "which library do I commit to" but "which adapter fits this stage". Start on the zero-infrastructure defaults, then change the wired import plus its `container.Provide` entry in `internal/app/wiring.go` when the deployment shape demands it, and rebuild.
+Switch adapters via imports and `container.Provide` in `internal/app/wiring.go`, not config.
 
-The default for every battery in `config.Default()` runs with no external service (`memory`, `local`, `sqlite`, `log`, `noop`, ...), which is why tests and `zever serve` work on a fresh checkout. The full table is in the [adapters matrix](../../../reference/adapters-matrix/); this page covers the choices that matter.
+`config.Default()` is zero-infra (`memory`, `local`, `sqlite`, `log`, `noop`) for tests/`zever serve`. See [adapters matrix](../../../reference/adapters-matrix/).
 
-## The one rule
+## Rule
 
-Pick by where state lives and who must see it:
+Single process: `memory`/`sqlite`. Shared state: `redis`/`postgres` (`db` reuses the existing DB, or substitutes without Redis, at the cost of polling and database load). Money, auth, or compliance: never `stub`, `noop`, or `memory` (`stub` payment and billing verify nothing and hold no funds). Verify with `zever doctor` after rewiring.
 
-- **One process, throwaway state** (tests, local dev, a single binary): the `memory` adapter.
-- **Several processes must share the state** (more than one server replica, or server plus worker): an adapter backed by a shared service, `redis` or your `postgres` database.
-- **You want fewer moving parts**: the `db` adapter that reuses the database you already run, instead of adding Redis.
+## Choices
 
-## Common choices
+| Battery | Local/tests | Production | Notes |
+| --- | --- | --- | --- |
+| `db` | `sqlite` | `postgres` (multi-instance/write-heavy) | `sqlite` `:memory:` per connection. File under `t.TempDir()`. |
+| `cache` | `memory` | `redis` (shared). `db` w/o Redis | `memory` not shared across replicas. |
+| `queue` | `memory` | `redis` workers. `db` w/o Redis | Only `redis`/`db` cross-host. See [Queue](../../background/queue/). |
+| `session` | `memory` | `redis` or `db` | Survives restarts/replicas. |
+| `auth` | `jwt` | `jwt`. `session` cookies. `oidc` IdP tokens | `jwt` needs >=32-byte secret. |
+| `ratelimit` | `memory` | `redis` across replicas | |
+| `lock`, `idempotency` | `memory` | `redis` or `db` | Cross-instance correctness. |
+| `eventbus` | `memory` | `redis` fan-out | No offline-handler durability. |
+| `outbox` | `memory` | `db`. `cdc` for Postgres | Defaults to `db`. |
+| `scheduler` | `embedded` | `postgres` durable leased slots | |
+| `observability` | `stdout` | `otlp` collector | `noop` for tests. |
+| `log` | `slog`/`pretty` | `slog`/`zerolog` JSON. `noop` tests | |
+| `storage` | `local` | `s3`/`r2` | |
+| `search`, `vectorstore` | `db` | `meilisearch`/`qdrant` at scale | Start on `db`. |
+| `secrets` | `env` | `vault` rotation/audit | `env` needs restart. |
+| `permission` | `noop` | `rbac`/`casbin` | |
+| `router` | `stdhttp` | `stdhttp`/`fiber` | Match middleware needs. |
 
-| Battery | Local and tests | Production when... | Notes |
-|---|---|---|---|
-| `db` | `sqlite` (pure Go, no cgo) | `postgres` for anything multi-instance or write-heavy. | sqlite `:memory:` is per connection; use a file path under `t.TempDir()` in tests. |
-| `cache` | `memory` | `redis` for a shared cache; `db` if you run no Redis. | `memory` is per process, so replicas see different values. |
-| `queue` | `memory` | `redis` for separate worker tiers; `db` for a shared queue without Redis. | Only `redis` and `db` let another host pop. See [Queue](../../background/queue/). |
-| `session` | `memory` | `redis` or `db` so a session survives restarts and spans replicas. | |
-| `auth` | `jwt` | `jwt` for stateless APIs; `session` for cookie apps; `oidc` to verify tokens from an identity provider. | `jwt` needs a secret of at least 32 bytes. |
-| `ratelimit` | `memory` | `redis` when limits must hold across replicas. | |
-| `lock`, `idempotency` | `memory` | `redis` (or `db` for idempotency) for cross-instance correctness. | |
-| `eventbus` | `memory` | `redis` for fan-out across instances. | No durability for offline handlers. |
-| `outbox` | `memory` | `db` for transactional delivery; `cdc` for postgres logical replication. | Defaults to `db`. |
-| `scheduler` | `embedded` | `postgres` for durable leased slots on several hosts. | |
-| `observability` | `stdout` | `otlp` to a collector. | `noop` for tests. |
-| `log` | `slog` or `pretty` | `slog` or `zerolog` for JSON logs; `noop` in tests. | |
-| `storage` | `local` | `s3` or `r2` for object storage. | |
-| `search`, `vectorstore` | `db` | `meilisearch` or `qdrant` when scale or features demand it. | Start on `db`. |
-| `secrets` | `env` | `vault` when you need rotation or an audited store. | `env` cannot rotate without a restart. |
-| `permission` | `noop` | `rbac` or `casbin` when you enforce authorization. | |
-| `router` | `stdhttp` | `stdhttp` or `fiber`. | Pick by the middleware ecosystem you want. |
+## Wire
 
-## Decide in order
-
-1. **Do I run more than one process of this service?** If no, stay on `memory`/`sqlite`. If yes, move the shared batteries (`session`, `ratelimit`, `lock`, `idempotency`, `cache`, `queue`) to `redis` or `db`.
-2. **Do I already run Redis?** If yes, use it for the shared batteries. If no, the `db` adapters avoid adding a service at the cost of polling and database load.
-3. **Does it carry money, auth, or compliance?** Do not use `stub`, `noop`, or `memory` adapters for it. The `stub` payment and billing adapters verify nothing and hold no funds.
-4. **Do I need to read the choice back later?** Run `zever doctor` after rewiring: it resolves every wired battery and reports `OK` or `FAIL` per battery.
-
-## Wiring a choice
-
-Wire it in `internal/app/wiring.go` with an import plus a `container.Provide` entry, then rebuild. `zever add cache/redis` adds the `go.mod` require, the wiring.go entry, and the `.env.example` stanza in one step:
+`zever add` writes imports + `container.Provide` in `internal/app/wiring.go`:
 
 ```sh
 zever add cache/redis
 zever doctor
 ```
 
-A battery with no `container.Provide` entry fails at startup with a `NotWiredError` naming the fix, instead of failing at first use. To trim a binary to only the adapters you ship, see `zever build --adapters` in the [CLI reference](../../../reference/cli/).
+Unwired batteries fail at startup (`NotWiredError`). Trim via `zever build --adapters` ([CLI reference](../../../reference/cli/)).
 
 <CardGrid>
-  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" description="Every battery and adapter." />
-  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" description="How registration and resolution work." />
-  <LinkCard title="Write a plugin" href="../write-a-plugin/" description="Bring your own adapter." />
+  <LinkCard title="Adapters matrix" href="../../../reference/adapters-matrix/" />
+  <LinkCard title="Providers and adapters" href="../../../concepts/providers-adapters/" />
+  <LinkCard title="Write a plugin" href="../write-a-plugin/" />
 </CardGrid>

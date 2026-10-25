@@ -5,17 +5,17 @@ description: Manage customers, subscriptions, and invoices with a stub, Stripe, 
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`billing.Billing` is one facade over provider APIs for customers, subscriptions, and invoices, in minor units. Use [Payments](../payment/) for the charge.
+`billing.Billing` facades provider APIs (customers, subscriptions, invoices, minor units). Charges: [Payments](../payment/).
 
 ## Quick start
 
-`stub` is the default: zero-infra, in memory, safe in tests.
+`stub` is default: zero-infra, in-memory, test-safe.
 
 ```sh
 BILLING_SANDBOX=true
 ```
 
-Provider keys come from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint` (absolute URL), `sandbox`. Env vars mirror the keys. See the [billing config reference](../../../reference/config/#billing).
+Provider keys from `shared/providersopt`: `secret_key` (Stripe), `api_key` (Paddle), `endpoint` (absolute URL), `sandbox`. See [billing config reference](../../../reference/config/#billing).
 
 ```go title="main.go" check
 package main
@@ -51,7 +51,7 @@ func main() {
 }
 ```
 
-Expected output with `stub` (IDs are `cus_`/`sub_` plus a random ULID, so they vary):
+Expected output (IDs are `cus_`/`sub_` plus a random ULID, so they vary):
 
 ```text
 customer: cus_01J0000000000000000000000
@@ -59,41 +59,35 @@ subscription: sub_01J0000000000000000000001 active
 invoice due: 0
 ```
 
-## Pass minor units and idempotency keys
+## Minor units and idempotency keys
 
-Amounts are `int64` minor units (cents, not dollars); format with the currency exponent helpers, since not every currency has two decimals. Pass a stable idempotency key on each create so retries never double-create.
+Amounts are `int64` minor units, use currency exponent helpers and one stable idempotency key per create.
 
 ## Choose an adapter
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `stub` | `adapters/billing/stub` | Default. In memory, ULID-identified records. |
+| `stub` | `adapters/billing/stub` | Default, in-memory ULID records. |
 | `stripe` | `adapters/billing/stripe` | Needs `secret_key`. |
 | `paddle` | `adapters/billing/paddle` | Needs `api_key`. |
 
 ## Production checklist
 
-- `billing` is not the system of record; the provider is, giving typed create/query without per-provider HTTP.
-- `SecretKey` and `APIKey` never surface in errors or logs. Hold them in [Secrets](../../security/secrets/).
+- The provider is the system of record, `billing` gives typed create/query, no per-provider HTTP.
+- Never log `SecretKey`/`APIKey`, hold them in [Secrets](../../security/secrets/).
 
 ## Troubleshooting
 
 <details>
 <summary>Tests hit the real provider</summary>
 
-Cause: the wired backend differs from what the test expects. Fix: check the `container.Provide` entry for the billing ref (tests default to the `stub` backend).
-</details>
-
-<details>
-<summary>`Validate` rejects `endpoint`</summary>
-
-Cause: a custom endpoint must be an absolute URL with scheme and host. Fix: correct the URL.
+Wrong backend, check `container.Provide` (tests default to `stub`).
 </details>
 
 <details>
 <summary>Amounts are off by a factor of 100</summary>
 
-Cause: major units passed where minor units belong. Fix: multiply by the currency exponent (`ParseMinorUnits`) before create.
+Major units passed, multiply by currency exponent (`ParseMinorUnits`) before create.
 </details>
 
 ## Related

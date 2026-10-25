@@ -5,7 +5,7 @@ description: Dispatch background jobs onto the shared queue and fire them on cro
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Use `job.Dispatcher` for deferred or retryable work (confirmation mail, push, webhook delivery): it wraps the resolved `Queue`. Use the scheduler for recurring triggers: it fires registered job names on cron specs through the dispatcher, with per-slot dedup across instances when a locker is set.
+`job.Dispatcher` handles deferred/retryable work (confirmation mail, push, webhook delivery), wrapping the resolved `Queue`. The scheduler fires registered job names on cron specs through the dispatcher, with per-slot dedup across instances when a locker is set.
 
 ## Quick start
 
@@ -13,15 +13,11 @@ Use `job.Dispatcher` for deferred or retryable work (confirmation mail, push, we
 SCHEDULER_CLOSE_TIMEOUT=5s
 ```
 
-```sh
-SCHEDULER_CLOSE_TIMEOUT=5s
-```
-
-Only `dsn`, `dedicated_pool`, and `close_timeout` are env-settable; `Dispatcher`, `Locker`, and `Logger` are code-wired (`json:"-"`) and injected by the container. Dispatch rides the [queue](../queue/), so its options matter too. All keys: [scheduler config reference](../../../reference/config/#scheduler).
+Only `dsn`, `dedicated_pool`, `close_timeout` are env-settable, `Dispatcher`, `Locker`, `Logger` are code-wired (`json:"-"`), injected by the container. Dispatch rides the [queue](../queue/), so its options matter too. All keys: [scheduler config reference](../../../reference/config/#scheduler).
 
 ## Dispatch and schedule a job
 
-Register typed jobs, dispatch one now, and schedule another on cron. This mirrors `go run ./cmd/worker` in `examples/bookings`.
+Register typed jobs, dispatch one, schedule another on cron. Mirrors `go run ./cmd/worker` in `examples/bookings`.
 
 ```go title="main.go" check
 package main
@@ -64,13 +60,13 @@ func main() {
 }
 ```
 
-`Dispatch` pushes onto the topic named after the job's priority (`low` by default, then `medium`, `high`), the schedule registers `0 9 * * *`, and `Start` begins ticks. The bookings worker runs `job.Worker{Queues: []string{"default", "low"}, Concurrency: 4}`, which polls topics in that order.
+`Dispatch` pushes onto the topic for the job priority (`low` default, then `medium`/`high`), the schedule registers `0 9 * * *`, `Start` begins ticks. The bookings worker runs `job.Worker{Queues: []string{"default", "low"}, Concurrency: 4}`, polling in that order.
 
-Set retry policy and priority at `job.Register` time with `WithRetryPolicy` and `WithPriority`. The default is 25 attempts with a 5s base delay doubling per attempt (the bookings schema overrides it with `max_attempts(3)` and an exponential 30s base). `job.NewBatch` covers batch enqueue. For singleton jobs, dispatch with `job.UniqueBy(key)`; that needs a `job.UniqueLocker` (built with `job.NewUniqueLocker(cache)`) set on the dispatcher, which the container does not wire for you.
+Set retry/priority at `Register` with `WithRetryPolicy`/`WithPriority`: default 25 attempts, 5s base doubling per attempt (bookings schema overrides to `max_attempts(3)`, 30s exponential base). `job.NewBatch` covers batch enqueue. Singleton jobs use `job.UniqueBy(key)`, needing a `job.UniqueLocker` (`job.NewUniqueLocker(cache)`) the container doesn't wire.
 
 ## Resolve the scheduler from the container
 
-`c.Job()` builds a `*job.Dispatcher` over the resolved `Queue` (`d.Q` is the shared instance); `c.Scheduler()` injects it, so resolving the scheduler resolves `Job()` and `Queue` too. Do not open a second queue for scheduled work. The scheduler has `Stop() error` instead of `Close`; the container stops it and job first, then snapshots, then `cache` and `queue`. See [the container](../../../concepts/container/).
+`c.Job()` builds a `*job.Dispatcher` over the resolved `Queue` (`d.Q` is the shared instance), `c.Scheduler()` injects it, so resolving the scheduler resolves `Job()` and `Queue` too. Never open a second queue for scheduled work. The scheduler has `Stop() error` (not `Close`), the container stops it and job first, then snapshots, then `cache`/`queue`. See [the container](../../../concepts/container/).
 
 ## Choose a scheduler adapter
 
@@ -79,41 +75,23 @@ Set retry policy and priority at `job.Register` time with `WithRetryPolicy` and 
 | `embedded` | `adapters/scheduler/embedded` | In-process cron ticks. `Stop()` ends ticks. |
 | `postgres` | `adapters/scheduler/postgres` | Durable leased slots, safe for multi-instance deploys. Set `dsn` to a postgres URL (empty is a private in-memory sqlite). |
 
-`job` has no adapter registry: topics are priority names, so the real decision is the backing queue. `memory` keeps web, worker, and ticks in one process; `redis` lets ticks fire in one process while any worker pops the job. The `postgres` adapter borrows the shared pool for its DSN unless `dedicated_pool: true`; under sustained load prefer a separate database.
+`job` has no adapter registry: topics are priority names, the real choice is the backing queue. `memory` keeps web/worker/ticks in one process, `redis` lets ticks fire in one process while any worker pops. `postgres` borrows the shared pool for its DSN unless `dedicated_pool: true`, prefer a separate database under load.
 
 ## Production checklist
 
-- Not a durable timeline: slots that fire while the process is down are skipped. Keep handlers idempotent, pair triggers with `lock` or `idempotency`, and consider a catch-up query on boot.
-- Guard overlapping ticks with the unique locker, or a slow run plus a fast cadence double-fires a slot.
-- Keep job payloads small JSON: large blobs inflate every retry and queue read.
-- Set `close_timeout` explicitly instead of relying on the 5s default.
-- Never log raw option maps; use `config.RedactedServices`.
+- Not a durable timeline: slots firing while down are skipped. Idempotent handlers, `lock`/`idempotency` triggers, consider a catch-up query on boot.
+- Guard overlapping ticks with the unique locker, slow run + fast cadence double-fires a slot.
+- Small JSON payloads: large blobs inflate every retry and queue read.
+- Set `close_timeout` explicitly, not the 5s default. Never log raw option maps (`config.RedactedServices`).
 
 ## Troubleshooting
 
-<details>
-<summary>Reminders fire twice from two hosts</summary>
-
-Two schedulers tick the same spec with no shared locker. Wire one cache-backed `job.UniqueLocker` (`scheduler.Options.Locker`, code only) into both, or run a single scheduler replica.
-</details>
-
-<details>
-<summary>scheduler.Open fails with dispatcher_is_required</summary>
-
-`Dispatcher` is code-only and was left nil. Resolve through `c.Scheduler()`, or pass `scheduler.Options{Dispatcher: d}`.
-</details>
-
-<details>
-<summary>A dispatched job never runs and the worker is idle</summary>
-
-Topic mismatch: `job.Register` defaults to `PriorityLow` (topic `low`) while the worker polls only `default`, or the reverse. Align `job.WithPriority` with the worker's `Queues`, and poll `default` and `low` in order, as the bookings worker does.
-</details>
-
-<details>
-<summary>Shutdown drops a tick that already started</summary>
-
-`close_timeout` is too short, or the queue closed before the scheduler. Raise it (nanoseconds in file, `"5s"` in env) and keep container close order so `Stop()` waits for running ticks.
-</details>
+| Symptom | Fix |
+|---|---|
+| Reminders fire twice from two hosts | No shared locker, wire one cache-backed `job.UniqueLocker` (`Options.Locker`, code only) into both, or run one scheduler replica |
+| `scheduler.Open` fails `dispatcher_is_required` | `Dispatcher` is code-only and nil, resolve via `c.Scheduler()` or pass `Options{Dispatcher: d}` |
+| Dispatched job never runs, worker idle | Topic mismatch (`PriorityLow` -> `low` vs worker polling `default`), align `WithPriority` with worker `Queues` |
+| Shutdown drops a started tick | `close_timeout` too short or queue closed first, raise it (ns in file, `"5s"` env), keep container close order |
 
 ## Related
 

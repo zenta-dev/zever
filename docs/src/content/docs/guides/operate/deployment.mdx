@@ -3,9 +3,9 @@ title: Deployment
 description: Ship Zever to production with one checklist for build, config, secrets, shutdown, health, scaling, and hardening.
 ---
 
-import { Steps, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-The production checklist for a tested checkout. Build once, configure per environment, run one container per process, and close it on SIGTERM. There is no build-time codegen: the `.zen` compiler runs explicitly (`zever compile`, `zever generate`) during development, never at container start.
+Build once, configure per env, run one container per process, close on SIGTERM. The `.zen` compiler runs explicitly (`zever compile`, `zever generate`) in development, never at container start.
 
 ## Build one binary
 
@@ -17,12 +17,12 @@ GOOS=linux GOARCH=amd64 go build -o myapp ./cmd/myapp   # cross-compile
 
 | Target | Shape | Pick it for |
 |---|---|---|
-| Systemd | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VMs and bare metal. |
-| Kubernetes | Image plus `env:` secrets and `.env` ConfigMap. | Orchestrated rollouts. |
+| Systemd | `ExecStart=/usr/local/bin/myapp` with `EnvironmentFile` | VMs. |
+| Kubernetes | Image plus `env:` secrets and `.env` ConfigMap. | Rollouts. |
 | Container image | `docker build -f examples/showcase/Dockerfile .` | Multi-stage: `golang:1.27-trixie` builder (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-s -w"`), final `gcr.io/distroless/static-debian13:nonroot` with an absolute `ENTRYPOINT ["/server"]`. |
-| Compose | `DB_PASSWORD=... docker compose up --build` | Scaffolded `compose.yaml` when `zever new` picks `db=postgres` or `*=redis`. Health-gated startup. |
+| Compose | `DB_PASSWORD=... docker compose up --build` | Scaffolded `compose.yaml` when `zever new` picks `db=postgres` or `*=redis`. Health-gated. |
 
-Static builds work because sqlite is pure Go (no cgo) and the distroless static base carries CA certificates for Stripe and cloud TLS. Build from the repo root; the builder runs with `GOWORK=off`. The worker follows the same pattern with `./cmd/worker`. Build from a clean tree at a tag and keep the SBOM. Tagged releases build static binaries and SBOMs with SLSA provenance; verify before deploy:
+Static builds work: sqlite is pure Go (no cgo). Distroless carries CA certs. Build from the repo root with `GOWORK=off`. Worker uses `./cmd/worker`. Build from a clean tagged tree and keep the SBOM. Tagged releases ship static binaries and SBOMs with SLSA provenance. Verify before deploy:
 
 ```sh
 gh attestation verify dist/zever-linux-amd64 --repo zenta-dev/zever
@@ -31,7 +31,7 @@ gh attestation verify sbom/cmd_zever.json --repo zenta-dev/zever
 
 ## Configure and inject secrets
 
-Ship an `.env` file for structure and set secrets and per-environment deltas through env. Layering is `defaults < .env < .env.local < process env`, and `config.Default()` never reaches production because its crypto key is deterministic and public. See [Configuration](../configuration/).
+Ship an `.env` for structure. Set secrets and per-env deltas via env. Layering: `defaults < .env < .env.local < process env`. `config.Default()` never reaches production (deterministic public crypto key). See [Configuration](../configuration/).
 
 ```sh
 DB_DSN=postgres://app:secret@db:5432/app
@@ -47,38 +47,11 @@ DB_DSN='postgres://app:${DB_PASSWORD}@db:5432/app'
 AUTH_JWT_SECRET='prod-secret-at-least-32-bytes-long'
 ```
 
-Resolve with an explicit env (`config.FromEnv()`) so a wrong working directory cannot fall back to sqlite. Keep secrets in env or mounted files, and prefer [Secrets](../../security/secrets/) with Vault for payment credentials (SOC2 and PCI expect a real secrets manager). The `env` adapter cannot rotate at runtime: rotate by restarting with new values. Print only `cfg.RedactedServices()` at boot.
-
-```go title="main.go"
-env, err := config.FromEnv()
-if err != nil {
-    log.Fatal(err)
-}
-cfg, err := config.Resolve(env)
-if err != nil {
-    log.Fatal(err)
-}
-c := container.New(cfg, app.Providers()...)
-
-srv := &http.Server{Addr: ":8080", Handler: routes(c)}
-go func() {
-    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-        log.Fatal(err)
-    }
-}()
-
-<-sigCh // SIGINT or SIGTERM
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-defer cancel()
-_ = srv.Shutdown(ctx)
-if err := c.Close(ctx); err != nil {
-    log.Fatal(err)
-}
-```
+Resolve via `config.FromEnv()` so a wrong working directory cannot fall back to sqlite. Keep secrets in env or mounted files. Prefer [Secrets](../../security/secrets/) with Vault for payment credentials (SOC2 and PCI expect a real secrets manager). The `env` adapter cannot rotate at runtime: restart. Print only `cfg.RedactedServices()` at boot.
 
 ## Shut down in order
 
-Build one container per process, resolve services in handlers, and close on SIGINT or SIGTERM:
+Build one container per process, resolve services in handlers, and close on SIGINT or SIGTERM (same boot and shutdown sequence as above):
 
 ```go title="main.go"
 env, err := config.FromEnv()
@@ -124,33 +97,29 @@ r.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Configure liveness on `/healthz` (no deps) and readiness on `/readyz` (with 3s db timeout). In Kubernetes, the `readinessProbe` timeout must exceed the db timeout so a slow query doesn't flip the probe.
+Liveness on `/healthz` (no deps). Readiness on `/readyz` (3s db timeout). In Kubernetes, the `readinessProbe` timeout must exceed the db timeout.
 
 ## Graceful shutdown
 
-On SIGTERM the generated server flips gRPC health to `NOT_SERVING`, calls `GracefulStop()`, shuts the HTTP server down, and closes the container, all within a 10 second grace. Keep `terminationGracePeriodSeconds` above that plus any `preStop` delay.
+On SIGTERM the generated server flips gRPC health to `NOT_SERVING`, calls `GracefulStop()`, shuts HTTP down, and closes the container within a 10s grace. Keep `terminationGracePeriodSeconds` above that plus any `preStop` delay.
 
-A short `preStop` delay lets endpoint removal propagate before SIGTERM. The reference image is distroless and has no shell; the example uses the native `sleep` lifecycle handler (Kubernetes 1.30+). On older clusters, add a tiny static sleep binary.
+A short `preStop` delay lets endpoint removal propagate before SIGTERM. The distroless image has no shell. The example uses the native `sleep` lifecycle handler (Kubernetes 1.30+). On older clusters, add a tiny static sleep binary.
 
 ## Config reload
 
-Log level and the rate limiter swap on SIGHUP; everything else needs a rollout. A rolling restart (`kubectl rollout restart deployment/myapp-server`) is the supported way to change anything else.
+Log level and rate limiter swap on SIGHUP. Everything else needs a rollout (`kubectl rollout restart deployment/myapp-server`).
 
 ## Scaling
 
-Run more than one replica only with shared-state adapters (`redis`, `db`) for cache, queue, session, lock, rate-limit. With more than one scheduler replica, wire a locker so a cron slot fires once; otherwise run the scheduler in a single replica. Scale workers on queue depth (`queue.Length`) with an autoscaler such as KEDA rather than on CPU.
-
-<Aside type="caution">
-Do not use a `memory` cache, queue, session, lock, or rate-limit adapter with more than one replica: each pod holds its own state. Point them at Redis or your database. See [Choosing batteries](../../extend/choosing-batteries/).
-</Aside>
+Run >1 replica only with shared-state adapters (`redis`, `db`) for cache, queue, session, lock, rate-limit. `memory` state splits per pod. With >1 scheduler replica, wire a locker so a cron slot fires once, else run scheduler in one replica. Scale workers on queue depth (`queue.Length`) with KEDA, not CPU. See [Choosing batteries](../../extend/choosing-batteries/).
 
 ## Migrations
 
-Run `zever db migrate` as a Kubernetes Job (or an init step in your pipeline) before rolling out a schema change, not inside every pod. Use a distinct Job per release so a failed migration blocks the rollout instead of racing replicas.
+Run `zever db migrate` as one Kubernetes Job per release before rollout (or pipeline init step), never in every pod. A failed migration blocks rollout.
 
 ## Profiling and debugging
 
-The generated server can expose pprof on a loopback-only listener (`--pprof-addr`). In a cluster, set `PPROF_ADDR=127.0.0.1:6060` on the pod and reach it with a port-forward rather than a Service:
+Generated server exposes pprof on a loopback-only listener (`--pprof-addr`). In a cluster, set `PPROF_ADDR=127.0.0.1:6060` and reach via port-forward:
 
 ```sh
 kubectl port-forward deploy/myapp-server 6060:6060
@@ -161,12 +130,12 @@ See [Profiling with pprof](../observability/#profiling-with-pprof). Never run `z
 
 ## Hardening checklist
 
-- [ ] Distroless, non-root, read-only rootfs, drop all capabilities
+- [ ] Distroless, non-root
+- [ ] Read-only rootfs, drop ALL capabilities
 - [ ] Secrets in Secret (not ConfigMap), rotate by restart
 - [ ] Readiness probe with db timeout
 - [ ] Liveness on `/healthz` (no deps)
 - [ ] `preStop` delay + `terminationGracePeriodSeconds`
-- [ ] Read-only rootfs, drop ALL capabilities
 - [ ] NetworkPolicy: deny all egress except db, redis, otel, allowed APIs
 - [ ] `PodDisruptionBudget` with `minAvailable`
 - [ ] Rolling restart for config changes (SIGHUP only reloads log/ratelimit)
@@ -174,7 +143,7 @@ See [Profiling with pprof](../observability/#profiling-with-pprof). Never run `z
 
 <CardGrid>
   <LinkCard title="Kubernetes" href="../kubernetes/" description="Manifests for server, worker, PDB, HPA." />
-  <LinkCard title="Configuration" href="../configuration/" description="Env-only, `.env`, `.env.local`, defaults." />
+  <LinkCard title="Configuration" href="../configuration/" description="Env-only config." />
   <LinkCard title="Secrets" href="../../security/secrets/" description="Vault, env, rotation." />
   <LinkCard title="FAQ and troubleshooting" href="../faq-troubleshooting/" description="Common problems." />
 </CardGrid>

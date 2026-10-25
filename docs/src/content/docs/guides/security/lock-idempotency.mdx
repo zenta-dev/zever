@@ -3,11 +3,11 @@ title: Locks and idempotency
 description: Guard critical sections with distributed locks and make retried jobs and webhooks take effect once.
 ---
 
-Use `lock` for mutual exclusion and `idempotency` for dedupe. `Locker` offers `TryAcquire`, blocking `Acquire` (polls every `retry_interval`, default 50ms), `Extend`, and ownership-checked `Unlock`. `Store` reserves a key with `Begin` and records the outcome with `Complete`, so retries replay the stored result.
+`lock` gives mutual exclusion, `idempotency` dedupes retries. `Locker` offers `TryAcquire`, blocking `Acquire` (polls `retry_interval`, default 50ms), `Extend`, ownership-checked `Unlock`, `Store` reserves keys with `Begin` and records outcomes with `Complete`, so retries replay stored results.
 
 ## Quick start
 
-Both default to `memory`: single process only. Register the adapters before resolving, since the container wires nothing.
+Both default to `memory` (single-process), register adapters first, the container wires nothing.
 
 ```go title="main.go" check
 package main
@@ -58,23 +58,23 @@ true <nil>
 false <nil>
 ```
 
-A second `Begin` with the same key and fingerprint prints `true <nil>` with the stored bytes.
+Repeated identical `Begin` prints `true <nil>` with stored bytes.
 
-## Guard a booking path
+## Guard bookings
 
-The bookings handler runs `RateLimit.Allow`, then `Idempotency.Begin` (`booking:<key>`, fingerprint `guest|space|start|end`), then `Lock.TryAcquire` on `booking:<space>:<start>:<end>` with a 30s TTL while the overlap check, charge, and insert run.
+Bookings handler runs `RateLimit.Allow`, `Idempotency.Begin` (`booking:<key>`, fingerprint `guest|space|start|end`), then `Lock.TryAcquire` on `booking:<space>:<start>:<end>` (30s TTL) around overlap check, charge, insert.
 
 | Outcome | Status |
 |---|---|
-| Replay of a finished request | Stored bytes returned. |
+| Finished-request replay | Stored bytes. |
 | `ErrInProgress` | `409`. |
 | `ErrKeyMismatch` | `400`. |
 
-Key the lock on the contended range and the idempotency key on a stable external ID (webhook event ID, job dedupe key), never raw payload bytes. Idempotency fails closed.
+Key the lock on the contended range, idempotency on a stable external ID (webhook event ID, job dedupe key), never raw payload bytes. Idempotency fails closed.
 
-## Share state across replicas
+## Share across replicas
 
-`memory` is invisible to other replicas, so a second instance can double-book or duplicate webhook effects. Move both to `redis`, or `idempotency` to `db`.
+`memory` is per-replica, so instances can double-book or duplicate webhook effects. Move both to `redis` (or `idempotency` to `db`).
 
 ```sh
 LOCK_TTL=30s
@@ -83,37 +83,31 @@ LOCK_PREFIX=bookings:
 IDEMPOTENCY_TTL=24h
 ```
 
-```sh
-LOCK_TTL=30s
-LOCK_RETRY_INTERVAL=50ms
-IDEMPOTENCY_TTL=24h
-```
-
-The lock takes Redis connection keys at the top level (`addr`, `url`, `password`, `db`, `tls`), while `idempotency` nests them under `redis:` (`redis.addr`, `redis.prefix`). Lock `Validate` is a no-op; each adapter validates its own fields. Idempotency rejects a negative `ttl` (zero means 24h) and bad Redis `addr`/`prefix`. Keys cap at 255 bytes (`MaxKeyLen`). Adapters: `adapters/lock/{memory,redis}` and `adapters/idempotency/{memory,redis,db}` (`db` via `dsn`, `dedicated_pool`). Keys: [lock](../../../reference/config/#lock), [idempotency](../../../reference/config/#idempotency).
+Lock Redis keys are top-level (`addr`, `url`, `password`, `db`, `tls`), `idempotency` nests them under `redis:` (`redis.addr`, `redis.prefix`). Lock `Validate` is a no-op, each adapter validates its own fields. Idempotency rejects negative `ttl` (zero is 24h) and bad Redis `addr`/`prefix`. Keys cap at 255 bytes (`MaxKeyLen`). `adapters/lock/{memory,redis}`, `adapters/idempotency/{memory,redis,db}` (`db` via `dsn`, `dedicated_pool`). See [lock](../../../reference/config/#lock), [idempotency](../../../reference/config/#idempotency).
 
 ## Production checklist
 
-- `Lock.Close(ctx)` takes a context; `Store.Close()` does not. Neither releases held leases or reservations; locks expire on their TTL (default 30s), so plan expiry.
-- Fingerprints may carry PII; keep them and raw option maps out of logs (`cfg.RedactedServices()`).
+- `Lock.Close(ctx)` takes a context, `Store.Close()` none. Neither releases held leases/reservations, locks expire on TTL (default 30s), plan expiry.
+- Fingerprints may carry PII, keep them and raw options out of logs (`cfg.RedactedServices()`).
 
 ## Troubleshooting
 
 <details>
-<summary>`409 dates already booked` with no real overlap</summary>
+<summary>`409` without real overlap</summary>
 
-A prior attempt holds the lock until its 30s TTL lapses, or a crashed worker never unlocked. Wait out the TTL or scope the key tighter; always `defer Unlock`.
+Prior attempt or crashed worker holds the lock until 30s TTL expiry. Wait out the TTL, scope keys tighter, always `defer Unlock`.
 </details>
 
 <details>
-<summary>`409 booking in progress` never clears</summary>
+<summary>`409` never clears</summary>
 
-A `Begin` without a matching `Complete` stays pending until the TTL. Run `Complete` on every post-reservation path, or `Forget` the key.
+`Begin` without `Complete` stays pending until TTL. `Complete` every post-reservation path, or `Forget` the key.
 </details>
 
 <details>
 <summary>`400 idempotency key mismatch`</summary>
 
-The same key arrived with a different fingerprint (key reuse across payloads). Key on a per-attempt ID (header or body `idempotency_key`), not guest plus dates.
+Same key, different fingerprint (key reuse across payloads). Key on a per-attempt ID (header/body `idempotency_key`), not guest plus dates.
 </details>
 
 ## Related

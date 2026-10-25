@@ -3,11 +3,11 @@ title: Rate limiting
 description: Bound request rates per key with token buckets in memory or shared over Redis.
 ---
 
-`ratelimit` bounds how fast one key (user, IP, token) can use an endpoint. `Limiter.Allow` returns a `Decision` with `Allowed`, `RetryAfter`, and `Remaining`; mapping a denial to `429` and the fail mode are your call.
+`ratelimit` bounds one key's (user, IP, token) endpoint rate, `Limiter.Allow` returns a `Decision` with `Allowed`, `RetryAfter`, `Remaining`. Map denials to `429`, fail mode is your call.
 
 ## Quick start
 
-The default is `memory` with `rate: 10`, `burst: 20`. `rate` (refill per second) and `burst` (bucket size) are both required, over zero, and finite.
+Default: `memory`, `rate: 10`, `burst: 20`. `rate` (refill/sec), `burst` (bucket size): both required, positive, finite.
 
 ```sh
 RATELIMIT_RATE=10
@@ -32,13 +32,13 @@ true 18 <nil>
 true 17 <nil>
 ```
 
-## Limit a request path
+## Limit requests
 
-The bookings handler calls `Allow(ctx, "book:"+guest, 1)`, returns `429` when `!dec.Allowed`, and `500` on error. Charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC interceptor (`ResourceExhausted`) when the ratelimit battery has a provider; both fail open, and `WithFailMode(FailClosed)` opts in.
+Bookings handler: `Allow(ctx, "book:"+guest, 1)` → `429` when `!dec.Allowed`, `500` on error, charges cap at burst. Generated servers wire `middleware.RateLimit` (HTTP `429` + `Retry-After`) and a gRPC `ResourceExhausted` interceptor when the battery has a provider, both fail open, `WithFailMode(FailClosed)` opts in.
 
-## Share limits across replicas
+## Share across replicas
 
-Per-instance buckets multiply the effective limit (`limit x replica count`); switch to `redis` once more than one replica serves traffic.
+Per-instance buckets multiply effective limits (`limit x replicas`), switch to `redis` with multiple replicas.
 
 ```sh
 RATELIMIT_RATE=100
@@ -47,37 +47,32 @@ RATELIMIT_REDIS_ADDR=127.0.0.1:6379
 RATELIMIT_REDIS_PREFIX=rl
 ```
 
-```sh
-RATELIMIT_RATE=100
-RATELIMIT_BURST=200
-```
-
-Use a distinct `redis.prefix` per environment. Durations take Go strings (`idle_ttl` default 10m, `sweep_interval` 1m), for example `"5s"`. `Validate` rejects non-positive `rate`/`burst`, negative `idle_ttl`/`sweep_interval`, and bad Redis `addr`/`prefix`. Adapters: `ratelimit/memory` (default) and `ratelimit/redis`. Keys: [reference](../../../reference/config/#ratelimit).
+Distinct `redis.prefix` per environment. Durations are Go strings (`idle_ttl` 10m, `sweep_interval` 1m, e.g. `"5s"`). `Validate` rejects non-positive `rate`/`burst`, negative `idle_ttl`/`sweep_interval`, bad Redis `addr`/`prefix`. `ratelimit/memory` (default), `ratelimit/redis`. Keys: [reference](../../../reference/config/#ratelimit).
 
 ## Production checklist
 
-- `Limiter.Close() error` takes no context; the container joins errors with `errors.Join`, and panics become `*ClosePanicError`.
-- Keys can be PII (IP, user ID); `InvalidKeyError` reports only length.
-- Never log raw option maps; use `cfg.RedactedServices()`.
+- `Limiter.Close() error` takes no context, errors join via `errors.Join`, panics become `*ClosePanicError`.
+- PII keys (IP, user ID), `InvalidKeyError` reports only length.
+- Never log raw options, use `cfg.RedactedServices()`.
 
 ## Troubleshooting
 
 <details>
-<summary>The effective limit looks multiplied</summary>
+<summary>Limit looks multiplied</summary>
 
-Replicas run `memory` buckets; move to `redis`, or divide the per-instance rate by the replica count.
+Replicas on `memory`, move to `redis` or divide per-instance rate by count.
 </details>
 
 <details>
 <summary>`rate must be > 0 and finite`</summary>
 
-`rate` and `burst` are required; an empty options block fails `Validate` (the bookings example uses `RATELIMIT_RATE=10`, `RATELIMIT_BURST=20` in `.env`).
+`rate`/`burst` required. Empty options fail `Validate` (bookings example: `RATELIMIT_RATE=10`, `RATELIMIT_BURST=20` in `.env`).
 </details>
 
 <details>
 <summary>`InvalidKeyError` on `Allow`</summary>
 
-Keys cap at 256 bytes (`MaxKeyLen`) with no control bytes; hash or truncate long composite keys first.
+256-byte key cap (`MaxKeyLen`), no control bytes, hash or truncate long composite keys.
 </details>
 
 ## Related

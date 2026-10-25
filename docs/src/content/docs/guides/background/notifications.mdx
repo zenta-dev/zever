@@ -5,9 +5,7 @@ description: Send push and SMS through one Notifier interface, with a safe log d
 
 import { LinkCard, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
-Use `notification.Notifier` for user-directed pings that are not mail: booking reminders, check-in prompts, fraud alerts. Code calls `Notify` against the interface, so adding FCM push or Twilio SMS is a config change, not a rewrite of every sender.
-
-Stay on `log` until a real channel is wired: it writes instead of sending. Pick `twilio` for SMS and `fcm` for push, with credentials from file or env, never committed YAML. The package does not queue or schedule, so enqueue notifications as jobs for retry and backpressure and never let a channel failure fail the triggering request.
+`notification.Notifier` sends non-mail pings: reminders, check-in prompts, fraud alerts. Callers use `Notify` against the interface, so FCM/Twilio is a config change, not a sender rewrite. Stay on `log` until a real channel is wired (writes instead of sending). `twilio` for SMS, `fcm` for push, credentials from file/env, never committed YAML. No queueing/scheduling here: enqueue as jobs for retry/backpressure, never fail the triggering request on channel failure.
 
 ## Quick start
 
@@ -43,13 +41,11 @@ func main() {
 }
 ```
 
-Output: two JSON log lines on stdout, then `notified push and sms via log adapter`; no network is used. The `notificationlog.New` constructor wires the default log backend, which writes single JSON lines to `os.Stdout`. In tests, use `NewWithWriter(opts, w)` with an `io.Writer` such as `io.Discard`.
+Output: two JSON log lines, then `notified push and sms via log adapter`, no network. `notificationlog.New` writes single JSON lines to `os.Stdout`, tests use `NewWithWriter(opts, w)` (e.g. `io.Discard`).
 
 ## Choose a channel and validate the target
 
-SMS targets must be E.164 (`+` plus 7 to 15 digits, starting non-zero), or `Validate` returns `InvalidTargetError` without echoing the number. SMS is body-only: `Title` and `Data` on `ChannelSMS` fail validation as push-only fields. A wrong-channel call fails closed with `InvalidNotificationError` before delivery, and an adapter that lacks a channel fails with `ChannelNotSupportedError` rather than dropping silently. All errors stay `errors.Is`-compatible.
-
-`TTL` zero means none and negative fails validation; priority zero means normal. Types: `ChannelPush`, `ChannelSMS`, and `PriorityLow`, `PriorityNormal`, `PriorityHigh`.
+SMS targets must be E.164 (`+` + 7-15 digits, leading non-zero) or `Validate` returns `InvalidTargetError` without echoing the number. SMS is body-only: `Title`/`Data` on `ChannelSMS` fail as push-only. Wrong-channel calls fail closed with `InvalidNotificationError`, an adapter lacking a channel returns `ChannelNotSupportedError`, never silent drop. All errors `errors.Is`-compatible. `TTL` zero = none (negative fails), priority zero = normal. Types: `ChannelPush`/`ChannelSMS`, `PriorityLow`/`Normal`/`High`.
 
 | Adapter | Package | Notes |
 |---|---|---|
@@ -83,7 +79,7 @@ NOTIFICATION_FCM_SERVICE_ACCOUNT=/run/secrets/fcm.json
 NOTIFICATION_TIMEOUT=30s
 ```
 
-Zero `timeout` means 30s and only negative values fail validation. Supply `account_sid`, `auth_token`, and `service_account` by file or env. All keys: [notification config reference](../../../reference/config/#notification).
+Zero `timeout` = 30s, only negatives fail. `account_sid`/`auth_token`/`service_account` by file/env. All keys: [notification config reference](../../../reference/config/#notification).
 
 ## Resolve the notifier from the container
 
@@ -91,41 +87,23 @@ Zero `timeout` means 30s and only negative values fail validation. Supply `accou
 n, err := c.Notification()
 ```
 
-`Notification()` resolves lazily and caches; on error the cache clears. `Close() error` is instant, and the container probes it as a snapshot service. See [the container](../../../concepts/container/).
+`Notification()` resolves lazily and caches, on error the cache clears. `Close() error` is instant, container probes it as a snapshot service. See [the container](../../../concepts/container/).
 
 ## Production checklist
 
-- The log adapter echoes the target, so phone numbers and device tokens land in log output. Switch to `twilio` or `fcm` before deploy, or gate log output.
-- `InvalidTargetError` carries a reason only, never the target; log channel and reason around `Notify`, not the number or token.
-- Do not call `Notify` inline on the request path for slow channels. Dispatch a job (bookings uses `SendReminder` on queue `low`) so provider latency and retries never gate the booking write.
-- When a user has no push token or phone, skip quietly at the job layer instead of erroring the whole batch.
-- Never log raw option maps; `auth_token` and service-account paths are secrets, so display config through `config.RedactedServices`.
+- `log` echoes targets (numbers/tokens land in logs): switch to `twilio`/`fcm` before deploy or gate log output.
+- `InvalidTargetError` carries reason only, log channel + reason, never number/token.
+- Never `Notify` inline for slow channels, dispatch a job (bookings `SendReminder` on `low`) so provider latency/retries never gate the write.
+- Missing push token/phone: skip quietly at the job layer, don't fail the batch. Never log raw option maps (`config.RedactedServices`).
 
 ## Troubleshooting
 
-<details>
-<summary>sms target must be E.164 on valid-looking numbers</summary>
-
-A missing `+` prefix, spaces, or dashes; the matcher wants `+` plus 7 to 15 digits starting non-zero. Normalize with an E.164 formatter before `Validate`, and reject unnormalizable input at the API boundary.
-</details>
-
-<details>
-<summary>title is push-only or data is push-only</summary>
-
-An SMS notification built with push fields copied from a push template. Set `Title` and `Data` only for `ChannelPush`, and body only for `ChannelSMS`.
-</details>
-
-<details>
-<summary>Pushes work in dev but nothing arrives in production</summary>
-
-Still on the `log` adapter, or FCM `project_id` and `service_account` point at a dev project. Set `notification.adapter` to `fcm` with the production project and key path, and confirm the file is mounted where the process reads it.
-</details>
-
-<details>
-<summary>ChannelNotSupportedError after switching adapters</summary>
-
-Code sends both push and SMS, but the new adapter serves one channel. Keep one notifier per channel or route by channel at the job layer, and cover both paths in tests with the log adapter plus validation checks.
-</details>
+| Symptom | Fix |
+|---|---|
+| `sms target must be E.164` on valid-looking numbers | Missing `+`, spaces, or dashes, normalize with an E.164 formatter before `Validate`, reject the rest at the API boundary |
+| `title/data is push-only` | SMS built with push fields, `Title`/`Data` only for `ChannelPush`, body only for `ChannelSMS` |
+| Dev pushes work, production silent | Still on `log`, or FCM points at dev project, set `notification.adapter=fcm` with prod project/key path, confirm mount |
+| `ChannelNotSupportedError` after switch | Adapter serves one channel but code sends both, one notifier per channel or route by channel at the job layer |
 
 ## Related
 

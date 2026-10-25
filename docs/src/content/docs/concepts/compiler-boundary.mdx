@@ -5,7 +5,7 @@ description: Why runtime packages never import the DSL compiler, how module laye
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Runtime packages must never import `dsl`. The compiler turns a `.zen` schema into Go source once; a running service imports only generated output, the container, and adapters. Linking the frontend would bloat every binary and let request-time code special-case schema logic.
+Runtime never imports `dsl`: the compiler emits Go source once. Services import only generated output, the container, adapters. Linking the frontend would bloat every binary and let request-time code special-case schema logic.
 
 ## The compile-time pipeline
 
@@ -14,20 +14,16 @@ source text -> lexer -> parser -> ast -> resolver -> ir.Schema
                                      -> compile -> backend outputs
 ```
 
-Everything on that line is compile-time only; runtime imports only its output (typed ORM, HTTP routes, gRPC stubs).
+Compile-time above. Runtime takes only its output (typed ORM, routes, gRPC stubs). The compiler reads schema files and backend flags, never env config.
 
-- **Compile time** `diag`, `token`, `lexer`, `ast`, `parser`: bytes to a best-effort syntax tree (never panics, depth guard, recovery).
-- **Compile time** `naming`, `resolver`, `ir`: multi-pass `[]*ast.File` to `*ir.Schema`, keep-going diagnostics.
-- **Compile time** `format`, `breaking`, `compile`, `backend`: formatter, `Change` taxonomy, filename-sorted build, `Backend` interface.
-- **Compile time** `dsl/gengrammar` via `tools/gengrammar`: renders `editors/nvim` and `editors/vscode`.
+- **Syntax** `diag`, `token`, `lexer`, `ast`, `parser`: bytes -> tree (never panics, depth guard, recovery).
+- **Resolve** `naming`, `resolver`, `ir`: `[]*ast.File` -> `*ir.Schema` (keep-going diagnostics).
+- **Emit** `format`, `breaking`, `compile`, `backend`: formatter, `Change` taxonomy, sorted build, `Backend` interface.
+- **Grammars** `dsl/gengrammar` via `tools/gengrammar`: renders `editors/{nvim,vscode}`.
 - **Runtime** `container`, `config`, `orm`, adapters: load, resolve, query, close.
-- **Tooling** `cmd/zever`, `tools/zever-lsp`: CLI and editor support (LSP is its own module).
+- **Tooling** `cmd/zever`, `tools/zever-lsp`: CLI and editor support (LSP own module).
 
-## Keep compile input and runtime config apart
-
-The compiler reads schema files and backend flags, never runtime config (env only). Schema errors come from `.zen` files; service errors (adapters, DSNs, secrets) come from `config.FromEnv`.
-
-## Compile, then run against generated output
+## Compile, then run
 
 ```sh
 zever check schema/todo.zen
@@ -37,42 +33,38 @@ zever db migrate --dry-run --adapter=sqlite schema/todo.zen
 go run ./examples/todo/cmd/server -addr :8080
 ```
 
-`check` validates; `fmt -l` lists unformatted files; `compile` emits ORM, OpenAPI, and DDL into `generated/`; `migrate --dry-run` previews SQL. The server imports `generated/` and resolves through the container, never `dsl` ([Container](../container/)).
+The server imports `generated/` and resolves via the container, never `dsl` ([Container](../container/)). `check` validates, `fmt -l` lists unformatted files, `compile` emits there, `migrate --dry-run` previews SQL.
 
-Regenerate with `zever compile`; never hand-edit `generated/`. Entry points are `parser.New(file, src).ParseFile()` then `resolver.Resolve(files)`, or `compile.Compile(files, backends...)`; `compile/testdata/app.zen` is the canonical fixture. After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` (`go run ./tools/gengrammar`).
+Entry points: `parser.New(file, src).ParseFile()` then `resolver.Resolve(files)`, or `compile.Compile(files, backends...)`. Canonical fixture `compile/testdata/app.zen`. Never hand-edit `generated/`. After touching `token.Keywords` or `resolver.ScalarTypeNames`, run `make generate` (`go run ./tools/gengrammar`).
 
-## Do not confuse it with schema modules
+## Design decisions
 
-`zever check-boundaries` checks a different rule: cross-schema-module references, where a relation, RPC return type, or permission resource reaches across `.zen` module directories. The resolver enforces it every compile; `check-boundaries` reports the `Resolve()` diagnostics ([Zen syntax](../../reference/zen-syntax/)).
-
-## Design decisions and trade-offs
-
-`dsl` is a top-level module, so Go's `internal/` visibility does not apply; an accidental import fails review. The parser never panics, so failures surface as diagnostics.
+Top-level `dsl` escapes Go's `internal/` visibility. Accidental imports fail review.
 
 ## Troubleshooting
 
 <details>
 <summary>`go build` fails importing `dsl`</summary>
 
-A runtime package reached the compiler. Drop the import; use `generated/`.
+Runtime package reached the compiler. Drop the import. Use `generated/`.
 </details>
 
 <details>
-<summary>`check-boundaries` reports cross-module references</summary>
+<summary>cross-module references in `check-boundaries`</summary>
 
-A relation or RPC type crosses `.zen` module directories. Move it.
+A relation, RPC return type, or permission resource crosses `.zen` module dirs. The resolver rejects it. Move it inside one module ([Zen syntax](../../reference/zen-syntax/)).
 </details>
 
 <details>
 <summary>`compile` prints diagnostics but writes no output</summary>
 
-Resolve errors block backends. Fix the `.zen` position; run `zever check`.
+Resolve errors block backends (schema errors from `.zen`, service errors from `config.FromEnv`). Fix the `.zen` position. Run `zever check`.
 </details>
 
 <details>
-<summary>The editor misses new keywords after a grammar change</summary>
+<summary>Editor misses new keywords after grammar change</summary>
 
-`token.Keywords` or `resolver.ScalarTypeNames` changed. Run `make generate` and commit `editors/`.
+`token.Keywords` or `resolver.ScalarTypeNames` changed. Run `make generate`. Commit `editors/`.
 </details>
 
 <details>
@@ -84,8 +76,8 @@ Compile overwrites `generated/`. Edit the `.zen` source.
 ## Related
 
 <CardGrid>
-  <LinkCard title="Resolver and IR" description="The frontend pipeline in detail." href="../resolver-ir/" />
-  <LinkCard title="Backends" description="The Backend.Generate extension point." href="../backends/" />
-  <LinkCard title="Container" description="The runtime resolver." href="../container/" />
-  <LinkCard title="Deployment" description="Ship generated output without the compiler." href="../../guides/operate/deployment/" />
+  <LinkCard title="Resolver and IR" description="Frontend pipeline." href="../resolver-ir/" />
+  <LinkCard title="Backends" description="Codegen extension point." href="../backends/" />
+  <LinkCard title="Container" description="Runtime resolver." href="../container/" />
+  <LinkCard title="Deployment" description="Ship output without the compiler." href="../../guides/operate/deployment/" />
 </CardGrid>

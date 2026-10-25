@@ -3,7 +3,7 @@ title: Session reference
 description: Session-store adapters, config keys, options, defaults, and error index for the session battery.
 ---
 
-Server-side session store. `session` creates, reads, saves, and deletes sessions with TTL expiry; expired sessions read as missing. It is not a cookie jar and does not mint client tokens itself. After authentication succeeds, call `Rotate` so a pre-login ID can never become authenticated (session fixation). Full how-to: [Sessions guide](../../guides/http/sessions/).
+Server-side sessions with TTL expiry. Expired sessions read as missing. Not a cookie jar. After login call `Rotate` against fixation. Full how-to: [Sessions guide](../../guides/http/sessions/).
 
 ## Adapters
 
@@ -13,7 +13,7 @@ Server-side session store. `session` creates, reads, saves, and deletes sessions
 | `redis` | `github.com/zenta-dev/zever/adapters/session/redis` | `redis.New` | No |
 | `db` | `github.com/zenta-dev/zever/adapters/session/db` | `db.New` | No |
 
-Resolve through the container with `c.Session()`. `memory` does not survive restarts; use a shared store beyond local dev. The `session/cookie` package is a stdlib cookie builder helper. Swapping backends is a wiring change: swap the `container.Provide` entry and rebuild.
+Resolve via `c.Session()`. `memory` is local-only, use a shared store beyond dev. `session/cookie` is a stdlib cookie helper. Swap backends via `container.Provide` and rebuild.
 
 ## Configuration
 
@@ -24,42 +24,39 @@ SESSION_TTL=15m
 SESSION_REDIS_ADDR=localhost:6379
 ```
 
-```sh
-```
-
-Env rule: `SESSION_<FIELD>=value`, uppercase, no prefix (for example `SESSION_DSN`). A non-empty `options` block replaces the default options wholesale; env variables overlay one field at a time. Full layering rules: [Config reference](../config/).
+Env rule: `SESSION_<FIELD>=value`, uppercase, no prefix. Non-empty `options` replace defaults wholesale. Env vars overlay one field at a time. Layering: [Config reference](../config/).
 
 ## Options
 
-Authority for types and defaults: [Config reference](../config/#session).
+Authority: [Config reference](../config/#session).
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `ttl` | duration | `15m` | Default session lifetime; zero means the default, negative fails |
-| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter; empty selects a private in-memory database |
-| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing; default shares one pool per exact DSN |
+| `ttl` | duration | `15m` | Default session lifetime, zero means the default, negative fails |
+| `dsn` | string | `""` | Postgres connection string or sqlite path for the db adapter, empty selects a private in-memory database |
+| `dedicated_pool` | boolean | `false` | Opts out of container-level pool sharing, default shares one pool per exact DSN |
 | `redis.prefix` | string | `""` | Key prefix for Redis session data |
 | `redis.url` | string | `""` | Reserved and currently ignored |
 
-Plus the shared Redis connection keys under `redis.*` (`addr`, `password`, `db`, `tls`, pooling knobs): [Redis connection options](../config/#redis-connection-options).
+Plus shared `redis.*` keys (`addr`, `password`, `db`, `tls`, pooling): [Redis connection options](../config/#redis-connection-options).
 
-Session IDs are 256-bit bearer secrets (64 hex characters). They must never be logged or echoed; `ValidateID` rejects malformed IDs without revealing them.
+Session IDs are 256-bit bearer secrets (64 hex chars). Never log them. `ValidateID` rejects malformed IDs without revealing them.
 
 ## Errors
 
-Every sentinel below is a package-level `ErrXxx` in `core/session` (see `errors.go`). Branch with `errors.Is`, never by message text.
+Package-level `ErrXxx` in `core/session` (`errors.go`). Branch with `errors.Is`.
 
 | Sentinel | Cause | Fix |
 |---|---|---|
 | `ErrNotFound` | Session does not exist or has expired (expired reads as missing) | Treat as logged-out: start a new session |
-| `ErrClosed` | Store used after `Close` | Open a new store; do not reuse the closed one |
-| `ErrNilFactory` | kept for compatibility; the registry is gone | Unused: `New` takes no factory |
-| `ErrDuplicateAdapter` | kept for compatibility; duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once; duplicates fail at `container.New` with `DuplicateRefError` |
+| `ErrClosed` | Store used after `Close` | Open a new store, do not reuse the closed one |
+| `ErrNilFactory` | kept for compatibility, the registry is gone | Unused: `New` takes no factory |
+| `ErrDuplicateAdapter` | kept for compatibility, duplicate wiring is a duplicate `Provide` for one Ref | Wire each Ref once, duplicates fail at `container.New` with `DuplicateRefError` |
 | `ErrDuplicate` | Alias of `ErrDuplicateAdapter` | Same as above |
-| `ErrUnknownAdapter` | kept for compatibility; the registry is gone | Backends are chosen by import with `container.Provide` (for example `memory.New`), never parsed from a name |
-| `ErrInvalidAdapter` | kept for compatibility; `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
+| `ErrUnknownAdapter` | kept for compatibility, the registry is gone | Backends are chosen by import with `container.Provide` (for example `memory.New`), never parsed from a name |
+| `ErrInvalidAdapter` | kept for compatibility, `ParseAdapter` is gone | Backends are chosen by import, never parsed from a name |
 | `ErrInvalidOptions` | `Options.Validate` failed (negative `ttl`, bad Redis address or prefix) | Fix the named field |
-| `ErrInvalidID` | Malformed session ID | Reject the request; the error carries the ID length only, never the ID |
+| `ErrInvalidID` | Malformed session ID | Reject the request, the error carries the ID length only, never the ID |
 
 ## Related
 

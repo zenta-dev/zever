@@ -5,7 +5,7 @@ description: Keep server-side sessions in memory, Redis, or a database, and send
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-A session is a server-side row behind a cookie: the browser holds an opaque ID, the server holds the data. Use sessions for browser flows that need revocation (logout, password reset, privilege change), and stateless tokens (`auth`) for APIs and service-to-service calls.
+A session is a server-side row: the browser holds an opaque cookie ID, the server holds the data. Sessions cover revocable browser flows (logout, password reset, privilege change), `auth` tokens suit APIs and service-to-service calls.
 
 ## Quick start
 
@@ -13,11 +13,11 @@ A session is a server-side row behind a cookie: the browser holds an opaque ID, 
 SESSION_REDIS_ADDR=redis:6379
 ```
 
-Wire the `redis` backend in `internal/app/wiring.go` for production (shared across instances); the default wiring uses in-process `memory`.
+Wire `redis` in `internal/app/wiring.go` for production (shared across instances), default is in-process `memory`.
 
-`config.Default()` resolves `memory` (dev needs no server). Zero TTL means `DefaultTTL` (15 minutes); `Options.Validate()` rejects negative TTLs. The `db` adapter takes `dsn` and `dedicated_pool` (shares the container pool per DSN by default); `redis` takes `redis.prefix` plus the shared Redis connection keys. All options: [Config reference](../../../reference/config/#session).
+`config.Default()` resolves `memory`, zero TTL means `DefaultTTL` (15 minutes) and negative TTLs fail `Options.Validate()`. `db` takes `dsn` and `dedicated_pool` (shares the container pool per DSN by default), `redis` takes `redis.prefix` plus the shared Redis connection keys. All options: [Config reference](../../../reference/config/#session).
 
-Create, save, and read a session:
+Create, save, read:
 
 ```go title="session.go"
 import (
@@ -56,32 +56,32 @@ HTTP/1.1 200 OK
 Set-Cookie: session_id=<opaque-id>; Path=/; HttpOnly; Secure; SameSite=Lax
 ```
 
-`Session()` resolves lazily and caches. `Get` returns `session.ErrNotFound` for a missing or expired session, which are indistinguishable by design. `Session.Data` is a plain `map[string]any`; keep it to IDs and flags, because every request loads the row. A `ttl <= 0` passed to `Create` means no expiry.
+`Session()` is lazy and cached. `Get` returns `session.ErrNotFound` for missing or expired sessions (indistinguishable by design). `Session.Data` is a plain `map[string]any`, keep it to IDs and flags, since every request loads the row. `ttl <= 0` means no expiry.
 
-## Set the session cookie
+## Session cookie
 
-`session.Store` knows nothing about HTTP. `cookie.New(sess.ID, opts)` builds a plain `*http.Cookie`; `cookie.Set(w, id, opts)` writes it.
+`session.Store` is HTTP-free, `cookie.New(sess.ID, opts)` builds a plain `*http.Cookie`, `cookie.Set(w, id, opts)` writes it.
 
 | Attribute | Default |
 |---|---|
-| Name, Path | `cookie.DefaultName` (`session_id`) and `cookie.DefaultPath` (`/`); `Options.Name` and `Options.Path` override. |
-| `Domain` | Unset (host-only). A value widens the cookie to subdomains. |
-| `Prefix` | None. `cookie.PrefixHost` (`__Host-`) forces Secure, `Path=/`, no Domain; `cookie.PrefixSecure` (`__Secure-`) forces Secure. |
-| Secure flags | `HttpOnly` and `Secure` default to `true` (HTTPS only); `SameSite` defaults to `Lax` (use `http.SameSiteStrictMode` for high-risk apps). |
-| `MaxAge` | `0`: a session cookie. Negative deletes it; positive sets `Max-Age` and `Expires`. |
+| Name, Path | Defaults `cookie.DefaultName` (`session_id`) and `cookie.DefaultPath` (`/`), `Options.Name`/`Options.Path` override. |
+| `Domain` | Unset (host-only), set it to widen to subdomains. |
+| `Prefix` | None. `cookie.PrefixHost` (`__Host-`) forces Secure, `Path=/`, no Domain. `cookie.PrefixSecure` (`__Secure-`) forces Secure. |
+| Secure flags | `HttpOnly`/`Secure` default `true` (HTTPS only), `SameSite` defaults `Lax` (`http.SameSiteStrictMode` for high-risk apps). |
+| `MaxAge` | `0` is a session cookie, negative deletes, positive sets `Max-Age`/`Expires`. |
 
-`Secure` and `HttpOnly` are `*bool`, so an explicit `false` (local HTTP dev) differs from unset. Rotate the session ID at privilege changes (login, password reset) to block fixation: `Delete` the old row, then `Create` a new one.
+`Secure`/`HttpOnly` are `*bool`, so explicit `false` (local HTTP dev) differs from unset. Rotate IDs at privilege changes (login, password reset) against fixation, `Delete` the old row, then `Create` anew.
 
-## Defend cookie sessions against CSRF
+## CSRF defense
 
-The browser attaches `session_id` to every request automatically, including a cross-site `POST` from an attacker's form or `fetch`. `SameSite=Lax` (the default) stops most of it, because modern browsers withhold the cookie on cross-site subrequests. But it does not cover everything: top-level `GET` navigations still carry the cookie, older browsers ignore `SameSite` entirely, a sibling subdomain can attack when `Domain` is widened, and any flow that needs `SameSite=None` opts out of the protection. Layer accordingly:
+The browser attaches `session_id` to every request, including cross-site `POST`s from attacker forms or `fetch`. `SameSite=Lax` (the default) stops most of it, but top-level `GET` navigations still carry the cookie, older browsers ignore `SameSite`, widened `Domain` exposes sibling subdomains, and `SameSite=None` opts out. Layer accordingly:
 
-1. Keep the `Lax` default; choose `http.SameSiteStrictMode` for high-risk apps (it also blocks top-level login links, so weigh the UX cost).
-2. Set `Prefix` to `cookie.PrefixHost` (`__Host-`) for single-host apps: the browser then refuses the cookie unless it is `Secure`, `Path=/`, and host-only.
-3. Never change state on `GET`. CSRF needs an ambient-credential state change; a `GET` that only reads has nothing to steal.
-4. Verify `Origin` (falling back to `Referer`) on every state-changing handler against an explicit allowlist, and answer `403` on missing or untrusted values. Same-origin browser requests always send one of the two; a cross-site form cannot forge `Origin`.
-5. When `SameSite=None` is required or subdomains are hostile, add a synchronizer token: mint a random per-session value, render it into forms (or expose it to your frontend over an authenticated endpoint), and require it back in a header or field, comparing with `subtle.ConstantTimeCompare`. There is deliberately no framework CSRF middleware today. The check is ~20 lines your app owns, not a speculative battery.
-6. For pure APIs, prefer `Authorization`-header tokens (`auth` `jwt`/`oidc`) over cookies: no ambient credentials means no CSRF surface at all.
+1. Keep `Lax`, use `http.SameSiteStrictMode` for high-risk apps (it also blocks top-level login links).
+2. Set `Prefix` to `cookie.PrefixHost` (`__Host-`) for single-host apps, browsers refuse cookies unless `Secure`, `Path=/`, host-only.
+3. Never change state on `GET` (CSRF needs ambient credentials, reads have nothing to steal).
+4. Verify `Origin` (fallback `Referer`) against an explicit allowlist on every state-changing handler, `403` on missing or untrusted values. A cross-site form cannot forge `Origin` since the browser sets it, so a mismatch proves the request came from elsewhere.
+5. When `SameSite=None` is required or subdomains are hostile, add a synchronizer token: mint a random per-session value, render it into forms (or expose it to your frontend over an authenticated endpoint), require it back in a header or field, and compare with `subtle.ConstantTimeCompare`. No framework CSRF middleware exists, own the check in your app.
+6. For pure APIs, prefer `Authorization`-header tokens (`auth` `jwt`/`oidc`) over cookies, no ambient credentials, no CSRF surface.
 
 ```go title="csrf.go"
 import (
@@ -91,7 +91,7 @@ import (
 )
 
 // allowOrigin reports whether origin is this app's own site. Compare
-// against an explicit allowlist, never against the request Host: the
+// against an explicit allowlist, never against the request Host. The
 // Host header is attacker-controlled on most deployments.
 func allowOrigin(origin string) bool {
     return origin == "https://app.example.com"
@@ -110,7 +110,7 @@ func requireSameOrigin(next http.Handler) http.Handler {
                 return
             }
         } else {
-            // No Origin and no Referer: a browser same-origin POST always
+            // No Origin and no Referer. A browser same-origin POST always
             // sends one of them, so fail closed rather than assume safe.
             http.Error(w, "forbidden", http.StatusForbidden)
             return
@@ -124,48 +124,48 @@ func checkToken(submitted, expected string) bool {
 }
 ```
 
-## Use the store API
+## Store API
 
 | Method | Purpose |
 |---|---|
-| `Create(ctx, ttl)` | Mint a session; `ttl <= 0` never expires. |
-| `Get(ctx, id)` | Load by ID; `ErrNotFound` on missing or expired. |
-| `Save(ctx, sess)` | Upsert the row and touch `UpdatedAt`. |
-| `Delete(ctx, id)` | Remove the row; idempotent (use for logout). |
+| `Create(ctx, ttl)` | Mint a session (`ttl <= 0` never expires). |
+| `Get(ctx, id)` | Load by ID, `ErrNotFound` on missing or expired. |
+| `Save(ctx, sess)` | Upsert the row, touching `UpdatedAt`. |
+| `Delete(ctx, id)` | Remove the row, idempotent (use for logout). |
 
-Helpers: `session.NewSession(id, ttl)`, `Session.Clone()`, `Session.Expired(now)`, `session.Open(adapter, opts)`, and `session.Register(adapter, factory)`. Use `auth` (`jwt`, `oidc`) for stateless tokens, `session` for revocable browser flows, and `authz` to verify via `auth` and decide via `permission`.
+Helpers: `session.NewSession(id, ttl)`, `Session.Clone()`, `Session.Expired(now)`, `session.Open(adapter, opts)`, `session.Register(adapter, factory)`. `auth` (`jwt`, `oidc`) is stateless, `session` is revocable, `authz` verifies via `auth` and decides via `permission`.
 
-## Production checklist
+## Checklist
 
-- Run more than one instance only on `redis`. Memory sessions pin users to one process.
-- Stores are `Close()`-shaped and close with `c.Close(ctx)`. Shared redis clients close once.
-- Never log `Session.Data` whole. Log the ID and chosen fields.
-- Pass `r.Context()` into `Create`, `Get`, and `Save`, and set explicit TTLs (short for sensitive flows).
+- Multi-instance requires `redis`, `memory` pins users to one process.
+- Stores are `Close()`-shaped, shared redis clients close once, all via `c.Close(ctx)`.
+- Log IDs and chosen fields, never whole `Session.Data`.
+- Pass `r.Context()` into `Create`/`Get`/`Save`, set explicit TTLs (short for sensitive flows).
 
 ## Troubleshooting
 
 <details>
-<summary>Login works locally but drops in production</summary>
+<summary>Local login works, production drops</summary>
 
-Two instances run `memory` sessions. Wire the `redis` backend (plus a shared `SESSION_REDIS_ADDR`) to share them.
+Instances run `memory`, wire `redis` plus a shared `SESSION_REDIS_ADDR`.
 </details>
 
 <details>
-<summary>Cookies are missing on local HTTP</summary>
+<summary>Missing cookies on local HTTP</summary>
 
-`Secure` defaults to true and browsers drop it over HTTP. Set an explicit `false` for dev only.
+`Secure` defaults true, browsers drop it over HTTP, so set explicit `false` for dev.
 </details>
 
 <details>
 <summary>`Get` returns `ErrNotFound` right after `Create`</summary>
 
-`Save` was skipped, or the cookie holds the wrong ID. `Save` after mutating `Data`, and set the cookie from `sess.ID`.
+`Save` was skipped or the cookie holds the wrong ID, `Save` after mutating `Data`, and set the cookie from `sess.ID`.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Redis" href="../../data/redis/" description="Shared versus memory, and redis options." />
-  <LinkCard title="Codec" href="../codec/" description="How typed values become stored bytes." />
-  <LinkCard title="Errors" href="../errors/" description="ErrNotFound branching with errors.Is." />
+  <LinkCard title="Redis" href="../../data/redis/" description="Shared versus memory." />
+  <LinkCard title="Codec" href="../codec/" description="Stored bytes." />
+  <LinkCard title="Errors" href="../errors/" description="ErrNotFound branching." />
 </CardGrid>

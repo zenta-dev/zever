@@ -1,79 +1,56 @@
 ---
 title: Installation
-description: Install Go 1.27, the Zever CLI, and the modules you need, then verify with a smoke test.
+description: Install Go 1.27, CLI, and modules. Verify with a smoke test.
 ---
 
 import { Steps, Tabs, TabItem, Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Install the `zever` CLI with the one-line installer, then add the Zever modules to your project with `go get`. A fresh install needs no config file and no database server.
-
 | Requirement | Version | Notes |
 |---|---|---|
-| Go | 1.27.3+ | `go 1.27.3` in `go.mod`; required but not installed by the script |
-| Git | any recent | needed for `go get` and scaffolding |
-| Node.js | 18+ | docs site only (`docs/`), not needed for backend work |
+| Go | 1.27.3+ | Not auto-installed |
+| Git | recent | Needed for `go get` |
+| Node.js | 18+ | Docs only |
 
-## Install the CLI with the one-line installer
+## Install CLI
 
 <Steps>
-
-1. Check your toolchain. The installer does not install Go: you need `go1.27.3` or newer, otherwise install it from [go.dev/dl](https://go.dev/dl/).
-
-   ```sh
-   go version
-   git --version
-   ```
-
-2. Install `zever` plus the matching `zever-lsp` with the pinned installer (never `main`).
+1. Check tools: `go version && git --version`
+2. Install `zever` + `zever-lsp` (pinned):
 
    <Tabs syncKey="os">
    <TabItem label="Linux">
-
    ```sh
    curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
    ```
-
    </TabItem>
    <TabItem label="macOS">
-
    ```sh
    curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
    ```
-
    </TabItem>
    <TabItem label="Windows">
-
    ```powershell
    irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex
    ```
-
    </TabItem>
    </Tabs>
 
-   The installer puts both binaries in `~/.local/bin`. If `zever` is not found, add that directory to your `PATH`.
-
-   <Aside type="caution" title="Windows execution policy">
-   If PowerShell blocks the script, download it first, then run `Unblock-File install.ps1` or invoke it with `powershell -ExecutionPolicy Bypass -File install.ps1`.
-   </Aside>
-
-3. Run `zever --help`. It prints the grouped command map (Scaffolding, Inspection, Runtime, Database, Operations).
-
+   Binaries: `~/.local/bin`. Add to `PATH` if missing.
+   <Aside type="caution" title="Windows execution policy">`Unblock-File install.ps1` or `-ExecutionPolicy Bypass`.</Aside>
+3. Run `zever --help`.
 </Steps>
 
 <details>
-<summary>Re-running the installer upgrades in place</summary>
+<summary>Installer notes</summary>
 
-If `zever` already exists, `install.sh` upgrades it in place: older installs ask for confirmation, re-running the same version skips, and downgrading from a newer install asks for confirmation. Non-interactive shells need `--yes`. Output is colourised on a terminal; pass `--quiet` (`-Quiet` on Windows) for errors only, or `--no-color` (`-NoColor`) / set `NO_COLOR` to disable colour. `zever-lsp` is always matched to the CLI version (it has no version flag).
+Re-running the installer upgrades in place. An older install asks for confirmation before it moves forward. Re-running the same version skips with no changes. A downgrade from a newer install asks for confirmation too. Non-interactive shells need `--yes`.
 
+Output has colour on a terminal. Pass `--quiet` (`-Quiet` on Windows) for errors only. Pass `--no-color` (`-NoColor`) or set `NO_COLOR` to turn colour off. `TERM=dumb` turns colour off as well. `zever-lsp` always matches the CLI version because it has no version flag of its own.
+
+Every binary is checked against the release `SHA256SUMS.txt`. When no SHA-256 tool (`sha256sum` or `shasum`) is present, or hashing fails, the installer aborts instead of installing unverified binaries. To proceed unverified, pass `--insecure-skip-verify` (`-InsecureSkipVerify` on Windows) or set `ZEVER_INSTALL_INSECURE=1`.
 </details>
 
-<Aside type="caution" title="Checksum verification is mandatory">
-Every binary is verified against the release's `SHA256SUMS.txt` before installation. If no SHA-256 tool (`sha256sum`/`shasum`) is available, or hashing fails, the installer aborts instead of installing unverified binaries. To proceed unverified (unsafe), pass `--insecure-skip-verify` (`-InsecureSkipVerify` on Windows) or set `ZEVER_INSTALL_INSECURE=1`. When `gh` is not installed, the installer prints the manual provenance check: `gh attestation verify <binary> --repo zenta-dev/zever`.
-</Aside>
-
-## Add the modules to your project
-
-Create a module and fetch the Zever modules you need at the same pinned version.
+## Add modules
 
 ```sh
 go mod init example.com/myapp
@@ -81,15 +58,12 @@ go get github.com/zenta-dev/zever/config@v0.8.0 github.com/zenta-dev/zever/conta
 ```
 
 <details>
-<summary>`go install` for the CLI</summary>
+<summary>`go install` for CLI</summary>
 
-From v0.7.2 on, `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z` builds the CLI from source. It does not work for v0.7.1 or earlier tags (their `cmd/zever/go.mod` commits `replace` directives), and it is only supported for the CLI module; the other modules are libraries you `go get`. Otherwise use the installer above or a prebuilt release binary.
-
+v0.7.2+ only: `go install github.com/zenta-dev/zever/cmd/zever@vX.Y.Z`. Earlier needs `replace`/installer. `cmd/zever` only.
 </details>
 
-## Verify with a smoke test
-
-Build one container from `config.Default()` and resolve the database. The default `db` wiring is `sqlite`, so the check imports that adapter and passes its `New` to `container.Provide`. An unwired service fails with `NotWiredError`.
+## Smoke test
 
 ```go title="main.go" check
 package main
@@ -117,110 +91,68 @@ func main() {
 go build ./... && go test ./... && go run .
 ```
 
-Expected output:
+Expect `db resolved: true`. The three commands prove fetch, build, and default resolution work. `container.New(nil)` stays valid ([configuration](../../guides/operate/configuration/)).
 
-```text
-db resolved: true
-```
-
-If that line prints, fetch, build, and default resolution all work. `container.New(nil)` is valid too and closes cleanly. When you configure services later, see the [configuration guide](../../guides/operate/configuration/): config is env-only, and env vars are `<SERVICE>_<FIELD>` with no prefix (`DB_DSN`, `DB_MAX_CONNS`), read from `.env`, `.env.local`, and the process environment.
-
-## Upgrade
-
-Re-run the pinned installer, or self-update from the CLI itself:
+## Upgrade / Uninstall
 
 ```sh
-zever upgrade
+zever upgrade        # or --check, --version vX.Y.Z
+zever uninstall      # or --keep-lsp, --dry-run
 ```
-
-Use `zever upgrade --check` to see whether a newer release exists without installing it, and `zever upgrade --version vX.Y.Z` to pin the target instead of latest.
-
-## Uninstall
-
-```sh
-zever uninstall
-```
-
-It removes both the `zever` and `zever-lsp` binaries. Pass `--keep-lsp` to leave the language server behind, or `--dry-run` to preview what would be removed.
 
 ## Production notes
 
-- Pin the CLI to the same version as the modules so the TUI and backend behave alike.
-- Never log raw option maps. Print `config.RedactedServices(cfg)` instead.
-- `Default()` ships a deterministic dev crypto key. Never let it reach production: supply real secrets through a file or env.
-- Close every container you open (`c.Close(ctx)` with a timeout parent), even in smoke tests.
+- Pin CLI to modules.
+- Never log raw maps. Use `config.RedactedServices(cfg)`.
+- `config.Default()` uses a dev crypto key. Use env secrets.
+- Close via `c.Close(ctx)` + timeout.
 
-## Work on Zever itself
+## Zever checkout
 
-If you contribute to the Zever repository, these `make` targets exist only in a checkout of Zever, not in a scaffolded project.
+`make` needs a Zever checkout. See AGENTS.
 
 <details>
-<summary>Make targets and focused test commands</summary>
-
-| Target | What it does |
-|---|---|
-| `make setup` | Install the pinned lint and vuln tools (once) |
-| `make build` / `make test` | `go build ./...` / `go test ./...` |
-| `make test-race` | `go test -race ./...` (run by `make check`, not the PR fast gate) |
-| `make fmt` / `make fmt-fix` | Check / write `gofmt` formatting |
-| `make lint` / `make lint-fix` | `golangci-lint run` with `.golangci.yml` |
-| `make vet` | `go vet` (a separate CI step, since `go test` runs with `-vet=off -count=1`) |
-| `make vulncheck` | `govulncheck` scan |
-| `make tidy-check` | `go mod tidy -diff` |
-| `make generate` | `go run ./tools/gengrammar` after touching `token.Keywords` or `resolver.ScalarTypeNames` |
-| `make check` | Full local CI mirror: download, fmt, vet, tidy-check, lint, test-race, vulncheck, build |
+<summary>Focused tests</summary>
 
 ```sh
 go test ./orm/...
 go test ./container/... -run TestName -v
 go test -race ./config/...
 ```
-
 </details>
 
 ## Troubleshooting
 
 <details>
-<summary>`go version` reports older than 1.27.3</summary>
-
-Cause: a stale toolchain is first on `PATH`. Fix: install Go 1.27.3+ from go.dev/dl and run `go version` again.
+<summary>`go version` < 1.27.3</summary>
+Install from [go.dev/dl](https://go.dev/dl/).
 </details>
-
 <details>
-<summary>`go get` fails with a network or proxy error</summary>
-
-Cause: an offline sandbox or a blocked `GOPROXY`. Fix: set `GOPROXY` per your site policy, run `go mod download`, then retry `go get`.
+<summary>`go get` fails</summary>
+Check `GOPROXY`. `go mod download`. Retry.
 </details>
-
 <details>
-<summary>`make setup` fails while installing the lint tools</summary>
-
-Cause: the pinned tool download was blocked or partial. Fix: re-run `make setup`, check the binaries are on `PATH`, then run `make build`.
+<summary>`make setup` fails</summary>
+Re-run `make setup`, check the tools are on `PATH`, then run `make build`.
 </details>
-
 <details>
-<summary>`zever` is not found or prints nothing useful</summary>
-
-Cause: the binaries landed in a directory outside `PATH`. Fix: add `~/.local/bin` to `PATH`, or re-run `curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh`.
+<summary>`zever` not found</summary>
+Add `~/.local/bin` to `PATH` or re-run installer.
 </details>
-
 <details>
-<summary>`go install ...@version` fails with a replace-directive error</summary>
-
-Cause: the tag predates v0.7.2 (v0.7.1 and earlier commit `replace` directives in `cmd/zever/go.mod`), or you are installing a module other than `cmd/zever`. Fix: install `github.com/zenta-dev/zever/cmd/zever@v0.8.0` or later, or use the installer above or a prebuilt release binary.
+<summary>`go install` replace error</summary>
+Use v0.7.2+ or installer/release binary.
 </details>
-
 <details>
-<summary>The smoke test panics resolving `DB()`</summary>
-
-Cause: broken local state or edited defaults. Fix: remove any `.env`/`.env.local` overrides and env variables so `config.Default()` applies, run `go run .`, then layer configuration back in.
+<summary>Smoke test panics on `DB()`</summary>
+Clear `.env`/`.env.local` and env overrides.
 </details>
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Quickstart" description="Go from an empty folder to a running API." href="../quickstart/" />
-  <LinkCard title="Project layout" description="Where every package lives." href="../project-layout/" />
-  <LinkCard title="Configuration" description="Layered config, env mapping, redaction." href="../../guides/operate/configuration/" />
-  <LinkCard title="Upgrade" description="Version bumps and breaking changes." href="../../guides/operate/upgrade/" />
+  <LinkCard title="Quickstart" href="../quickstart/" />
+  <LinkCard title="Project layout" href="../project-layout/" />
+  <LinkCard title="Configuration" href="../../guides/operate/configuration/" />
+  <LinkCard title="Upgrade" href="../../guides/operate/upgrade/" />
 </CardGrid>

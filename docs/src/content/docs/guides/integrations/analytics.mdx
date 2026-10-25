@@ -5,7 +5,7 @@ description: Track events, identify users, and group them with a log adapter in 
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`analytics.Analytics` keeps `Track`, `Identify`, and `Group` identical across the `log` (default, zero-infra) and `posthog` adapters. Use `log` for dev and tests; `posthog` when events must be durable.
+`analytics.Analytics` offers `Track`, `Identify`, `Group` across `log` (default) and `posthog`.
 
 ## Quick start
 
@@ -16,7 +16,7 @@ ANALYTICS_MAX_PROPERTIES_BYTES=65536
 ANALYTICS_MAX_PROPERTIES=100
 ```
 
-Defaults: `anonymous_id` `"anonymous"`, `group_type` `"organization"`, `max_properties_bytes` 64KiB. `endpoint` needs scheme and host; `max_properties` bounds count; negatives are rejected. Env vars mirror the keys. See the [analytics config reference](../../../reference/config/#analytics).
+Defaults: `anonymous_id` `anonymous`, `group_type` `organization`, `max_properties_bytes` 64KiB. `endpoint` must use https or localhost http, `max_properties` bounds count, negatives rejected. See [analytics config reference](../../../reference/config/#analytics).
 
 ```go title="main.go" check
 package main
@@ -47,7 +47,7 @@ func main() {
 }
 ```
 
-Expected output with `log` (slog JSON lines on stdout; `time` omitted here, and `Track` falls back to `anonymous_id` when the context carries no user):
+Expected output (`Track` falls back to `anonymous_id` when the context has no user):
 
 ```text
 {"level":"INFO","msg":"track","user_id":"anonymous","event":"signup","properties":"{\"plan\":\"pro\"}"}
@@ -60,35 +60,27 @@ tracked 1 event for user-1
 
 | Adapter | Package | Notes |
 |---|---|---|
-| `log` | `analytics/log` | Default. Debug output, no PII redaction. Never a production fallback. |
-| `posthog` | `analytics/posthog` | Real pipeline. Needs `api_key`. |
-
-PostHog mirrors the vendor event shape, so field names keep upstream spelling.
+| `log` | `analytics/log` | Default, no PII redaction, never a production fallback. |
+| `posthog` | `analytics/posthog` | Needs `api_key`. Keeps upstream field spelling (`DistinctId`). |
 
 ## Production checklist
 
-- `posthog` buffers; call `Close()` before exit or the last batch never leaves.
-- A runaway properties map fails fast locally instead of being truncated.
-- Never log raw option maps (use `cfg.RedactedServices()`); keep the write key in [Secrets](../../security/secrets/).
+- `posthog` buffers, `Close()` before exit or lose the last batch.
+- Oversize properties fail fast with `ErrPropertiesTooLarge`, nothing is truncated.
+- Never log raw options, use `cfg.RedactedServices()`, keep the key in [Secrets](../../security/secrets/).
 
 ## Troubleshooting
 
 <details>
 <summary>Events vanish on shutdown</summary>
 
-Cause: exit without `Close()`. Fix: flush the handle and container before exit.
+Missing `Close()`, flush handle and container before exit.
 </details>
 
 <details>
-<summary>`Validate` rejects `endpoint`</summary>
+<summary>Payload too large</summary>
 
-Cause: the URL lacks a scheme or host. Fix: add it.
-</details>
-
-<details>
-<summary>Payload rejected for size</summary>
-
-Cause: `max_properties_bytes` or `max_properties` exceeded. Fix: trim the map or raise the bound.
+Over `max_properties_bytes` or `max_properties`, trim the map or raise the bound.
 </details>
 
 ## Related

@@ -1,13 +1,13 @@
 ---
 title: How Zever works
-description: One-page overview of the path from a .zen schema through the compiler and container to swappable adapters.
+description: Path from .zen schema through compiler and container to swappable adapters.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Zever turns a `.zen` schema into typed code at compile time, then wires every backend concern through one container at run time. It generates the plumbing, never your business logic.
+Zever compiles `.zen` schemas into typed code and wires backends through one container: plumbing, not business logic.
 
-## The mental model
+## Flow
 
 ```text
  compile time                              run time
@@ -19,32 +19,31 @@ Zever turns a `.zen` schema into typed code at compile time, then wires every ba
                backends                      < process env
 ```
 
-The two halves meet at generated code only. Your running service imports generated output, `config`, `container`, and adapters. It never imports the compiler. Config is env-only: it layers as `defaults < .env < .env.local < process env`, and no config file is read.
+Runtime imports only generated code, `config`, `container`, and adapters. Config is env-only (`defaults < .env < .env.local < process env`), never a file.
 
-## How the pieces fit
+## Stages
 
-| Stage | What happens | Read more |
+| Stage | What | More |
 |---|---|---|
-| Schema | You describe entities, services, and RPCs in `.zen` files. | [Syntax](../../reference/zen-syntax/) |
-| Compiler | Lexer, parser, and resolver turn source into one `ir.Schema`, reporting every problem in a single run. | [Resolver and IR](../resolver-ir/) |
-| Backends | Each backend reads the IR and writes files: ORM bindings, protobuf, OpenAPI, Atlas HCL. | [Backends](../backends/) |
-| Boundary | Compiler packages are compile-time only; runtime packages never import `dsl`. | [Compiler boundary](../compiler-boundary/) |
-| Config | Strict, layered `defaults < .env < .env.local < process env`. No config file is read. | [Configuration](../../guides/operate/configuration/) |
-| Container | One per process; each service resolves lazily on first use and closes in dependency order. | [Container](../container/) |
-| Adapters | Small interfaces with swappable adapters, bound to a `Ref` by `container.Provide`. | [Providers and adapters](../providers-adapters/) |
+| Schema | Entities, services, RPCs in `.zen`. | [Syntax](../../reference/zen-syntax/) |
+| Compiler | Lexer, parser, resolver -> `ir.Schema`, all in one run. | [Resolver and IR](../resolver-ir/) |
+| Backends | IR in, files out (ORM, protobuf, OpenAPI, Atlas HCL). | [Backends](../backends/) |
+| Boundary | Compile-time only. Runtime never imports `dsl`. | [Compiler boundary](../compiler-boundary/) |
+| Config | Strict layered env only. | [Configuration](../../guides/operate/configuration/) |
+| Container | One per process. Lazy resolve, dependency-ordered close. | [Container](../container/) |
+| Adapters | Small interfaces, swappable via `Ref` + `container.Provide`. | [Providers and adapters](../providers-adapters/) |
 | Process | Load, build, resolve on first use, close. | [Lifecycle](../lifecycle/) |
 
-## Why it works this way
+## Key points
 
-- **Swapping is wiring plus env.** Changing `sqlite` to `postgres` or `memory` to `redis` edits `internal/app/wiring.go` and the env, never call sites.
-- **No hidden wiring.** There are no globals and no `init()` registration: you wire every instance yourself with `container.Provide` in `internal/app/wiring.go` and rebuild.
-- **Compile-time cost, run-time speed.** Parsing and resolving happen once, ahead of time, so request-time code stays plain Go.
+- Swap by editing `internal/app/wiring.go` and env, not call sites, with no globals or `init()`, only `container.Provide`, then rebuild. Changing `sqlite` to `postgres` or `memory` to `redis` is the typical case.
+- Pay once at compile time by parsing and resolving once, request-time code stays plain Go.
 
 ## Related
 
 <CardGrid>
-  <LinkCard title="Quickstart" description="Run the whole path in five commands." href="../../start/quickstart/" />
-  <LinkCard title="Lifecycle" description="The four process phases." href="../lifecycle/" />
-  <LinkCard title="Container" description="Accessors and ordered close." href="../container/" />
-  <LinkCard title="Compiler boundary" description="Why runtime never imports dsl." href="../compiler-boundary/" />
+  <LinkCard title="Quickstart" description="Five commands to a running app." href="../../start/quickstart/" />
+  <LinkCard title="Lifecycle" description="Four process phases." href="../lifecycle/" />
+  <LinkCard title="Container" description="Accessors and close order." href="../container/" />
+  <LinkCard title="Compiler boundary" description="Runtime never imports dsl." href="../compiler-boundary/" />
 </CardGrid>

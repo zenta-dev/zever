@@ -1,78 +1,44 @@
 ---
 title: Introduction
-description: What Zever is, how the compiler and container fit together, and where to go next.
+description: What Zever is and where to start.
 ---
 
-import { Steps, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, CardGrid } from '@astrojs/starlight/components';
 import HeroBanner from '../../../components/docs/mdx/HeroBanner.astro';
 import FeatureCard from '../../../components/docs/mdx/FeatureCard.astro';
 
 <HeroBanner
-  eyebrow="Zever documentation"
-  title="One schema. Every backend concern. <em>Zero rewiring.</em>"
-  lede="Zever is a schema-driven scaffolding compiler for Go. Describe your domain once in .zen, compile it into validation, ORM, OpenAPI, and DDL, then resolve every backend through one container. Not a web framework: your handlers and business logic stay yours."
+  eyebrow="Docs"
+  title="One schema. Every backend. <em>Zero rewiring.</em>"
+  lede="Describe domain in `.zen`. Compile to validation, ORM, OpenAPI, DDL. One container resolves backends. Handlers stay yours."
 />
 
 ## Install
 
-One command installs the `zever` CLI and `zever-lsp` (no sudo, SHA-256 verified):
-
-<Tabs syncKey="os">
-<TabItem label="Linux">
+One command installs the CLI and language server. No sudo is needed because the default prefix is `~/.local/bin`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
 ```
 
-</TabItem>
-<TabItem label="macOS">
+Windows: `irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex`. See [installation](../installation/).
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/zenta-dev/zever/main/install.sh | sh
-```
-
-</TabItem>
-<TabItem label="Windows">
-
-```powershell
-irm https://raw.githubusercontent.com/zenta-dev/zever/main/install.ps1 | iex
-```
-
-</TabItem>
-</Tabs>
-
-Options, upgrade and uninstall are on the [installation page](../installation/).
-
-## Where to start
+## Start
 
 <CardGrid>
-  <FeatureCard title="Quickstart" href="../quickstart/">
-    Go from an empty folder to a running API in five commands.
-  </FeatureCard>
-  <FeatureCard title="Tutorials" href="../../tutorials/overview/">
-    Learn by building, from a first schema to a running Booking API.
-  </FeatureCard>
-  <FeatureCard title="Guides" href="../../guides/">
-    Task-focused how-tos for HTTP, data, background work, security, and operations.
-  </FeatureCard>
-  <FeatureCard title="Concepts" href="../../concepts/how-zever-works/">
-    One lazy container, explicit adapter registration, and a defined lifecycle.
-  </FeatureCard>
-  <FeatureCard title="Schema syntax" href="../../reference/zen-syntax/">
-    Entities, services, RPCs, and attributes in the `.zen` language.
-  </FeatureCard>
-  <FeatureCard title="Reference" href="../../reference/cli/">
-    CLI commands, configuration keys, adapter matrix, and API index.
-  </FeatureCard>
+  <FeatureCard title="Quickstart" href="../quickstart/">Folder to running API in five commands.</FeatureCard>
+  <FeatureCard title="Tutorials" href="../../tutorials/overview/">First schema to Booking API.</FeatureCard>
+  <FeatureCard title="Guides" href="../../guides/">HTTP, data, background, security, ops.</FeatureCard>
+  <FeatureCard title="Concepts" href="../../concepts/how-zever-works/">Container, adapters, lifecycle.</FeatureCard>
+  <FeatureCard title="Schema syntax" href="../../reference/zen-syntax/">Entities, services, RPCs.</FeatureCard>
+  <FeatureCard title="Reference" href="../../reference/cli/">CLI, config, adapters, API.</FeatureCard>
 </CardGrid>
 
-## How it fits together
+## Flow
 
 <Steps>
-
-1. **Describe** entities and services in a `.zen` schema ([syntax](../../reference/zen-syntax/)).
-2. **Compile** with `zever compile` into typed ORM, OpenAPI, and migration DDL ([backends](../../concepts/backends/)).
-3. **Wire** services through one lazy `container.Container` ([container](../../concepts/container/)).
-4. **Swap** adapters (sqlite to postgres, memory to redis) by editing config, never call sites ([adapters](../../concepts/providers-adapters/)).
-
+1. **Describe** entities/services in `.zen` ([syntax](../../reference/zen-syntax/)).
+2. **Compile** via `zever compile` ([backends](../../concepts/backends/)).
+3. **Wire** via `container.Container` ([container](../../concepts/container/)).
+4. **Swap** adapters via config ([adapters](../../concepts/providers-adapters/)).
 </Steps>

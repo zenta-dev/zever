@@ -5,13 +5,13 @@ description: Add a new adapter to an existing battery or ship an entirely new ba
 
 import { Steps, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-A plugin is a standalone Go module: a new adapter for an existing battery (`zever-adapter-<name>`), or an entirely new battery (`zever-battery-<name>`, dogfooded by `examples/sms`). Run the conformance kit before publishing.
+A plugin is a standalone Go module: an adapter for an existing battery (`zever-adapter-<name>`), or a new battery (`zever-battery-<name>`, dogfooded by `examples/sms`). Run the conformance kit before publishing.
 
-## Add an adapter to an existing battery
+## New adapter
 
-A battery owns an interface plus typed `Options` and a `DefaultRef`. The container is the only resolver; adapters never self-register (no `init`, no globals). Each adapter lives at `adapters/<battery>/<name>` and exposes a `New` constructor taking the battery's `Options`. There is no adapter registry, no `Adapter` string type, and no `ParseAdapter`: selection is the import plus the `container.Provide` entry, never config.
+A battery owns an interface plus typed `Options` and a `DefaultRef`. The container is the only resolver. Adapters never self-register (no `init`, no globals). Each adapter lives at `adapters/<battery>/<name>` with `New` taking the battery's `Options`. No adapter registry, `Adapter` type, or `ParseAdapter`: selection is import plus `container.Provide`, never config.
 
-This `cache` adapter lives in module `zever-adapter-foo`:
+Example `cache` adapter in module `zever-adapter-foo`:
 
 ```go title="foo/foo.go"
 package foo // import "example.com/zever-adapter-foo"
@@ -59,18 +59,18 @@ func Providers() []container.Provider {
 }
 ```
 
-With the container, the first `container.Get(c, Cache)` call (or the `c.Cache()` accessor, once covered by a provider) resolves your factory like any core adapter. Changing it later means changing the import and rebuilding.
+First `container.Get(c, Cache)` (or `c.Cache()`, once provided) resolves the factory like any core adapter. Switching means changing the import and rebuilding.
 
 Follow these rules:
 
-- Do not add methods to a public battery interface; propose a new capability interface instead (such as `cache.CompareAndSwapCache`).
-- Call `opts.Validate()` first in `New`; fail closed and join all violations.
-- Keep errors sentinel-based, `errors.Is`-compatible, prefixed with the battery name (`cache:`); never put secrets or raw option maps in error text (use `config.RedactedServices`).
+- Never add methods to a battery interface. Propose a capability interface instead (such as `cache.CompareAndSwapCache`).
+- Call `opts.Validate()` first in `New`, fail closed and join all violations.
+- Keep errors sentinel-based, `errors.Is`-compatible, `cache:`-prefixed. Never leak secrets or option maps (use `config.RedactedServices`).
 - Take `ctx` first for I/O and never store it in a struct.
 
-## Prove parity with the conformance kit
+## Conformance kit
 
-Every battery with a kit exposes `Conformance` in `core/<b>/<b>test`. Run it in your tests and link the passing run from your README:
+Batteries with a kit expose `Conformance` in `core/<b>/<b>test`. Run it and link the passing run from your README:
 
 ```go title="foo/foo_test.go"
 import "github.com/zenta-dev/zever/core/cache/cachetest"
@@ -98,13 +98,13 @@ outbox password payment permission queue ratelimit resilience router scheduler
 search secrets session storage tenant vectorstore webhook workflow
 ```
 
-## Ship an entirely new battery
+## New battery
 
-Mirror the core shape: an interface, typed `Options` with `Validate`, a `DefaultRef`, a `New` constructor, and sentinel errors. Copy `examples/sms/sms.go` (the `SMS` interface, `Stub` adapter, `Options{From}`) and add a deterministic stub backend like `examples/sms/stub`. There is no registry to join and no adapter name to claim: your package's `New` is wired straight into the host's providers.
+Mirror the core shape (interface, validated `Options`, `DefaultRef`, `New`, sentinels): copy `examples/sms/sms.go` (`SMS` interface, `Stub` adapter, `Options{From}`) plus a deterministic stub like `examples/sms/stub`. No registry, no name to claim: `New` wires straight into host providers.
 
 <Steps>
 
-1. Add the config entry. Plugins live under `config.Config.Plugins`, keyed by name with raw options the plugin validates itself (`map[string]Service[json.RawMessage]`, nil by default, so initialize it first):
+1. Add the config entry under `config.Config.Plugins`: name-keyed raw options the plugin validates itself (`map[string]Service[json.RawMessage]`, nil by default, so initialize first):
 
     ```go
     cfg.Plugins = map[string]config.Service[json.RawMessage]{
@@ -114,9 +114,9 @@ Mirror the core shape: an interface, typed `Options` with `Validate`, a `Default
     }
     ```
 
-    Plugins carry options only: there is no adapter key in the envelope, and no env overlay. The backend is chosen in the build func below.
+    Options only: no adapter key, no env overlay. The build func below picks the backend.
 
-2. Register a validator so `Config.Validate` covers the plugin. Plugins without one skip validation and their options stay raw and are not env-overridable:
+2. Register a validator for `Config.Validate` coverage. Without one, options stay raw, unvalidated, and not env-overridable:
 
     ```go
     if err := config.RegisterPluginValidator("sms", func(opts jsontext.Value) error {
@@ -130,7 +130,7 @@ Mirror the core shape: an interface, typed `Options` with `Validate`, a `Default
     }
     ```
 
-3. Register a versioned build func once at startup, then resolve per container. The build receives the container's `*config.Config` and picks the backend in code:
+3. Register a versioned build func once at startup, then resolve per container. The build takes the container's `*config.Config` and picks the backend in code:
 
     ```go
     if err := container.RegisterPlugin[sms.SMS]("sms", container.PluginAPIVersion, func(cfg *config.Config) (sms.SMS, error) {
@@ -149,43 +149,43 @@ Mirror the core shape: an interface, typed `Options` with `Validate`, a `Default
 
 </Steps>
 
-Successful builds cache per `Container`; failures retry on the next `Resolve`. A wrong-typed value fails `Resolve` with a type-mismatch error, and resolved plugins close with `Container.Close`. `examples/sms/app/main.go` shows the full flow.
+Successes cache per `Container`. Failures retry on next `Resolve`. Wrong types fail `Resolve`. Resolved plugins close with `Container.Close`. Full flow: `examples/sms/app/main.go`.
 
-`zever add <battery>[/<adapter>]` scaffolds the `go.mod` and `internal/app/wiring.go` with typed `container.Provide` wiring. For a plugin, pass `--module <path[@version]>` (default `v0.1.0`):
+`zever add <battery>[/<adapter>]` scaffolds `go.mod` and `internal/app/wiring.go`. Plugins add `--module <path[@version]>` (default `v0.1.0`):
 
 ```sh
 zever add sms/stub --module example.com/zever-battery-sms
 ```
 
-Flags are `--adapter`, `--force`, `--module`, and `--dry-run`. Run `go mod tidy` afterwards. See the [CLI reference](../../../reference/cli/).
+Flags: `--adapter`, `--force`, `--module`, `--dry-run`. Then run `go mod tidy`. See [CLI reference](../../../reference/cli/).
 
-## Wire only what you choose
+## Wiring
 
-There is no manifest file: the `go.mod` requires are the component list, and the generated `wiring.go` imports plus `container.Provide` entries are the manifest, emitted for the floor (`log`, `router`) plus your picks.
+No manifest file: `go.mod` requires plus `wiring.go` imports/`container.Provide` entries are the manifest (floor: `log`, `router`, plus picks).
 
-This mirrors the `database/sql` driver model: import alone resolves nothing, and wiring without the `go.mod` require does not build. For every adapter, import its module, add the `container.Provide` entry before first use, and require it in `go.mod`. An unwired service fails resolution with `NotWiredError` naming the fix.
+As with `database/sql` drivers: bare imports resolve nothing, and wiring without the `go.mod` require does not build. Import the module, add `container.Provide` before first use, require it in `go.mod`. Unwired services fail with `NotWiredError` naming the fix.
 
-## Version and publish
+## Versioning
 
-`container.PluginAPIVersion` is one integer, currently `1`, bumped only on a breaking host-side change. `RegisterPlugin` rejects any other version, empty names, nil builds, and duplicate names, so mismatches fail at registration, never resolve. The pre-1.0 `0.x` core may break the plugin surface with release notes. Pin scaffolds with `--framework-version`.
+`container.PluginAPIVersion` is one integer (`1`), bumped only on breaking host changes. `RegisterPlugin` rejects other versions, empty names, nil builds, and duplicates: mismatches fail at registration, never resolve. Pre-1.0 `0.x` may break the surface with release notes. Pin scaffolds with `--framework-version`.
 
-- Publish from your own repo with independent semver tags (not a lockstep Zever tag).
-- State the targeted `PluginAPIVersion` in your README and verify a mismatched `RegisterPlugin` fails before publishing.
+- Publish from your repo with independent semver (no lockstep Zever tag).
+- State the targeted `PluginAPIVersion`. Verify a mismatched `RegisterPlugin` fails pre-publish.
 - Link the passing conformance run from your README.
 - Record changes in your own `CHANGELOG.md`.
 
-## Keep plugins out of `.zen`
+## Plugins and `.zen`
 
-`.zen` schemas cannot reference plugin batteries. This is a scope boundary: the compiler resolves only core batteries (the job `queue:` name is never validated against registered adapters), while plugins wire at runtime. Model the domain in `.zen`, then wire the plugin in Go. Syntax: [Zen syntax](../../../reference/zen-syntax/).
+`.zen` cannot reference plugin batteries: the compiler resolves only core batteries (job `queue:` names are never validated against adapters). Model in `.zen`, wire in Go. Syntax: [Zen syntax](../../../reference/zen-syntax/).
 
 <details>
 <summary>Why there is no schema-level plugin reference yet</summary>
 
-A proposal (`uses sms;` plus an optional `@via(sms)` field attribute) was deferred:
+A proposal (`uses sms;` plus optional `@via(sms)`) was deferred:
 
-- **A, `uses` declaration:** the resolver records and checks names at runtime. It touches the token table (`uses` becomes reserved), AST, parser, resolver and IR, formatter, `breaking`, grammars, LSP, and fixtures, plus a second manifest.
-- **B, plugin-shipped `.zen` fragment:** reuses existing machinery, but nothing machine-checks the fragment against the Go code, and there is no import.
-- **C, typed registry in the resolver:** rejected; `dsl/` must never import runtime code, and it adds global state.
+- Option A (`uses` declaration, runtime-checked names): touches tokens (`uses` reserved), AST, parser, resolver/IR, formatter, `breaking`, grammars, LSP, fixtures, plus a second manifest.
+- Option B (plugin-shipped `.zen` fragment): reuses machinery, but nothing checks the fragment against Go code, and there is no import.
+- Option C (typed registry in the resolver): rejected, since `dsl/` must never import runtime code, and it adds global state.
 
 Revisit A when a real plugin needs schema-visible surface (validation, OpenAPI, queue typing). Never choose C.
 </details>
@@ -193,7 +193,7 @@ Revisit A when a real plugin needs schema-visible surface (validation, OpenAPI, 
 <details>
 <summary>Why idempotency, lock, and ratelimit do not wrap cache</summary>
 
-None maps cleanly onto cache reads and writes: `idempotency.Store` uses a `Begin`/`Complete`/`Forget` reservation protocol, `lock.Locker` issues holder-scoped leases with ownership-checked `Extend`/`Unlock`, and `ratelimit.Limiter` does token-bucket accounting returning `Decision{Allowed, RetryAfter, Remaining}`. The reuse boundary is shared primitives (`shared/cas`, `shared/redisclient`).
+None maps onto cache reads/writes: `idempotency.Store` reserves via `Begin`/`Complete`/`Forget`, `lock.Locker` leases with ownership-checked `Extend`/`Unlock`, `ratelimit.Limiter` does token-bucket accounting returning `Decision{Allowed, RetryAfter, Remaining}`. Shared reuse is `shared/cas` and `shared/redisclient`.
 </details>
 
 ## Related

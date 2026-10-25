@@ -5,11 +5,11 @@ description: Cache values with a TTL, in memory or in Redis, with typed helpers 
 
 import { Tabs, TabItem, LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-`cache.Cache` stashes slow-to-compute values with a TTL, keyed by something stable such as a user ID or query hash. It is not a primary store: entries expire, evict under `max_entries` pressure, and vanish on restart for `memory`.
+`cache.Cache` stores slow values by stable key with a TTL. Entries expire, evict under `max_entries`, and `memory` entries vanish on restart.
 
 ## Quick start
 
-Pick `memory` for one process (default, no infra); pick `redis` when instances or web and worker processes must share entries.
+`memory` for one process (default), `redis` to share.
 
 <Tabs>
   <TabItem label="memory">
@@ -27,11 +27,11 @@ CACHE_MIN_IDLE_CONNS=2
   </TabItem>
 </Tabs>
 
-Durations take Go duration strings such as `"1m"`. Env matching ignores case and `_`, so `CACHE_SWEEPINTERVAL` and `CACHE_SWEEP_INTERVAL` both set `SweepInterval`; an unknown key under the `CACHE_` prefix fails with a did-you-mean hint, while an unknown service head is ignored. See the [cache options](../../../reference/config/#cache) for every key.
+Durations use Go strings (`"1m"`). Env matching ignores case and `_`. Unknown keys under `CACHE_` fail with a did-you-mean hint, unknown service heads are ignored. See [cache options](../../../reference/config/#cache).
 
 ## Cache a value with a TTL
 
-Wire the adapter with a `container.Provide` entry, then resolve from the container, which resolves lazily, caches, and retries after an error; `container.New(nil)` is valid.
+Wire via `container.Provide`, `Cache()` is lazy, cached, retried (`container.New(nil)` is valid).
 
 ```go title="main.go" check
 package main
@@ -71,11 +71,11 @@ func main() {
 loft
 ```
 
-`Get` on a missing key wraps `cache.ErrNotFound`; the interface also has `SetIfAbsent`, `Delete`, `Increment`, `Decrement`, and `Exists`.
+Missing keys wrap `cache.ErrNotFound`. Also: `SetIfAbsent`, `Delete`, `Increment`, `Decrement`, `Exists`.
 
 ## Cache structs with typed helpers
 
-`cache.NewTyped` wraps any backend with a codec, so call sites skip manual JSON.
+`cache.NewTyped` wraps any backend with a codec, skipping manual JSON.
 
 ```go title="typed.go"
 import (
@@ -94,42 +94,42 @@ card, err := typed.Get(ctx, "space:card:42")
 fmt.Println(card.Title, card.PriceCents) // Loft 12000
 ```
 
-Keys can be strings or numeric types. Adapters implementing `cache.CompareAndSwapCache` add `CompareAndDelete` and `CompareAndExtend`, which act only when the live value equals the expected one.
+Keys accept strings or numerics. `cache.CompareAndSwapCache` backends add `CompareAndDelete`/`CompareAndExtend`, acting only on value match.
 
 ## Choose an adapter
 
 | Adapter | Package | Notes |
 |---|---|---|
 | `memory` | `adapters/cache/memory` | Default, process-local, closes instantly |
-| `redis` | `adapters/cache/redis` | Shared, pool-backed, `Close(ctx)` drains the pool |
-| `db` | `adapters/cache/db` | Over `shared/kvstore`; empty `dsn` is a private in-memory sqlite, or use a postgres URL. Counters are read-modify-write and not linearizable under contention |
+| `redis` | `adapters/cache/redis` | Shared, pool-backed |
+| `db` | `adapters/cache/db` | Over `shared/kvstore`. Empty `dsn` uses in-memory sqlite, postgres URL uses postgres. Counters are read-modify-write, not linearizable under contention |
 
-All three serve one interface, so switching is config-only. The `db` adapter shares one pool per exact DSN unless `dedicated_pool: true`. Size `max_entries` (memory default 1000, sweep every 1m) for the working set, and on Redis set `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, and `max_conn_lifetime` explicitly. Keep TTLs explicit and short for user-facing reads. Version keys when the cached type changes (`space:card:v2:42`): typed `Get` decodes at read time, so old JSON fails after a rename. See the [adapters matrix](../../../reference/adapters-matrix/).
+One interface. `db` shares one pool per DSN unless `dedicated_pool: true`. Size `max_entries` (memory default 1000, sweep 1m), on Redis set `pool_size`, `min_idle_conns`, `pool_timeout`, `max_conn_idle_time`, `max_conn_lifetime`. Keep TTLs explicit and short, version keys on type changes (`space:card:v2:42`). See the [adapters matrix](../../../reference/adapters-matrix/).
 
 ## Troubleshooting
 
 <details>
 <summary>Typed `Get` returns decode errors after a deploy</summary>
 
-Cause: stale entries hold the old struct shape. Fix: bump the key version and let old keys expire, or `Delete` the old prefix.
+Stale shape. Bump key version or `Delete` old prefix.
 </details>
 
 <details>
 <summary>Instance A writes, instance B misses</summary>
 
-Cause: `memory` in a multi-instance deploy. Fix: wire the `redis` backend with a shared `CACHE_ADDR` and confirm the host with `RedactedServices`.
+`memory` across instances. Wire `redis` with shared `CACHE_ADDR`, confirm via `RedactedServices`.
 </details>
 
 <details>
-<summary>`Load` fails with unknown field `sweepinterval`</summary>
+<summary>Unknown key under `CACHE_` fails startup</summary>
 
-Cause: strict file decoding. Fix: rename to `sweep_interval` with integer nanoseconds; use `"1m"` strings in env only.
+Config is env-only. Unknown keys under `CACHE_` fail with a did-you-mean hint, unknown service heads are ignored, durations use Go strings such as `"1m"`.
 </details>
 
 <details>
 <summary>Shutdown hangs or logs pool timeouts</summary>
 
-Cause: no close deadline while Redis drains, or the cache closed before workers finished. Fix: pass `context.WithTimeout` to `c.Close(ctx)`.
+No close deadline. Pass `context.WithTimeout` to `c.Close(ctx)`.
 </details>
 
 ## Related

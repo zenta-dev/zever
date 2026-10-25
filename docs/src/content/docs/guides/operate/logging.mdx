@@ -5,17 +5,11 @@ description: Log structured events through one interface and swap slog, zerolog,
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Every service logs through one interface, `log.Logger`. Swap the wired backend and every line changes shape with no call-site changes: `noop` for tests, `slog` for the stdlib, `zerolog` for high-throughput JSON, `pretty` for local development. Resolve one logger per process and inject it.
+Every service logs through `log.Logger`. Swapping the wired backend changes every line with no call-site changes (`noop` tests, `slog` stdlib, `zerolog` high-throughput JSON, `pretty` local dev). Resolve one logger per process and inject it.
 
 ## Quick start
 
-```sh
-```
-
-```sh
-```
-
-The only option is `min_level` (minimum severity). `Options.Validate()` accepts the zero value. The backend is chosen by the `container.Provide` entry in `internal/app/wiring.go`, never by config; the snippet below shows the explicit form:
+`min_level` is the only option. `Options.Validate()` accepts the zero value. The backend comes from `container.Provide` in `internal/app/wiring.go`, never config.
 
 ```go title="main.go"
 import (
@@ -35,11 +29,11 @@ if err != nil {
 handler := middleware.RequestLogger(logger)(mux)
 ```
 
-`Logger` has no `Close`; logging probes as a no-op in `c.Close(ctx)`. Full keys: [log config reference](../../../reference/config/#log).
+No `Close`. Logging probes as a no-op in `c.Close(ctx)`. Keys: [log config reference](../../../reference/config/#log).
 
 ## Write typed fields
 
-`Event` has one typed method per kind, so `slog` and `zerolog` output stays queryable instead of a flat string.
+`Event` has one typed method per kind.
 
 ```go title="handler.go"
 logger.Info().Str("user_id", userID).Dur("duration", elapsed).Msg("request handled")
@@ -54,42 +48,40 @@ if logger.Enabled(log.LevelDebug) {
 level=INFO msg="request handled" user_id=u_123 duration=12ms
 ```
 
-Prefer `Str`/`Int`/`Dur` over `Any` for hot fields, because `Any` uses reflection. Reserve `Any` for dynamic payloads, and never pass request bodies, headers, or config maps through it. `RequestLogger` emits one line per request (method, path, status, `duration_ms` (fractional milliseconds), plus `request_id` when present); `Recover` logs panics with value and stack, then responds 500. Emit one line per failure, with no duplicates.
+Prefer `Str`/`Int`/`Dur` over `Any` for hot fields (`Any` uses reflection). Reserve `Any` for dynamic payloads. Never pass request bodies, headers, or config maps. `RequestLogger` emits one line per request (method, path, status, fractional `duration_ms`, plus `request_id`). `Recover` logs panics with value and stack, then responds 500. Emit one line per failure, with no duplicates.
 
-The API: `Logger` exposes `Debug()`, `Info()`, `Warn()`, `Error()`, `Fatal()`, `With()`, `WithContext(ctx)`, `Enabled(level)`, `Sync()`, and `Name()`. `Event` exposes `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Dur`, `Time`, `Err`, `AnErr(key, err)`, `Any`, `Msg`, `Msgf(format, args...)`, and `Send`. Helpers: `log.ContextWithLogger(ctx, l)`, `log.FromContext(ctx, fallback)`, `container.Provide(log.DefaultRef(), logslog.New)`, and `middleware.RequestLogger(logger)`.
+API: `Logger` exposes Debug/Info/Warn/Error/Fatal/With/WithContext/Enabled/Sync/Name. `Event` exposes Str/Int/Int64/Float64/Bool/Dur/Time/Err/AnErr/Any/Msg/Msgf/Send. Helpers: `log.ContextWithLogger`, `log.FromContext`, `container.Provide(log.DefaultRef(), logslog.New)`, `middleware.RequestLogger`.
 
-## Carry a logger through context
-
-`log.ContextWithLogger(ctx, logger)` carries only the logger value, no I/O state. `log.FromContext(ctx, fallback)` returns it, or the fallback for contexts that carry none, so `request_id` and other attached fields survive the call chain.
+`log.ContextWithLogger(ctx, logger)` carries only the logger value. `log.FromContext(ctx, fallback)` returns it or the fallback, so attached fields survive the call chain.
 
 ## Keep secrets out of logs
 
-Never pass raw config or headers into `Any`, which may print DSNs and keys. Use `cfg.RedactedServices()` and fixed field names. The same rule covers error text: name services and fields, never values. See [Configuration](../configuration/).
+Never pass raw config or headers into `Any` (may print DSNs and keys). Use `cfg.RedactedServices()` and fixed field names, including in error text. See [Configuration](../configuration/).
 
 ## Production checklist
 
-- One process, one backend: `slog` for stdlib-only builds, `zerolog` for high-throughput JSON, `pretty` for local shells, `noop` for tests.
-- Buffered providers flush through their own `Shutdown(ctx)`, which `c.Close(ctx)` probes. Do not exit before `Close` returns or trailing lines drop.
-- Shutdown never blocks past 5s per service (or the parent deadline). Keep log I/O fast and never format unbounded payloads.
+- One process, one backend: `slog` stdlib-only, `zerolog` high-throughput JSON, `pretty` local shells, `noop` tests.
+- Buffered providers flush via their own `Shutdown(ctx)`, probed by `c.Close(ctx)`. Never exit before `Close` returns or trailing lines drop.
+- Shutdown never blocks past 5s per service (or the parent deadline). Keep log I/O fast. No unbounded payloads.
 
 ## Troubleshooting
 
 <details>
 <summary>No log output in tests</summary>
 
-The wired backend is `noop`, correct for hermetic tests. Assert behavior, not lines, or wire `slog` explicitly.
+Wired backend is `noop` for hermetic tests. Assert behavior, not lines, or wire `slog` explicitly.
 </details>
 
 <details>
 <summary>`request_id` is missing from lines</summary>
 
-The context logger was never attached. Wrap the context with `log.ContextWithLogger` in middleware before handlers run.
+Context logger never attached. Wrap the context with `log.ContextWithLogger` in middleware.
 </details>
 
 <details>
 <summary>Secrets in log files</summary>
 
-A call passes raw config or headers into `Any`. Use `cfg.RedactedServices()` and fixed field names.
+Raw config or headers passed into `Any`. Use `cfg.RedactedServices()` and fixed field names.
 </details>
 
 <details>
@@ -101,7 +93,7 @@ Fields compute even when the level is off. Gate with `logger.Enabled(log.LevelDe
 <details>
 <summary>Trailing lines lost at exit</summary>
 
-The process exits before `c.Close(ctx)` finishes. Defer `Close` with a timeout parent and check the joined error.
+Process exited before `c.Close(ctx)` finished. Defer `Close` with a timeout parent.
 </details>
 
 ## Related
