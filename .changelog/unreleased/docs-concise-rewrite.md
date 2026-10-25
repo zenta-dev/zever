@@ -1,1 +1,0 @@
-- docs: concise rewrite of all 93 Astro docs pages, 61,733 to 47,830 prose words, with audit-found facts restored and lint, audit, check-links, check-legacy-config, and build green.
