@@ -281,7 +281,7 @@ zever upgrade --project --dry-run  # plan the project's go.mod upgrade instead
 
 `--project` upgrades the project's `go.mod` instead of the binary:
 rewrites every framework require (third-party
-and `replace`-pinned stay untouched), prints the `**Breaking:**` notes in between,
+entries and `replace` directives stay untouched), prints the `**Breaking:**` notes in between,
 then tidies. Needs a `go.mod` with a framework require. The binary is untouched.
 
 Versions compare with `golang.org/x/mod/semver`: current
