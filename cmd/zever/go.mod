@@ -108,10 +108,10 @@ require (
 	github.com/anthonynsimon/bild v0.17.1 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.82.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.47.3 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.47.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.22 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.33.9 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.9 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.10 // indirect
 	github.com/aymanbagabas/go-udiff v0.4.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bufbuild/protocompile v0.14.1 // indirect
@@ -166,7 +166,9 @@ require (
 	github.com/zenta-dev/zever/adapters/log/noop v0.8.0 // indirect
 	github.com/zenta-dev/zever/adapters/media/ffmpeg v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/agent v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/authz v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/job v0.8.0 // indirect
+	github.com/zenta-dev/zever/core/middleware v0.8.0 // indirect
 	github.com/zenta-dev/zever/core/rag v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/endpoint v0.8.0 // indirect
 	github.com/zenta-dev/zever/shared/grpcclient v0.8.0 // indirect
