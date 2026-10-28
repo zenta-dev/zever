@@ -3,7 +3,7 @@ module github.com/zenta-dev/zever/adapters/analytics/posthog
 go 1.27.3
 
 require (
-	github.com/posthog/posthog-go v1.35.1
+	github.com/posthog/posthog-go v1.36.0
 	github.com/zenta-dev/zever/core/analytics v0.8.0
 	github.com/zenta-dev/zever/shared/codec v0.8.0
 )
