@@ -32,7 +32,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.5
-	github.com/aws/smithy-go v1.28.6
+	github.com/aws/smithy-go v1.28.7
 	github.com/zenta-dev/zever/core/media v0.8.0
 	github.com/zenta-dev/zever/shared/codec v0.8.0
 	github.com/zenta-dev/zever/shared/s3opts v0.8.0
